@@ -1,4 +1,7 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -10,10 +13,18 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
+
+  final List<Widget> _pages = [
+    HomePage(),
+    Center(child: Text('Support')),
+    Center(child: Text('Sell')),
+    Center(child: Text('Status')),
+    Center(child: Text('Profile')),
+  ];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: HomePage(),
+      body: _pages[currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
@@ -22,7 +33,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             currentIndex = index;
           });
         },
-        selectedItemColor: Colors.green,
+        selectedItemColor: AppTheme.primaryColor,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         showSelectedLabels: true,
