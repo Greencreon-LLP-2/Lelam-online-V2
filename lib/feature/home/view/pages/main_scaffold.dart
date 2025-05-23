@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
+import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -17,7 +18,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _pages = [
     HomePage(),
     Center(child: Text('Support')),
-    Center(child: Text('Sell')),
+    SellPage(),
     Center(child: Text('Status')),
     Center(child: Text('Profile')),
   ];
