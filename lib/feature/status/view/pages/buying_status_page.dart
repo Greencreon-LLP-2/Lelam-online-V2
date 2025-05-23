@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 class BuyingStatusPage extends StatelessWidget {
   const BuyingStatusPage({super.key});
@@ -12,6 +14,7 @@ class BuyingStatusPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Buying Status'),
           bottom: const TabBar(
+            dividerColor: Colors.transparent,
             isScrollable: true, // enables scrolling for many tabs
             indicatorColor: AppTheme.primaryColor,
             labelColor: AppTheme.primaryColor,
@@ -27,8 +30,8 @@ class BuyingStatusPage extends StatelessWidget {
         ),
         body: const TabBarView(
           children: [
-            Center(child: Text('My Bids')),
-            Center(child: Text('My Meetings')),
+            MyBidsWidget(),
+            MyMeetingsWidget(),
             Center(child: Text('Expired')),
           ],
         ),
