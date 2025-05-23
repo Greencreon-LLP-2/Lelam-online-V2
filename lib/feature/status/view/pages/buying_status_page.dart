@@ -15,7 +15,7 @@ class BuyingStatusPage extends StatelessWidget {
           title: const Text('Buying Status'),
           bottom: const TabBar(
             dividerColor: Colors.transparent,
-            isScrollable: true, // enables scrolling for many tabs
+            isScrollable: false, // enables scrolling for many tabs
             indicatorColor: AppTheme.primaryColor,
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: Colors.black54,

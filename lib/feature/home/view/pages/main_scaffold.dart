@@ -5,6 +5,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/status_page.dart';
 
 class MainScaffold extends StatefulWidget {
@@ -20,7 +21,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   List<Widget> get _pages => [
     HomePage(),
     isStatus ? BuyingStatusPage() : Center(child: Text('Support')),
-    isStatus ? Center(child: Text('Selling')) : SellPage(),
+    isStatus ? SellingStatusPage() : SellPage(),
     isStatus ? Center(child: Text('Shortlist')) : StatusPage(),
     Center(child: Text('Profile')),
   ];
