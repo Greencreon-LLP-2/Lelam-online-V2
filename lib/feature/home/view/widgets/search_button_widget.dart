@@ -9,10 +9,10 @@ class SearchButtonWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
+        // border: Border.all(color: Colors.grey.shade200, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.shade200,
+            color: Colors.grey.shade300,
             blurRadius: 10,
             offset: Offset(0, 10),
           ),

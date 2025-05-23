@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/status_page.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -14,12 +15,12 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
-
-  final List<Widget> _pages = [
+  bool isStatus = false;
+  List<Widget> get _pages => [
     HomePage(),
-    Center(child: Text('Support')),
-    SellPage(),
-    Center(child: Text('Status')),
+    isStatus ? Center(child: Text('Buying')) : Center(child: Text('Support')),
+    isStatus ? Center(child: Text('Selling')) : SellPage(),
+    isStatus ? Center(child: Text('Shortlist')) : StatusPage(),
     Center(child: Text('Profile')),
   ];
   @override
@@ -33,8 +34,19 @@ class _MainScaffoldState extends State<MainScaffold> {
           setState(() {
             currentIndex = index;
           });
+          if (index == 0) {
+            setState(() {
+              isStatus = false;
+            });
+          }
+          if (index == 3) {
+            setState(() {
+              // currentIndex = isStatus ? 1 : 3;
+              isStatus = true;
+            });
+          }
         },
-        selectedItemColor: AppTheme.primaryColor,
+        selectedItemColor: isStatus ? Colors.redAccent : AppTheme.primaryColor,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         showSelectedLabels: true,
@@ -47,15 +59,30 @@ class _MainScaffoldState extends State<MainScaffold> {
         unselectedFontSize: 12,
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.support_agent),
-            label: 'Support',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Sell'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.stream_sharp),
-            label: 'Status',
-          ),
+          isStatus
+              ? BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_cart),
+                label: 'Buying',
+              )
+              : BottomNavigationBarItem(
+                icon: Icon(Icons.support_agent),
+                label: 'Support',
+              ),
+          isStatus
+              ? BottomNavigationBarItem(
+                icon: Icon(Icons.sell_outlined),
+                label: 'Selling',
+              )
+              : BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Sell'),
+          isStatus
+              ? BottomNavigationBarItem(
+                icon: Icon(Icons.star_border_outlined),
+                label: 'Shortlist',
+              )
+              : BottomNavigationBarItem(
+                icon: Icon(Icons.stream_sharp),
+                label: 'Status',
+              ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
