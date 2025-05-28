@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/tab_bar_widget.dart';
 
 class MyAdsWidget extends StatelessWidget {
   const MyAdsWidget({super.key});
@@ -216,6 +217,8 @@ class MyAdsWidget extends StatelessWidget {
                     ),
                   ),
                 ],
+
+                TabBarWidget(),
               ],
             ),
           ),
