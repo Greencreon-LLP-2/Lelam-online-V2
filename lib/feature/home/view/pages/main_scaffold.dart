@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/app_drawer.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
+import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/status_page.dart';
@@ -18,21 +20,29 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
   bool isStatus = false;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   List<Widget> get _pages => [
     HomePage(),
     isStatus ? BuyingStatusPage() : Center(child: Text('Support')),
     isStatus ? SellingStatusPage() : SellPage(),
-    isStatus ? Center(child: Text('Shortlist')) : StatusPage(),
+    isStatus ? ShortListPage() : StatusPage(),
     Center(child: Text('Profile')),
   ];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: AppDrawerWidget(),
       body: _pages[currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
         onTap: (index) {
           print(index);
+          if (index == 4) {
+            _scaffoldKey.currentState?.openDrawer();
+            return;
+          }
           setState(() {
             currentIndex = index;
           });
@@ -85,7 +95,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                 icon: Icon(Icons.stream_sharp),
                 label: 'Status',
               ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.more_vert), label: 'More'),
         ],
       ),
     );

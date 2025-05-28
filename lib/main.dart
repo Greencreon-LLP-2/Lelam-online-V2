@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
+import 'package:lelamonline_flutter/core/router/app_router.dart';
 
 void main() {
   runApp(const App());
@@ -11,6 +11,9 @@ class App extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, home: MainScaffold());
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      routerConfig: appRouter,
+    );
   }
 }
