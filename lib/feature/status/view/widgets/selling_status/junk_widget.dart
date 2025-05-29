@@ -63,7 +63,13 @@ class _JunkWidgetState extends State<JunkWidget> {
                   },
                 );
               } else {
-                return const SizedBox(width: 8);
+                final leftIndex = (i - 1) ~/ 2;
+                final isActive = leftIndex < selectedIndex;
+                return PillConnector(
+                  isActive: isActive,
+                  activeColor: Colors.green,
+                  inactiveColor: Colors.grey,
+                );
               }
             }),
           ),
@@ -113,6 +119,32 @@ class StatusPill extends StatelessWidget {
             fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class PillConnector extends StatelessWidget {
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const PillConnector({
+    super.key,
+    this.isActive = false,
+    this.activeColor = Colors.green,
+    this.inactiveColor = Colors.grey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 4,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: isActive ? activeColor : inactiveColor,
+        borderRadius: BorderRadius.circular(2),
       ),
     );
   }
