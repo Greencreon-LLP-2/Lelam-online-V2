@@ -10,6 +10,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), centerTitle: true),
+
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -82,9 +83,10 @@ class SettingsPage extends StatelessWidget {
             onTap: () => context.pushNamed(RouteNames.sellingstatuspage),
           ),
           _buildSettingsTile(
-            icon: Icons.favorite_border,
-            title: 'Shortlist',
+            icon: Icons.favorite,
+            title: 'Favourites',
             onTap: () => context.pushNamed(RouteNames.shortlistpage),
+            isFavorite: true,
           ),
         ],
       ),
@@ -182,9 +184,10 @@ class SettingsPage extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
     Color? textColor,
+    bool isFavorite = false,
   }) {
     return ListTile(
-      leading: Icon(icon, color: textColor),
+      leading: Icon(icon, color: isFavorite ? Colors.red : textColor),
       title: Text(title, style: TextStyle(color: textColor)),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
