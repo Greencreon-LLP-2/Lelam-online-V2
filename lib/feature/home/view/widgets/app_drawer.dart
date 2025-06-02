@@ -72,8 +72,8 @@ class AppDrawerWidget extends StatelessWidget {
             icon: Icons.question_answer,
             title: 'FAQ',
             onTap: () {
-              // TODO: Navigate to FAQ
               Navigator.pop(context);
+              context.pushNamed(RouteNames.faqPage);
             },
           ),
           _buildDrawerItem(

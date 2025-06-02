@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
+import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
+import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
@@ -40,6 +42,16 @@ final GoRouter appRouter = GoRouter(
       path: RouteNames.sellpage,
       builder: (context, state) => const SellPage(),
       name: RouteNames.sellpage,
+    ),
+    GoRoute(
+      path: RouteNames.productDetailsPage,
+      builder: (context, state) => const ProductDetailsPage(),
+      name: RouteNames.productDetailsPage,
+    ),
+    GoRoute(
+      path: RouteNames.faqPage,
+      builder: (context, state) => const FAQPage(),
+      name: RouteNames.faqPage,
     ),
   ],
   errorBuilder:

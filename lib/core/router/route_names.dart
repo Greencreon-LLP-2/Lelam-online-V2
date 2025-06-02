@@ -6,4 +6,6 @@ class RouteNames {
   static const String shortlistpage = "/shortlistpage";
   static const String buyingStatusPage = "/buyingStatusPage";
   static const String sellingstatuspage = "/sellingstatuspage";
+  static const String productDetailsPage = "/productDetailsPage";
+  static const String faqPage = "/faqPage";
 }
