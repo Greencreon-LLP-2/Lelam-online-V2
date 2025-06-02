@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
@@ -32,7 +34,9 @@ class HomePage extends StatelessWidget {
                     Spacer(),
                     //!Notification section
                     IconButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        context.pushNamed(RouteNames.notificationPage);
+                      },
                       icon: Icon(Icons.notifications),
                     ),
                   ],

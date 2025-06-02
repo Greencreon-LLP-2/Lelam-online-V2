@@ -4,7 +4,9 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
 import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
+import 'package:lelamonline_flutter/feature/notification/view/pages/notification_page.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
+import 'package:lelamonline_flutter/feature/product/view/pages/seller_profile_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/settings/view/pages/edit_profile_page.dart';
 import 'package:lelamonline_flutter/feature/settings/view/pages/settings_page.dart';
@@ -64,6 +66,16 @@ final GoRouter appRouter = GoRouter(
       path: RouteNames.editProfilePage,
       builder: (context, state) => const EditProfilePage(),
       name: RouteNames.editProfilePage,
+    ),
+    GoRoute(
+      path: RouteNames.notificationPage,
+      builder: (context, state) => const NotificationPage(),
+      name: RouteNames.notificationPage,
+    ),
+    GoRoute(
+      path: RouteNames.sellerProfilePage,
+      builder: (context, state) => const SellerProfilePage(),
+      name: RouteNames.sellerProfilePage,
     ),
   ],
   errorBuilder:

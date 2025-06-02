@@ -1,217 +1,452 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   const ProductDetailsPage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            // TODO: Implement back button functionality
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border),
-            onPressed: () {
-              // TODO: Implement favorite functionality
-            },
+  void _showBidDialog(BuildContext context) {
+    final TextEditingController bidAmountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              // TODO: Implement share functionality
-            },
+          title: Column(
+            children: [
+              const Icon(
+                Icons.currency_rupee_rounded,
+                size: 40,
+                color: Colors.blue,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Place Your Bid',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Enter amount in rupees',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Car Image Placeholder
-            Image.network(
-              'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg', // Replace with actual image URL
-              width: double.infinity,
-              height: 400,
-              fit: BoxFit.cover,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Mahindra XUV 500',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: bidAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'W10',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey,
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      child: const Text(
+                        '₹',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        'Thrissur',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '28-05-2025 07:02 pm',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '₹ 990000.00',
-                    style: TextStyle(
-                      fontSize: 22,
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
+                    hintText: '0',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 2,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '#AD ID 494',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement call functionality
-                        },
-                        icon: const Icon(Icons.call),
-                        label: const Text('Call Support'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Current Price: ₹990000.00',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Details',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDetailItem(Icons.calendar_today, '2016'),
-                      ),
-                      Expanded(
-                        child: _buildDetailItem(Icons.person, '2nd Owner'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDetailItem(
-                          Icons.local_gas_station,
-                          'Diesel',
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildDetailItem(Icons.settings, 'Manual'),
-                      ),
-                      Expanded(
-                        child: _buildDetailItem(Icons.speed, '42000 KM'),
-                      ),
-                    ],
-                  ),
-                ],
+            ElevatedButton(
+              onPressed: () {
+                final String amount = bidAmountController.text;
+                if (amount.isNotEmpty) {
+                  // Process the bid
+                  print('Bid amount: ₹$amount'); // For testing
+                  Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Seller Comments',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSellerCommentItem('Year', '2016'),
-                  _buildSellerCommentItem('No Of Owners', '2nd Owner'),
-                  _buildSellerCommentItem('Fuel Type', 'Diesel'),
-                  _buildSellerCommentItem('Transmission', 'Manual'),
-                  _buildSellerCommentItem(
-                    'Service History',
-                    'In Showroom Only',
-                  ),
-                  _buildSellerCommentItem('Sold By', 'Re Seller'),
-                ],
-              ),
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Seller Information',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSellerInformationItem(
-                    'LELAMONLINE ADMIN',
-                    'Member Since 2024-12-07 11:49:43',
-                    'https://img.freepik.com/premium-vector/vector-illustration-young-man-face-with-short-brown-hair-cartoon-male-character_87771-31254.jpg?semt=ais_items_boosted&w=740', // Replace with actual avatar URL
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Questions',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildQuestionsSection(),
-                ],
+              child: const Text(
+                'Submit Bid',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
           ],
-        ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            // Add padding at bottom to prevent content from being hidden behind buttons
+            padding: const EdgeInsets.only(bottom: 80),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Car Image Placeholder
+                Stack(
+                  children: [
+                    Image.network(
+                      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg', // Replace with actual image URL
+                      width: double.infinity,
+                      height: 400,
+                      fit: BoxFit.cover,
+                    ),
+                    SafeArea(
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              context.pop();
+                            },
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Spacer(),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.favorite_border,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              // TODO: Implement favorite functionality
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.share, color: Colors.white),
+                            onPressed: () {
+                              // TODO: Implement share functionality
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Mahindra XUV 500',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'W10',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Thrissur',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            '28-05-2025 07:02 pm',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        '₹ 990000.00',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '#AD ID 494',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              // TODO: Implement call functionality
+                            },
+                            icon: const Icon(Icons.call),
+                            label: const Text('Call Support'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.calendar_today,
+                              '2016',
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildDetailItem(Icons.person, '2nd Owner'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailItem(
+                              Icons.local_gas_station,
+                              'Diesel',
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildDetailItem(Icons.settings, 'Manual'),
+                          ),
+                          Expanded(
+                            child: _buildDetailItem(Icons.speed, '42000 KM'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seller Comments',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSellerCommentItem('Year', '2016'),
+                      _buildSellerCommentItem('No Of Owners', '2nd Owner'),
+                      _buildSellerCommentItem('Fuel Type', 'Diesel'),
+                      _buildSellerCommentItem('Transmission', 'Manual'),
+                      _buildSellerCommentItem(
+                        'Service History',
+                        'In Showroom Only',
+                      ),
+                      _buildSellerCommentItem('Sold By', 'Re Seller'),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seller Information',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSellerInformationItem(
+                        'LELAMONLINE ADMIN',
+                        'Member Since 2024-12-07 11:49:43',
+                        'https://img.freepik.com/premium-vector/vector-illustration-young-man-face-with-short-brown-hair-cartoon-male-character_87771-31254.jpg?semt=ais_items_boosted&w=740', // Replace with actual avatar URL
+                        context,
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Questions',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildQuestionsSection(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.transparent),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _showBidDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.blue,
+                        side: const BorderSide(color: Colors.blue),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Place a Bid'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // TODO: Implement make offer functionality
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Fix Meeting'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -246,6 +481,7 @@ class ProductDetailsPage extends StatelessWidget {
     String name,
     String memberSince,
     String avatarUrl,
+    BuildContext context,
   ) {
     return Row(
       children: [
@@ -270,7 +506,7 @@ class ProductDetailsPage extends StatelessWidget {
               const SizedBox(height: 4),
               InkWell(
                 onTap: () {
-                  // TODO: Implement view profile functionality
+                  context.pushNamed(RouteNames.sellerProfilePage);
                 },
                 child: const Text(
                   'SEE PROFILE',
