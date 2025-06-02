@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   const ProductDetailsPage({super.key});
@@ -18,15 +19,10 @@ class ProductDetailsPage extends StatelessWidget {
           ),
           title: Column(
             children: [
-              const Icon(
-                Icons.currency_rupee_rounded,
-                size: 40,
-                color: Colors.blue,
-              ),
               const SizedBox(height: 8),
               const Text(
-                'Place Your Bid',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                'Place Your Bid Amount',
+                style: TextStyle(fontSize: 24),
               ),
               const SizedBox(height: 4),
               Text(
@@ -151,6 +147,117 @@ class ProductDetailsPage extends StatelessWidget {
               ),
               child: const Text(
                 'Submit Bid',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  void _showMeetingDialog(BuildContext context) {
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = TimeOfDay.now();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Column(
+            children: [
+              const SizedBox(height: 8),
+              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
+              const SizedBox(height: 4),
+              Text(
+                'Select date ',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryColor,
+                  ),
+                  title: const Text('Select Date'),
+                  subtitle: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    style: const TextStyle(color: AppTheme.primaryColor),
+                  ),
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    if (picked != null && picked != selectedDate) {
+                      selectedDate = picked;
+                      // Rebuild dialog
+                      Navigator.pop(context);
+                      _showMeetingDialog(context);
+                    }
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Process the meeting request
+                print(
+                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year} at ${selectedTime.hour}:${selectedTime.minute}',
+                );
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Schedule Meeting',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -431,9 +538,7 @@ class ProductDetailsPage extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Implement make offer functionality
-                      },
+                      onPressed: () => _showMeetingDialog(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
