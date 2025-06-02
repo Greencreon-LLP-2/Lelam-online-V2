@@ -13,7 +13,7 @@ class SettingsPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildProfileSection(),
+          _buildProfileSection(context),
           const SizedBox(height: 24),
           _buildSettingsSection(context),
           const SizedBox(height: 24),
@@ -23,7 +23,7 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileSection() {
+  Widget _buildProfileSection(BuildContext context) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -48,7 +48,7 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
-                // Navigate to edit profile
+                context.pushNamed(RouteNames.editProfilePage);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
