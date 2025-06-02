@@ -8,4 +8,6 @@ class RouteNames {
   static const String sellingstatuspage = "/sellingstatuspage";
   static const String productDetailsPage = "/productDetailsPage";
   static const String faqPage = "/faqPage";
+  static const String settingsPage = "/settingsPage";
+  static const String editProfilePage = "/editProfilePage";
 }

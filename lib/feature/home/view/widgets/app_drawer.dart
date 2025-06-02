@@ -107,8 +107,8 @@ class AppDrawerWidget extends StatelessWidget {
             icon: Icons.settings,
             title: 'Settings',
             onTap: () {
-              // TODO: Navigate to settings
               Navigator.pop(context);
+              context.pushNamed(RouteNames.settingsPage);
             },
           ),
           _buildDrawerItem(

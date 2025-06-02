@@ -6,6 +6,7 @@ import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
+import 'package:lelamonline_flutter/feature/settings/view/pages/settings_page.dart';
 import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
@@ -52,6 +53,11 @@ final GoRouter appRouter = GoRouter(
       path: RouteNames.faqPage,
       builder: (context, state) => const FAQPage(),
       name: RouteNames.faqPage,
+    ),
+    GoRoute(
+      path: RouteNames.settingsPage,
+      builder: (context, state) => const SettingsPage(),
+      name: RouteNames.settingsPage,
     ),
   ],
   errorBuilder:
