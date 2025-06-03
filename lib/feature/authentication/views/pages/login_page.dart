@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
@@ -29,8 +31,13 @@ class _LoginPageState extends State<LoginPage> {
       setState(() => _isLoading = true);
       try {
         if (_isOtpMode) {
-          // TODO: Implement OTP login logic
-          await Future.delayed(const Duration(seconds: 2));
+          // Navigate to OTP verification page
+          if (mounted) {
+            context.pushNamed(
+              RouteNames.otpVerificationPage,
+              extra: '+91${_phoneController.text}',
+            );
+          }
         } else {
           // TODO: Implement password login logic
           await Future.delayed(const Duration(seconds: 2));
