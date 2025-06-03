@@ -26,39 +26,52 @@ class CustomFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType:
-          isNumberInput == true ? TextInputType.number : TextInputType.text,
-      inputFormatters:
-          isNumberInput == true
-              ? [FilteringTextInputFormatter.digitsOnly]
-              : null,
-      decoration: InputDecoration(
-        labelText: isRequired ? '$label *' : label,
-        alignLabelWithHint: alignLabelWithHint,
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppTheme.primaryColor),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
+    return Container(
+      decoration: BoxDecoration(
+        // color: Colors.grey.shade50,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade300,
+            blurRadius: 10,
+            offset: const Offset(0, 10),
+          ),
+        ],
+        borderRadius: BorderRadius.circular(12),
       ),
-      validator:
-          validator ??
-          (value) {
-            if (isRequired && (value == null || value.isEmpty)) {
-              return 'Please enter ${label.toLowerCase()}';
-            }
-            return null;
-          },
+      child: TextFormField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType:
+            isNumberInput == true ? TextInputType.number : TextInputType.text,
+        inputFormatters:
+            isNumberInput == true
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
+        decoration: InputDecoration(
+          labelText: isRequired ? '$label *' : label,
+          alignLabelWithHint: alignLabelWithHint,
+          prefixIcon: Icon(prefixIcon),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.primaryColor),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+        ),
+        validator:
+            validator ??
+            (value) {
+              if (isRequired && (value == null || value.isEmpty)) {
+                return 'Please enter ${label.toLowerCase()}';
+              }
+              return null;
+            },
+      ),
     );
   }
 }

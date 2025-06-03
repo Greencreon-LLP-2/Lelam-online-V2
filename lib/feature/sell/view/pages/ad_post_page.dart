@@ -98,7 +98,7 @@ class _AdPostFormState extends State<AdPostForm>
   final _priceController = TextEditingController();
   final _districtController = TextEditingController();
   final _landMarkController = TextEditingController();
-  String? _selectedCategory;
+  String? _selectedMake;
   String? _selectedDistrict;
   final List<XFile> _selectedImages = [];
   final ImagePicker _imagePicker = ImagePicker();
@@ -132,7 +132,6 @@ class _AdPostFormState extends State<AdPostForm>
   @override
   void initState() {
     super.initState();
-    _selectedCategory = widget.initialCategory;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -332,12 +331,12 @@ class _AdPostFormState extends State<AdPostForm>
                 _buildImagePicker(),
                 const SizedBox(height: 24),
                 CustomDropdownWidget<String>(
-                  label: 'Category',
-                  value: _selectedCategory,
+                  label: 'Make',
+                  value: _selectedMake,
                   items: _categories,
                   onChanged: (String? newValue) {
                     setState(() {
-                      _selectedCategory = newValue;
+                      _selectedMake = newValue;
                     });
                   },
                   prefixIcon: Icons.category_outlined,

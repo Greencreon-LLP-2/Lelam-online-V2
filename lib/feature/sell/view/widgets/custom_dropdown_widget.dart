@@ -25,39 +25,51 @@ class CustomDropdownWidget<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<T>(
-      value: value,
-      decoration: InputDecoration(
-        labelText: isRequired ? '$label *' : label,
-        prefixIcon: Icon(prefixIcon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppTheme.primaryColor),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade300,
+            blurRadius: 10,
+            offset: const Offset(1, 10),
+          ),
+        ],
+        borderRadius: BorderRadius.circular(12),
       ),
-      items:
-          items.map((T item) {
-            return DropdownMenuItem<T>(
-              value: item,
-              child: Text(itemToString(item)),
-            );
-          }).toList(),
-      onChanged: onChanged,
-      validator:
-          validator ??
-          (value) {
-            if (isRequired && value == null) {
-              return 'Please select a ${label.toLowerCase()}';
-            }
-            return null;
-          },
+      child: DropdownButtonFormField<T>(
+        value: value,
+        decoration: InputDecoration(
+          labelText: isRequired ? '$label *' : label,
+          prefixIcon: Icon(prefixIcon),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppTheme.primaryColor),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+        ),
+        items:
+            items.map((T item) {
+              return DropdownMenuItem<T>(
+                value: item,
+                child: Text(itemToString(item)),
+              );
+            }).toList(),
+        onChanged: onChanged,
+        validator:
+            validator ??
+            (value) {
+              if (isRequired && value == null) {
+                return 'Please select a ${label.toLowerCase()}';
+              }
+              return null;
+            },
+      ),
     );
   }
 }
