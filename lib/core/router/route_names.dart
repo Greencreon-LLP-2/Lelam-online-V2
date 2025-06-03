@@ -12,4 +12,5 @@ class RouteNames {
   static const String editProfilePage = "/editProfilePage";
   static const String notificationPage = "/notificationPage";
   static const String sellerProfilePage = "/sellerProfilePage";
+  static const String searchPage = "/searchPage";
 }

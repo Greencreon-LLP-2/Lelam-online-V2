@@ -6,8 +6,22 @@ import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.da
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +59,14 @@ class HomePage extends StatelessWidget {
               //!Search section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SearchButtonWidget(),
+                child: SearchButtonWidget(
+                  controller: _searchController,
+                  onSearch: (query) {
+                    setState(() {
+                      _searchQuery = query;
+                    });
+                  },
+                ),
               ),
 
               //!Banner section
@@ -58,7 +79,7 @@ class HomePage extends StatelessWidget {
               ),
 
               //!Product section
-              ProductSectionWidget(),
+              ProductSectionWidget(searchQuery: _searchQuery),
             ],
           ),
         ),

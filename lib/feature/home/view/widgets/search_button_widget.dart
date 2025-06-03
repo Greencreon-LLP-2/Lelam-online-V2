@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class SearchButtonWidget extends StatelessWidget {
-  const SearchButtonWidget({super.key});
+  final ValueChanged<String> onSearch;
+  final TextEditingController controller;
+
+  const SearchButtonWidget({
+    super.key,
+    required this.onSearch,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -9,28 +16,30 @@ class SearchButtonWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        // border: Border.all(color: Colors.grey.shade200, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.shade300,
             blurRadius: 10,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-
-      child: Center(
-        child: TextField(
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            prefixIcon: Icon(Icons.search),
-            // alignLabelWithHint: true,
-            hintStyle: TextStyle(color: Colors.grey.shade500),
-            hintText: 'Find Cars and more ...',
-            contentPadding: EdgeInsets.symmetric(
-              vertical: 14,
-            ), // Center vertically
+      child: TextField(
+        controller: controller,
+        onChanged: onSearch,
+        decoration: InputDecoration(
+          border: InputBorder.none,
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: () {
+              controller.clear();
+              onSearch('');
+            },
           ),
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          hintText: 'Find Cars and more ...',
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
         ),
       ),
     );
