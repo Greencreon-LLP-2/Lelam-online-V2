@@ -197,112 +197,160 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   Widget _buildImagePicker() {
-    return Container(
-      height: 150,
-      margin: const EdgeInsets.only(bottom: 24),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _selectedImages.length + 1,
-        itemBuilder: (context, index) {
-          if (index == _selectedImages.length) {
-            return Container(
-              width: 120,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: _showImageSourceBottomSheet,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.add_photo_alternate_outlined,
-                        size: 36,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Add Photo',
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+    return Center(
+      child: Container(
+        height: 150,
+        margin: const EdgeInsets.only(bottom: 24),
+        child:
+            _selectedImages.isEmpty
+                ? Container(
+                  width: 120,
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
-                ),
-              ),
-            );
-          }
-          return Container(
-            width: 120,
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                children: [
-                  Image.file(
-                    File(_selectedImages[index].path),
-                    width: 120,
-                    height: 150,
-                    fit: BoxFit.cover,
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(20),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: _showImageSourceBottomSheet,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate_outlined,
+                            size: 36,
+                            color: AppTheme.primaryColor,
                           ),
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.close,
-                              size: 20,
-                              color: Colors.white,
+                          const SizedBox(height: 8),
+                          Text(
+                            'Add Photo',
+                            style: TextStyle(
+                              color: AppTheme.primaryColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _selectedImages.removeAt(index);
-                              });
-                            },
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          );
-        },
+                )
+                : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == _selectedImages.length) {
+                      return Container(
+                        width: 120,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: _showImageSourceBottomSheet,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_photo_alternate_outlined,
+                                  size: 36,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Add Photo',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return Container(
+                      width: 120,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Stack(
+                          children: [
+                            Image.file(
+                              File(_selectedImages[index].path),
+                              width: 120,
+                              height: 150,
+                              fit: BoxFit.cover,
+                            ),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(
+                                    sigmaX: 10.0,
+                                    sigmaY: 10.0,
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.close,
+                                        size: 20,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _selectedImages.removeAt(index);
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
       ),
     );
   }
@@ -317,7 +365,7 @@ class _AdPostFormState extends State<AdPostForm>
           child: Form(
             key: widget.formKey,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Text(
                   'Add Photos',
@@ -328,7 +376,12 @@ class _AdPostFormState extends State<AdPostForm>
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildImagePicker(),
+                _selectedImages.isEmpty
+                    ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [_buildImagePicker()],
+                    )
+                    : _buildImagePicker(),
                 const SizedBox(height: 24),
                 CustomDropdownWidget<String>(
                   label: 'Make',
