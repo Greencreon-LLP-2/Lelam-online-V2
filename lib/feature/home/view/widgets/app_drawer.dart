@@ -102,6 +102,39 @@ class AppDrawerWidget extends StatelessWidget {
                   Navigator.pop(context);
                 },
               ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 72),
+                title: const Text('Terms of Service'),
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: Colors.black,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 72),
+                title: const Text('About Us'),
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: Colors.black,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 72),
+                title: const Text('Shipping Policy'),
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: Colors.black,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
             ],
           ),
           const Divider(),

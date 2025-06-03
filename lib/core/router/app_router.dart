@@ -7,7 +7,7 @@ import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
 import 'package:lelamonline_flutter/feature/notification/view/pages/notification_page.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/seller_profile_page.dart';
-import 'package:lelamonline_flutter/feature/search/view/pages/search_page.dart';
+import 'package:lelamonline_flutter/feature/sell/view/pages/ad_post_page.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/settings/view/pages/edit_profile_page.dart';
 import 'package:lelamonline_flutter/feature/settings/view/pages/settings_page.dart';
@@ -79,12 +79,11 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.sellerProfilePage,
     ),
     GoRoute(
-      path: RouteNames.searchPage,
-      builder: (context, state) {
-        final query = state.uri.queryParameters['q'];
-        return SearchPage(initialQuery: query);
-      },
-      name: RouteNames.searchPage,
+      path: RouteNames.adPostPage,
+      builder:
+          (context, state) =>
+              AdPostPage(category: state.extra as String? ?? ''),
+      name: RouteNames.adPostPage,
     ),
   ],
   errorBuilder:

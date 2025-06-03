@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 class SellPage extends StatelessWidget {
@@ -6,18 +8,34 @@ class SellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final categories = [
+      'Used Cars',
+      'Real Estate',
+      'Commercial Vehicles',
+      'Other',
+      'Mobile Phones',
+    ];
+
     return Scaffold(
-      appBar: AppBar(title: Text('Choose Category')),
+      appBar: AppBar(title: const Text('Choose Category')),
       body: ListView.builder(
-        itemCount: 5,
+        itemCount: categories.length,
         itemBuilder: (context, index) {
-          return ListTile(
-            title: Text('Category ${index + 1}'),
-            leading: CircleAvatar(
-              backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
-              child: Icon(Icons.category),
+          return InkWell(
+            onTap: () {
+              context.pushNamed(
+                RouteNames.adPostPage,
+                extra: categories[index],
+              );
+            },
+            child: ListTile(
+              title: Text(categories[index]),
+              leading: CircleAvatar(
+                backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
+                child: const Icon(Icons.category),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios),
             ),
-            trailing: Icon(Icons.arrow_forward_ios),
           );
         },
       ),
