@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
 import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
@@ -84,6 +85,11 @@ final GoRouter appRouter = GoRouter(
           (context, state) =>
               AdPostPage(category: state.extra as String? ?? ''),
       name: RouteNames.adPostPage,
+    ),
+    GoRoute(
+      path: RouteNames.loginPage,
+      builder: (context, state) => const LoginPage(),
+      name: RouteNames.loginPage,
     ),
   ],
   errorBuilder:

@@ -53,6 +53,12 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: Icon(Icons.notifications),
                     ),
+                    IconButton(
+                      onPressed: () {
+                        context.pushNamed(RouteNames.loginPage);
+                      },
+                      icon: Icon(Icons.person),
+                    ),
                   ],
                 ),
               ),
