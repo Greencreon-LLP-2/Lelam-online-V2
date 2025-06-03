@@ -1,4 +1,7 @@
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
+
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,20 +23,47 @@ class _AdPostPageState extends State<AdPostPage> {
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Processing your ad...')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Processing your ad...'),
+          backgroundColor: AppTheme.primaryColor.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Post your Ad'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: const Text(
+          'Post your Ad',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
         centerTitle: true,
         actions: [
-          TextButton(onPressed: _submitForm, child: const Text('Post')),
+          TextButton(
+            onPressed: _submitForm,
+            child: Text(
+              'Post',
+              style: TextStyle(
+                color: AppTheme.primaryColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
       body: AdPostForm(
@@ -61,7 +91,8 @@ class AdPostForm extends StatefulWidget {
   State<AdPostForm> createState() => _AdPostFormState();
 }
 
-class _AdPostFormState extends State<AdPostForm> {
+class _AdPostFormState extends State<AdPostForm>
+    with SingleTickerProviderStateMixin {
   final _makecontroller = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
@@ -71,7 +102,8 @@ class _AdPostFormState extends State<AdPostForm> {
   String? _selectedDistrict;
   final List<XFile> _selectedImages = [];
   final ImagePicker _imagePicker = ImagePicker();
-  bool _isAuctionable = false;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   final List<String> _districts = [
     'Ernakulam',
@@ -101,6 +133,15 @@ class _AdPostFormState extends State<AdPostForm> {
   void initState() {
     super.initState();
     _selectedCategory = widget.initialCategory;
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_animationController);
+    _animationController.forward();
   }
 
   @override
@@ -109,6 +150,7 @@ class _AdPostFormState extends State<AdPostForm> {
     _descriptionController.dispose();
     _priceController.dispose();
     _districtController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -124,10 +166,16 @@ class _AdPostFormState extends State<AdPostForm> {
         });
       }
     } catch (e) {
-      // Handle error
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error picking image: $e'),
+          backgroundColor: Colors.red.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
     }
   }
 
@@ -151,65 +199,108 @@ class _AdPostFormState extends State<AdPostForm> {
 
   Widget _buildImagePicker() {
     return Container(
-      height: 120,
-      margin: const EdgeInsets.only(bottom: 20),
+      height: 150,
+      margin: const EdgeInsets.only(bottom: 24),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _selectedImages.length + 1,
         itemBuilder: (context, index) {
           if (index == _selectedImages.length) {
             return Container(
-              width: 100,
-              margin: const EdgeInsets.only(right: 8),
+              width: 120,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-              child: IconButton(
-                icon: const Icon(Icons.add_photo_alternate_outlined, size: 32),
-                onPressed: _showImageSourceBottomSheet,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _showImageSourceBottomSheet,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 36,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Add Photo',
+                        style: TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           }
           return Container(
-            width: 100,
-            margin: const EdgeInsets.only(right: 8),
+            width: 120,
+            margin: const EdgeInsets.only(right: 12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.file(
-                    File(_selectedImages[index].path),
-                    width: 100,
-                    height: 120,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () {
-                        setState(() {
-                          _selectedImages.removeAt(index);
-                        });
-                      },
-                    ),
-                  ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  spreadRadius: 1,
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  Image.file(
+                    File(_selectedImages[index].path),
+                    width: 120,
+                    height: 150,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.close,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _selectedImages.removeAt(index);
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -219,108 +310,144 @@ class _AdPostFormState extends State<AdPostForm> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: widget.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Add Photos',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              _buildImagePicker(),
-              const SizedBox(height: 20),
-              //! =======================Make Dropdown=======================
-              CustomDropdownWidget<String>(
-                label: 'Make',
-                value: _selectedCategory,
-                items: _categories,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedCategory = newValue;
-                  });
-                },
-                prefixIcon: Icons.category_outlined,
-                isRequired: true,
-                itemToString: (String item) => item,
-              ),
-              const SizedBox(height: 20),
-              CustomFormField(
-                controller: _priceController,
-                label: 'Price',
-                prefixIcon: Icons.currency_rupee,
-                isNumberInput: true,
-                isRequired: true,
-              ),
-              const SizedBox(height: 20),
-              CustomDropdownWidget<String>(
-                label: 'District',
-                value: _selectedDistrict,
-                items: _districts,
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedDistrict = newValue;
-                  });
-                },
-                prefixIcon: Icons.location_on_outlined,
-                isRequired: true,
-                itemToString: (String item) => item,
-              ),
-
-              const SizedBox(height: 20),
-              CustomFormField(
-                controller: _landMarkController,
-                label: 'Landmark',
-                prefixIcon: Icons.location_on_outlined,
-                alignLabelWithHint: true,
-              ),
-              const SizedBox(height: 20),
-              CustomFormField(
-                controller: _descriptionController,
-                label: 'Description',
-                prefixIcon: Icons.description_outlined,
-                alignLabelWithHint: true,
-                maxLines: 5,
-              ),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('Allow Auction'),
-                subtitle: const Text('Enable bidding on your item'),
-                value: _isAuctionable,
-                onChanged: (bool value) {
-                  setState(() {
-                    _isAuctionable = value;
-                  });
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade300),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: widget.formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Add Photos',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: widget.onSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                _buildImagePicker(),
+                const SizedBox(height: 24),
+                CustomDropdownWidget<String>(
+                  label: 'Category',
+                  value: _selectedCategory,
+                  items: _categories,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedCategory = newValue;
+                    });
+                  },
+                  prefixIcon: Icons.category_outlined,
+                  isRequired: true,
+                  itemToString: (String item) => item,
+                ),
+                const SizedBox(height: 24),
+                CustomFormField(
+                  controller: _priceController,
+                  label: 'Price',
+                  prefixIcon: Icons.currency_rupee,
+                  isNumberInput: true,
+                  isRequired: true,
+                ),
+                const SizedBox(height: 24),
+                CustomDropdownWidget<String>(
+                  label: 'District',
+                  value: _selectedDistrict,
+                  items: _districts,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedDistrict = newValue;
+                    });
+                  },
+                  prefixIcon: Icons.location_on_outlined,
+                  isRequired: true,
+                  itemToString: (String item) => item,
+                ),
+                const SizedBox(height: 24),
+                CustomFormField(
+                  controller: _landMarkController,
+                  label: 'Landmark',
+                  prefixIcon: Icons.location_on_outlined,
+                  alignLabelWithHint: true,
+                ),
+                const SizedBox(height: 24),
+                CustomFormField(
+                  controller: _descriptionController,
+                  label: 'Description',
+                  prefixIcon: Icons.description_outlined,
+                  alignLabelWithHint: true,
+                  maxLines: 5,
+                ),
+                // const SizedBox(height: 24),
+                // Container(
+                //   decoration: BoxDecoration(
+                //     color: Colors.white,
+                //     borderRadius: BorderRadius.circular(16),
+                //     boxShadow: [
+                //       BoxShadow(
+                //         color: Colors.black.withOpacity(0.05),
+                //         blurRadius: 10,
+                //         spreadRadius: 1,
+                //       ),
+                //     ],
+                //   ),
+                //   child: ClipRRect(
+                //     borderRadius: BorderRadius.circular(16),
+                //     child: BackdropFilter(
+                //       filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+                //       child: SwitchListTile(
+                //         title: const Text(
+                //           'Allow Auction',
+                //           style: TextStyle(
+                //             fontSize: 16,
+                //             fontWeight: FontWeight.w500,
+                //             color: Colors.black87,
+                //           ),
+                //         ),
+                //         subtitle: const Text(
+                //           'Enable bidding on your item',
+                //           style: TextStyle(fontSize: 14, color: Colors.black54),
+                //         ),
+                //         value: _isAuctionable,
+                //         onChanged: (bool value) {
+                //           setState(() {
+                //             _isAuctionable = value;
+                //           });
+                //         },
+                //         activeColor: AppTheme.primaryColor,
+                //       ),
+                //     ),
+                //   ),
+                // ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: widget.onSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Post Ad',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'Post Ad',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),

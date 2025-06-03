@@ -67,6 +67,7 @@ class CategoryCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
+              // ignore: deprecated_member_use
               colors: [color.withOpacity(0.7), color],
             ),
           ),

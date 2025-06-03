@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/tab_bar_widget.dart';
 
