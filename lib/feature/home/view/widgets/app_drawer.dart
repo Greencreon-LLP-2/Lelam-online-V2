@@ -76,15 +76,34 @@ class AppDrawerWidget extends StatelessWidget {
               context.pushNamed(RouteNames.faqPage);
             },
           ),
-          _buildDrawerItem(
-            icon: Icons.info_outlined,
-            title: 'Info',
-            onTap: () {
-              // TODO: Navigate to orders
-              Navigator.pop(context);
-            },
+          ExpansionTile(
+            leading: const Icon(Icons.info_outlined, color: Colors.black),
+            title: const Text('Info'),
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 72),
+                title: const Text('EULA'),
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: Colors.black,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.only(left: 72),
+                title: const Text('Privacy Policy'),
+                leading: const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: Colors.black,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ],
           ),
-
           const Divider(),
           _buildDrawerItem(
             icon: Icons.phone,
