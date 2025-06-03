@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
+import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
 
 class AdPostPage extends StatefulWidget {
@@ -27,6 +31,7 @@ class _AdPostPageState extends State<AdPostPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Post your Ad'),
+        centerTitle: true,
         actions: [
           TextButton(onPressed: _submitForm, child: const Text('Post')),
         ],
@@ -64,7 +69,8 @@ class _AdPostFormState extends State<AdPostForm> {
   final _landMarkController = TextEditingController();
   String? _selectedCategory;
   String? _selectedDistrict;
-  final List<String> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
+  final ImagePicker _imagePicker = ImagePicker();
   bool _isAuctionable = false;
 
   final List<String> _districts = [
@@ -106,6 +112,43 @@ class _AdPostFormState extends State<AdPostForm> {
     super.dispose();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImages.add(image);
+        });
+      }
+    } catch (e) {
+      // Handle error
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
+  }
+
+  void _showImageSourceBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => ImageSourceBottomSheetWidget(
+            onCameraTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.camera);
+            },
+            onGalleryTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.gallery);
+            },
+          ),
+    );
+  }
+
   Widget _buildImagePicker() {
     return Container(
       height: 120,
@@ -125,9 +168,7 @@ class _AdPostFormState extends State<AdPostForm> {
               ),
               child: IconButton(
                 icon: const Icon(Icons.add_photo_alternate_outlined, size: 32),
-                onPressed: () {
-                  // TODO: Implement image picking
-                },
+                onPressed: _showImageSourceBottomSheet,
               ),
             );
           }
@@ -141,23 +182,31 @@ class _AdPostFormState extends State<AdPostForm> {
             ),
             child: Stack(
               children: [
-                Center(
-                  child: Icon(
-                    Icons.image,
-                    size: 32,
-                    color: Colors.grey.shade600,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(_selectedImages[index].path),
+                    width: 100,
+                    height: 120,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 Positioned(
                   top: 4,
                   right: 4,
-                  child: IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () {
-                      setState(() {
-                        _selectedImages.removeAt(index);
-                      });
-                    },
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _selectedImages.removeAt(index);
+                        });
+                      },
+                    ),
                   ),
                 ),
               ],

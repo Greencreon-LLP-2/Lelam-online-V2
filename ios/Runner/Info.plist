@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take photos for your ads</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs photos access to let you choose images for your ads</string>
 </dict>
 </plist>
