@@ -63,8 +63,25 @@ class _AdPostFormState extends State<AdPostForm> {
   final _districtController = TextEditingController();
   final _landMarkController = TextEditingController();
   String? _selectedCategory;
+  String? _selectedDistrict;
   final List<String> _selectedImages = [];
   bool _isAuctionable = false;
+
+  final List<String> _districts = [
+    'Ernakulam',
+    'Idukki',
+    'Kannur',
+    'Kasaragod',
+    'Kollam',
+    'Kottayam',
+    'Kozhikode',
+    'Malappuram',
+    'Palakkad',
+    'Pathanamthitta',
+    'Thiruvananthapuram',
+    'Thrissur',
+    'Wayanad',
+  ];
 
   final List<String> _categories = [
     'Used Cars',
@@ -191,13 +208,20 @@ class _AdPostFormState extends State<AdPostForm> {
                 isRequired: true,
               ),
               const SizedBox(height: 20),
-              CustomFormField(
-                controller: _districtController,
+              CustomDropdownWidget<String>(
                 label: 'District',
+                value: _selectedDistrict,
+                items: _districts,
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedDistrict = newValue;
+                  });
+                },
                 prefixIcon: Icons.location_on_outlined,
                 isRequired: true,
-                alignLabelWithHint: true,
+                itemToString: (String item) => item,
               ),
+
               const SizedBox(height: 20),
               CustomFormField(
                 controller: _landMarkController,
