@@ -17,6 +17,12 @@ class ProductDetailsPage extends StatefulWidget {
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
+  final TransformationController _transformationController =
+      TransformationController();
+
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+  }
 
   // Sample images - replace with actual image URLs from your data
   final List<String> _images = [
@@ -45,6 +51,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       onPageChanged: (index) {
                         setState(() {
                           _currentImageIndex = index;
+                          _resetZoom();
                         });
                         // Update the main view's page controller
                         _pageController.animateToPage(
@@ -56,28 +63,52 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       itemCount: _images.length,
                       itemBuilder: (context, index) {
                         return InteractiveViewer(
+                          transformationController: _transformationController,
                           minScale: 0.5,
-                          maxScale: 3.0,
-                          child: Hero(
-                            tag: 'image_$index',
-                            child: CachedNetworkImage(
-                              imageUrl: _images[index],
-                              fit: BoxFit.contain,
-                              placeholder:
-                                  (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                              errorWidget:
-                                  (context, url, error) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.error_outline,
-                                        size: 50,
-                                        color: Colors.red,
+                          maxScale: 5.0,
+                          boundaryMargin: const EdgeInsets.all(double.infinity),
+                          onInteractionStart: (ScaleStartDetails details) {
+                            // Handle interaction start if needed
+                          },
+                          onInteractionUpdate: (ScaleUpdateDetails details) {
+                            // Handle interaction update if needed
+                          },
+                          onInteractionEnd: (ScaleEndDetails details) {
+                            if (details.velocity.pixelsPerSecond.distance > 0) {
+                              final double scale =
+                                  _transformationController.value
+                                      .getMaxScaleOnAxis();
+                              if (scale < 0.5) {
+                                _resetZoom();
+                              } else if (scale > 5.0) {
+                                _transformationController.value =
+                                    Matrix4.identity()..scale(5.0);
+                              }
+                            }
+                          },
+                          child: GestureDetector(
+                            onDoubleTap: _resetZoom,
+                            child: Hero(
+                              tag: 'image_$index',
+                              child: CachedNetworkImage(
+                                imageUrl: _images[index],
+                                fit: BoxFit.contain,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
                                       ),
                                     ),
-                                  ),
+                              ),
                             ),
                           ),
                         );
@@ -469,6 +500,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   void dispose() {
     _pageController.dispose();
+    _transformationController.dispose();
     super.dispose();
   }
 
