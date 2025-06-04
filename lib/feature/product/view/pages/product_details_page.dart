@@ -20,6 +20,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   final TransformationController _transformationController =
       TransformationController();
 
+  bool _isFavorited = false;
+
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
   }
@@ -587,12 +589,16 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           const Spacer(),
                           IconButton(
-                            icon: const Icon(
-                              Icons.favorite_border,
-                              color: Colors.white,
+                            icon: Icon(
+                              _isFavorited
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: _isFavorited ? Colors.red : Colors.white,
                             ),
                             onPressed: () {
-                              // TODO: Implement favorite functionality
+                              setState(() {
+                                _isFavorited = !_isFavorited;
+                              });
                             },
                           ),
                           IconButton(
