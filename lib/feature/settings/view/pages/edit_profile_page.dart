@@ -69,36 +69,37 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             width: 2,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.person,
-                          size: 60,
-                          color: AppTheme.primaryColor,
+                        child: Image.asset(
+                          'assets/images/avatar.gif',
+                          // width: 120,
+                          // height: 120,
+                          fit: BoxFit.cover,
                         ),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                spreadRadius: 1,
-                                blurRadius: 3,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
+                      // Positioned(
+                      //   bottom: 0,
+                      //   right: 0,
+                      //   child: Container(
+                      //     padding: const EdgeInsets.all(8),
+                      //     decoration: BoxDecoration(
+                      //       color: AppTheme.primaryColor,
+                      //       shape: BoxShape.circle,
+                      //       boxShadow: [
+                      //         BoxShadow(
+                      //           color: Colors.black.withOpacity(0.1),
+                      //           spreadRadius: 1,
+                      //           blurRadius: 3,
+                      //           offset: const Offset(0, 1),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //     child: const Icon(
+                      //       Icons.camera_alt,
+                      //       color: Colors.white,
+                      //       size: 20,
+                      //     ),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

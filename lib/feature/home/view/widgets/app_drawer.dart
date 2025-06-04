@@ -20,10 +20,11 @@ class AppDrawerWidget extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 35,
-                    color: AppTheme.primaryColor,
+                  child: Image.asset(
+                    'assets/images/avatar.gif',
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.cover,
                   ),
                 ),
                 const SizedBox(height: 10),

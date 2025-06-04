@@ -31,10 +31,15 @@ class SettingsPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 40,
-              backgroundColor: AppTheme.primaryColor,
-              child: Icon(Icons.person, size: 40, color: Colors.white),
+              // backgroundColor: AppTheme.primaryColor,
+              child: Image.asset(
+                'assets/images/avatar.gif',
+                width: 160,
+                height: 160,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
