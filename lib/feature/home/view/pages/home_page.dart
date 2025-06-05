@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/districts.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
@@ -16,6 +17,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String? _selectedDistrict;
 
   @override
   void dispose() {
@@ -43,7 +45,23 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Icon(Icons.location_on),
                         SizedBox(width: 8),
-                        Text('Location'),
+                        DropdownButton<String>(
+                          value: _selectedDistrict,
+                          hint: Text('Select District'),
+                          items:
+                              districts.map((district) {
+                                return DropdownMenuItem<String>(
+                                  value: district,
+                                  child: Text(district),
+                                );
+                              }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedDistrict = newValue;
+                            });
+                          },
+                          underline: SizedBox(),
+                        ),
                       ],
                     ),
                     Spacer(),

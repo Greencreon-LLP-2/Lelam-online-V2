@@ -6,6 +6,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lelamonline_flutter/core/districts.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
@@ -105,22 +106,6 @@ class _AdPostFormState extends State<AdPostForm>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _imageError = false;
-
-  final List<String> _districts = [
-    'Ernakulam',
-    'Idukki',
-    'Kannur',
-    'Kasaragod',
-    'Kollam',
-    'Kottayam',
-    'Kozhikode',
-    'Malappuram',
-    'Palakkad',
-    'Pathanamthitta',
-    'Thiruvananthapuram',
-    'Thrissur',
-    'Wayanad',
-  ];
 
   final List<String> _categories = [
     'Used Cars',
@@ -459,7 +444,7 @@ class _AdPostFormState extends State<AdPostForm>
                 CustomDropdownWidget<String>(
                   label: 'District',
                   value: _selectedDistrict,
-                  items: _districts,
+                  items: districts,
                   onChanged: (String? newValue) {
                     setState(() {
                       _selectedDistrict = newValue;
