@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 class OtpVerificationPage extends StatefulWidget {
@@ -56,9 +57,15 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
   Future<void> _verifyOtp() async {
     final otp = _otpControllers.map((controller) => controller.text).join();
     if (otp.length != 4) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter a valid OTP')));
+      Fluttertoast.showToast(
+        msg: 'Please enter a valid OTP',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.red.withOpacity(0.5),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
       return;
     }
 
