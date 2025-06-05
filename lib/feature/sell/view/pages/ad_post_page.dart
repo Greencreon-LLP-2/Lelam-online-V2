@@ -6,7 +6,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lelamonline_flutter/core/districts.dart';
+import 'package:lelamonline_flutter/core/constants/districts.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';

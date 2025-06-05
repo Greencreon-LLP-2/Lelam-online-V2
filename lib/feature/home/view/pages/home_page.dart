@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lelamonline_flutter/core/districts.dart';
+import 'package:lelamonline_flutter/core/constants/districts.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
