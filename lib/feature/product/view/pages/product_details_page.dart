@@ -778,7 +778,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       _buildSellerInformationItem(
                         'LELAMONLINE ADMIN',
                         'Member Since 2024-12-07 11:49:43',
-                        'https://img.freepik.com/premium-vector/vector-illustration-young-man-face-with-short-brown-hair-cartoon-male-character_87771-31254.jpg?semt=ais_items_boosted&w=740', // Replace with actual avatar URL
                         context,
                       ),
                     ],
@@ -876,12 +875,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   Widget _buildSellerInformationItem(
     String name,
     String memberSince,
-    String avatarUrl,
+    // String avatarUrl,
     BuildContext context,
   ) {
     return Row(
       children: [
-        CircleAvatar(backgroundImage: NetworkImage(avatarUrl), radius: 30),
+        CircleAvatar(
+          backgroundImage: AssetImage('assets/images/avatar.gif'),
+          radius: 30,
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
