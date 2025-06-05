@@ -64,20 +64,6 @@ class SellerProfilePage extends StatelessWidget {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(70),
-                            // child: Image.network(
-                            //   'https://picsum.photos/280',
-                            //   fit: BoxFit.cover,
-                            //   errorBuilder: (context, error, stackTrace) {
-                            //     return Container(
-                            //       color: Colors.grey.shade200,
-                            //       child: const Icon(
-                            //         Icons.person,
-                            //         size: 70,
-                            //         color: Colors.grey,
-                            //       ),
-                            //     );
-                            //   },
-                            // ),
                             child: Image.asset(
                               'assets/images/avatar.gif',
                               fit: BoxFit.cover,
