@@ -372,9 +372,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   horizontal: 20,
                   vertical: 12,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Text(
                 'Submit Bid',
@@ -483,9 +481,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   horizontal: 20,
                   vertical: 12,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Text(
                 'Schedule Meeting',
@@ -681,6 +677,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
                             ),
                           ),
                         ],
@@ -817,10 +816,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     child: ElevatedButton(
                       onPressed: () => _showBidDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.blue,
-                        side: const BorderSide(color: Colors.blue),
+                        backgroundColor: const Color.fromARGB(255, 255, 44, 90),
+                        foregroundColor: Colors.white,
+                        //  side: const BorderSide(color: Colors.blue),
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
                       ),
                       child: const Text('Place a Bid'),
                     ),
@@ -833,6 +835,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
                       ),
                       child: const Text('Fix Meeting'),
                     ),
@@ -944,6 +949,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 backgroundColor:
                     Colors.blue, // Use a distinct color for the button
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Text('Ask a question'),
             ),

@@ -6,8 +6,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lelamonline_flutter/core/constants/districts.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
@@ -94,18 +94,21 @@ class AdPostForm extends StatefulWidget {
 
 class _AdPostFormState extends State<AdPostForm>
     with SingleTickerProviderStateMixin {
-  final _makecontroller = TextEditingController();
+  final _makeController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
+  final _listPriceController = TextEditingController();
+  final _offerPriceController = TextEditingController();
   final _districtController = TextEditingController();
   final _landMarkController = TextEditingController();
   String? _selectedMake;
-  String? _selectedDistrict;
+  String? _selectedDistrict =
+      districts.isNotEmpty ? districts[0] : 'Thiruvananthapuram';
   final List<XFile> _selectedImages = [];
   final ImagePicker _imagePicker = ImagePicker();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _imageError = false;
+  final int _maxImages = 5; // Maximum number of images allowed
 
   final List<String> _categories = [
     'Used Cars',
@@ -118,6 +121,7 @@ class _AdPostFormState extends State<AdPostForm>
   @override
   void initState() {
     super.initState();
+    _selectedMake = widget.initialCategory;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -131,15 +135,29 @@ class _AdPostFormState extends State<AdPostForm>
 
   @override
   void dispose() {
-    _makecontroller.dispose();
+    _makeController.dispose();
     _descriptionController.dispose();
-    _priceController.dispose();
+    _listPriceController.dispose();
+    _offerPriceController.dispose();
     _districtController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum $_maxImages images allowed'),
+          backgroundColor: Colors.red.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
@@ -148,6 +166,7 @@ class _AdPostFormState extends State<AdPostForm>
       if (image != null) {
         setState(() {
           _selectedImages.add(image);
+          _imageError = false;
         });
       }
     } catch (e) {
@@ -165,6 +184,19 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   void _showImageSourceBottomSheet() {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum $_maxImages images allowed'),
+          backgroundColor: Colors.red.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -220,7 +252,7 @@ class _AdPostFormState extends State<AdPostForm>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Add Photo',
+                                'Add Photo (${_selectedImages.length}/$_maxImages)',
                                 style: TextStyle(
                                   color: AppTheme.primaryColor,
                                   fontSize: 12,
@@ -237,47 +269,50 @@ class _AdPostFormState extends State<AdPostForm>
                       itemCount: _selectedImages.length + 1,
                       itemBuilder: (context, index) {
                         if (index == _selectedImages.length) {
-                          return Container(
-                            width: 120,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
+                          if (_selectedImages.length < _maxImages) {
+                            return Container(
+                              width: 120,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                onTap: _showImageSourceBottomSheet,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_photo_alternate_outlined,
-                                      size: 36,
-                                      color: AppTheme.primaryColor,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add Photo',
-                                      style: TextStyle(
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: _showImageSourceBottomSheet,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate_outlined,
+                                        size: 36,
                                         color: AppTheme.primaryColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Add Photo (${_selectedImages.length}/$_maxImages)',
+                                        style: TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
+                            );
+                          }
+                          return const SizedBox.shrink();
                         }
                         return Container(
                           width: 120,
@@ -434,11 +469,55 @@ class _AdPostFormState extends State<AdPostForm>
                 ),
                 const SizedBox(height: 24),
                 CustomFormField(
-                  controller: _priceController,
-                  label: 'Price',
+                  controller: _listPriceController,
+                  label: 'List Price',
                   prefixIcon: Icons.currency_rupee,
                   isNumberInput: true,
                   isRequired: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the list price';
+                    }
+                    final listPrice = double.tryParse(value);
+                    if (listPrice == null) {
+                      return 'Please enter a valid number';
+                    }
+                    if (_offerPriceController.text.isNotEmpty) {
+                      final offerPrice = double.tryParse(
+                        _offerPriceController.text,
+                      );
+                      if (offerPrice != null && offerPrice > listPrice) {
+                        return 'List price must be greater than or equal to offer price';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                CustomFormField(
+                  controller: _offerPriceController,
+                  label: 'Offer Price',
+                  prefixIcon: Icons.currency_rupee,
+                  isNumberInput: true,
+                  isRequired: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the offer price';
+                    }
+                    final offerPrice = double.tryParse(value);
+                    if (offerPrice == null) {
+                      return 'Please enter a valid number';
+                    }
+                    if (_listPriceController.text.isNotEmpty) {
+                      final listPrice = double.tryParse(
+                        _listPriceController.text,
+                      );
+                      if (listPrice != null && offerPrice > listPrice) {
+                        return 'Offer price must be less than or equal to list price';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 CustomDropdownWidget<String>(
@@ -469,47 +548,6 @@ class _AdPostFormState extends State<AdPostForm>
                   alignLabelWithHint: true,
                   maxLines: 5,
                 ),
-                // const SizedBox(height: 24),
-                // Container(
-                //   decoration: BoxDecoration(
-                //     color: Colors.white,
-                //     borderRadius: BorderRadius.circular(16),
-                //     boxShadow: [
-                //       BoxShadow(
-                //         color: Colors.black.withOpacity(0.05),
-                //         blurRadius: 10,
-                //         spreadRadius: 1,
-                //       ),
-                //     ],
-                //   ),
-                //   child: ClipRRect(
-                //     borderRadius: BorderRadius.circular(16),
-                //     child: BackdropFilter(
-                //       filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                //       child: SwitchListTile(
-                //         title: const Text(
-                //           'Allow Auction',
-                //           style: TextStyle(
-                //             fontSize: 16,
-                //             fontWeight: FontWeight.w500,
-                //             color: Colors.black87,
-                //           ),
-                //         ),
-                //         subtitle: const Text(
-                //           'Enable bidding on your item',
-                //           style: TextStyle(fontSize: 14, color: Colors.black54),
-                //         ),
-                //         value: _isAuctionable,
-                //         onChanged: (bool value) {
-                //           setState(() {
-                //             _isAuctionable = value;
-                //           });
-                //         },
-                //         activeColor: AppTheme.primaryColor,
-                //       ),
-                //     ),
-                //   ),
-                // ),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -527,7 +565,7 @@ class _AdPostFormState extends State<AdPostForm>
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.zero,
                       ),
                     ),
                     child: const Text(

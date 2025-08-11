@@ -223,7 +223,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.zero,
                       ),
                       elevation: 0,
                     ),
@@ -315,7 +315,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             backgroundColor: Colors.white,
                             foregroundColor: AppTheme.primaryColor,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.zero,
                               side: const BorderSide(
                                 color: AppTheme.primaryColor,
                               ),

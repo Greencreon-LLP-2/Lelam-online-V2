@@ -82,17 +82,34 @@ class _MainScaffoldState extends State<MainScaffold> {
               ),
           isStatus
               ? BottomNavigationBarItem(
-                icon: Icon(Icons.sell_outlined),
+                icon: Icon(Icons.sell),
                 label: 'Selling',
               )
-              : BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Sell'),
+              : BottomNavigationBarItem(
+                icon: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Color.fromARGB(255, 12, 9, 233),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Color.fromARGB(255, 12, 9, 233),
+                  ),
+                ),
+                label: 'Sell',
+              ),
+
           isStatus
               ? BottomNavigationBarItem(
                 icon: Icon(Icons.star_border_outlined),
                 label: 'Shortlist',
               )
               : BottomNavigationBarItem(
-                icon: Icon(Icons.stream_sharp),
+                icon: Icon(Icons.stream_outlined),
                 label: 'Status',
               ),
           BottomNavigationBarItem(icon: Icon(Icons.more_vert), label: 'More'),

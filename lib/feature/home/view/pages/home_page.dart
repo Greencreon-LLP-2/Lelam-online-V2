@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lelamonline_flutter/core/constants/districts.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
@@ -33,7 +33,7 @@ class _HomePageState extends State<HomePage> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            spacing: 16,
+            spacing: 8,
             children: [
               //!TOP section
               Padding(
@@ -43,11 +43,11 @@ class _HomePageState extends State<HomePage> {
                     //!Location section
                     Row(
                       children: [
-                        Icon(Icons.location_on),
-                        SizedBox(width: 8),
+                        const Icon(Icons.location_on),
+                        const SizedBox(width: 8),
                         DropdownButton<String>(
                           value: _selectedDistrict,
-                          hint: Text('Select District'),
+                          hint: const Text('All Kerala'),
                           items:
                               districts.map((district) {
                                 return DropdownMenuItem<String>(
@@ -60,10 +60,12 @@ class _HomePageState extends State<HomePage> {
                               _selectedDistrict = newValue;
                             });
                           },
-                          underline: SizedBox(),
+                          underline: const SizedBox(),
+                          icon: const SizedBox.shrink(),
                         ),
                       ],
                     ),
+
                     Spacer(),
                     //!Notification section
                     IconButton(
@@ -72,12 +74,12 @@ class _HomePageState extends State<HomePage> {
                       },
                       icon: Icon(Icons.notifications),
                     ),
-                    IconButton(
-                      onPressed: () {
-                        context.pushNamed(RouteNames.loginPage);
-                      },
-                      icon: Icon(Icons.person),
-                    ),
+                    // IconButton(
+                    //   onPressed: () {
+                    //     context.pushNamed(RouteNames.loginPage);
+                    //   },
+                    //   icon: Icon(Icons.person),
+                    // ),
                   ],
                 ),
               ),
