@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 
 class AppDrawerWidget extends StatelessWidget {
   const AppDrawerWidget({super.key});
@@ -170,8 +172,12 @@ class AppDrawerWidget extends StatelessWidget {
             icon: Icons.logout,
             title: 'Log Out',
             onTap: () {
-              // TODO: Navigate to settings
-              Navigator.pop(context);
+              Navigator.pop(context); // Close the drawer first
+
+              // Navigate to LoginPage and remove all previous routes
+
+              // Navigate to login page and clear stack
+              context.goNamed(RouteNames.loginPage);
             },
           ),
         ],
