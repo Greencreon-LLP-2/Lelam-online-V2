@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/utils/palette.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   const ProductDetailsPage({super.key});
@@ -45,7 +46,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           return StatefulBuilder(
             builder: (context, setState) {
               return Scaffold(
-                backgroundColor: Colors.transparent,
+                backgroundColor: Colors.white,
                 body: Stack(
                   children: [
                     PageView.builder(
@@ -505,6 +506,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -816,7 +818,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     child: ElevatedButton(
                       onPressed: () => _showBidDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 255, 44, 90),
+                        backgroundColor: Palette.primarypink,
                         foregroundColor: Colors.white,
                         //  side: const BorderSide(color: Colors.blue),
                         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -832,7 +834,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Palette.primaryblue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(

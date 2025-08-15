@@ -63,8 +63,7 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
           // Handle API error messages
           if (decodedResponse['status'] == 'error') {
             throw Exception('API Error: ${decodedResponse['message']}');
-          }
-          else if (decodedResponse['data'] is List) {
+          } else if (decodedResponse['data'] is List) {
             setState(() {
               _products =
                   (decodedResponse['data'] as List)

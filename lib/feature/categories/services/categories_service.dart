@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/feature/home/view/models/categories_model.dart';
+import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 
 class CategoryService {
   Future<List<CategoryModel>> fetchCategories() async {

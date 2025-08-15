@@ -1,140 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
-class Property {
+class Bike {
   final String id;
-  final String slug;
-  final String title;
-  final String categoryId;
-  final String image;
+  final String name;
   final String type;
-  final String propertyType;
-  final String description;
+  final String year;
+  final String km;
   final String price;
-  final Map<String, dynamic> filters;
-  final String latitude;
-  final String longitude;
-  final String landMark;
-  final String adminApproval;
+  final String location;
+  final String brand;
+  final String fuel;
+  final String condition;
+  final String image;
+  final String verified;
+  final String featured;
+  final String description;
+  final String owner;
+  final String transmission;
   final String ifFinance;
-  final String feature;
-  final String status;
-  final String visiterCount;
-  final String ifSold;
-  final String ifExpired;
-  final String byDealer;
-  final String createdBy;
-  final String createdOn;
-  final String updatedOn;
 
-  Property({
+  Bike({
     required this.id,
-    required this.slug,
-    required this.title,
-    required this.categoryId,
-    required this.image,
+    required this.name,
     required this.type,
-    required this.propertyType,
-    required this.description,
+    required this.year,
+    required this.km,
     required this.price,
-    required this.filters,
-    required this.latitude,
-    required this.longitude,
-    required this.landMark,
-    required this.adminApproval,
+    required this.location,
+    required this.brand,
+    required this.fuel,
+    required this.condition,
+    required this.image,
+    required this.verified,
+    required this.featured,
+    required this.description,
+    required this.owner,
+    required this.transmission,
     required this.ifFinance,
-    required this.feature,
-    required this.status,
-    required this.visiterCount,
-    required this.ifSold,
-    required this.ifExpired,
-    required this.byDealer,
-    required this.createdBy,
-    required this.createdOn,
-    required this.updatedOn,
   });
 }
 
-class RealEstatePage extends StatefulWidget {
-  const RealEstatePage({super.key});
+class OthersPage extends StatefulWidget {
+  const OthersPage({super.key});
 
   @override
-  State<RealEstatePage> createState() => _RealEstatePageState();
+  State<OthersPage> createState() => _OthersPageState();
 }
 
-class _RealEstatePageState extends State<RealEstatePage> {
+class _OthersPageState extends State<OthersPage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
+  List<String> _selectedVehicleTypes = [];
+  String _selectedPriceRange = 'all';
+  String _selectedCondition = 'all';
+  List<String> _selectedFuelTypes = [];
 
   final TextEditingController _searchController = TextEditingController();
 
-  // Filter variables
-  List<String> _selectedPropertyTypes = [];
-  String _selectedPriceRange = 'all';
-  String _selectedBedroomRange = 'all';
-  String _selectedAreaRange = 'all';
-  List<String> _selectedFurnishings = [];
-  String _selectedPostedBy = 'all';
-
-  final List<Property> _properties = List.generate(
+  final List<Bike> _bikes = List.generate(
     20,
-    (index) => Property(
+    (index) => Bike(
       id: '${index + 1}',
-      slug: 'property-${index + 1}',
-      title:
+      name:
           [
-            'Modern 3BHK Apartment',
-            'Luxury Villa with Pool',
-            'Commercial Office Space',
-            'Prime Location Shop',
-            'Beachfront Villa',
-            '2BHK Premium Flat',
-            'Penthouse with Terrace',
-            'Family Independent House',
-            'Warehouse Space',
-            'Farmhouse with Garden',
-            'Studio Apartment',
-            'Duplex Villa',
-            'Industrial Plot',
-            'Residential Plot',
-            'Apartment for Rent',
-            'Luxury Apartment',
-            'Villa with Sea View',
-            'Office Space in CBD',
-            'Retail Shop',
-            'Bungalow with Garden',
-          ][index % 20],
-      categoryId: 'real-estate',
-      image: 'assets/images/property_${(index % 5) + 1}.jpg',
-      type: ['Residential', 'Commercial', 'Industrial'][index % 3],
-      propertyType:
-          [
-            'Apartment',
-            'Villa',
-            'Office',
-            'Shop',
-            'House',
-            'Penthouse',
-            'Duplex',
-            'Warehouse',
-            'Plot',
-            'Farmhouse',
+            'Hero Splendor Plus',
+            'Royal Enfield Classic 350',
+            'Bajaj Pulsar 150',
+            'TVS Apache RTR 160',
+            'Honda CB Shine',
+            'Yamaha MT-15',
+            'Hero Electric Photon',
+            'Trek Marlin 7',
+            'Giant Defy Advanced',
+            'Ola S1 Pro',
           ][index % 10],
-      description:
-          'Beautiful property with modern amenities and excellent location connectivity.',
-      price: '${(index + 1) * 500000 + 2000000}',
-      filters: {
-        'bedrooms': '${(index % 5) + 1}',
-        'bathrooms': '${(index % 4) + 1}',
-        'area': '${(index + 1) * 200 + 800}',
-        'furnishing': ['Furnished', 'Semi-Furnished', 'Unfurnished'][index % 3],
-        'floor': '${(index % 10) + 1}',
-        'totalFloors': '${(index % 5) + 5}',
-        'age': '${(index % 10) + 1}',
-      },
-      latitude: '19.0760',
-      longitude: '72.8777',
-      landMark:
+      type: ['Motorcycle', 'Bicycle', 'E-Bike', 'Scooter'][index % 4],
+      year: '${2018 + (index % 6)}',
+      km:
+          index % 4 < 2
+              ? '${(index + 1) * 5000}'
+              : '0', // 0 km for bicycles/e-bikes
+      price: '${(index + 1) * 10000 + (index % 4 == 1 ? 50000 : 30000)}',
+      location:
           [
             'Ernakulam',
             'Idukki',
@@ -149,209 +100,142 @@ class _RealEstatePageState extends State<RealEstatePage> {
             'Thiruvananthapuram',
             'Thrissur',
             'Wayanad',
-          ][index % 13],
-      adminApproval: '1',
-      ifFinance: index % 3 == 0 ? '1' : '0',
-      feature: index % 5 == 0 ? '1' : '0',
-      status: '1',
-      visiterCount: '${(index + 1) * 15}',
-      ifSold: '0',
-      ifExpired: '0',
-      byDealer: ['0', '1', '1'][index % 3],
-      createdBy: 'user_${index + 1}',
-      createdOn:
-          DateTime.now().subtract(Duration(days: index)).toIso8601String(),
-      updatedOn:
-          DateTime.now().subtract(Duration(hours: index)).toIso8601String(),
+          ][index % 8],
+      brand:
+          [
+            'Hero',
+            'Royal Enfield',
+            'Bajaj',
+            'TVS',
+            'Honda',
+            'Yamaha',
+            'Hero Electric',
+            'Trek',
+            'Giant',
+            'Ola',
+          ][index % 10],
+      fuel:
+          [
+            'Petrol',
+            'None', // For bicycles and e-bikes
+            'Electric',
+            'Petrol',
+          ][index % 4],
+      condition: ['New', 'Used'][index % 2],
+      image: 'assets/images/bike_${(index % 5) + 1}.jpg',
+      verified: index % 4 == 0 ? '1' : '0',
+      featured: index % 7 == 0 ? '1' : '0',
+      description:
+          'Well-maintained ${['motorcycle', 'bicycle', 'e-bike', 'scooter'][index % 4]} with excellent performance.',
+      owner: index % 3 == 0 ? 'First Owner' : 'Second Owner',
+      transmission:
+          index % 4 < 2 ? 'Manual' : 'None', // None for bicycles/e-bikes
+      ifFinance: index < 2 ? '1' : '0', // Finance available for first two items
     ),
   );
 
-  final List<String> _propertyTypes = [
-    'Apartment',
-    'Villa',
-    'House',
-    'Office',
-    'Shop',
-    'Penthouse',
-    'Duplex',
-    'Warehouse',
-    'Plot',
-    'Farmhouse',
+  final List<String> _vehicleTypes = [
+    'Motorcycle',
+    'Bicycle',
+    'E-Bike',
+    'Scooter',
   ];
 
   final List<String> _priceRanges = [
     'all',
-    'Under 50L',
-    '50L-1Cr',
-    '1Cr-2Cr',
-    '2Cr-5Cr',
-    'Above 5Cr',
+    'Under 50K',
+    '50K-1L',
+    '1L-2L',
+    '2L-5L',
+    'Above 5L',
   ];
 
-  final List<String> _bedroomRanges = ['all', '1', '2', '3', '4', '5+'];
-
-  final List<String> _areaRanges = [
+  final List<String> _locations = [
     'all',
-    'Under 500 sq ft',
-    '500-1000 sq ft',
-    '1000-1500 sq ft',
-    '1500-2000 sq ft',
-    'Above 2000 sq ft',
-  ];
-
-  final List<String> _furnishings = [
-    'Furnished',
-    'Semi-Furnished',
-    'Unfurnished',
-  ];
-
-  final List<String> _postedByOptions = ['all', 'Owner', 'Builder', 'Agent'];
-
-  final List<String> _districts = [
-    'all',
-    'Thiruvananthapuram',
-    'Kollam',
-    'Pathanamthitta',
-    'Alappuzha',
-    'Kottayam',
-    'Idukki',
     'Ernakulam',
-    'Thrissur',
-    'Palakkad',
-    'Malappuram',
-    'Kozhikode',
-    'Wayanad',
+    'Idukki',
     'Kannur',
     'Kasaragod',
+    'Kollam',
+    'Kottayam',
+    'Kozhikode',
+    'Malappuram',
+    'Palakkad',
+    'Pathanamthitta',
+    'Thiruvananthapuram',
+    'Thrissur',
+    'Wayanad',
   ];
 
-  List<Property> get filteredProperties {
-    List<Property> filtered = _properties;
+  final List<String> _conditions = ['all', 'New', 'Used'];
+
+  final List<String> _fuelTypes = ['Petrol', 'Electric', 'None'];
+
+  List<Bike> get filteredBikes {
+    List<Bike> filtered = _bikes;
 
     // Search filter
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered =
-          filtered.where((property) {
-            return property.title.toLowerCase().contains(query) ||
-                property.landMark.toLowerCase().contains(query) ||
-                property.propertyType.toLowerCase().contains(query);
+          filtered.where((bike) {
+            return bike.name.toLowerCase().contains(query) ||
+                bike.brand.toLowerCase().contains(query) ||
+                bike.type.toLowerCase().contains(query) ||
+                bike.location.toLowerCase().contains(query);
           }).toList();
     }
 
     // Location filter
     if (_selectedLocation != 'all') {
       filtered =
-          filtered
-              .where((property) => property.landMark == _selectedLocation)
-              .toList();
+          filtered.where((bike) => bike.location == _selectedLocation).toList();
     }
 
-    // Property type filter
-    if (_selectedPropertyTypes.isNotEmpty) {
+    // Vehicle type filter
+    if (_selectedVehicleTypes.isNotEmpty) {
       filtered =
           filtered
-              .where(
-                (property) => _selectedPropertyTypes.contains(property.type),
-              )
+              .where((bike) => _selectedVehicleTypes.contains(bike.type))
               .toList();
     }
 
-    // Price range filter
+    // Price filter
     if (_selectedPriceRange != 'all') {
       filtered =
-          filtered.where((property) {
-            int price = int.tryParse(property.price) ?? 0;
+          filtered.where((bike) {
+            final price = int.tryParse(bike.price) ?? 0;
             switch (_selectedPriceRange) {
-              case 'Under 50L':
-                return price < 5000000;
-              case '50L-1Cr':
-                return price >= 5000000 && price < 10000000;
-              case '1Cr-2Cr':
-                return price >= 10000000 && price < 20000000;
-              case '2Cr-5Cr':
-                return price >= 20000000 && price < 50000000;
-              case 'Above 5Cr':
-                return price >= 50000000;
+              case 'Under 50K':
+                return price < 50000;
+              case '50K-1L':
+                return price >= 50000 && price < 100000;
+              case '1L-2L':
+                return price >= 100000 && price < 200000;
+              case '2L-5L':
+                return price >= 200000 && price < 500000;
+              case 'Above 5L':
+                return price >= 500000;
               default:
                 return true;
             }
           }).toList();
     }
 
-    // Bedroom filter
-    if (_selectedBedroomRange != 'all') {
-      filtered =
-          filtered.where((property) {
-            int bedrooms =
-                int.tryParse(property.filters['bedrooms']?.toString() ?? '0') ??
-                0;
-            switch (_selectedBedroomRange) {
-              case '1':
-                return bedrooms == 1;
-              case '2':
-                return bedrooms == 2;
-              case '3':
-                return bedrooms == 3;
-              case '4':
-                return bedrooms == 4;
-              case '5+':
-                return bedrooms >= 5;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    // Area filter
-    if (_selectedAreaRange != 'all') {
-      filtered =
-          filtered.where((property) {
-            int area =
-                int.tryParse(property.filters['area']?.toString() ?? '0') ?? 0;
-            switch (_selectedAreaRange) {
-              case 'Under 500 sq ft':
-                return area < 500;
-              case '500-1000 sq ft':
-                return area >= 500 && area < 1000;
-              case '1000-1500 sq ft':
-                return area >= 1000 && area < 1500;
-              case '1500-2000 sq ft':
-                return area >= 1500 && area < 2000;
-              case 'Above 2000 sq ft':
-                return area >= 2000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    // Furnishing filter
-    if (_selectedFurnishings.isNotEmpty) {
+    // Condition filter
+    if (_selectedCondition != 'all') {
       filtered =
           filtered
-              .where(
-                (property) => _selectedFurnishings.contains(
-                  property.filters['furnishing'],
-                ),
-              )
+              .where((bike) => bike.condition == _selectedCondition)
               .toList();
     }
 
-    // Posted by filter
-    if (_selectedPostedBy != 'all') {
+    // Fuel type filter
+    if (_selectedFuelTypes.isNotEmpty) {
       filtered =
-          filtered.where((property) {
-            switch (_selectedPostedBy) {
-              case 'Owner':
-                return property.byDealer == '0';
-              case 'Builder':
-              case 'Agent':
-                return property.byDealer == '1';
-              default:
-                return true;
-            }
-          }).toList();
+          filtered
+              .where((bike) => _selectedFuelTypes.contains(bike.fuel))
+              .toList();
     }
 
     return filtered;
@@ -375,6 +259,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   child: Column(
                     children: [
+                      // Handle
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 12),
                         width: 40,
@@ -384,13 +269,15 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
+
+                      // Header
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Filter Properties',
+                              'Filter Bikes & Others',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -399,12 +286,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             TextButton(
                               onPressed: () {
                                 setModalState(() {
-                                  _selectedPropertyTypes.clear();
+                                  _selectedVehicleTypes.clear();
                                   _selectedPriceRange = 'all';
-                                  _selectedBedroomRange = 'all';
-                                  _selectedAreaRange = 'all';
-                                  _selectedFurnishings.clear();
-                                  _selectedPostedBy = 'all';
+                                  _selectedCondition = 'all';
+                                  _selectedFuelTypes.clear();
                                 });
                               },
                               child: const Text(
@@ -418,7 +303,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           ],
                         ),
                       ),
+
                       const Divider(height: 1),
+
+                      // Filters Content
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -426,9 +314,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildMultiSelectFilterSection(
-                                'Property Type',
-                                _propertyTypes,
-                                _selectedPropertyTypes,
+                                'Vehicle Type',
+                                _vehicleTypes,
+                                _selectedVehicleTypes,
                                 setModalState,
                               ),
                               _buildSingleSelectFilterSection(
@@ -440,40 +328,26 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 ),
                               ),
                               _buildSingleSelectFilterSection(
-                                'Bedrooms',
-                                _bedroomRanges,
-                                _selectedBedroomRange,
+                                'Condition',
+                                _conditions,
+                                _selectedCondition,
                                 (value) => setModalState(
-                                  () => _selectedBedroomRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Area',
-                                _areaRanges,
-                                _selectedAreaRange,
-                                (value) => setModalState(
-                                  () => _selectedAreaRange = value,
+                                  () => _selectedCondition = value,
                                 ),
                               ),
                               _buildMultiSelectFilterSection(
-                                'Furnishing',
-                                _furnishings,
-                                _selectedFurnishings,
+                                'Fuel Type',
+                                _fuelTypes,
+                                _selectedFuelTypes,
                                 setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Posted By',
-                                _postedByOptions,
-                                _selectedPostedBy,
-                                (value) => setModalState(
-                                  () => _selectedPostedBy = value,
-                                ),
                               ),
                               const SizedBox(height: 100),
                             ],
                           ),
                         ),
                       ),
+
+                      // Apply Button
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -484,6 +358,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         ),
                         child: Row(
                           children: [
+                            // Cancel Button
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () => Navigator.pop(context),
@@ -507,6 +382,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               ),
                             ),
                             const SizedBox(width: 12),
+                            // Apply Filters Button
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
@@ -667,12 +543,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
   int _getActiveFilterCount() {
     int count = 0;
-    if (_selectedPropertyTypes.isNotEmpty) count++;
+    if (_selectedVehicleTypes.isNotEmpty) count++;
     if (_selectedPriceRange != 'all') count++;
-    if (_selectedBedroomRange != 'all') count++;
-    if (_selectedAreaRange != 'all') count++;
-    if (_selectedFurnishings.isNotEmpty) count++;
-    if (_selectedPostedBy != 'all') count++;
+    if (_selectedCondition != 'all') count++;
+    if (_selectedFuelTypes.isNotEmpty) count++;
     return count;
   }
 
@@ -724,16 +598,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
               });
             },
             itemBuilder: (BuildContext context) {
-              return _districts.map((String district) {
+              return _locations.map((String location) {
                 return PopupMenuItem<String>(
-                  value: district,
+                  value: location,
                   child: Row(
                     children: [
-                      if (_selectedLocation == district)
+                      if (_selectedLocation == location)
                         const Icon(Icons.check, color: Colors.blue, size: 16),
-                      if (_selectedLocation == district)
+                      if (_selectedLocation == location)
                         const SizedBox(width: 8),
-                      Text(district == 'all' ? 'All Kerala' : district),
+                      Text(location == 'all' ? 'All Kerala' : location),
                     ],
                   ),
                 );
@@ -756,7 +630,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search by property type, location, features...',
+                hintText: 'Search by bike type, brand, location...',
                 hintStyle: TextStyle(color: Colors.grey.shade500),
                 prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
                 suffixIcon:
@@ -792,17 +666,17 @@ class _RealEstatePageState extends State<RealEstatePage> {
               ),
             ),
           ),
-          // Properties List
-          Expanded(child: _buildPropertiesList()),
+          // Bikes List
+          Expanded(child: _buildBikesList()),
         ],
       ),
     );
   }
 
-  Widget _buildPropertiesList() {
-    final properties = filteredProperties;
+  Widget _buildBikesList() {
+    final bikes = filteredBikes;
 
-    if (properties.isEmpty) {
+    if (bikes.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -810,7 +684,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
             Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
-              'No properties found',
+              'No bikes found',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade600,
@@ -829,18 +703,18 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: properties.length,
+      itemCount: bikes.length,
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
-        final property = properties[index];
-        return _buildPropertyCard(property);
+        final bike = bikes[index];
+        return _buildBikeCard(bike);
       },
     );
   }
 
-  Widget _buildPropertyCard(Property property) {
-    final isFinanceAvailable = property.ifFinance == '1';
-    final isFeatured = property.feature == '1';
+  Widget _buildBikeCard(Bike bike) {
+    final isFinanceAvailable = bike.ifFinance == '1';
+    final isFeatured = bike.featured == '1';
 
     return Container(
       decoration: BoxDecoration(
@@ -848,10 +722,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 4,
-            spreadRadius: 1,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -861,7 +734,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Property Image
+              // Bike Image
               Container(
                 width: 140,
                 height: 190,
@@ -880,14 +753,14 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         bottomLeft: Radius.circular(12),
                       ),
                       child: Image.asset(
-                        property.image,
+                        bike.image,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Center(
                             child: Container(
                               color: Colors.grey.shade200,
                               child: Icon(
-                                Icons.home,
+                                Icons.directions_bike,
                                 size: 40,
                                 color: Colors.grey.shade400,
                               ),
@@ -919,20 +792,37 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           ),
                         ),
                       ),
+                    if (bike.verified == '1')
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.verified,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
 
-              // Property Details
+              // Bike Details
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title and Property Type
+                      // Title and Bike Type
                       Text(
-                        property.title,
+                        bike.name,
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -942,7 +832,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        property.propertyType,
+                        bike.type,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey.shade600,
@@ -953,7 +843,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
                       // Price
                       Text(
-                        '₹ ${_formatPrice(int.tryParse(property.price) ?? 0)}',
+                        '₹${_formatPrice(int.tryParse(bike.price) ?? 0)}',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -973,9 +863,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            property.landMark,
+                            bike.location,
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               color: Colors.grey.shade600,
                             ),
                           ),
@@ -984,30 +874,34 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
                       const SizedBox(height: 8),
 
-                      // Property Details Row (Bedrooms, Bathrooms, Area)
+                      // Bike Details Row (Year, Condition, Fuel)
                       Row(
                         children: [
                           _buildDetailChip(
-                            Icon(Icons.bed, size: 14, color: Colors.grey[700]),
-                            '${property.filters['bedrooms']} Beds',
+                            Icon(
+                              Icons.calendar_today,
+                              size: 14,
+                              color: Colors.grey[700],
+                            ),
+                            '${bike.year}',
                           ),
                           const SizedBox(width: 4),
                           _buildDetailChip(
                             Icon(
-                              Icons.bathtub,
-                              size: 10,
+                              Icons.construction,
+                              size: 14,
                               color: Colors.grey[700],
                             ),
-                            '${property.filters['bathrooms']} Baths',
+                            bike.condition,
                           ),
                           const SizedBox(width: 4),
                           _buildDetailChip(
                             Icon(
-                              Icons.aspect_ratio,
-                              size: 10,
+                              Icons.local_gas_station,
+                              size: 14,
                               color: Colors.grey[700],
                             ),
-                            '${property.filters['area']} sq ft',
+                            bike.fuel,
                           ),
                         ],
                       ),
@@ -1016,22 +910,23 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
                       Row(
                         children: [
-                          _buildDetailChip(
-                            Icon(
-                              Icons.chair,
-                              size: 14,
-                              color: Colors.grey[700],
+                          if (bike.km != '0')
+                            _buildDetailChip(
+                              Icon(
+                                Icons.speed,
+                                size: 14,
+                                color: Colors.grey[700],
+                              ),
+                              '${_formatNumber(int.tryParse(bike.km) ?? 0)} km',
                             ),
-                            '${property.filters['furnishing']}',
-                          ),
                           const SizedBox(width: 4),
                           _buildDetailChip(
                             Icon(
-                              Icons.apartment,
+                              Icons.person,
                               size: 14,
                               color: Colors.grey[700],
                             ),
-                            'Floor: ${property.filters['floor']}/${property.filters['totalFloors']}',
+                            bike.owner,
                           ),
                         ],
                       ),
@@ -1077,7 +972,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
   Widget _buildDetailChip(Widget icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
@@ -1096,15 +991,25 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String _formatPrice(int price) {
     if (price >= 10000000) {
       double crore = price / 10000000;
-      return '${crore.toStringAsFixed(crore == crore.round() ? 0 : 2)} Crore';
+      return '${crore.toStringAsFixed(crore == crore.round() ? 0 : 2)} Cr';
     } else if (price >= 100000) {
       double lakh = price / 100000;
-      return '${lakh.toStringAsFixed(lakh == lakh.round() ? 0 : 2)} Lakh';
+      return '${lakh.toStringAsFixed(lakh == lakh.round() ? 0 : 2)} L';
     } else if (price >= 1000) {
       double thousand = price / 1000;
       return '${thousand.toStringAsFixed(thousand == thousand.round() ? 0 : 1)}K';
     } else {
       return price.toString();
+    }
+  }
+
+  String _formatNumber(int number) {
+    if (number >= 100000) {
+      return '${(number / 100000).toStringAsFixed(1)}L';
+    } else if (number >= 1000) {
+      return '${(number / 1000).round()}K';
+    } else {
+      return number.toString();
     }
   }
 

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lelamonline_flutter/feature/home/view/models/categories_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/categories_service.dart';
+import 'package:lelamonline_flutter/feature/categories/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
+import 'package:lelamonline_flutter/feature/categories/other_category/other_categoty.dart';
+import 'package:lelamonline_flutter/feature/categories/real%20estate/real_estate_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
 
 class CategoryWidget extends StatefulWidget {
   const CategoryWidget({super.key});
@@ -42,37 +46,75 @@ class _CategoryWidgetState extends State<CategoryWidget> {
             scrollDirection: Axis.horizontal,
             itemBuilder: (context, index) {
               final category = categories[index];
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    height: 70,
-                    width: 70,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(50),
-                      image: DecorationImage(
-                        image: NetworkImage(
-                          'https://lelamonline.com/admin/${category.image}',
+              return InkWell(
+                onTap: () {
+                  switch (category.id) {
+                    case "1":
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => UsedCarsPage()),
+                      );
+                      break;
+                    case "2":
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RealEstatePage(),
                         ),
-                        fit: BoxFit.cover,
+                      );
+                      break;
+                    case "3":
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CommercialVehiclesPage(),
+                        ),
+                      );
+                      break;
+                    case '4':
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => OthersPage()),
+                      );
+                      break;
+                    // case "4":
+                    //   Navigator.push(context,
+                    //       MaterialPageRoute(builder: (context) => ()));
+                    //   break;
+                  }
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      height: 70,
+                      width: 70,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(50),
+                        image: DecorationImage(
+                          image: NetworkImage(
+                            'https://lelamonline.com/admin/${category.image}',
+                          ),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: 70,
-                    child: Text(
-                      category.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: 70,
+                      child: Text(
+                        category.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               );
             },
           );
