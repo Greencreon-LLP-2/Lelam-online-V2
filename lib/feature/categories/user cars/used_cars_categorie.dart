@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
-// Placeholder Product model (replace with your actual Product model)
+// Placeholder Product model
 class Product {
   final String id;
   final String slug;
@@ -109,8 +109,37 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedKmRange = 'all';
   String _selectedSoldBy = 'all';
 
+  // Scroll controller for dynamic search bar
+  late ScrollController _scrollController;
+  bool _showAppBarSearch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    // Show app bar search when scrolled beyond threshold
+    if (_scrollController.offset > 100 && !_showAppBarSearch) {
+      setState(() => _showAppBarSearch = true);
+    }
+    // Hide app bar search when scrolled back to top
+    else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+      setState(() => _showAppBarSearch = false);
+    }
+  }
+
   final List<Product> _products = List.generate(
-    30, // Increased from 20 to 30 for more auction products
+    30,
     (index) => Product(
       id: '${index + 1}',
       slug: 'car-${index + 1}',
@@ -434,14 +463,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             'Kozhikode',
             'Kollam',
           ][index % 30],
-      // More auction products - every 2nd product is auction instead of every 3rd
       ifAuction: index % 2 == 0 ? '1' : '0',
       auctionStatus: index % 2 == 0 ? 'active' : 'inactive',
       auctionStartin:
           DateTime.now().add(Duration(hours: index % 24)).toIso8601String(),
       auctionEndin:
           DateTime.now().add(Duration(days: (index % 7) + 1)).toIso8601String(),
-      // Varied auction attempts: 0, 1, 2, or 3
       auctionAttempt:
           '${[0, 1, 2, 3, 0, 1, 0, 2, 1, 0, 3, 1, 0, 2, 1, 0, 1, 2, 0, 1, 0, 3, 2, 0, 1, 0, 2, 1, 0, 3][index % 30]}',
       adminApproval: '1',
@@ -596,11 +623,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               .toList();
     }
 
-    // Price filter (works for both sale and auction)
+    // Price filter
     if (_selectedPriceRange != 'all') {
       filtered =
           filtered.where((product) {
-            // Use auction starting price for auctions, regular price for sales
             int price =
                 product.ifAuction == '1'
                     ? (int.tryParse(product.auctionStartingPrice) ?? 0)
@@ -891,11 +917,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             // Cancel Button
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  Navigator.pop(
-                                    context,
-                                  ); // Just close the dialog/screen
-                                },
+                                onPressed: () => Navigator.pop(context),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primarypink,
                                   padding: const EdgeInsets.symmetric(
@@ -915,7 +937,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12), // Space between buttons
+                            const SizedBox(width: 12),
                             // Apply Filters Button
                             Expanded(
                               child: ElevatedButton(
@@ -932,9 +954,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: Text(
+                                child: const Text(
                                   'Apply Filters',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1101,6 +1123,171 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return count;
   }
 
+  Widget _buildFullAppBarContent() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.only(top: kToolbarHeight, left: 16, right: 16),
+      child: Column(
+        children: [
+          // Original search field
+          _buildSearchField(),
+          const SizedBox(height: 16),
+          // Location and filter buttons
+          Row(
+            children: [
+              // Location dropdown
+              Expanded(
+                child: PopupMenuButton<String>(
+                  icon: Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.black87),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _selectedLocation == 'all'
+                              ? 'All Kerala'
+                              : _selectedLocation,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  onSelected:
+                      (value) => setState(() => _selectedLocation = value),
+                  itemBuilder:
+                      (context) =>
+                          _keralaCities.map((city) {
+                            return PopupMenuItem(
+                              value: city,
+                              child: Row(
+                                children: [
+                                  if (_selectedLocation == city)
+                                    const Icon(Icons.check, color: Colors.blue),
+                                  if (_selectedLocation == city)
+                                    const SizedBox(width: 8),
+                                  Text(city == 'all' ? 'All Kerala' : city),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                ),
+              ),
+              // Filter button
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showFilterBottomSheet,
+                    icon: const Icon(Icons.tune, color: Colors.black87),
+                  ),
+                  if (_getActiveFilterCount() > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${_getActiveFilterCount()}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBarSearchField() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: _searchController,
+        autofocus: false,
+        decoration: InputDecoration(
+          hintText: 'Search cars...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                      });
+                    },
+                  )
+                  : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(top: 10),
+        ),
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      onChanged: (value) {
+        setState(() {
+          _searchQuery = value;
+        });
+      },
+      decoration: InputDecoration(
+        hintText: 'Search by brand, model, location, fuel type...',
+        hintStyle: TextStyle(color: Colors.grey.shade500),
+        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+        suffixIcon:
+            _searchQuery.isNotEmpty
+                ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+                : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blue),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1112,7 +1299,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
+        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
         actions: [
+          // Filter button (always visible)
           Stack(
             children: [
               IconButton(
@@ -1141,6 +1330,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 ),
             ],
           ),
+          // Location button (always visible)
           PopupMenuButton<String>(
             icon: const Icon(Icons.location_on, color: Colors.black87),
             onSelected: (String value) {
@@ -1168,54 +1358,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       ),
       body: Column(
         children: [
-          // Search Bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by brand, model, location, fuel type...',
-                hintStyle: TextStyle(color: Colors.grey.shade500),
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-                suffixIcon:
-                    _searchQuery.isNotEmpty
-                        ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                          onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                          },
-                        )
-                        : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.blue),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
+          // Search Bar (only shown when not in app bar)
+          if (!_showAppBarSearch)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildSearchField(),
             ),
-          ),
 
           // Market Place / Auction Toggle
           Container(
@@ -1243,16 +1392,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   ? Palette.primaryblue
                                   : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
-                          boxShadow:
-                              _listingType == 'sale'
-                                  ? [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                  : null,
                         ),
                         child: Text(
                           'Market Place',
@@ -1286,16 +1425,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   ? Palette.primaryblue
                                   : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
-                          boxShadow:
-                              _listingType == 'auction'
-                                  ? [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ]
-                                  : null,
                         ),
                         child: Text(
                           'Auction',
@@ -1319,49 +1448,210 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             ),
           ),
 
-          // Products List
-          Expanded(child: _buildProductsList()),
+          // Products List (with scroll controller)
+          Expanded(
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              children: [
+                for (var product in filteredProducts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildProductCard(product),
+                  ),
+                if (filteredProducts.isEmpty)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No cars found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildProductsList() {
+  Widget _buildToggleSection() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _listingType = 'sale'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color:
+                        _listingType == 'sale'
+                            ? Palette.primaryblue
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Market Place',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight:
+                          _listingType == 'sale'
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                      color:
+                          _listingType == 'sale'
+                              ? Colors.white
+                              : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _listingType = 'auction'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color:
+                        _listingType == 'auction'
+                            ? Palette.primaryblue
+                            : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Auction',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight:
+                          _listingType == 'auction'
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                      color:
+                          _listingType == 'auction'
+                              ? Colors.white
+                              : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget _buildSearchField() {
+  //     return TextField(
+  //       controller: _searchController,
+  //       onChanged: (value) {
+  //         setState(() {
+  //           _searchQuery = value;
+  //         });
+  //       },
+  //       decoration: InputDecoration(
+  //         hintText: 'Search by brand, model, location, fuel type...',
+  //         hintStyle: TextStyle(color: Colors.grey.shade500),
+  //         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+  //         suffixIcon: _searchQuery.isNotEmpty
+  //             ? IconButton(
+  //                 icon: Icon(Icons.clear, color: Colors.grey.shade400),
+  //                 onPressed: () {
+  //                   setState(() {
+  //                     _searchQuery = '';
+  //                     _searchController.clear();
+  //                   });
+  //                 },
+  //               )
+  //             : null,
+  //         border: OutlineInputBorder(
+  //           borderRadius: BorderRadius.circular(12),
+  //           borderSide: BorderSide(color: Colors.grey.shade200),
+  //         ),
+  //         enabledBorder: OutlineInputBorder(
+  //           borderRadius: BorderRadius.circular(12),
+  //           borderSide: BorderSide(color: Colors.grey.shade200),
+  //         ),
+  //         focusedBorder: OutlineInputBorder(
+  //           borderRadius: BorderRadius.circular(12),
+  //           borderSide: const BorderSide(color: Colors.blue),
+  //         ),
+  //         filled: true,
+  //         fillColor: Colors.grey.shade50,
+  //         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //       ),
+  //     );
+  //   }
+
+  Widget _buildProductsListAsSliver() {
     final products = filteredProducts;
 
     if (products.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'No cars found',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'No cars found',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your filters or search terms',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: products.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final product = products[index];
-        return _buildProductCard(product);
-      },
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: _buildProductCard(products[index]),
+        ),
+        childCount: products.length,
+      ),
     );
   }
 
@@ -1376,7 +1666,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.30), // darker shadow
+            color: Colors.black.withOpacity(0.30),
             blurRadius: 4,
             spreadRadius: 1,
             offset: const Offset(0, 5),
@@ -1634,7 +1924,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               decoration: BoxDecoration(
                 color: Palette.primarylightblue,
                 borderRadius: BorderRadius.circular(8),
-                // border: Border.all(color: Palette.primarylightblue),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1795,11 +2084,5 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     } else {
       return number.toString();
     }
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

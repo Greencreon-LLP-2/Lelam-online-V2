@@ -62,6 +62,36 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   List<String> _selectedFuelTypes = [];
 
   final TextEditingController _searchController = TextEditingController();
+  
+  // NEW: Scroll controller and search bar visibility
+  late ScrollController _scrollController;
+  bool _showAppBarSearch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    // Show app bar search when scrolled beyond threshold
+    if (_scrollController.offset > 100 && !_showAppBarSearch) {
+      setState(() => _showAppBarSearch = true);
+    } 
+    // Hide app bar search when scrolled back to top
+    else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+      setState(() => _showAppBarSearch = false);
+    }
+  }
 
   final List<Vehicle> _vehicles = List.generate(
     20,
@@ -568,6 +598,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
+        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
         actions: [
           Stack(
             children: [
@@ -625,97 +656,134 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       ),
       body: Column(
         children: [
-          // Search Bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by vehicle type, brand, location...',
-                hintStyle: TextStyle(color: Colors.grey.shade500),
-                prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-                suffixIcon:
-                    _searchQuery.isNotEmpty
-                        ? IconButton(
-                          icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                          onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                          },
-                        )
-                        : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.blue),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
+          // Search Bar (only shown when not in app bar)
+          if (!_showAppBarSearch) 
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildSearchField(),
+            ),
+
+          // Vehicles List (with scroll controller)
+          Expanded(
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              children: [
+                for (var vehicle in filteredVehicles)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildVehicleCard(vehicle),
+                  ),
+                if (filteredVehicles.isEmpty)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No vehicles found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
-          // Vehicles List
-          Expanded(child: _buildVehiclesList()),
         ],
       ),
     );
   }
 
-  Widget _buildVehiclesList() {
-    final vehicles = filteredVehicles;
-
-    if (vehicles.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'No vehicles found',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-            ),
-          ],
+  // Build the search field for the app bar
+  Widget _buildAppBarSearchField() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: _searchController,
+        autofocus: false,
+        decoration: InputDecoration(
+          hintText: 'Search vehicles...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(top: 10),
         ),
-      );
-    }
+        onChanged: (value) => setState(() => _searchQuery = value),
+      ),
+    );
+  }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: vehicles.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final vehicle = vehicles[index];
-        return _buildVehicleCard(vehicle);
+  // Build the main search field
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      onChanged: (value) {
+        setState(() {
+          _searchQuery = value;
+        });
       },
+      decoration: InputDecoration(
+        hintText: 'Search by vehicle type, brand, location...',
+        hintStyle: TextStyle(color: Colors.grey.shade500),
+        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+        suffixIcon:
+            _searchQuery.isNotEmpty
+                ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+                : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blue),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
     );
   }
 
@@ -1018,11 +1086,5 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     } else {
       return number.toString();
     }
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }
