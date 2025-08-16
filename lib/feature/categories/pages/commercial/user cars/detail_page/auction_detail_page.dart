@@ -1,34 +1,31 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
-import 'package:lelamonline_flutter/utils/palette.dart';
 
-class ProductDetailsPage extends StatefulWidget {
-  final Product product;
-
-  const ProductDetailsPage({super.key, required this.product});
+class AuctionProductDetailsPage extends StatefulWidget {
+  const AuctionProductDetailsPage({super.key, required Product product,});
 
   @override
-  State<ProductDetailsPage> createState() => _ProductDetailsPageState();
+  State<AuctionProductDetailsPage> createState() => _AuctionProductDetailsPageState();
 }
 
-class _ProductDetailsPageState extends State<ProductDetailsPage> {
+class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
-  final TransformationController _transformationController =
-      TransformationController();
+  final TransformationController _transformationController = TransformationController();
   bool _isFavorited = false;
+  int _currentBid = 990000; // Example current bid amount
+  final int _minBidIncrement = 5000; // Minimum bid increment
 
-  List<String> get _images {
-    if (widget.product.image.isNotEmpty) {
-      return ['https://lelamonline.com/admin/${widget.product.image}'];
-    }
-    return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-    ];
-  }
+  // Sample images
+  final List<String> _images = [
+    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    'https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260',
+    'https://images.pexels.com/photos/3802510/pexels-photo-3802510.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260',
+  ];
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -69,21 +66,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           minScale: 0.5,
                           maxScale: 5.0,
                           boundaryMargin: const EdgeInsets.all(double.infinity),
-                          onInteractionStart: (ScaleStartDetails details) {},
-                          onInteractionUpdate: (ScaleUpdateDetails details) {},
-                          onInteractionEnd: (ScaleEndDetails details) {
-                            if (details.velocity.pixelsPerSecond.distance > 0) {
-                              final double scale =
-                                  _transformationController.value
-                                      .getMaxScaleOnAxis();
-                              if (scale < 0.5) {
-                                _resetZoom();
-                              } else if (scale > 5.0) {
-                                _transformationController.value =
-                                    Matrix4.identity()..scale(5.0);
-                              }
-                            }
-                          },
                           child: GestureDetector(
                             onDoubleTap: _resetZoom,
                             child: Hero(
@@ -91,21 +73,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -132,8 +112,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -184,10 +163,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -198,22 +176,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
+                                        placeholder: (context, url) => const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) => const Icon(
+                                          Icons.error,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -234,6 +209,196 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
+  void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
+    final TextEditingController bidAmountController = TextEditingController();
+    if (isIncrease) {
+      bidAmountController.text = (_currentBid + _minBidIncrement).toString();
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Column(
+            children: [
+              const SizedBox(height: 8),
+              Text(
+                isIncrease ? 'Increase Your Bid' : 'Place Your Bid Amount',
+                style: const TextStyle(fontSize: 24),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Enter amount in rupees',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: bidAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                  decoration: InputDecoration(
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      child: const Text(
+                        '₹',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
+                    hintText: '0',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 2,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Current Highest Bid: ₹${NumberFormat('#,##0').format(_currentBid)}',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                ),
+                if (isIncrease) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Minimum increase: ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final String amount = bidAmountController.text;
+                if (amount.isNotEmpty) {
+                  final int bidAmount = int.tryParse(amount) ?? 0;
+                  if (bidAmount <= _currentBid) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  if (isIncrease && bidAmount < _currentBid + _minBidIncrement) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Minimum bid increase is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  setState(() {
+                    _currentBid = bidAmount;
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bid placed successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: Text(
+                isIncrease ? 'Increase Bid' : 'Submit Bid',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
   void _showMeetingDialog(BuildContext context) {
     DateTime selectedDate = DateTime.now();
     TimeOfDay selectedTime = TimeOfDay.now();
@@ -251,7 +416,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
               const SizedBox(height: 4),
               Text(
-                'Select date',
+                'Select date and time',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -268,12 +433,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ListTile(
                   leading: const Icon(
                     Icons.calendar_today,
-                    color: AppTheme.primaryColor,
+                    color: Colors.blue,
                   ),
                   title: const Text('Select Date'),
                   subtitle: Text(
                     '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
+                    style: const TextStyle(color: Colors.blue),
                   ),
                   onTap: () async {
                     final DateTime? picked = await showDatePicker(
@@ -284,6 +449,35 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     );
                     if (picked != null && picked != selectedDate) {
                       selectedDate = picked;
+                      // Rebuild dialog
+                      Navigator.pop(context);
+                      _showMeetingDialog(context);
+                    }
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: const Icon(
+                    Icons.access_time,
+                    color: Colors.blue,
+                  ),
+                  title: const Text('Select Time'),
+                  subtitle: Text(
+                    selectedTime.format(context),
+                    style: const TextStyle(color: Colors.blue),
+                  ),
+                  onTap: () async {
+                    final TimeOfDay? picked = await showTimePicker(
+                      context: context,
+                      initialTime: selectedTime,
+                    );
+                    if (picked != null && picked != selectedTime) {
+                      selectedTime = picked;
+                      // Rebuild dialog
                       Navigator.pop(context);
                       _showMeetingDialog(context);
                     }
@@ -315,10 +509,17 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
             ElevatedButton(
               onPressed: () {
+                // Process the meeting request
                 print(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year} at ${selectedTime.hour}:${selectedTime.minute}',
                 );
                 Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Meeting scheduled successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -348,23 +549,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     super.dispose();
   }
 
-  String _formatPriceWithLakh(double price) {
-    if (price >= 10000000) {
-      double crore = price / 10000000;
-      return '${crore.toStringAsFixed(crore == crore.roundToDouble() ? 0 : 2)} Crore';
-    } else if (price >= 100000) {
-      double lakh = price / 100000;
-      return '${lakh.toStringAsFixed(lakh == lakh.roundToDouble() ? 0 : 2)} Lakh';
-    } else if (price >= 1000) {
-      double thousand = price / 1000;
-      return '${thousand.toStringAsFixed(thousand == thousand.roundToDouble() ? 0 : 1)}K';
-    } else {
-      return price.toStringAsFixed(price == price.roundToDouble() ? 0 : 2);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final auctionEndTime = DateTime.now().add(const Duration(days: 2, hours: 5));
+    final timeLeft = auctionEndTime.difference(DateTime.now());
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -374,6 +563,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Car Image Placeholder
                 Stack(
                   children: [
                     SizedBox(
@@ -396,13 +586,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -435,7 +623,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       child: Row(
                         children: [
                           IconButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () {
+                              context.pop();
+                            },
                             icon: const Icon(
                               Icons.arrow_back,
                               color: Colors.white,
@@ -458,7 +648,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
-                              // Share functionality
+                              // TODO: Implement share functionality
                             },
                           ),
                         ],
@@ -466,21 +656,74 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     ),
                   ],
                 ),
+                
+                // Current Highest Bid Banner
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  color: Colors.blue.shade50,
+                  child: Center(
+                    child: Column(
+                      children: [
+                        const Text(
+                          'CURRENT HIGHEST BID',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '₹${NumberFormat('#,##0').format(_currentBid)}',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Auction Timer
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  color: Colors.red.shade50,
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.timer, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.product.title,
-                        style: const TextStyle(
+                      const Text(
+                        'Mahindra XUV 500',
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.product.modelVariation,
+                        'W10',
                         style: TextStyle(fontSize: 18, color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 8),
@@ -492,9 +735,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             color: Colors.grey,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            widget.product.landMark,
-                            style: const TextStyle(color: Colors.grey),
+                          const Text(
+                            'Thrissur',
+                            style: TextStyle(color: Colors.grey),
                           ),
                           const Spacer(),
                           const Icon(
@@ -504,31 +747,71 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            widget.product.createdOn,
+                            'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
                             style: const TextStyle(color: Colors.grey),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        '₹ ${_formatPriceWithLakh(double.tryParse(widget.product.price) ?? 0)}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Starting Price',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  '₹850,000',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Minimum Bid Increment',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  '₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            '#AD ID ${widget.product.id}',
-                            style: const TextStyle(color: Colors.grey),
+                          const Text(
+                            '#AD ID 494',
+                            style: TextStyle(color: Colors.grey),
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // Call functionality
+                              // TODO: Implement call functionality
                             },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
@@ -564,16 +847,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           Expanded(
                             child: _buildDetailItem(
                               Icons.calendar_today,
-                              widget.product.filters['year'] ?? 'N/A',
+                              '2016',
                             ),
                           ),
                           Expanded(
-                            child: _buildDetailItem(
-                              Icons.person,
-                              _getOwnerText(
-                                widget.product.filters['owners'] ?? '1',
-                              ),
-                            ),
+                            child: _buildDetailItem(Icons.person, '2nd Owner'),
                           ),
                         ],
                       ),
@@ -583,20 +861,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           Expanded(
                             child: _buildDetailItem(
                               Icons.local_gas_station,
-                              widget.product.filters['fuel'] ?? 'N/A',
+                              'Diesel',
                             ),
                           ),
                           Expanded(
-                            child: _buildDetailItem(
-                              Icons.settings,
-                              widget.product.filters['transmission'] ?? 'N/A',
-                            ),
+                            child: _buildDetailItem(Icons.settings, 'Manual'),
                           ),
                           Expanded(
-                            child: _buildDetailItem(
-                              Icons.speed,
-                              '${_formatNumber(int.tryParse(widget.product.filters['km']?.toString() ?? '0') ?? 0)} KM',
-                            ),
+                            child: _buildDetailItem(Icons.speed, '42000 KM'),
                           ),
                         ],
                       ),
@@ -617,30 +889,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerCommentItem(
-                        'Year',
-                        widget.product.filters['year'] ?? 'N/A',
-                      ),
-                      _buildSellerCommentItem(
-                        'No Of Owners',
-                        _getOwnerText(widget.product.filters['owners'] ?? '1'),
-                      ),
-                      _buildSellerCommentItem(
-                        'Fuel Type',
-                        widget.product.filters['fuel'] ?? 'N/A',
-                      ),
-                      _buildSellerCommentItem(
-                        'Transmission',
-                        widget.product.filters['transmission'] ?? 'N/A',
-                      ),
+                      _buildSellerCommentItem('Year', '2016'),
+                      _buildSellerCommentItem('No Of Owners', '2nd Owner'),
+                      _buildSellerCommentItem('Fuel Type', 'Diesel'),
+                      _buildSellerCommentItem('Transmission', 'Manual'),
                       _buildSellerCommentItem(
                         'Service History',
                         'In Showroom Only',
                       ),
-                      _buildSellerCommentItem(
-                        'Sold By',
-                        widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
-                      ),
+                      _buildSellerCommentItem('Sold By', 'Re Seller'),
                     ],
                   ),
                 ),
@@ -659,8 +916,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildSellerInformationItem(
-                        widget.product.createdBy,
-                        'Member Since ${widget.product.createdOn}',
+                        'LELAMONLINE ADMIN',
+                        'Member Since 2024-12-07 11:49:43',
                         context,
                       ),
                     ],
@@ -673,14 +930,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Questions',
+                        'Bidding History',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildQuestionsSection(),
+                      _buildBidHistoryItem('John D.', '₹1,020,000', '2 hours ago'),
+                      _buildBidHistoryItem('Sarah M.', '₹1,010,000', '3 hours ago'),
+                      _buildBidHistoryItem('Robert P.', '₹1,000,000', '5 hours ago'),
+                      _buildBidHistoryItem('Emma S.', '₹990,000', '1 day ago'),
+                      _buildBidHistoryItem('Michael T.', '₹980,000', '1 day ago'),
                     ],
                   ),
                 ),
@@ -708,34 +969,45 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        // Contact seller functionality
-                      },
+                      onPressed: () => _showBidDialog(context, isIncrease: true),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primarypink,
+                        backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('Contact Seller'),
+                      child: const Text('Increase Bid'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _showMeetingDialog(context),
+                      onPressed: () => _showBidDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
+                        backgroundColor: Colors.pink,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('Fix Meeting'),
+                      child: const Text('Place Bid'),
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () => _showMeetingDialog(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Icon(Icons.calendar_today),
                   ),
                 ],
               ),
@@ -772,6 +1044,53 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
+  Widget _buildBidHistoryItem(String bidder, String amount, String time) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.blue.shade100,
+            child: Text(
+              bidder.substring(0, 1),
+              style: const TextStyle(color: Colors.blue),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bidder,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            amount,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSellerInformationItem(
     String name,
     String memberSince,
@@ -779,9 +1098,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   ) {
     return Row(
       children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
+        CircleAvatar(
+          backgroundColor: Colors.blue.shade100,
+          child: const Icon(Icons.person, color: Colors.blue),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -803,13 +1122,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               const SizedBox(height: 4),
               InkWell(
                 onTap: () {
-                  // Navigate to seller profile
+                  // TODO: Navigate to seller profile
                 },
                 child: const Text(
                   'SEE PROFILE',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.blueAccent,
+                    color: Colors.blue,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -820,58 +1139,5 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       ],
     );
-  }
-
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Ask a question functionality
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text('Ask a question'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-        return '1st Owner';
-      case '2':
-        return '2nd Owner';
-      case '3':
-        return '3rd Owner';
-      default:
-        return '${owners}th Owner';
-    }
-  }
-
-  String _formatNumber(num number) {
-    if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(2)}L';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    } else {
-      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
-    }
   }
 }
