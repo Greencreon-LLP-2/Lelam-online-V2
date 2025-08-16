@@ -16,7 +16,7 @@ class ProductSectionWidget extends StatefulWidget {
 }
 
 class _ProductSectionWidgetState extends State<ProductSectionWidget> {
-  List<Product> _products = [];
+  List<FeatureListModel> _products = [];
   bool _isLoading = true;
   String? _error;
   bool _hasFeaturedProducts = false;
@@ -54,7 +54,9 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
           setState(() {
             _products =
                 decodedResponse
-                    .map<Product>((json) => Product.fromJson(json))
+                    .map<FeatureListModel>(
+                      (json) => FeatureListModel.fromJson(json),
+                    )
                     .toList();
             _isLoading = false;
             _hasFeaturedProducts = _products.isNotEmpty;
@@ -67,7 +69,9 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
             setState(() {
               _products =
                   (decodedResponse['data'] as List)
-                      .map<Product>((json) => Product.fromJson(json))
+                      .map<FeatureListModel>(
+                        (json) => FeatureListModel.fromJson(json),
+                      )
                       .toList();
               _isLoading = false;
               _hasFeaturedProducts = _products.isNotEmpty;
@@ -87,7 +91,7 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
     }
   }
 
-  List<Product> get filteredProducts {
+  List<FeatureListModel> get filteredProducts {
     if (widget.searchQuery.trim().isEmpty) {
       return _products;
     }
@@ -170,7 +174,7 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
     );
   }
 
-  Widget _buildProductCard(BuildContext context, Product product) {
+  Widget _buildProductCard(BuildContext context, FeatureListModel product) {
     final isAuction = product.ifAuction == "1";
     final formattedPrice =
         double.tryParse(product.price)?.toStringAsFixed(0) ?? '0';

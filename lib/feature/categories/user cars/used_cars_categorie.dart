@@ -1,8 +1,277 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
-// Placeholder Product model
+class MarketplacePost {
+  final String id;
+  final String slug;
+  final String title;
+  final String categoryId;
+  final String image;
+  final String brand;
+  final String model;
+  final String modelVariation;
+  final String description;
+  final String price;
+  final String auctionPriceInterval;
+  final String auctionStartingPrice;
+  final List<String> attributeId;
+  final List<String> attributeVariationsId;
+  final Map<String, List<String>> filters;
+  final String latitude;
+  final String longitude;
+  final String userZoneId;
+  final String parentZoneId;
+  final String zoneId;
+  final String landMark;
+  final String ifAuction;
+  final String auctionStatus;
+  final String auctionStartin;
+  final String auctionEndin;
+  final String auctionAttempt;
+  final String adminApproval;
+  final String ifFinance;
+  final String ifExchange;
+  final String feature;
+  final String status;
+  final String visiterCount;
+  final String ifSold;
+  final String ifExpired;
+  final String byDealer;
+  final String createdBy;
+  final String createdOn;
+  final String updatedOn;
+
+  MarketplacePost({
+    required this.id,
+    required this.slug,
+    required this.title,
+    required this.categoryId,
+    required this.image,
+    required this.brand,
+    required this.model,
+    required this.modelVariation,
+    required this.description,
+    required this.price,
+    required this.auctionPriceInterval,
+    required this.auctionStartingPrice,
+    required this.attributeId,
+    required this.attributeVariationsId,
+    required this.filters,
+    required this.latitude,
+    required this.longitude,
+    required this.userZoneId,
+    required this.parentZoneId,
+    required this.zoneId,
+    required this.landMark,
+    required this.ifAuction,
+    required this.auctionStatus,
+    required this.auctionStartin,
+    required this.auctionEndin,
+    required this.auctionAttempt,
+    required this.adminApproval,
+    required this.ifFinance,
+    required this.ifExchange,
+    required this.feature,
+    required this.status,
+    required this.visiterCount,
+    required this.ifSold,
+    required this.ifExpired,
+    required this.byDealer,
+    required this.createdBy,
+    required this.createdOn,
+    required this.updatedOn,
+  });
+
+  factory MarketplacePost.fromJson(Map<String, dynamic> json) {
+    List<String> parseStringList(dynamic value) {
+      if (value == null) return [];
+      if (value is List) return List<String>.from(value);
+      if (value is String) {
+        try {
+          final decoded = jsonDecode(value);
+          if (decoded is List)
+            return List<String>.from(decoded.map((e) => e.toString()));
+        } catch (e) {
+          return value.split(',').map((e) => e.trim()).toList();
+        }
+      }
+      return [];
+    }
+
+    Map<String, List<String>> parseFilters(dynamic value) {
+      if (value == null) return {};
+      if (value is Map) {
+        return Map<String, List<String>>.from(
+          value.map((key, value) {
+            return MapEntry(key.toString(), parseStringList(value));
+          }),
+        );
+      }
+      if (value is String) {
+        try {
+          final decoded = jsonDecode(value);
+          if (decoded is Map) {
+            return Map<String, List<String>>.from(
+              decoded.map((key, value) {
+                return MapEntry(key.toString(), parseStringList(value));
+              }),
+            );
+          }
+        } catch (e) {
+          return {};
+        }
+      }
+      return {};
+    }
+
+    return MarketplacePost(
+      id: json['id']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      categoryId: json['category_id']?.toString() ?? '',
+      image: json['image']?.toString() ?? '',
+      brand: json['brand']?.toString() ?? '',
+      model: json['model']?.toString() ?? '',
+      modelVariation: json['model_variation']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      price: json['price']?.toString() ?? '0',
+      auctionPriceInterval: json['auction_price_intervel']?.toString() ?? '0',
+      auctionStartingPrice: json['auction_starting_price']?.toString() ?? '0',
+      attributeId: parseStringList(json['attribute_id']),
+      attributeVariationsId: parseStringList(json['attribute_variations_id']),
+      filters: parseFilters(json['filters']),
+      latitude: json['latitude']?.toString() ?? '',
+      longitude: json['longitude']?.toString() ?? '',
+      userZoneId: json['user_zone_id']?.toString() ?? '',
+      parentZoneId: json['parent_zone_id']?.toString() ?? '',
+      zoneId: json['zone_id']?.toString() ?? '',
+      landMark: json['land_mark']?.toString() ?? '',
+      ifAuction: json['if_auction']?.toString() ?? '0',
+      auctionStatus: json['auction_status']?.toString() ?? '',
+      auctionStartin: json['auction_startin']?.toString() ?? '',
+      auctionEndin: json['auction_endin']?.toString() ?? '',
+      auctionAttempt: json['auction_attempt']?.toString() ?? '0',
+      adminApproval: json['admin_approval']?.toString() ?? '0',
+      ifFinance: json['if_finance']?.toString() ?? '0',
+      ifExchange: json['if_exchange']?.toString() ?? '0',
+      feature: json['feature']?.toString() ?? '0',
+      status: json['status']?.toString() ?? '0',
+      visiterCount: json['visiter_count']?.toString() ?? '0',
+      ifSold: json['if_sold']?.toString() ?? '0',
+      ifExpired: json['if_expired']?.toString() ?? '0',
+      byDealer: json['by_dealer']?.toString() ?? '0',
+      createdBy: json['created_by']?.toString() ?? '',
+      createdOn: json['created_on']?.toString() ?? '',
+      updatedOn: json['updated_on']?.toString() ?? '',
+    );
+  }
+
+  Product toProduct() {
+
+    final convertedFilters = filters.map(
+      (key, value) => MapEntry(key, value.isNotEmpty ? value.first : ''),
+    );
+
+    return Product(
+      id: id,
+      slug: slug,
+      title: title,
+      categoryId: categoryId,
+      image: image,
+      brand: brand,
+      model: model,
+      modelVariation: modelVariation,
+      description: description,
+      price: price,
+      auctionPriceIntervel: auctionPriceInterval,
+      auctionStartingPrice: auctionStartingPrice,
+      attributeId: attributeId,
+      attributeVariationsId: attributeVariationsId,
+      filters: convertedFilters,
+      latitude: latitude,
+      longitude: longitude,
+      userZoneId: userZoneId,
+      parentZoneId: parentZoneId,
+      zoneId: zoneId,
+      landMark: landMark,
+      ifAuction: ifAuction,
+      auctionStatus: auctionStatus,
+      auctionStartin: auctionStartin,
+      auctionEndin: auctionEndin,
+      auctionAttempt: auctionAttempt,
+      adminApproval: adminApproval,
+      ifFinance: ifFinance,
+      ifExchange: ifExchange,
+      feature: feature,
+      status: status,
+      visiterCount: visiterCount,
+      ifSold: ifSold,
+      ifExpired: ifExpired,
+      byDealer: byDealer,
+      createdBy: createdBy,
+      createdOn: createdOn,
+      updatedOn: updatedOn,
+    );
+  }
+}
+
+// Marketplace Service
+class MarketplaceService {
+  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
+
+  Future<List<MarketplacePost>> fetchPosts({
+    required String categoryId,
+    required String userZoneId,
+  }) async {
+    final url =
+        '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        // First decode the response body
+        final decodedBody = jsonDecode(response.body);
+
+        // Check if the response is a List
+        if (decodedBody is List) {
+          return decodedBody.map((json) {
+            try {
+              return MarketplacePost.fromJson(json);
+            } catch (e) {
+              print('Error parsing post: $e');
+              print('Problematic JSON: $json');
+              throw Exception('Failed to parse post: $e');
+            }
+          }).toList();
+        }
+        // Handle case where API returns a Map with data
+        else if (decodedBody is Map && decodedBody.containsKey('data')) {
+          final data = decodedBody['data'] as List;
+          return data.map((json) => MarketplacePost.fromJson(json)).toList();
+        }
+        // Handle unexpected format
+        else {
+          throw Exception('Unexpected API response format');
+        }
+      } else {
+        throw Exception('Failed to load posts: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error in fetchPosts: $e');
+      throw Exception('Error fetching posts: $e');
+    }
+  }
+}
+
+// Product model (kept as provided for UI compatibility)
 class Product {
   final String id;
   final String slug;
@@ -98,6 +367,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _listingType = 'sale';
 
   final TextEditingController _searchController = TextEditingController();
+  final MarketplaceService _marketplaceService = MarketplaceService();
+  List<Product> _products = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Filter variables
   List<String> _selectedBrands = [];
@@ -118,375 +391,47 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_handleScroll);
+    _fetchProducts();
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   void _handleScroll() {
-    // Show app bar search when scrolled beyond threshold
     if (_scrollController.offset > 100 && !_showAppBarSearch) {
       setState(() => _showAppBarSearch = true);
-    }
-    // Hide app bar search when scrolled back to top
-    else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+    } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
       setState(() => _showAppBarSearch = false);
     }
   }
 
-  final List<Product> _products = List.generate(
-    30,
-    (index) => Product(
-      id: '${index + 1}',
-      slug: 'car-${index + 1}',
-      title:
-          [
-            'Hyundai Grand i10 Nios',
-            'Hyundai i10',
-            'Tata Tiago',
-            'Maruti Swift VDi',
-            'Toyota Camry Hybrid',
-            'BMW 320d Sport',
-            'Audi A4 Premium',
-            'Ford EcoSport Titanium',
-            'Mahindra XUV500 W8',
-            'Volkswagen Polo GT',
-            'Honda City VTi',
-            'Maruti Baleno Delta',
-            'Hyundai Creta SX',
-            'Tata Harrier XZ+',
-            'Kia Seltos HTK+',
-            'Maruti Alto K10',
-            'Honda Jazz VX',
-            'Toyota Innova Crysta',
-            'Mahindra Scorpio S11',
-            'Hyundai Venue SX',
-            'Tata Nexon XZ+',
-            'Ford Figo Titanium',
-            'Maruti Wagon R VXI',
-            'Hyundai Elantra SX',
-            'BMW X1 sDrive20d',
-            'Audi Q3 Premium Plus',
-            'Mercedes C-Class',
-            'Skoda Rapid Monte Carlo',
-            'Volkswagen Vento Highline',
-            'Nissan Kicks XV',
-          ][index % 30],
-      categoryId: 'used-cars',
-      image: 'assets/images/used_car_${(index % 5) + 1}.jpg',
-      brand:
-          [
-            'Hyundai',
-            'Hyundai',
-            'Tata',
-            'Maruti',
-            'Toyota',
-            'BMW',
-            'Audi',
-            'Ford',
-            'Mahindra',
-            'Volkswagen',
-            'Honda',
-            'Maruti',
-            'Hyundai',
-            'Tata',
-            'Kia',
-            'Maruti',
-            'Honda',
-            'Toyota',
-            'Mahindra',
-            'Hyundai',
-            'Tata',
-            'Ford',
-            'Maruti',
-            'Hyundai',
-            'BMW',
-            'Audi',
-            'Mercedes',
-            'Skoda',
-            'Volkswagen',
-            'Nissan',
-          ][index % 30],
-      model:
-          [
-            'Grand i10 Nios',
-            'i10',
-            'Tiago',
-            'Swift',
-            'Camry',
-            '320d',
-            'A4',
-            'EcoSport',
-            'XUV500',
-            'Polo',
-            'City',
-            'Baleno',
-            'Creta',
-            'Harrier',
-            'Seltos',
-            'Alto K10',
-            'Jazz',
-            'Innova Crysta',
-            'Scorpio',
-            'Venue',
-            'Nexon',
-            'Figo',
-            'Wagon R',
-            'Elantra',
-            'X1',
-            'Q3',
-            'C-Class',
-            'Rapid',
-            'Vento',
-            'Kicks',
-          ][index % 30],
-      modelVariation:
-          [
-            'Sportz',
-            'Sportz',
-            'XT',
-            'VDi',
-            'Hybrid',
-            'Sport',
-            'Premium',
-            'Titanium',
-            'W8',
-            'GT',
-            'VTi',
-            'Delta',
-            'SX',
-            'XZ+',
-            'HTK+',
-            'VXI',
-            'VX',
-            'GX',
-            'S11',
-            'SX',
-            'XZ+',
-            'Titanium',
-            'VXI',
-            'SX',
-            'sDrive20d',
-            'Premium Plus',
-            'Progressive',
-            'Monte Carlo',
-            'Highline',
-            'XV',
-          ][index % 30],
-      description: 'Well maintained car in excellent condition',
-      price:
-          '${[430000, 210000, 390000, 520000, 1200000, 1800000, 2200000, 680000, 950000, 750000, 890000, 650000, 1150000, 1400000, 1300000, 280000, 720000, 1650000, 1100000, 850000, 980000, 480000, 350000, 1580000, 2400000, 2800000, 3200000, 780000, 920000, 1020000][index % 30]}',
-      auctionPriceIntervel: '5000',
-      auctionStartingPrice:
-          '${[380000, 180000, 340000, 470000, 1100000, 1650000, 2000000, 620000, 850000, 680000, 800000, 580000, 1000000, 1250000, 1150000, 250000, 650000, 1500000, 980000, 750000, 880000, 420000, 300000, 1400000, 2200000, 2500000, 2900000, 700000, 820000, 920000][index % 30]}',
-      attributeId: ['attr1', 'attr2'],
-      attributeVariationsId: ['var1', 'var2'],
-      filters: {
-        'year':
-            '${[2019, 2011, 2018, 2017, 2020, 2016, 2021, 2015, 2019, 2018, 2020, 2019, 2021, 2020, 2022, 2013, 2019, 2021, 2018, 2020, 2022, 2016, 2014, 2021, 2017, 2019, 2020, 2018, 2019, 2021][index % 30]}',
-        'km':
-            '${[67000, 87000, 45000, 32000, 25000, 85000, 15000, 95000, 42000, 58000, 28000, 72000, 35000, 48000, 22000, 105000, 38000, 18000, 65000, 29000, 41000, 78000, 92000, 33000, 55000, 47000, 26000, 63000, 51000, 36000][index % 30]}',
-        'fuel':
-            [
-              'Petrol',
-              'Petrol',
-              'Petrol',
-              'Diesel',
-              'Hybrid',
-              'Diesel',
-              'Petrol',
-              'Diesel',
-              'Diesel',
-              'Petrol',
-              'Petrol',
-              'Petrol',
-              'Diesel',
-              'Diesel',
-              'Petrol',
-              'Petrol',
-              'Petrol',
-              'Diesel',
-              'Diesel',
-              'Petrol',
-              'Diesel',
-              'Petrol',
-              'Petrol',
-              'Petrol',
-              'Diesel',
-              'Petrol',
-              'Petrol',
-              'Petrol',
-              'Diesel',
-              'Petrol',
-            ][index % 30],
-        'transmission':
-            [
-              'Automatic',
-              'Automatic',
-              'Manual',
-              'Manual',
-              'Automatic',
-              'Manual',
-              'Automatic',
-              'Manual',
-              'Automatic',
-              'Manual',
-              'Manual',
-              'CVT',
-              'Automatic',
-              'Manual',
-              'Manual',
-              'Manual',
-              'Manual',
-              'Automatic',
-              'Manual',
-              'Automatic',
-              'Manual',
-              'Manual',
-              'Manual',
-              'Automatic',
-              'Automatic',
-              'Automatic',
-              'Automatic',
-              'Manual',
-              'Automatic',
-              'CVT',
-            ][index % 30],
-        'owners':
-            '${[3, 4, 2, 1, 1, 2, 1, 3, 2, 1, 1, 2, 1, 2, 1, 2, 1, 1, 2, 1, 1, 3, 4, 1, 2, 1, 1, 2, 1, 2][index % 30]}',
-        'engine':
-            [
-              '1.2L',
-              '1.2L',
-              '1.2L',
-              '1.3L',
-              '2.5L',
-              '2.0L',
-              '2.0L',
-              '1.5L',
-              '2.2L',
-              '1.0L',
-              '1.5L',
-              '1.2L',
-              '1.6L',
-              '2.0L',
-              '1.5L',
-              '1.0L',
-              '1.2L',
-              '2.4L',
-              '2.2L',
-              '1.0L',
-              '1.2L',
-              '1.2L',
-              '1.0L',
-              '1.8L',
-              '2.0L',
-              '2.0L',
-              '1.5L',
-              '1.6L',
-              '1.6L',
-              '1.5L',
-            ][index % 30],
-        'condition':
-            [
-              'Excellent',
-              'Good',
-              'Good',
-              'Excellent',
-              'Excellent',
-              'Fair',
-              'Excellent',
-              'Good',
-              'Good',
-              'Excellent',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Good',
-              'Fair',
-              'Good',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Excellent',
-              'Good',
-              'Excellent',
-              'Good',
-            ][index % 30],
-      },
-      latitude: '19.0760',
-      longitude: '72.8777',
-      userZoneId: 'zone_${index % 3 + 1}',
-      parentZoneId: 'parent_zone_1',
-      zoneId: 'zone_${index % 3 + 1}',
-      landMark:
-          [
-            'Thiruvananthapuram',
-            'Kollam',
-            'Pathanamthitta',
-            'Alappuzha',
-            'Kottayam',
-            'Idukki',
-            'Ernakulam',
-            'Thrissur',
-            'Palakkad',
-            'Malappuram',
-            'Kozhikode',
-            'Wayanad',
-            'Kannur',
-            'Kasaragod',
-            'Ernakulam',
-            'Kollam',
-            'Kottayam',
-            'Thrissur',
-            'Kozhikode',
-            'Ernakulam',
-            'Thiruvananthapuram',
-            'Palakkad',
-            'Alappuzha',
-            'Kannur',
-            'Ernakulam',
-            'Kottayam',
-            'Thiruvananthapuram',
-            'Thrissur',
-            'Kozhikode',
-            'Kollam',
-          ][index % 30],
-      ifAuction: index % 2 == 0 ? '1' : '0',
-      auctionStatus: index % 2 == 0 ? 'active' : 'inactive',
-      auctionStartin:
-          DateTime.now().add(Duration(hours: index % 24)).toIso8601String(),
-      auctionEndin:
-          DateTime.now().add(Duration(days: (index % 7) + 1)).toIso8601String(),
-      auctionAttempt:
-          '${[0, 1, 2, 3, 0, 1, 0, 2, 1, 0, 3, 1, 0, 2, 1, 0, 1, 2, 0, 1, 0, 3, 2, 0, 1, 0, 2, 1, 0, 3][index % 30]}',
-      adminApproval: '1',
-      ifFinance: index % 2 == 0 ? '1' : '0',
-      ifExchange: index % 3 == 0 ? '1' : '0',
-      feature: index % 5 == 0 ? '1' : '0',
-      status: '1',
-      visiterCount: '${(index + 1) * 10}',
-      ifSold: '0',
-      ifExpired: '0',
-      byDealer: ['0', '1', '1', '0', '1', '0', '1', '0', '1', '0'][index % 10],
-      createdBy: 'user_${index + 1}',
-      createdOn:
-          DateTime.now().subtract(Duration(days: index)).toIso8601String(),
-      updatedOn:
-          DateTime.now().subtract(Duration(hours: index)).toIso8601String(),
-    ),
-  );
+  Future<void> _fetchProducts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final posts = await _marketplaceService.fetchPosts(
+        categoryId: '1',
+        userZoneId: '0',
+      );
+      setState(() {
+        _products = posts.map((post) => post.toProduct()).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   final List<String> _brands = [
     'Maruti Suzuki',
@@ -581,7 +526,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<Product> get filteredProducts {
     List<Product> filtered = _products;
 
-    // Enhanced search functionality
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
       filtered =
@@ -597,7 +541,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               product.filters['year']?.toString() ?? '',
               product.byDealer == '1' ? 'dealer' : 'owner',
             ].join(' ');
-
             return searchableText.contains(query);
           }).toList();
     }
@@ -615,7 +558,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       filtered = filtered.where((product) => product.ifAuction == '0').toList();
     }
 
-    // Brand filter
     if (_selectedBrands.isNotEmpty) {
       filtered =
           filtered
@@ -623,7 +565,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               .toList();
     }
 
-    // Price filter
     if (_selectedPriceRange != 'all') {
       filtered =
           filtered.where((product) {
@@ -631,7 +572,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 product.ifAuction == '1'
                     ? (int.tryParse(product.auctionStartingPrice) ?? 0)
                     : (int.tryParse(product.price) ?? 0);
-
             switch (_selectedPriceRange) {
               case 'Under ₹2 Lakh':
                 return price < 200000;
@@ -649,7 +589,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }).toList();
     }
 
-    // Year filter
     if (_selectedYearRange != 'all') {
       filtered =
           filtered.where((product) {
@@ -672,7 +611,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }).toList();
     }
 
-    // Owners filter
     if (_selectedOwnersRange != 'all') {
       filtered =
           filtered.where((product) {
@@ -693,7 +631,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }).toList();
     }
 
-    // Fuel type filter
     if (_selectedFuelTypes.isNotEmpty) {
       filtered =
           filtered
@@ -705,7 +642,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               .toList();
     }
 
-    // Transmission filter
     if (_selectedTransmissions.isNotEmpty) {
       filtered =
           filtered
@@ -717,7 +653,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               .toList();
     }
 
-    // KM filter
     if (_selectedKmRange != 'all') {
       filtered =
           filtered.where((product) {
@@ -740,14 +675,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }).toList();
     }
 
-    // Sold by filter
     if (_selectedSoldBy != 'all') {
       filtered =
           filtered.where((product) {
             switch (_selectedSoldBy) {
               case 'Owner':
                 return product.byDealer == '0';
-              case 'Dealer':
+              // casevan 'Dealer':
               case 'Certified Dealer':
                 return product.byDealer == '1';
               default:
@@ -757,6 +691,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
 
     return filtered;
+  }
+
+  String getImageUrl(String imagePath) {
+    // Remove any leading slashes to prevent double slashes
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://lelamonline.com/$cleanedPath';
   }
 
   void _showFilterBottomSheet() {
@@ -777,7 +718,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ),
                   child: Column(
                     children: [
-                      // Handle
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 12),
                         width: 40,
@@ -787,8 +727,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-
-                      // Header
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Row(
@@ -825,10 +763,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           ],
                         ),
                       ),
-
                       const Divider(height: 1),
-
-                      // Filters Content
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -902,8 +837,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           ),
                         ),
                       ),
-
-                      // Apply Button
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -914,7 +847,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                         ),
                         child: Row(
                           children: [
-                            // Cancel Button
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () => Navigator.pop(context),
@@ -938,7 +870,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            // Apply Filters Button
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () {
@@ -1073,7 +1004,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               options.map((option) {
                 final isSelected = selectedValue == option;
                 final displayText = option == 'all' ? 'Any $title' : option;
-
                 return GestureDetector(
                   onTap: () => onChanged(option),
                   child: Container(
@@ -1121,91 +1051,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (_selectedKmRange != 'all') count++;
     if (_selectedSoldBy != 'all') count++;
     return count;
-  }
-
-  Widget _buildFullAppBarContent() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.only(top: kToolbarHeight, left: 16, right: 16),
-      child: Column(
-        children: [
-          // Original search field
-          _buildSearchField(),
-          const SizedBox(height: 16),
-          // Location and filter buttons
-          Row(
-            children: [
-              // Location dropdown
-              Expanded(
-                child: PopupMenuButton<String>(
-                  icon: Row(
-                    children: [
-                      const Icon(Icons.location_on, color: Colors.black87),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          _selectedLocation == 'all'
-                              ? 'All Kerala'
-                              : _selectedLocation,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  onSelected:
-                      (value) => setState(() => _selectedLocation = value),
-                  itemBuilder:
-                      (context) =>
-                          _keralaCities.map((city) {
-                            return PopupMenuItem(
-                              value: city,
-                              child: Row(
-                                children: [
-                                  if (_selectedLocation == city)
-                                    const Icon(Icons.check, color: Colors.blue),
-                                  if (_selectedLocation == city)
-                                    const SizedBox(width: 8),
-                                  Text(city == 'all' ? 'All Kerala' : city),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                ),
-              ),
-              // Filter button
-              Stack(
-                children: [
-                  IconButton(
-                    onPressed: _showFilterBottomSheet,
-                    icon: const Icon(Icons.tune, color: Colors.black87),
-                  ),
-                  if (_getActiveFilterCount() > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '${_getActiveFilterCount()}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildAppBarSearchField() {
@@ -1301,7 +1146,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         ),
         title: _showAppBarSearch ? _buildAppBarSearchField() : null,
         actions: [
-          // Filter button (always visible)
           Stack(
             children: [
               IconButton(
@@ -1330,7 +1174,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 ),
             ],
           ),
-          // Location button (always visible)
           PopupMenuButton<String>(
             icon: const Icon(Icons.location_on, color: Colors.black87),
             onSelected: (String value) {
@@ -1358,15 +1201,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       ),
       body: Column(
         children: [
-          // Search Bar (only shown when not in app bar)
           if (!_showAppBarSearch)
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: _buildSearchField(),
             ),
-
-          // Market Place / Auction Toggle
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1379,11 +1219,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _listingType = 'sale';
-                        });
-                      },
+                      onTap: () => setState(() => _listingType = 'sale'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
@@ -1412,11 +1248,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _listingType = 'auction';
-                        });
-                      },
+                      onTap: () => setState(() => _listingType = 'auction'),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
@@ -1447,210 +1279,79 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ),
             ),
           ),
-
-          // Products List (with scroll controller)
           Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              children: [
-                for (var product in filteredProducts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildProductCard(product),
-                  ),
-                if (filteredProducts.isEmpty)
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorMessage != null
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: $_errorMessage',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchProducts,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                    : ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
                       children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No cars found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                        for (var product in filteredProducts)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildProductCard(product),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
+                        if (filteredProducts.isEmpty)
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.search_off,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No cars found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Try adjusting your filters or search terms',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
-                  ),
-              ],
-            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildToggleSection() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _listingType = 'sale'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color:
-                        _listingType == 'sale'
-                            ? Palette.primaryblue
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'Market Place',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight:
-                          _listingType == 'sale'
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                      color:
-                          _listingType == 'sale'
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _listingType = 'auction'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color:
-                        _listingType == 'auction'
-                            ? Palette.primaryblue
-                            : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    'Auction',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight:
-                          _listingType == 'auction'
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                      color:
-                          _listingType == 'auction'
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Widget _buildSearchField() {
-  //     return TextField(
-  //       controller: _searchController,
-  //       onChanged: (value) {
-  //         setState(() {
-  //           _searchQuery = value;
-  //         });
-  //       },
-  //       decoration: InputDecoration(
-  //         hintText: 'Search by brand, model, location, fuel type...',
-  //         hintStyle: TextStyle(color: Colors.grey.shade500),
-  //         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-  //         suffixIcon: _searchQuery.isNotEmpty
-  //             ? IconButton(
-  //                 icon: Icon(Icons.clear, color: Colors.grey.shade400),
-  //                 onPressed: () {
-  //                   setState(() {
-  //                     _searchQuery = '';
-  //                     _searchController.clear();
-  //                   });
-  //                 },
-  //               )
-  //             : null,
-  //         border: OutlineInputBorder(
-  //           borderRadius: BorderRadius.circular(12),
-  //           borderSide: BorderSide(color: Colors.grey.shade200),
-  //         ),
-  //         enabledBorder: OutlineInputBorder(
-  //           borderRadius: BorderRadius.circular(12),
-  //           borderSide: BorderSide(color: Colors.grey.shade200),
-  //         ),
-  //         focusedBorder: OutlineInputBorder(
-  //           borderRadius: BorderRadius.circular(12),
-  //           borderSide: const BorderSide(color: Colors.blue),
-  //         ),
-  //         filled: true,
-  //         fillColor: Colors.grey.shade50,
-  //         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  //       ),
-  //     );
-  //   }
-
-  Widget _buildProductsListAsSliver() {
-    final products = filteredProducts;
-
-    if (products.isEmpty) {
-      return SliverFillRemaining(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(
-                'No cars found',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Try adjusting your filters or search terms',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: _buildProductCard(products[index]),
-        ),
-        childCount: products.length,
       ),
     );
   }
@@ -1660,210 +1361,220 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final isFinanceAvailable = product.ifFinance == '1';
     final isExchangeAvailable = product.ifExchange == '1';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 4,
-            spreadRadius: 1,
-            offset: const Offset(0, 5),
+    return GestureDetector(
+  onTap: () {
+      if (isAuction) {
+        // Navigate to auction details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AuctionProductDetailsPage(product: product),
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Main content
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Car Image
-              Container(
-                width: 140,
-                height: 190,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(0),
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                  ),
-                  child: Image.asset(
-                    product.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey.shade200,
-                        child: Icon(
-                          Icons.directions_car,
-                          size: 40,
-                          color: Colors.grey.shade400,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-
-              // Car Details
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title and Model Variation
-                      Text(
-                        product.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        product.modelVariation,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Price with range
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isAuction
-                                ? '₹${_formatNumber(int.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPriceWithLakh(int.tryParse(product.price) ?? 0)}'
-                                : '₹ ${_formatPriceWithLakh(int.tryParse(product.price) ?? 0)}',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Palette.primaryblue,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Location
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            product.landMark,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Car Details Row (Year, Owner, KM, Fuel, Transmission)
-                      Row(
-                        children: [
-                          _buildDetailChip(
-                            Icon(
-                              Icons.calendar_today,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${product.filters['year']}',
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.person,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            _getOwnerText(product.filters['owners'] ?? '1'),
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.speed,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${_formatNumber(int.tryParse(product.filters['km']?.toString() ?? '0') ?? 0)} KM',
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Row(
-                        children: [
-                          _buildDetailChip(
-                            Icon(
-                              Icons.local_gas_station,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${product.filters['fuel']}',
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.settings,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${product.filters['transmission']}',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+        );
+      } else {
+        // Navigate to regular product details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailsPage(product: product),
           ),
-
-          // Bottom section with finance/exchange or auction info
-          if (isAuction || isFinanceAvailable || isExchangeAvailable)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-              decoration: BoxDecoration(
-                color:
-                    isAuction ? Palette.primarylightblue : Colors.green.shade50,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-              ),
-              child:
-                  isAuction
-                      ? _buildAuctionInfo(product)
-                      : _buildFinanceExchangeInfo(
-                        isFinanceAvailable,
-                        isExchangeAvailable,
-                      ),
+        );
+      }
+    },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.30),
+              blurRadius: 4,
+              spreadRadius: 1,
+              offset: const Offset(0, 5),
             ),
-        ],
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 140,
+                  height: 190,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(0),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
+
+                    child: Image.network(
+                      'https://lelamonline.com/admin/${product.image}',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print(
+                          'Failed to load image: https://lelamonline.com/${product.image}',
+                        );
+                        print('Error: $error');
+                        return Container(
+                          color: Colors.grey.shade200,
+                          child: Icon(
+                            Icons.directions_car,
+                            size: 40,
+                            color: Colors.grey.shade400,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          product.modelVariation,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              isAuction
+                                  ? '₹${_formatNumber(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}'
+                                  : '₹ ${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Palette.primaryblue,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              product.landMark,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _buildDetailChip(
+                              Icon(
+                                Icons.calendar_today,
+                                size: 10,
+                                color: Colors.grey[700],
+                              ),
+                              '${product.filters['year']}',
+                            ),
+                            const SizedBox(width: 4),
+                            _buildDetailChip(
+                              Icon(
+                                Icons.person,
+                                size: 10,
+                                color: Colors.grey[700],
+                              ),
+                              _getOwnerText(product.filters['owners'] ?? '1'),
+                            ),
+                            const SizedBox(width: 4),
+                            _buildDetailChip(
+                              Icon(
+                                Icons.speed,
+                                size: 10,
+                                color: Colors.grey[700],
+                              ),
+                              '${_formatNumber(int.tryParse(product.filters['km']?.toString() ?? '0') ?? 0)} KM',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _buildDetailChip(
+                              Icon(
+                                Icons.local_gas_station,
+                                size: 10,
+                                color: Colors.grey[700],
+                              ),
+                              '${product.filters['fuel']}',
+                            ),
+                            const SizedBox(width: 4),
+                            _buildDetailChip(
+                              Icon(
+                                Icons.settings,
+                                size: 10,
+                                color: Colors.grey[700],
+                              ),
+                              '${product.filters['transmission']}',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (isAuction || isFinanceAvailable || isExchangeAvailable)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                decoration: BoxDecoration(
+                  color:
+                      isAuction
+                          ? Palette.primarylightblue
+                          : Colors.green.shade50,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child:
+                    isAuction
+                        ? _buildAuctionInfo(product)
+                        : _buildFinanceExchangeInfo(
+                          isFinanceAvailable,
+                          isExchangeAvailable,
+                        ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1914,7 +1625,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       return const SizedBox.shrink();
     }
 
-    // If both are available, show them side by side with full width
     if (isFinanceAvailable && isExchangeAvailable) {
       return Row(
         children: [
@@ -1972,7 +1682,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       );
     }
 
-    // If only one is available, show it full width
     if (isFinanceAvailable) {
       return Container(
         width: double.infinity,
@@ -2061,28 +1770,28 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  String _formatPriceWithLakh(int price) {
+  String _formatPriceWithLakh(double price) {
     if (price >= 10000000) {
       double crore = price / 10000000;
-      return '${crore.toStringAsFixed(crore == crore.round() ? 0 : 2)} Crore';
+      return '${crore.toStringAsFixed(crore == crore.roundToDouble() ? 0 : 2)} Crore';
     } else if (price >= 100000) {
       double lakh = price / 100000;
-      return '${lakh.toStringAsFixed(lakh == lakh.round() ? 0 : 2)} Lakh';
+      return '${lakh.toStringAsFixed(lakh == lakh.roundToDouble() ? 0 : 2)} Lakh';
     } else if (price >= 1000) {
       double thousand = price / 1000;
-      return '${thousand.toStringAsFixed(thousand == thousand.round() ? 0 : 1)}K';
+      return '${thousand.toStringAsFixed(thousand == thousand.roundToDouble() ? 0 : 1)}K';
     } else {
-      return price.toString();
+      return price.toStringAsFixed(price == price.roundToDouble() ? 0 : 2);
     }
   }
 
-  String _formatNumber(int number) {
+  String _formatNumber(num number) {
     if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(1)}L';
+      return '${(number / 100000).toStringAsFixed(2)}L';
     } else if (number >= 1000) {
-      return '${(number / 1000).round()}K';
+      return '${(number / 1000).toStringAsFixed(1)}K';
     } else {
-      return number.toString();
+      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
     }
   }
 }

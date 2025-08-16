@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-class FeatureListModel {
+// Model class for Marketplace Post
+class MarketplacePost {
   final String id;
   final String slug;
   final String title;
@@ -11,11 +13,11 @@ class FeatureListModel {
   final String modelVariation;
   final String description;
   final String price;
-  final String auctionPriceIntervel;
+  final String auctionPriceInterval;
   final String auctionStartingPrice;
   final List<String> attributeId;
   final List<String> attributeVariationsId;
-  final Map<String, dynamic> filters;
+  final Map<String, List<String>> filters;
   final String latitude;
   final String longitude;
   final String userZoneId;
@@ -40,7 +42,7 @@ class FeatureListModel {
   final String createdOn;
   final String updatedOn;
 
-FeatureListModel({
+  MarketplacePost({
     required this.id,
     required this.slug,
     required this.title,
@@ -51,7 +53,7 @@ FeatureListModel({
     required this.modelVariation,
     required this.description,
     required this.price,
-    required this.auctionPriceIntervel,
+    required this.auctionPriceInterval,
     required this.auctionStartingPrice,
     required this.attributeId,
     required this.attributeVariationsId,
@@ -81,8 +83,8 @@ FeatureListModel({
     required this.updatedOn,
   });
 
-  factory FeatureListModel.fromJson(Map<String, dynamic> json) {
-    return FeatureListModel(
+  factory MarketplacePost.fromJson(Map<String, dynamic> json) {
+    return MarketplacePost(
       id: json['id'] ?? '',
       slug: json['slug'] ?? '',
       title: json['title'] ?? '',
@@ -91,15 +93,23 @@ FeatureListModel({
       brand: json['brand'] ?? '',
       model: json['model'] ?? '',
       modelVariation: json['model_variation'] ?? '',
-
       description: json['description'] ?? '',
       price: json['price'] ?? '',
-      auctionPriceIntervel: json['auction_price_intervel'] ?? '',
+      auctionPriceInterval: json['auction_price_intervel'] ?? '',
       auctionStartingPrice: json['auction_starting_price'] ?? '',
-      attributeId: _parseStringList(json['attribute_id']),
-      attributeVariationsId: _parseStringList(json['attribute_variations_id']),
-
-      filters: _parseFilters(json['filters']),
+      attributeId: json['attribute_id'] != null
+          ? List<String>.from(jsonDecode(json['attribute_id']))
+          : [],
+      attributeVariationsId: json['attribute_variations_id'] != null
+          ? List<String>.from(jsonDecode(json['attribute_variations_id']))
+          : [],
+      filters: json['filters'] != null
+          ? Map<String, List<String>>.from(
+              jsonDecode(json['filters']).map(
+                (key, value) => MapEntry(key, List<String>.from(value)),
+              ),
+            )
+          : {},
       latitude: json['latitude'] ?? '',
       longitude: json['longitude'] ?? '',
       userZoneId: json['user_zone_id'] ?? '',
@@ -124,32 +134,5 @@ FeatureListModel({
       createdOn: json['created_on'] ?? '',
       updatedOn: json['updated_on'] ?? '',
     );
-  }
-
-  static List<String> _parseStringList(dynamic value) {
-    if (value is String) {
-      try {
-        final decoded = jsonDecode(value) as List;
-        return decoded.map((e) => e.toString()).toList();
-      } catch (_) {
-        return [value.toString()];
-      }
-    } else if (value is List) {
-      return value.map((e) => e.toString()).toList();
-    }
-    return [];
-  }
-
-  static Map<String, dynamic> _parseFilters(dynamic value) {
-    if (value is String) {
-      try {
-        return Map<String, dynamic>.from(jsonDecode(value));
-      } catch (_) {
-        return {};
-      }
-    } else if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return {};
   }
 }

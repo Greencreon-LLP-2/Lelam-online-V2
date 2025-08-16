@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/otp_verification_page.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
 import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
@@ -50,11 +51,14 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const SellPage(),
       name: RouteNames.sellpage,
     ),
-    GoRoute(
-      path: RouteNames.productDetailsPage,
-      builder: (context, state) => const ProductDetailsPage(),
-      name: RouteNames.productDetailsPage,
-    ),
+   GoRoute(
+  path: RouteNames.productDetailsPage,
+  builder: (context, state) {
+    final dynamic product = state.extra;
+    return ProductDetailsPage(product: product);
+  },
+  name: RouteNames.productDetailsPage,
+),
     GoRoute(
       path: RouteNames.faqPage,
       builder: (context, state) => const FAQPage(),
