@@ -51,7 +51,7 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const SellPage(),
       name: RouteNames.sellpage,
     ),
-   GoRoute(
+GoRoute(
   path: RouteNames.productDetailsPage,
   builder: (context, state) {
     final dynamic product = state.extra;

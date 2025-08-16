@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
+import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 
 class ProductSectionWidget extends StatefulWidget {
   final String searchQuery;
@@ -185,8 +186,18 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
 
     return InkWell(
       onTap: () {
-        context.pushNamed(RouteNames.productDetailsPage, extra: product);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => ProductDetailsPage(
+                  product: product,
+                  isAuction: product.ifAuction == "1",
+                ),
+          ),
+        );
       },
+
       splashColor: AppTheme.primaryColor.withOpacity(.1),
       borderRadius: BorderRadius.circular(12),
       child: Ink(

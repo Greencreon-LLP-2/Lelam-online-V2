@@ -1373,12 +1373,15 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         );
       } else {
         // Navigate to regular product details page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailsPage(product: product),
-          ),
-        );
+      Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ProductDetailsPage(
+        product: product,
+        isAuction: product.ifAuction == "1",
+      ),
+    ),
+  );;
       }
     },
       child: Container(

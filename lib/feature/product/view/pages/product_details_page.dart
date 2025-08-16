@@ -3,32 +3,137 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 class ProductDetailsPage extends StatefulWidget {
-  final Product product;
+  final dynamic product; // Can be either Product or FeatureListModel
+  final bool isAuction;
 
-  const ProductDetailsPage({super.key, required this.product});
+  const ProductDetailsPage({
+    super.key,
+    required this.product,
+    this.isAuction = false,
+  });
 
   @override
   State<ProductDetailsPage> createState() => _ProductDetailsPageState();
 }
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
-  final PageController _pageController = PageController();
-  int _currentImageIndex = 0;
-  final TransformationController _transformationController =
-      TransformationController();
-  bool _isFavorited = false;
+  // Helper methods to access properties consistently
+  String get id => _getProperty('id') ?? '';
+  String get title => _getProperty('title') ?? '';
+  String get image => _getProperty('image') ?? '';
+  String get modelVariation => _getProperty('modelVariation') ?? '';
+  String get price => _getProperty('price') ?? '0';
+  String get auctionStartingPrice =>
+      _getProperty('auctionStartingPrice') ?? '0';
+  String get landMark => _getProperty('landMark') ?? '';
+  String get createdOn => _getProperty('createdOn') ?? '';
+  String get createdBy => _getProperty('createdBy') ?? '';
+  String get byDealer => _getProperty('byDealer') ?? '0';
+  String get ifAuction => _getProperty('ifAuction') ?? '0';
+  String get auctionAttempt => _getProperty('auctionAttempt') ?? '0';
+
+  // Helper to get filters with fallback for both models
+  Map<String, dynamic> get filters {
+    if (widget.product is Product) {
+      return (widget.product as Product).filters;
+    } else if (widget.product is FeatureListModel) {
+      final featureFilters = (widget.product as FeatureListModel).filters;
+      // Convert Map<String, List<String>> to Map<String, dynamic>
+      return featureFilters.map(
+        (key, value) => MapEntry(key, value.isNotEmpty ? value.first : ''),
+      );
+    }
+    return {};
+  }
+
+  dynamic _getProperty(String propertyName) {
+    if (widget.product == null) return null;
+
+    // Handle FeatureListModel
+    if (widget.product is FeatureListModel) {
+      final product = widget.product as FeatureListModel;
+      switch (propertyName) {
+        case 'id':
+          return product.id;
+        case 'title':
+          return product.title;
+        case 'image':
+          return product.image;
+        case 'modelVariation':
+          return product.modelVariation;
+        case 'price':
+          return product.price;
+        case 'auctionStartingPrice':
+          return product.auctionStartingPrice;
+        case 'landMark':
+          return product.landMark;
+        case 'createdOn':
+          return product.createdOn;
+        case 'createdBy':
+          return product.createdBy;
+        case 'byDealer':
+          return product.byDealer;
+        case 'ifAuction':
+          return product.ifAuction;
+        case 'auctionAttempt':
+          return product.auctionAttempt;
+        default:
+          return null;
+      }
+    }
+    // Handle Product
+    else if (widget.product is Product) {
+      final product = widget.product as Product;
+      switch (propertyName) {
+        case 'id':
+          return product.id;
+        case 'title':
+          return product.title;
+        case 'image':
+          return product.image;
+        case 'modelVariation':
+          return product.modelVariation;
+        case 'price':
+          return product.price;
+        case 'auctionStartingPrice':
+          return product.auctionStartingPrice;
+        case 'landMark':
+          return product.landMark;
+        case 'createdOn':
+          return product.createdOn;
+        case 'createdBy':
+          return product.createdBy;
+        case 'byDealer':
+          return product.byDealer;
+        case 'ifAuction':
+          return product.ifAuction;
+        case 'auctionAttempt':
+          return product.auctionAttempt;
+        default:
+          return null;
+      }
+    }
+    return null;
+  }
 
   List<String> get _images {
-    if (widget.product.image.isNotEmpty) {
-      return ['https://lelamonline.com/admin/${widget.product.image}'];
+    if (image.isNotEmpty) {
+      return ['https://lelamonline.com/admin/$image'];
     }
     return [
       'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
     ];
   }
+
+  final PageController _pageController = PageController();
+  int _currentImageIndex = 0;
+  final TransformationController _transformationController =
+      TransformationController();
+  bool _isFavorited = false;
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -472,7 +577,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.product.title,
+                        title,
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -480,7 +585,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.product.modelVariation,
+                        modelVariation,
                         style: TextStyle(fontSize: 18, color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 8),
@@ -493,7 +598,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            widget.product.landMark,
+                            landMark,
                             style: const TextStyle(color: Colors.grey),
                           ),
                           const Spacer(),
@@ -504,14 +609,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            widget.product.createdOn,
+                            createdOn,
                             style: const TextStyle(color: Colors.grey),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '₹ ${_formatPriceWithLakh(double.tryParse(widget.product.price) ?? 0)}',
+                        '₹ ${_formatPriceWithLakh(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -523,7 +628,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '#AD ID ${widget.product.id}',
+                            '#AD ID $id',
                             style: const TextStyle(color: Colors.grey),
                           ),
                           ElevatedButton.icon(
@@ -546,61 +651,73 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 ),
                 const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.calendar_today,
-                              widget.product.filters['year'] ?? 'N/A',
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.person,
-                              _getOwnerText(
-                                widget.product.filters['owners'] ?? '1',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.local_gas_station,
-                              widget.product.filters['fuel'] ?? 'N/A',
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.settings,
-                              widget.product.filters['transmission'] ?? 'N/A',
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.speed,
-                              '${_formatNumber(int.tryParse(widget.product.filters['km']?.toString() ?? '0') ?? 0)} KM',
-                            ),
-                          ),
-                        ],
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.30),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                        offset: const Offset(1, 1),
                       ),
                     ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Details',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.calendar_today,
+                                filters['year'] ?? 'N/A',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.person,
+                                _getOwnerText(filters['owners'] ?? '1'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.local_gas_station,
+                                filters['fuel'] ?? 'N/A',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.settings,
+                                filters['transmission'] ?? 'N/A',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.speed,
+                                '${_formatNumber(int.tryParse(filters['km']?.toString() ?? '0') ?? 0)} KM',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const Divider(),
@@ -617,21 +734,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerCommentItem(
-                        'Year',
-                        widget.product.filters['year'] ?? 'N/A',
-                      ),
+                      _buildSellerCommentItem('Year', filters['year'] ?? 'N/A'),
                       _buildSellerCommentItem(
                         'No Of Owners',
-                        _getOwnerText(widget.product.filters['owners'] ?? '1'),
+                        _getOwnerText(filters['owners'] ?? '1'),
                       ),
                       _buildSellerCommentItem(
                         'Fuel Type',
-                        widget.product.filters['fuel'] ?? 'N/A',
+                        filters['fuel'] ?? 'N/A',
                       ),
                       _buildSellerCommentItem(
                         'Transmission',
-                        widget.product.filters['transmission'] ?? 'N/A',
+                        filters['transmission'] ?? 'N/A',
                       ),
                       _buildSellerCommentItem(
                         'Service History',
@@ -639,7 +753,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       _buildSellerCommentItem(
                         'Sold By',
-                        widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+                        byDealer == '1' ? 'Dealer' : 'Owner',
                       ),
                     ],
                   ),
@@ -659,8 +773,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildSellerInformationItem(
-                        widget.product.createdBy,
-                        'Member Since ${widget.product.createdOn}',
+                        createdBy,
+                        'Member Since $createdOn',
                         context,
                       ),
                     ],

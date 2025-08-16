@@ -40,7 +40,7 @@ class FeatureListModel {
   final String createdOn;
   final String updatedOn;
 
-FeatureListModel({
+  FeatureListModel({
     required this.id,
     required this.slug,
     required this.title,
@@ -96,10 +96,11 @@ FeatureListModel({
       price: json['price'] ?? '',
       auctionPriceIntervel: json['auction_price_intervel'] ?? '',
       auctionStartingPrice: json['auction_starting_price'] ?? '',
-      attributeId: _parseStringList(json['attribute_id']),
-      attributeVariationsId: _parseStringList(json['attribute_variations_id']),
-
-      filters: _parseFilters(json['filters']),
+      attributeId: List<String>.from(jsonDecode(json['attribute_id'] ?? '[]')),
+      attributeVariationsId: List<String>.from(
+        jsonDecode(json['attribute_variations_id'] ?? '[]'),
+      ),
+      filters: jsonDecode(json['filters'] ?? '{}'),
       latitude: json['latitude'] ?? '',
       longitude: json['longitude'] ?? '',
       userZoneId: json['user_zone_id'] ?? '',
@@ -152,4 +153,6 @@ FeatureListModel({
     }
     return {};
   }
+
+  
 }
