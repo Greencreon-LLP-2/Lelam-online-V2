@@ -2,8 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 class ProductDetailsPage extends StatefulWidget {
@@ -21,6 +25,160 @@ class ProductDetailsPage extends StatefulWidget {
 }
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
+  // Data properties
+  Brand? brand;
+  BrandModel? brandModel;
+  ModelVariation? modelVariationObj;
+  List<Attribute> attributes = [];
+  List<AttributeVariation> attributeVariations = [];
+  bool isLoadingDetails = false;
+
+  // Add this getter to your _ProductDetailsPageState class
+  Map<String, dynamic> get filters {
+    if (widget.product is Product) {
+      return (widget.product as Product).filters;
+    } else if (widget.product is FeatureListModel) {
+      final featureFilters = (widget.product as FeatureListModel).filters;
+      // Convert Map<String, dynamic> to consistent format
+      return featureFilters.map((key, value) {
+        if (value is List) {
+          return MapEntry(key, value.isNotEmpty ? value.first.toString() : '');
+        }
+        return MapEntry(key, value.toString());
+      });
+    }
+    return {};
+  }
+
+  // UI controllers
+  final PageController _pageController = PageController();
+  int _currentImageIndex = 0;
+  final TransformationController _transformationController =
+      TransformationController();
+  bool _isFavorited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDetailsData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchDetailsData() async {
+    setState(() {
+      isLoadingDetails = true;
+      _isLoadingLocations = true;
+    });
+
+    try {
+      // Fetch locations
+      final locationResponse = await _locationService.fetchLocations();
+      if (locationResponse != null && locationResponse.status) {
+        _locations = locationResponse.data;
+      } else {
+        throw Exception('Failed to load locations');
+      }
+
+      // Fetch brand
+      final brands = await ApiService.fetchBrands();
+      brand = brands.firstWhere(
+        (b) => b.id == widget.product.brand,
+        orElse:
+            () => Brand(
+              id: '',
+              slug: '',
+              categoryId: '',
+              name: 'Unknown Brand',
+              image: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
+      );
+
+      // Fetch brand model
+      final brandModels = await ApiService.fetchBrandModels();
+      brandModel = brandModels.firstWhere(
+        (m) => m.id == widget.product.model,
+        orElse:
+            () => BrandModel(
+              id: '',
+              brandId: '',
+              slug: '',
+              name: 'Unknown Model',
+              image: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
+      );
+
+      // Fetch model variation
+      final modelVariations = await ApiService.fetchModelVariations();
+      modelVariationObj = modelVariations.firstWhere(
+        (v) => v.id == widget.product.modelVariation,
+        orElse:
+            () => ModelVariation(
+              id: '',
+              slug: '',
+              brandId: '',
+              brandModelId: '',
+              name: 'Unknown Variation',
+              image: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
+      );
+
+      // Fetch attributes
+      attributes = await ApiService.fetchAttributes();
+
+      // Fetch attribute variations
+      attributeVariations = await ApiService.fetchAttributeVariations();
+
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      print('Error fetching details: $e');
+      setState(() {
+        _isLoadingLocations = false;
+        isLoadingDetails = false;
+      });
+    }
+  }
+
+  String _getLocationName(String zoneId) {
+    if (zoneId == 'all') return 'All Kerala';
+    final location = _locations.firstWhere(
+      (loc) => loc.id == zoneId,
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId, // Fallback to zoneId if not found
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+    );
+    return location.name;
+  }
+
   // Helper methods to access properties consistently
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
@@ -35,25 +193,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String get byDealer => _getProperty('byDealer') ?? '0';
   String get ifAuction => _getProperty('ifAuction') ?? '0';
   String get auctionAttempt => _getProperty('auctionAttempt') ?? '0';
-
-  // Helper to get filters with fallback for both models
-  Map<String, dynamic> get filters {
-    if (widget.product is Product) {
-      return (widget.product as Product).filters;
-    } else if (widget.product is FeatureListModel) {
-      final featureFilters = (widget.product as FeatureListModel).filters;
-      // Convert Map<String, List<String>> to Map<String, dynamic>
-      return featureFilters.map(
-        (key, value) => MapEntry(key, value.isNotEmpty ? value.first : ''),
-      );
-    }
-    return {};
-  }
-
   dynamic _getProperty(String propertyName) {
     if (widget.product == null) return null;
 
-    // Handle FeatureListModel
     if (widget.product is FeatureListModel) {
       final product = widget.product as FeatureListModel;
       switch (propertyName) {
@@ -70,7 +212,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         case 'auctionStartingPrice':
           return product.auctionStartingPrice;
         case 'landMark':
-          return product.landMark;
+          return _getLocationName(product.parentZoneId);
         case 'createdOn':
           return product.createdOn;
         case 'createdBy':
@@ -84,9 +226,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         default:
           return null;
       }
-    }
-    // Handle Product
-    else if (widget.product is Product) {
+    } else if (widget.product is Product) {
       final product = widget.product as Product;
       switch (propertyName) {
         case 'id':
@@ -102,7 +242,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         case 'auctionStartingPrice':
           return product.auctionStartingPrice;
         case 'landMark':
-          return product.landMark;
+          return _getLocationName(product.parentZoneId);
         case 'createdOn':
           return product.createdOn;
         case 'createdBy':
@@ -120,6 +260,10 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     return null;
   }
 
+  final LocationService _locationService = LocationService();
+  List<LocationData> _locations = [];
+  bool _isLoadingLocations = true;
+
   List<String> get _images {
     if (image.isNotEmpty) {
       return ['https://lelamonline.com/admin/$image'];
@@ -128,12 +272,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
     ];
   }
-
-  final PageController _pageController = PageController();
-  int _currentImageIndex = 0;
-  final TransformationController _transformationController =
-      TransformationController();
-  bool _isFavorited = false;
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -446,13 +584,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _transformationController.dispose();
-    super.dispose();
-  }
-
   String _formatPriceWithLakh(double price) {
     if (price >= 10000000) {
       double crore = price / 10000000;
@@ -466,6 +597,197 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     } else {
       return price.toStringAsFixed(price == price.roundToDouble() ? 0 : 2);
     }
+  }
+
+  String _getAttributeName(String id) {
+    return attributes
+        .firstWhere(
+          (attr) => attr.id == id,
+          orElse:
+              () => Attribute(
+                id: '',
+                slug: '',
+                name: 'Unknown Attribute',
+                listOrder: '',
+                categoryId: '',
+                formValidation: '',
+                ifDetailsIcons: '',
+                detailsIcons: '',
+                detailsIconsOrder: '',
+                showFilter: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        )
+        .name;
+  }
+
+  String _getAttributeVariationName(String id) {
+    return attributeVariations
+        .firstWhere(
+          (variation) => variation.id == id,
+          orElse:
+              () => AttributeVariation(
+                id: '',
+                attributeId: '',
+                name: 'Unknown Variation',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        )
+        .name;
+  }
+
+  String _getOwnerText(String owners) {
+    switch (owners) {
+      case '1':
+        return '1st Owner';
+      case '2':
+        return '2nd Owner';
+      case '3':
+        return '3rd Owner';
+      default:
+        return '${owners}th Owner';
+    }
+  }
+
+  String _formatNumber(num number) {
+    if (number >= 100000) {
+      return '${(number / 100000).toStringAsFixed(2)}L';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    } else {
+      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
+    }
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16, color: Colors.grey)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[700]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerCommentItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellerInformationItem(
+    String name,
+    String memberSince,
+    BuildContext context,
+  ) {
+    return Row(
+      children: [
+        const CircleAvatar(
+          backgroundImage: AssetImage('assets/images/avatar.gif'),
+          radius: 30,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                memberSince,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: () {
+                  // Navigate to seller profile
+                },
+                child: const Text(
+                  'SEE PROFILE',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      ],
+    );
+  }
+
+  Widget _buildQuestionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'You are the first one to ask question',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Ask a question functionality
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Text('Ask a question'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
@@ -597,10 +919,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             color: Colors.grey,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            landMark,
-                            style: const TextStyle(color: Colors.grey),
-                          ),
+                          _isLoadingLocations
+                              ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -623,6 +953,55 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           color: Colors.blueAccent,
                         ),
                       ),
+                      // const SizedBox(height: 16),
+                      // if (isLoadingDetails)
+                      //   const Center(child: CircularProgressIndicator())
+                      // else
+                      //   Column(
+                      //     crossAxisAlignment: CrossAxisAlignment.start,
+                      //     children: [
+                      //       if (brand != null)
+                      //         _buildDetailRow('Brand', brand!.name),
+                      //       if (brandModel != null)
+                      //         _buildDetailRow('Model', brandModel!.name),
+                      //       if (modelVariationObj != null)
+                      //         _buildDetailRow(
+                      //           'Variant',
+                      //           modelVariationObj!.name,
+                      //         ),
+                      //       const SizedBox(height: 8),
+                      //       const Text(
+                      //         'Specifications',
+                      //         style: TextStyle(
+                      //           fontSize: 18,
+                      //           fontWeight: FontWeight.bold,
+                      //         ),
+                      //       ),
+                      //       const SizedBox(height: 8),
+                      //       if (widget.product.attributeId.isNotEmpty)
+                      //         ...widget.product.attributeId.asMap().entries.map(
+                      //           (entry) {
+                      //             final index = entry.key;
+                      //             final attributeId = entry.value;
+                      //             final variationId =
+                      //                 index <
+                      //                         widget
+                      //                             .product
+                      //                             .attributeVariationsId
+                      //                             .length
+                      //                     ? widget
+                      //                         .product
+                      //                         .attributeVariationsId[index]
+                      //                     : '';
+
+                      //             return _buildDetailRow(
+                      //               _getAttributeName(attributeId),
+                      //               _getAttributeVariationName(variationId),
+                      //             );
+                      //           },
+                      //         ).toList(),
+                      //     ],
+                      //   ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -858,134 +1237,5 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         ],
       ),
     );
-  }
-
-  Widget _buildDetailItem(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        Text(text, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
-      ],
-    );
-  }
-
-  Widget _buildSellerCommentItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          Text(value, style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSellerInformationItem(
-    String name,
-    String memberSince,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                memberSince,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  // Navigate to seller profile
-                },
-                child: const Text(
-                  'SEE PROFILE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
-    );
-  }
-
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // Ask a question functionality
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text('Ask a question'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-        return '1st Owner';
-      case '2':
-        return '2nd Owner';
-      case '3':
-        return '3rd Owner';
-      default:
-        return '${owners}th Owner';
-    }
-  }
-
-  String _formatNumber(num number) {
-    if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(2)}L';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    } else {
-      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
-    }
   }
 }

@@ -51,14 +51,14 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const SellPage(),
       name: RouteNames.sellpage,
     ),
-GoRoute(
-  path: RouteNames.productDetailsPage,
-  builder: (context, state) {
-    final dynamic product = state.extra;
-    return ProductDetailsPage(product: product);
-  },
-  name: RouteNames.productDetailsPage,
-),
+    GoRoute(
+      path: RouteNames.productDetailsPage,
+      builder: (context, state) {
+        final dynamic product = state.extra;
+        return ProductDetailsPage(product: product);
+      },
+      name: RouteNames.productDetailsPage,
+    ),
     GoRoute(
       path: RouteNames.faqPage,
       builder: (context, state) => const FAQPage(),
@@ -102,6 +102,11 @@ GoRoute(
           (context, state) =>
               OtpVerificationPage(phoneNumber: state.extra as String? ?? ''),
       name: RouteNames.otpVerificationPage,
+    ),
+    GoRoute(
+      path: RouteNames.usedCarsPage,
+      builder: (context, state) => const UsedCarsPage(),
+      name: RouteNames.usedCarsPage,
     ),
   ],
   errorBuilder:

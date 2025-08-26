@@ -16,4 +16,5 @@ class RouteNames {
   static const String adPostPage = "/adPostPage";
   static const String loginPage = "/loginPage";
   static const String otpVerificationPage = "/otpVerificationPage";
+  static const String usedCarsPage = '/usedCarsPage';
 }

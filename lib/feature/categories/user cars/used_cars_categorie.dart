@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
@@ -27,7 +29,6 @@ class MarketplacePost {
   final String longitude;
   final String userZoneId;
   final String parentZoneId;
-  final String zoneId;
   final String landMark;
   final String ifAuction;
   final String auctionStatus;
@@ -67,7 +68,6 @@ class MarketplacePost {
     required this.longitude,
     required this.userZoneId,
     required this.parentZoneId,
-    required this.zoneId,
     required this.landMark,
     required this.ifAuction,
     required this.auctionStatus,
@@ -150,7 +150,6 @@ class MarketplacePost {
       longitude: json['longitude']?.toString() ?? '',
       userZoneId: json['user_zone_id']?.toString() ?? '',
       parentZoneId: json['parent_zone_id']?.toString() ?? '',
-      zoneId: json['zone_id']?.toString() ?? '',
       landMark: json['land_mark']?.toString() ?? '',
       ifAuction: json['if_auction']?.toString() ?? '0',
       auctionStatus: json['auction_status']?.toString() ?? '',
@@ -173,7 +172,6 @@ class MarketplacePost {
   }
 
   Product toProduct() {
-
     final convertedFilters = filters.map(
       (key, value) => MapEntry(key, value.isNotEmpty ? value.first : ''),
     );
@@ -198,7 +196,6 @@ class MarketplacePost {
       longitude: longitude,
       userZoneId: userZoneId,
       parentZoneId: parentZoneId,
-      zoneId: zoneId,
       landMark: landMark,
       ifAuction: ifAuction,
       auctionStatus: auctionStatus,
@@ -292,7 +289,6 @@ class Product {
   final String longitude;
   final String userZoneId;
   final String parentZoneId;
-  final String zoneId;
   final String landMark;
   final String ifAuction;
   final String auctionStatus;
@@ -332,7 +328,6 @@ class Product {
     required this.longitude,
     required this.userZoneId,
     required this.parentZoneId,
-    required this.zoneId,
     required this.landMark,
     required this.ifAuction,
     required this.auctionStatus,
@@ -372,6 +367,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  final LocationService _locationService = LocationService();
+  List<LocationData> _locations = [];
+  bool _isLoadingLocations = true;
+
   // Filter variables
   List<String> _selectedBrands = [];
   String _selectedPriceRange = 'all';
@@ -386,12 +385,38 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
 
+  Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+    try {
+      final locationResponse = await _locationService.fetchLocations();
+      if (locationResponse != null && locationResponse.status) {
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Failed to load locations');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading locations: $e';
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_handleScroll);
     _fetchProducts();
+    _fetchLocations();
   }
 
   @override
@@ -415,11 +440,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
       final posts = await _marketplaceService.fetchPosts(
         categoryId: '1',
-        userZoneId: '0',
+        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
       );
       setState(() {
         _products = posts.map((post) => post.toProduct()).toList();
@@ -503,23 +527,33 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     'Certified Dealer',
   ];
 
-  final List<String> _keralaCities = [
-    'all',
-    'Thiruvananthapuram',
-    'Kollam',
-    'Pathanamthitta',
-    'Alappuzha',
-    'Kottayam',
-    'Idukki',
-    'Ernakulam',
-    'Thrissur',
-    'Palakkad',
-    'Malappuram',
-    'Kozhikode',
-    'Wayanad',
-    'Kannur',
-    'Kasaragod',
-  ];
+  List<String> get _keralaCities {
+    return ['all', ..._locations.map((loc) => loc.name)];
+  }
+
+  String _getLocationName(String zoneId) {
+    if (zoneId == 'all') return 'All Kerala';
+    final location = _locations.firstWhere(
+      (loc) => loc.id == zoneId,
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId, // Fallback to zoneId if not found
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+    );
+    return location.name;
+  }
 
   final List<String> _listingTypes = ['sale', 'auction'];
 
@@ -535,7 +569,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               product.brand.toLowerCase(),
               product.model.toLowerCase(),
               product.modelVariation.toLowerCase(),
-              product.landMark.toLowerCase(),
+              _getLocationName(product.parentZoneId).toLowerCase(),
               product.filters['fuel']?.toLowerCase() ?? '',
               product.filters['transmission']?.toLowerCase() ?? '',
               product.filters['year']?.toString() ?? '',
@@ -548,7 +582,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (_selectedLocation != 'all') {
       filtered =
           filtered
-              .where((product) => product.landMark == _selectedLocation)
+              .where((product) => product.parentZoneId == _selectedLocation)
               .toList();
     }
 
@@ -1174,185 +1208,218 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 ),
             ],
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.location_on, color: Colors.black87),
-            onSelected: (String value) {
-              setState(() {
-                _selectedLocation = value;
-              });
-            },
-            itemBuilder: (BuildContext context) {
-              return _keralaCities.map((String city) {
-                return PopupMenuItem<String>(
-                  value: city,
-                  child: Row(
-                    children: [
-                      if (_selectedLocation == city)
-                        const Icon(Icons.check, color: Colors.blue, size: 16),
-                      if (_selectedLocation == city) const SizedBox(width: 8),
-                      Text(city == 'all' ? 'All Kerala' : city),
-                    ],
-                  ),
-                );
-              }).toList();
-            },
-          ),
+          _isLoadingLocations
+              ? const CircularProgressIndicator()
+              : PopupMenuButton<String>(
+                icon: const Icon(Icons.location_on, color: Colors.black87),
+                onSelected: (String value) {
+                  setState(() {
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
+                  });
+                },
+                itemBuilder: (BuildContext context) {
+                  return _keralaCities.map((String city) {
+                    return PopupMenuItem<String>(
+                      value: city,
+                      child: Row(
+                        children: [
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const Icon(
+                              Icons.check,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const SizedBox(width: 8),
+                          Text(city == 'all' ? 'All Kerala' : city),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
         ],
       ),
-      body: Column(
-        children: [
-          if (!_showAppBarSearch)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _buildSearchField(),
-            ),
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
+      body:
+          _isLoadingLocations
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _listingType = 'sale'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color:
-                              _listingType == 'sale'
-                                  ? Palette.primaryblue
-                                  : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'Market Place',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight:
-                                _listingType == 'sale'
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                            color:
-                                _listingType == 'sale'
-                                    ? Colors.white
-                                    : Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
+                  if (!_showAppBarSearch)
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: _buildSearchField(),
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _listingType = 'auction'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color:
-                              _listingType == 'auction'
-                                  ? Palette.primaryblue
-                                  : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'Auction',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight:
-                                _listingType == 'auction'
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                            color:
-                                _listingType == 'auction'
-                                    ? Colors.white
-                                    : Colors.grey.shade600,
-                          ),
-                        ),
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child:
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
-                    ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Row(
                         children: [
-                          Icon(
-                            Icons.error,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error: $_errorMessage',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
+                          Expanded(
+                            child: GestureDetector(
+                              onTap:
+                                  () => setState(() => _listingType = 'sale'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      _listingType == 'sale'
+                                          ? Palette.primaryblue
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Market Place',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight:
+                                        _listingType == 'sale'
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                    color:
+                                        _listingType == 'sale'
+                                            ? Colors.white
+                                            : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _fetchProducts,
-                            child: const Text('Retry'),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap:
+                                  () =>
+                                      setState(() => _listingType = 'auction'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      _listingType == 'auction'
+                                          ? Palette.primaryblue
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Auction',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight:
+                                        _listingType == 'auction'
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                    color:
+                                        _listingType == 'auction'
+                                            ? Colors.white
+                                            : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    )
-                    : ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        for (var product in filteredProducts)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildProductCard(product),
-                          ),
-                        if (filteredProducts.isEmpty)
-                          Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                    ),
+                  ),
+                  Expanded(
+                    child:
+                        _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _errorMessage != null
+                            ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Error: $_errorMessage',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _fetchProducts,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            )
+                            : ListView(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.all(16),
                               children: [
-                                Icon(
-                                  Icons.search_off,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No cars found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey.shade600,
-                                    fontWeight: FontWeight.w500,
+                                for (var product in filteredProducts)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildProductCard(product),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Try adjusting your filters or search terms',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade500,
+                                if (filteredProducts.isEmpty)
+                                  Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.search_off,
+                                          size: 64,
+                                          color: Colors.grey.shade400,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'No cars found',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.grey.shade600,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Try adjusting your filters or search terms',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
-                          ),
-                      ],
-                    ),
-          ),
-        ],
-      ),
+                  ),
+                ],
+              ),
     );
   }
 
@@ -1362,28 +1429,28 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final isExchangeAvailable = product.ifExchange == '1';
 
     return GestureDetector(
-  onTap: () {
-      if (isAuction) {
-        // Navigate to auction details page
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AuctionProductDetailsPage(product: product),
-          ),
-        );
-      } else {
-        // Navigate to regular product details page
-      Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ProductDetailsPage(
-        product: product,
-        isAuction: product.ifAuction == "1",
-      ),
-    ),
-  );;
-      }
-    },
+      onTap: () {
+        if (isAuction) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AuctionProductDetailsPage(product: product),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (context) => ProductDetailsPage(
+                    product: product,
+                    isAuction: product.ifAuction == "1",
+                  ),
+            ),
+          );
+          ;
+        }
+      },
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -1391,7 +1458,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.30),
-              blurRadius: 4,
+              blurRadius: 5,
               spreadRadius: 1,
               offset: const Offset(0, 5),
             ),
@@ -1402,45 +1469,45 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 140,
-                  height: 190,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(0),
+                Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Container(
+                    width: 100,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        bottomLeft: Radius.circular(0),
+                      ),
                     ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.all(Radius.circular(12)),
 
-                    child: Image.network(
-                      'https://lelamonline.com/admin/${product.image}',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        print(
-                          'Failed to load image: https://lelamonline.com/${product.image}',
-                        );
-                        print('Error: $error');
-                        return Container(
-                          color: Colors.grey.shade200,
-                          child: Icon(
-                            Icons.directions_car,
-                            size: 40,
-                            color: Colors.grey.shade400,
-                          ),
-                        );
-                      },
+                      child: Image.network(
+                        'https://lelamonline.com/admin/${product.image}',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          print(
+                            'Failed to load image: https://lelamonline.com/${product.image}',
+                          );
+                          print('Error: $error');
+                          return Container(
+                            color: Colors.grey.shade200,
+                            child: Icon(
+                              Icons.directions_car,
+                              size: 40,
+                              color: Colors.grey.shade400,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1448,7 +1515,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           product.title,
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                            fontSize: 15,
                             color: Colors.black87,
                           ),
                           maxLines: 1,
@@ -1457,7 +1524,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                         Text(
                           product.modelVariation,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 10,
                             color: Colors.grey.shade600,
                           ),
                         ),
@@ -1470,7 +1537,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   ? '₹${_formatNumber(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}'
                                   : '₹ ${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 15,
                                 fontWeight: FontWeight.bold,
                                 color: Palette.primaryblue,
                               ),
@@ -1487,7 +1554,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              product.landMark,
+                              _getLocationName(product.parentZoneId),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
@@ -1501,7 +1568,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             _buildDetailChip(
                               Icon(
                                 Icons.calendar_today,
-                                size: 10,
+                                size: 8,
                                 color: Colors.grey[700],
                               ),
                               '${product.filters['year']}',
@@ -1510,7 +1577,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             _buildDetailChip(
                               Icon(
                                 Icons.person,
-                                size: 10,
+                                size: 8,
                                 color: Colors.grey[700],
                               ),
                               _getOwnerText(product.filters['owners'] ?? '1'),
@@ -1519,7 +1586,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             _buildDetailChip(
                               Icon(
                                 Icons.speed,
-                                size: 10,
+                                size: 8,
                                 color: Colors.grey[700],
                               ),
                               '${_formatNumber(int.tryParse(product.filters['km']?.toString() ?? '0') ?? 0)} KM',
@@ -1532,7 +1599,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             _buildDetailChip(
                               Icon(
                                 Icons.local_gas_station,
-                                size: 10,
+                                size: 8,
                                 color: Colors.grey[700],
                               ),
                               '${product.filters['fuel']}',
@@ -1541,7 +1608,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             _buildDetailChip(
                               Icon(
                                 Icons.settings,
-                                size: 10,
+                                size: 8,
                                 color: Colors.grey[700],
                               ),
                               '${product.filters['transmission']}',
@@ -1559,10 +1626,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
                 decoration: BoxDecoration(
-                  color:
-                      isAuction
-                          ? Palette.primarylightblue
-                          : Colors.green.shade50,
+                  color: isAuction ? Palette.primarylightblue : Colors.white,
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(12),
                     bottomRight: Radius.circular(12),
@@ -1641,12 +1705,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.account_balance, size: 16, color: Colors.white),
+                  Icon(Icons.account_balance, size: 12, color: Colors.white),
                   const SizedBox(width: 6),
                   Text(
                     'Finance Available',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1697,12 +1761,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.account_balance, size: 16, color: Colors.black),
+            Icon(Icons.account_balance, size: 12, color: Colors.black),
             const SizedBox(width: 8),
             Text(
               'Finance Available',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 10,
                 color: Colors.black,
                 fontWeight: FontWeight.w600,
               ),
@@ -1744,7 +1808,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   Widget _buildDetailChip(Widget icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
@@ -1754,7 +1818,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         children: [
           icon,
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          Text(label, style: const TextStyle(fontSize: 8)),
         ],
       ),
     );

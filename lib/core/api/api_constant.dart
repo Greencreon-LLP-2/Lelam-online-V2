@@ -11,8 +11,14 @@ const String products = '$baseUrl/products?token=$token';
 const String banner = '$baseUrl/banner.php?token=$token';
 const String usedCarsProducts =
     '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=1&user_zone_id=0';
-    
+const String locations = '$baseUrl/list-location.php?token=$token';
 
 //====================== Feature Posts ===============================//
-const String listFeaturePost = '$baseUrl/list-feature-post.php?token=$token';
-
+const String brand = '$baseUrl/list-brand.php?token=$token';
+const String brandModel = '$baseUrl/list-model.php?token=$token&brand_id=5';
+const String modelVariations =
+    '$baseUrl/list-model-variations.php?token=$token&brands_model_id=3';
+const String attribute =
+    '$baseUrl/filter-attribute.php?token=$token&category_id=0';
+const String attributeVariations =
+    '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=1';

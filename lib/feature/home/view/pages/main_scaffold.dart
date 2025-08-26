@@ -35,85 +35,92 @@ class _MainScaffoldState extends State<MainScaffold> {
       key: _scaffoldKey,
       drawer: AppDrawerWidget(),
       body: _pages[currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: (index) {
-          print(index);
-          if (index == 4) {
-            _scaffoldKey.currentState?.openDrawer();
-            return;
-          }
-          setState(() {
-            currentIndex = index;
-          });
-          if (index == 0) {
+      bottomNavigationBar: SizedBox(
+        height: 65,
+
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: currentIndex,
+          onTap: (index) {
+            print(index);
+            if (index == 4) {
+              _scaffoldKey.currentState?.openDrawer();
+              return;
+            }
             setState(() {
-              isStatus = false;
+              currentIndex = index;
             });
-          }
-          if (index == 3) {
-            setState(() {
-              // currentIndex = isStatus ? 1 : 3;
-              isStatus = true;
-            });
-          }
-        },
-        selectedItemColor: isStatus ? Colors.redAccent : AppTheme.primaryColor,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        showSelectedLabels: true,
-        selectedLabelStyle: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: TextStyle(fontSize: 12),
-        selectedFontSize: 14,
-        unselectedFontSize: 12,
-        items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          isStatus
-              ? BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_cart),
-                label: 'Buying',
-              )
-              : BottomNavigationBarItem(
-                icon: Icon(Icons.support_agent),
-                label: 'Support',
-              ),
-          isStatus
-              ? BottomNavigationBarItem(
-                icon: Icon(Icons.sell),
-                label: 'Selling',
-              )
-              : BottomNavigationBarItem(
-                icon: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
+            if (index == 0) {
+              setState(() {
+                isStatus = false;
+              });
+            }
+            if (index == 3) {
+              setState(() {
+                // currentIndex = isStatus ? 1 : 3;
+                isStatus = true;
+              });
+            }
+          },
+          selectedItemColor:
+              isStatus ? Colors.redAccent : AppTheme.primaryColor,
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          showSelectedLabels: true,
+          selectedLabelStyle: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: TextStyle(fontSize: 10),
+          selectedFontSize: 10,
+          unselectedFontSize: 10,
+          items: [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            isStatus
+                ? BottomNavigationBarItem(
+                  icon: Icon(Icons.shopping_cart, size: 20),
+                  label: 'Buying',
+                )
+                : BottomNavigationBarItem(
+                  icon: Icon(Icons.support_agent, size: 20),
+                  label: 'Support',
+                ),
+            isStatus
+                ? BottomNavigationBarItem(
+                  icon: Icon(Icons.sell, size: 20),
+                  label: 'Selling',
+                )
+                : BottomNavigationBarItem(
+                  icon: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Color.fromARGB(255, 12, 9, 233),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      size: 15,
                       color: Color.fromARGB(255, 12, 9, 233),
-                      width: 2,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.add,
-                    color: Color.fromARGB(255, 12, 9, 233),
-                  ),
+                  label: 'Sell',
                 ),
-                label: 'Sell',
-              ),
 
-          isStatus
-              ? BottomNavigationBarItem(
-                icon: Icon(Icons.star_border_outlined),
-                label: 'Shortlist',
-              )
-              : BottomNavigationBarItem(
-                icon: Icon(Icons.stream_outlined),
-                label: 'Status',
-              ),
-          BottomNavigationBarItem(icon: Icon(Icons.more_vert), label: 'More'),
-        ],
+            isStatus
+                ? BottomNavigationBarItem(
+                  icon: Icon(Icons.star_border_outlined, size: 20),
+                  label: 'Shortlist',
+                )
+                : BottomNavigationBarItem(
+                  icon: Icon(Icons.stream_outlined, size: 20),
+                  label: 'Status',
+                ),
+            BottomNavigationBarItem(icon: Icon(Icons.more_vert), label: 'More'),
+          ],
+        ),
       ),
     );
   }

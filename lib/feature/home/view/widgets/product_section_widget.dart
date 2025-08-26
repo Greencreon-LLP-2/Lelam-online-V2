@@ -219,7 +219,7 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
               children: [
                 // Product Image
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
@@ -273,7 +273,7 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
                           product.title,
                           style: const TextStyle(
                             fontWeight: FontWeight.w500,
-                            fontSize: 14,
+                            fontSize: 12,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
