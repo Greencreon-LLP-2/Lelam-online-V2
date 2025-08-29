@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/otp_verification_page.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
 import 'package:lelamonline_flutter/feature/faq/view/faq_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
@@ -52,7 +54,10 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: RouteNames.productDetailsPage,
-      builder: (context, state) => const ProductDetailsPage(),
+      builder: (context, state) {
+        final dynamic product = state.extra;
+        return ProductDetailsPage(product: product);
+      },
       name: RouteNames.productDetailsPage,
     ),
     GoRoute(
@@ -98,6 +103,18 @@ final GoRouter appRouter = GoRouter(
           (context, state) =>
               OtpVerificationPage(phoneNumber: state.extra as String? ?? ''),
       name: RouteNames.otpVerificationPage,
+    ),
+    GoRoute(
+      path: RouteNames.usedCarsPage,
+      builder: (context, state) => const UsedCarsPage(),
+      name: RouteNames.usedCarsPage,
+    ),
+    GoRoute(
+      path: RouteNames.marketPlaceProductDetailsPage,
+      builder:
+          (context, state) =>
+              const MarketPlaceProductDetailsPage(product: null),
+      name: RouteNames.marketPlaceProductDetailsPage,
     ),
   ],
   errorBuilder:

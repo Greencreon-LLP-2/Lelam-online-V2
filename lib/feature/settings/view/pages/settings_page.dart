@@ -60,6 +60,7 @@ class SettingsPage extends StatelessWidget {
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
                 minimumSize: const Size(200, 40),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Text('Edit Profile'),
             ),

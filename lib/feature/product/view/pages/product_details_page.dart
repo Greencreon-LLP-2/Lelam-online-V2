@@ -1,37 +1,339 @@
-// ignore_for_file: deprecated_member_use, avoid_print, use_build_context_synchronously
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
-import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
+import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/utils/palette.dart';
 
 class ProductDetailsPage extends StatefulWidget {
-  const ProductDetailsPage({super.key});
+  final dynamic product;
+  final bool isAuction;
+
+  const ProductDetailsPage({
+    super.key,
+    required this.product,
+    this.isAuction = false,
+  });
 
   @override
   State<ProductDetailsPage> createState() => _ProductDetailsPageState();
 }
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
+  List<Attribute> attributes = [];
+  List<AttributeVariation> attributeVariations = [];
+  bool isLoadingDetails = false;
+  Map<String, String> attributeValues = {};
+  List<MapEntry<String, String>> orderedAttributeValues = [];
+
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
       TransformationController();
-
   bool _isFavorited = false;
+  bool _isLoadingLocations = true;
+  List<LocationData> _locations = [];
+  final LocationService _locationService = LocationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDetailsData();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchDetailsData() async {
+    setState(() {
+      isLoadingDetails = true;
+      _isLoadingLocations = true;
+    });
+
+    try {
+      final locationResponse = await _locationService.fetchLocations();
+      if (locationResponse != null && locationResponse.status) {
+        _locations = locationResponse.data;
+      } else {
+        throw Exception('Failed to load locations');
+      }
+
+      attributes = await ApiService.fetchAttributes();
+
+      attributeVariations = await ApiService.fetchAttributeVariations(
+        widget.product.filters,
+      );
+
+      final attributeValuePairs =
+          await AttributeValueService.fetchAttributeValuePairs();
+
+      _mapFiltersToValues(attributeValuePairs);
+
+      setState(() {
+        isLoadingDetails = false;
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      print('Error fetching details: $e');
+      setState(() {
+        isLoadingDetails = false;
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
+    final filters = widget.product.filters as Map<String, dynamic>;
+    attributeValues.clear();
+    orderedAttributeValues.clear();
+
+    print('Attribute Value Pairs: $attributeValuePairs');
+    print('Attribute Variations: $attributeVariations');
+    print('Filters: $filters');
+
+    final Set<String> processedAttributes = {};
+
+    for (var pair in attributeValuePairs) {
+      if (pair.attributeName.isNotEmpty &&
+          pair.attributeValue.isNotEmpty &&
+          !processedAttributes.contains(pair.attributeName)) {
+        attributeValues[pair.attributeName] = pair.attributeValue;
+        orderedAttributeValues.add(
+          MapEntry(pair.attributeName, pair.attributeValue),
+        );
+        processedAttributes.add(pair.attributeName);
+        print('Added from API: ${pair.attributeName} = ${pair.attributeValue}');
+      } else {
+        print('Skipped API pair: ${pair.attributeName} (duplicate or invalid)');
+      }
+    }
+
+    if (filters.containsKey('3')) {
+      final variationList = filters['3'] as List<dynamic>?;
+      if (variationList != null &&
+          variationList.isNotEmpty &&
+          variationList[0].toString().isNotEmpty) {
+        final variationId = variationList[0].toString();
+        attributeValues['KM Range'] = variationId;
+        final kmIndex = orderedAttributeValues.indexWhere(
+          (entry) => entry.key == 'KM Range',
+        );
+        if (kmIndex != -1) {
+          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
+        } else {
+          orderedAttributeValues.add(MapEntry('KM Range', variationId));
+        }
+        processedAttributes.add('KM Range');
+        print('Added KM Range from filters: $variationId');
+      }
+    }
+
+    filters.forEach((attributeId, variationList) {
+      if (attributeId != '3' &&
+          variationList is List &&
+          variationList.isNotEmpty &&
+          variationList[0].toString().isNotEmpty) {
+        final variationId = variationList[0].toString();
+        final attribute = attributes.firstWhere(
+          (attr) => attr.id == attributeId,
+          orElse:
+              () => Attribute(
+                id: attributeId,
+                slug: '',
+                name: _getAttributeNameFromId(attributeId),
+                listOrder: '',
+                categoryId: '',
+                formValidation: '',
+                ifDetailsIcons: '',
+                detailsIcons: '',
+                detailsIconsOrder: '',
+                showFilter: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        );
+        if (!processedAttributes.contains(attribute.name)) {
+          final variation = attributeVariations.firstWhere(
+            (varAttr) =>
+                varAttr.id == variationId && varAttr.attributeId == attributeId,
+            orElse:
+                () => AttributeVariation(
+                  id: variationId,
+                  attributeId: attributeId,
+                  name: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
+          );
+          print(
+            'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variation.name}',
+          );
+          if (variation.name.isNotEmpty && variation.name != variationId) {
+            attributeValues[attribute.name] = variation.name;
+            orderedAttributeValues.add(
+              MapEntry(attribute.name, variation.name),
+            );
+            processedAttributes.add(attribute.name);
+            print(
+              'Added from variations: ${attribute.name} = ${variation.name}',
+            );
+          } else {
+            print(
+              'Skipped variation: ${attribute.name} (invalid name or ID match)',
+            );
+          }
+        }
+      } else {
+        print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
+      }
+    });
+
+    print('Final attributeValues: $attributeValues');
+    print('Final orderedAttributeValues: $orderedAttributeValues');
+  }
+
+  String _getAttributeNameFromId(String id) {
+    switch (id) {
+      case '1':
+        return 'Year';
+      case '2':
+        return 'No of owners';
+      case '3':
+        return 'KM Range';
+      case '4':
+        return 'Fuel Type';
+      case '5':
+        return 'Transmission';
+      case '6':
+        return 'Service History';
+      case '7':
+        return 'Accident History';
+      case '8':
+        return 'Replacements';
+      case '9':
+        return 'Flood Affected';
+      case '10':
+        return 'Engine Condition';
+      case '11':
+        return 'Transmission Condition';
+      case '12':
+        return 'Suspension Condition';
+      case '13':
+        return 'Features';
+      case '14':
+        return 'Functions';
+      case '15':
+        return 'Battery';
+      case '16':
+        return 'Driver side front tyre';
+      case '17':
+        return 'Driver side rear tyre';
+      case '18':
+        return 'Co driver side front tyre';
+      case '19':
+        return 'Co driver side rear tyre';
+      case '20':
+        return 'Rust';
+      case '21':
+        return 'Emission Norms';
+      case '22':
+        return 'Status Of RC';
+      case '23':
+        return 'Registration valid till';
+      case '24':
+        return 'Insurance Type';
+      case '25':
+        return 'Insurance Upto';
+      case '26':
+        return 'Scratches';
+      case '27':
+        return 'Dents';
+      case '28':
+        return 'Sold by';
+      default:
+        return 'Unknown Attribute';
+    }
+  }
+
+  String _getLocationName(String zoneId) {
+    if (zoneId == 'all') return 'All Kerala';
+    final location = _locations.firstWhere(
+      (loc) => loc.id == zoneId,
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+    );
+    return location.name;
+  }
+
+  String get id => _getProperty('id') ?? '';
+  String get title => _getProperty('title') ?? '';
+  String get image => _getProperty('image') ?? '';
+  String get price => _getProperty('price') ?? '0';
+  String get landMark => _getProperty('landMark') ?? '';
+  String get createdOn => _getProperty('createdOn') ?? '';
+  String get createdBy => _getProperty('createdBy') ?? '';
+  String get byDealer => _getProperty('byDealer') ?? '0';
+
+  dynamic _getProperty(String propertyName) {
+    if (widget.product == null) return null;
+    switch (propertyName) {
+      case 'id':
+        return widget.product.id;
+      case 'title':
+        return widget.product.title;
+      case 'image':
+        return widget.product.image;
+      case 'price':
+        return widget.product.price;
+      case 'landMark':
+        return _getLocationName(widget.product.parentZoneId);
+      case 'createdOn':
+        return widget.product.createdOn;
+      case 'createdBy':
+        return widget.product.createdBy;
+      case 'byDealer':
+        return widget.product.byDealer;
+      default:
+        return null;
+    }
+  }
+
+  List<String> get _images {
+    if (image.isNotEmpty) {
+      return ['https://lelamonline.com/admin/$image'];
+    }
+    return [
+      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    ];
+  }
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
   }
-
-  // Sample images - replace with actual image URLs from your data
-  final List<String> _images = [
-    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-    'https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260',
-    'https://images.pexels.com/photos/3802510/pexels-photo-3802510.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260',
-  ];
 
   void _showFullScreenGallery(BuildContext context) {
     Navigator.of(context).push(
@@ -45,7 +347,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           return StatefulBuilder(
             builder: (context, setState) {
               return Scaffold(
-                backgroundColor: Colors.transparent,
+                backgroundColor: Colors.white,
                 body: Stack(
                   children: [
                     PageView.builder(
@@ -55,7 +357,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           _currentImageIndex = index;
                           _resetZoom();
                         });
-                        // Update the main view's page controller
                         _pageController.animateToPage(
                           index,
                           duration: const Duration(milliseconds: 300),
@@ -69,25 +370,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           minScale: 0.5,
                           maxScale: 5.0,
                           boundaryMargin: const EdgeInsets.all(double.infinity),
-                          onInteractionStart: (ScaleStartDetails details) {
-                            // Handle interaction start if needed
-                          },
-                          onInteractionUpdate: (ScaleUpdateDetails details) {
-                            // Handle interaction update if needed
-                          },
-                          onInteractionEnd: (ScaleEndDetails details) {
-                            if (details.velocity.pixelsPerSecond.distance > 0) {
-                              final double scale =
-                                  _transformationController.value
-                                      .getMaxScaleOnAxis();
-                              if (scale < 0.5) {
-                                _resetZoom();
-                              } else if (scale > 5.0) {
-                                _transformationController.value =
-                                    Matrix4.identity()..scale(5.0);
-                              }
-                            }
-                          },
                           child: GestureDetector(
                             onDoubleTap: _resetZoom,
                             child: Hero(
@@ -238,160 +520,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
-  void _showBidDialog(BuildContext context) {
-    final TextEditingController bidAmountController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text(
-                'Place Your Bid Amount',
-                style: TextStyle(fontSize: 24),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Enter amount in rupees',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: bidAmountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: false,
-                  ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    prefixIcon: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      child: const Text(
-                        '₹',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 0,
-                      minHeight: 0,
-                    ),
-                    hintText: '0',
-                    hintStyle: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Colors.blue,
-                        width: 2,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.grey[300]!,
-                        width: 2,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Colors.blue,
-                        width: 2,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Current Price: ₹990000.00',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final String amount = bidAmountController.text;
-                if (amount.isNotEmpty) {
-                  // Process the bid
-                  print('Bid amount: ₹$amount'); // For testing
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Submit Bid',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
-
   void _showMeetingDialog(BuildContext context) {
     DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
-
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -405,7 +535,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
               const SizedBox(height: 4),
               Text(
-                'Select date ',
+                'Select date',
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -438,7 +568,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     );
                     if (picked != null && picked != selectedDate) {
                       selectedDate = picked;
-                      // Rebuild dialog
                       Navigator.pop(context);
                       _showMeetingDialog(context);
                     }
@@ -470,9 +599,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                // Process the meeting request
                 print(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year} at ${selectedTime.hour}:${selectedTime.minute}',
+                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                 );
                 Navigator.pop(context);
               },
@@ -483,9 +611,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   horizontal: 20,
                   vertical: 12,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Text(
                 'Schedule Meeting',
@@ -499,25 +625,160 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _transformationController.dispose();
-    super.dispose();
+  String formatPriceInt(double price) {
+    final formatter = NumberFormat.decimalPattern('en_IN');
+    return formatter.format(price.round());
+  }
+
+  String _getOwnerText(String owners) {
+    switch (owners) {
+      case '1':
+      case '1st Owner':
+        return '1st Owner';
+      case '2':
+      case '2nd Owner':
+        return '2nd Owner';
+      case '3':
+      case '3rd Owner':
+        return '3rd Owner';
+      default:
+        return owners.isNotEmpty ? owners : 'N/A';
+    }
+  }
+
+  String _formatNumber(String value) {
+    final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+    final formatter = NumberFormat.decimalPattern(
+      'en_IN',
+    ); // Indian style commas
+    return formatter.format(number);
+  }
+
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: Colors.grey[700]),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 15, color: Colors.grey[700]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSellerCommentItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          Text(value, style: const TextStyle(fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellerInformationItem(
+    String name,
+    String memberSince,
+    BuildContext context,
+  ) {
+    return Row(
+      children: [
+        const CircleAvatar(
+          backgroundImage: AssetImage('assets/images/avatar.gif'),
+          radius: 30,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                memberSince,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: () {
+                  // Navigate to seller profile
+                },
+                child: const Text(
+                  'SEE PROFILE',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      ],
+    );
+  }
+
+  Widget _buildQuestionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'You are the first one to ask question',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Ask a question functionality
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Text('Ask a question'),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           SingleChildScrollView(
-            // Add padding at bottom to prevent content from being hidden behind buttons
             padding: const EdgeInsets.only(bottom: 80),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Car Image Placeholder
                 Stack(
                   children: [
                     SizedBox(
@@ -579,9 +840,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       child: Row(
                         children: [
                           IconButton(
-                            onPressed: () {
-                              context.pop();
-                            },
+                            onPressed: () => Navigator.pop(context),
                             icon: const Icon(
                               Icons.arrow_back,
                               color: Colors.white,
@@ -604,7 +863,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
-                              // TODO: Implement share functionality
+                              // Share functionality
                             },
                           ),
                         ],
@@ -617,17 +876,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Mahindra XUV 500',
-                        style: TextStyle(
+                      Text(
+                        title,
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'W10',
-                        style: TextStyle(fontSize: 18, color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -638,10 +892,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             color: Colors.grey,
                           ),
                           const SizedBox(width: 4),
-                          const Text(
-                            'Thrissur',
-                            style: TextStyle(color: Colors.grey),
-                          ),
+                          _isLoadingLocations
+                              ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -649,16 +911,16 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             color: Colors.grey,
                           ),
                           const SizedBox(width: 4),
-                          const Text(
-                            '28-05-2025 07:02 pm',
-                            style: TextStyle(color: Colors.grey),
+                          Text(
+                            createdOn,
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        '₹ 990000.00',
-                        style: TextStyle(
+                      Text(
+                        '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.blueAccent,
@@ -668,19 +930,22 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            '#AD ID 494',
-                            style: TextStyle(color: Colors.grey),
+                          Text(
+                            '#AD ID $id',
+                            style: const TextStyle(color: Colors.grey),
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // TODO: Implement call functionality
+                              // Call functionality
                             },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
                             ),
                           ),
                         ],
@@ -689,50 +954,92 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 ),
                 const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.calendar_today,
-                              '2016',
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(Icons.person, '2nd Owner'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDetailItem(
-                              Icons.local_gas_station,
-                              'Diesel',
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(Icons.settings, 'Manual'),
-                          ),
-                          Expanded(
-                            child: _buildDetailItem(Icons.speed, '42000 KM'),
-                          ),
-                        ],
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.30),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                        offset: const Offset(1, 1),
                       ),
                     ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Details',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (isLoadingDetails)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.speed,
+                                      _formatNumber(
+                                        attributeValues['KM Range'] ?? '0',
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.local_gas_station,
+                                      attributeValues['Fuel Type'] ?? 'N/A',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.person,
+                                      _getOwnerText(
+                                        attributeValues['No of owners'] ??
+                                            'N/A',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.calendar_today,
+                                      attributeValues['Year'] ?? 'N/A',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.settings,
+                                      attributeValues['Transmission'] ?? 'N/A',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.build,
+                                      attributeValues['Engine Condition'] ??
+                                          'N/A',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 const Divider(),
@@ -749,15 +1056,27 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerCommentItem('Year', '2016'),
-                      _buildSellerCommentItem('No Of Owners', '2nd Owner'),
-                      _buildSellerCommentItem('Fuel Type', 'Diesel'),
-                      _buildSellerCommentItem('Transmission', 'Manual'),
-                      _buildSellerCommentItem(
-                        'Service History',
-                        'In Showroom Only',
-                      ),
-                      _buildSellerCommentItem('Sold By', 'Re Seller'),
+                      if (isLoadingDetails)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        Column(
+                          children:
+                              orderedAttributeValues
+                                  .where(
+                                    (entry) =>
+                                        entry.value != 'N/A' &&
+                                        entry.key != 'Co driver side rear tyre',
+                                  )
+                                  .map(
+                                    (entry) => _buildSellerCommentItem(
+                                      entry.key,
+                                      entry.key == 'No of owners'
+                                          ? _getOwnerText(entry.value)
+                                          : entry.value,
+                                    ),
+                                  )
+                                  .toList(),
+                        ),
                     ],
                   ),
                 ),
@@ -776,8 +1095,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildSellerInformationItem(
-                        'LELAMONLINE ADMIN',
-                        'Member Since 2024-12-07 11:49:43',
+                        createdBy,
+                        'Member Since $createdOn',
                         context,
                       ),
                     ],
@@ -807,32 +1126,48 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: -5,
             child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.transparent),
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                // No background color
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 15,
+                    spreadRadius: 0,
+                    offset: Offset(1, 3),
+                  ),
+                ],
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context),
+                      onPressed: () {
+                        // Contact seller functionality
+                      },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.blue,
-                        side: const BorderSide(color: Colors.blue),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Palette.primarypink,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
                       ),
-                      child: const Text('Place a Bid'),
+                      child: const Text('Place Bid'),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Palette.primaryblue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
                       ),
                       child: const Text('Fix Meeting'),
                     ),
@@ -843,113 +1178,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDetailItem(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        Text(text, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
-      ],
-    );
-  }
-
-  Widget _buildSellerCommentItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          ),
-          Text(value, style: const TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSellerInformationItem(
-    String name,
-    String memberSince,
-    // String avatarUrl,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                memberSince,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  context.pushNamed(RouteNames.sellerProfilePage);
-                },
-                child: const Text(
-                  'SEE PROFILE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
-    );
-  }
-
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // TODO: Implement ask a question functionality
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    Colors.blue, // Use a distinct color for the button
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Ask a question'),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

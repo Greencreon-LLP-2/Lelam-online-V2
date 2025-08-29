@@ -190,7 +190,7 @@ class MyAdsWidget extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.zero,
                           ),
                         ),
                         onPressed: () {},

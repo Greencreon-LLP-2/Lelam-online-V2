@@ -6,8 +6,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:lelamonline_flutter/core/constants/districts.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
@@ -94,18 +94,21 @@ class AdPostForm extends StatefulWidget {
 
 class _AdPostFormState extends State<AdPostForm>
     with SingleTickerProviderStateMixin {
-  final _makecontroller = TextEditingController();
+  final _makeController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
+  final _listPriceController = TextEditingController();
+  final _offerPriceController = TextEditingController();
   final _districtController = TextEditingController();
   final _landMarkController = TextEditingController();
   String? _selectedMake;
-  String? _selectedDistrict;
+  String? _selectedDistrict =
+      districts.isNotEmpty ? districts[0] : 'Thiruvananthapuram';
   final List<XFile> _selectedImages = [];
   final ImagePicker _imagePicker = ImagePicker();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _imageError = false;
+  final int _maxImages = 5; // Maximum number of images allowed
 
   final List<String> _categories = [
     'Used Cars',
@@ -118,6 +121,7 @@ class _AdPostFormState extends State<AdPostForm>
   @override
   void initState() {
     super.initState();
+    _selectedMake = widget.initialCategory;
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -131,15 +135,29 @@ class _AdPostFormState extends State<AdPostForm>
 
   @override
   void dispose() {
-    _makecontroller.dispose();
+    _makeController.dispose();
     _descriptionController.dispose();
-    _priceController.dispose();
+    _listPriceController.dispose();
+    _offerPriceController.dispose();
     _districtController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum $_maxImages images allowed'),
+          backgroundColor: Colors.red.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: source,
@@ -148,6 +166,7 @@ class _AdPostFormState extends State<AdPostForm>
       if (image != null) {
         setState(() {
           _selectedImages.add(image);
+          _imageError = false;
         });
       }
     } catch (e) {
@@ -165,6 +184,19 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   void _showImageSourceBottomSheet() {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Maximum $_maxImages images allowed'),
+          backgroundColor: Colors.red.withOpacity(0.9),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -186,201 +218,160 @@ class _AdPostFormState extends State<AdPostForm>
     return Center(
       child: Column(
         children: [
+          // Add Image Button (always visible)
           Container(
+            width: 120,
             height: 150,
-            margin: const EdgeInsets.only(bottom: 8),
-            child:
-                _selectedImages.isEmpty
-                    ? Container(
-                      width: 120,
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            spreadRadius: 1,
-                          ),
-                        ],
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _showImageSourceBottomSheet,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 36,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add Photo (${_selectedImages.length}/$_maxImages)',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: _showImageSourceBottomSheet,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.add_photo_alternate_outlined,
-                                size: 36,
-                                color: AppTheme.primaryColor,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Add Photo',
-                                style: TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Grid View for selected images
+          if (_selectedImages.isNotEmpty)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: _selectedImages.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        Image.file(
+                          File(_selectedImages[index].path),
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                        // Cover Photo Badge
+                        if (index == 0)
+                          Positioned(
+                            bottom: 8,
+                            left: 8,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10.0,
+                                  sigmaY: 10.0,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Cover Photo',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
+                            ),
+                          ),
+                        // Delete Button
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 10.0,
+                                sigmaY: 10.0,
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.close,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _selectedImages.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                    : ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _selectedImages.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == _selectedImages.length) {
-                          return Container(
-                            width: 120,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: _showImageSourceBottomSheet,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.add_photo_alternate_outlined,
-                                      size: 36,
-                                      color: AppTheme.primaryColor,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Add Photo',
-                                      style: TextStyle(
-                                        color: AppTheme.primaryColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        return Container(
-                          width: 120,
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Stack(
-                              children: [
-                                Image.file(
-                                  File(_selectedImages[index].path),
-                                  width: 120,
-                                  height: 150,
-                                  fit: BoxFit.cover,
-                                ),
-                                if (index == 0)
-                                  Positioned(
-                                    bottom: 8,
-                                    left: 8,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: BackdropFilter(
-                                        filter: ImageFilter.blur(
-                                          sigmaX: 10.0,
-                                          sigmaY: 10.0,
-                                        ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withOpacity(
-                                              0.5,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Cover Photo',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(
-                                        sigmaX: 10.0,
-                                        sigmaY: 10.0,
-                                      ),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.3),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: IconButton(
-                                          icon: const Icon(
-                                            Icons.close,
-                                            size: 20,
-                                            color: Colors.white,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              _selectedImages.removeAt(index);
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                      ],
                     ),
-          ),
+                  ),
+                );
+              },
+            ),
+
+          // Error message
           if (_imageError)
             Padding(
-              padding: const EdgeInsets.only(top: 4.0),
+              padding: const EdgeInsets.only(top: 16.0),
               child: Text(
                 'Please add at least one photo',
                 style: TextStyle(color: Colors.red[700], fontSize: 12),
@@ -432,15 +423,59 @@ class _AdPostFormState extends State<AdPostForm>
                   isRequired: true,
                   itemToString: (String item) => item,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
-                  controller: _priceController,
-                  label: 'Price',
+                  controller: _listPriceController,
+                  label: 'List Price',
                   prefixIcon: Icons.currency_rupee,
                   isNumberInput: true,
                   isRequired: true,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the list price';
+                    }
+                    final listPrice = double.tryParse(value);
+                    if (listPrice == null) {
+                      return 'Please enter a valid number';
+                    }
+                    if (_offerPriceController.text.isNotEmpty) {
+                      final offerPrice = double.tryParse(
+                        _offerPriceController.text,
+                      );
+                      if (offerPrice != null && offerPrice > listPrice) {
+                        return 'List price must be greater than or equal to offer price';
+                      }
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 5),
+                // CustomFormField(
+                //   controller: _offerPriceController,
+                //   label: 'Offer Price',
+                //   prefixIcon: Icons.currency_rupee,
+                //   isNumberInput: true,
+                //   isRequired: true,
+                //   validator: (value) {
+                //     if (value == null || value.isEmpty) {
+                //       return 'Please enter the offer price';
+                //     }
+                //     final offerPrice = double.tryParse(value);
+                //     if (offerPrice == null) {
+                //       return 'Please enter a valid number';
+                //     }
+                //     if (_listPriceController.text.isNotEmpty) {
+                //       final listPrice = double.tryParse(
+                //         _listPriceController.text,
+                //       );
+                //       if (listPrice != null && offerPrice > listPrice) {
+                //         return 'Offer price must be less than or equal to list price';
+                //       }
+                //     }
+                //     return null;
+                //   },
+                // ),
+                const SizedBox(height: 12),
                 CustomDropdownWidget<String>(
                   label: 'District',
                   value: _selectedDistrict,
@@ -454,14 +489,14 @@ class _AdPostFormState extends State<AdPostForm>
                   isRequired: true,
                   itemToString: (String item) => item,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
                   controller: _landMarkController,
                   label: 'Landmark',
                   prefixIcon: Icons.location_on_outlined,
                   alignLabelWithHint: true,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
                   controller: _descriptionController,
                   label: 'Description',
@@ -469,48 +504,7 @@ class _AdPostFormState extends State<AdPostForm>
                   alignLabelWithHint: true,
                   maxLines: 5,
                 ),
-                // const SizedBox(height: 24),
-                // Container(
-                //   decoration: BoxDecoration(
-                //     color: Colors.white,
-                //     borderRadius: BorderRadius.circular(16),
-                //     boxShadow: [
-                //       BoxShadow(
-                //         color: Colors.black.withOpacity(0.05),
-                //         blurRadius: 10,
-                //         spreadRadius: 1,
-                //       ),
-                //     ],
-                //   ),
-                //   child: ClipRRect(
-                //     borderRadius: BorderRadius.circular(16),
-                //     child: BackdropFilter(
-                //       filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                //       child: SwitchListTile(
-                //         title: const Text(
-                //           'Allow Auction',
-                //           style: TextStyle(
-                //             fontSize: 16,
-                //             fontWeight: FontWeight.w500,
-                //             color: Colors.black87,
-                //           ),
-                //         ),
-                //         subtitle: const Text(
-                //           'Enable bidding on your item',
-                //           style: TextStyle(fontSize: 14, color: Colors.black54),
-                //         ),
-                //         value: _isAuctionable,
-                //         onChanged: (bool value) {
-                //           setState(() {
-                //             _isAuctionable = value;
-                //           });
-                //         },
-                //         activeColor: AppTheme.primaryColor,
-                //       ),
-                //     ),
-                //   ),
-                // ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
@@ -527,7 +521,7 @@ class _AdPostFormState extends State<AdPostForm>
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.zero,
                       ),
                     ),
                     child: const Text(
