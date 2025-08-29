@@ -9,27 +9,28 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
-class ProductDetailsPage extends StatefulWidget {
+class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
 
-  const ProductDetailsPage({
+  const MarketPlaceProductDetailsPage({
     super.key,
     required this.product,
     this.isAuction = false,
   });
 
   @override
-  State<ProductDetailsPage> createState() => _ProductDetailsPageState();
+  State<MarketPlaceProductDetailsPage> createState() =>
+      _MarketPlaceProductDetailsPageState();
 }
 
-class _ProductDetailsPageState extends State<ProductDetailsPage> {
+class _MarketPlaceProductDetailsPageState
+    extends State<MarketPlaceProductDetailsPage> {
   List<Attribute> attributes = [];
   List<AttributeVariation> attributeVariations = [];
   bool isLoadingDetails = false;
   Map<String, String> attributeValues = {};
   List<MapEntry<String, String>> orderedAttributeValues = [];
-
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
@@ -67,11 +68,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       }
 
       attributes = await ApiService.fetchAttributes();
-
       attributeVariations = await ApiService.fetchAttributeVariations(
         widget.product.filters,
       );
-
       final attributeValuePairs =
           await AttributeValueService.fetchAttributeValuePairs();
 
@@ -96,11 +95,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     orderedAttributeValues.clear();
 
     print('Attribute Value Pairs: $attributeValuePairs');
-    print('Attribute Variations: $attributeVariations');
+    print(
+      'Attribute Variations: ${attributeVariations.map((v) => {'id': v.id, 'attribute_id': v.attributeId, 'name': v.name}).toList()}',
+    );
     print('Filters: $filters');
 
     final Set<String> processedAttributes = {};
 
+    // Process attribute value pairs from API
     for (var pair in attributeValuePairs) {
       if (pair.attributeName.isNotEmpty &&
           pair.attributeValue.isNotEmpty &&
@@ -116,12 +118,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       }
     }
 
+    // Process KM Range (ID 3) specially
     if (filters.containsKey('3')) {
-      final variationList = filters['3'] as List<dynamic>?;
-      if (variationList != null &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
+      String variationId;
+      if (filters['3'] is String) {
+        variationId = filters['3'] as String; // Handle string value
+      } else if (filters['3'] is List<dynamic> &&
+          (filters['3'] as List).isNotEmpty) {
+        variationId = (filters['3'] as List)[0].toString();
+      } else {
+        variationId = '';
+      }
+      if (variationId.isNotEmpty) {
         attributeValues['KM Range'] = variationId;
         final kmIndex = orderedAttributeValues.indexWhere(
           (entry) => entry.key == 'KM Range',
@@ -136,65 +144,74 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       }
     }
 
-    filters.forEach((attributeId, variationList) {
-      if (attributeId != '3' &&
-          variationList is List &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
-        final attribute = attributes.firstWhere(
-          (attr) => attr.id == attributeId,
-          orElse:
-              () => Attribute(
-                id: attributeId,
-                slug: '',
-                name: _getAttributeNameFromId(attributeId),
-                listOrder: '',
-                categoryId: '',
-                formValidation: '',
-                ifDetailsIcons: '',
-                detailsIcons: '',
-                detailsIconsOrder: '',
-                showFilter: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
-        );
-        if (!processedAttributes.contains(attribute.name)) {
-          final variation = attributeVariations.firstWhere(
-            (varAttr) =>
-                varAttr.id == variationId && varAttr.attributeId == attributeId,
+    // Process other filters
+    filters.forEach((attributeId, variation) {
+      if (attributeId != '3') {
+        String variationId;
+        if (variation is String) {
+          variationId = variation; // Handle string value
+        } else if (variation is List<dynamic> && variation.isNotEmpty) {
+          variationId = variation[0].toString();
+        } else {
+          print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
+          return;
+        }
+
+        if (variationId.isNotEmpty) {
+          final attribute = attributes.firstWhere(
+            (attr) => attr.id == attributeId,
             orElse:
-                () => AttributeVariation(
-                  id: variationId,
-                  attributeId: attributeId,
-                  name: '',
+                () => Attribute(
+                  id: attributeId,
+                  slug: '',
+                  name: _getAttributeNameFromId(attributeId),
+                  listOrder: '',
+                  categoryId: '',
+                  formValidation: '',
+                  ifDetailsIcons: '',
+                  detailsIcons: '',
+                  detailsIconsOrder: '',
+                  showFilter: '',
                   status: '',
                   createdOn: '',
                   updatedOn: '',
                 ),
           );
-          print(
-            'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variation.name}',
-          );
-          if (variation.name.isNotEmpty && variation.name != variationId) {
-            attributeValues[attribute.name] = variation.name;
-            orderedAttributeValues.add(
-              MapEntry(attribute.name, variation.name),
+          if (!processedAttributes.contains(attribute.name)) {
+            final variationObj = attributeVariations.firstWhere(
+              (varAttr) =>
+                  varAttr.id == variationId &&
+                  varAttr.attributeId == attributeId,
+              orElse:
+                  () => AttributeVariation(
+                    id: variationId,
+                    attributeId: attributeId,
+                    name: '',
+                    status: '',
+                    createdOn: '',
+                    updatedOn: '',
+                  ),
             );
-            processedAttributes.add(attribute.name);
             print(
-              'Added from variations: ${attribute.name} = ${variation.name}',
+              'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variationObj.name}',
             );
-          } else {
-            print(
-              'Skipped variation: ${attribute.name} (invalid name or ID match)',
-            );
+            if (variationObj.name.isNotEmpty &&
+                variationObj.name != variationId) {
+              attributeValues[attribute.name] = variationObj.name;
+              orderedAttributeValues.add(
+                MapEntry(attribute.name, variationObj.name),
+              );
+              processedAttributes.add(attribute.name);
+              print(
+                'Added from variations: ${attribute.name} = ${variationObj.name}',
+              );
+            } else {
+              print(
+                'Skipped variation: ${attribute.name} (invalid name or ID match)',
+              );
+            }
           }
         }
-      } else {
-        print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
       }
     });
 
@@ -647,12 +664,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   String _formatNumber(String value) {
-    final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-
-    final formatter = NumberFormat.decimalPattern(
-      'en_IN',
-    ); // Indian style commas
-    return formatter.format(number);
+    if (value == 'N/A') return 'N/A';
+    final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
+    return '$number KM';
   }
 
   Widget _buildDetailItem(IconData icon, String text) {
@@ -989,16 +1003,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                 children: [
                                   Expanded(
                                     child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        attributeValues['KM Range'] ?? '0',
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
+                                      Icons.calendar_today,
+                                      attributeValues['Year'] ?? 'N/A',
                                     ),
                                   ),
                                   Expanded(
@@ -1010,6 +1016,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       ),
                                     ),
                                   ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.speed,
+                                      _formatNumber(
+                                        attributeValues['KM Range'] ?? 'N/A',
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -1017,8 +1031,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                 children: [
                                   Expanded(
                                     child: _buildDetailItem(
-                                      Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
+                                      Icons.local_gas_station,
+                                      attributeValues['Fuel Type'] ?? 'N/A',
                                     ),
                                   ),
                                   Expanded(

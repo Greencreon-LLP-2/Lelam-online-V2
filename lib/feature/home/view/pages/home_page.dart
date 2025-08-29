@@ -33,7 +33,7 @@ class _HomePageState extends State<HomePage> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            spacing: 8,
+            spacing: 2,
             children: [
               //!TOP section
               Padding(

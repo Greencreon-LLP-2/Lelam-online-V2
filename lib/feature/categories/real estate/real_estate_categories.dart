@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 class Property {
@@ -95,12 +96,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
   }
 
   void _handleScroll() {
-    // Show app bar search when scrolled beyond threshold
     if (_scrollController.offset > 100 && !_showAppBarSearch) {
       setState(() => _showAppBarSearch = true);
-    }
-    // Hide app bar search when scrolled back to top
-    else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+    } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
       setState(() => _showAppBarSearch = false);
     }
   }
@@ -257,7 +255,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
   List<Property> get filteredProperties {
     List<Property> filtered = _properties;
 
-    // Search filter
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered =
@@ -268,7 +265,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
           }).toList();
     }
 
-    // Location filter
     if (_selectedLocation != 'all') {
       filtered =
           filtered
@@ -276,7 +272,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
               .toList();
     }
 
-    // Property type filter
     if (_selectedPropertyTypes.isNotEmpty) {
       filtered =
           filtered
@@ -286,7 +281,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
               .toList();
     }
 
-    // Price range filter
     if (_selectedPriceRange != 'all') {
       filtered =
           filtered.where((property) {
@@ -308,7 +302,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
           }).toList();
     }
 
-    // Bedroom filter
     if (_selectedBedroomRange != 'all') {
       filtered =
           filtered.where((property) {
@@ -332,7 +325,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
           }).toList();
     }
 
-    // Area filter
     if (_selectedAreaRange != 'all') {
       filtered =
           filtered.where((property) {
@@ -355,7 +347,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
           }).toList();
     }
 
-    // Furnishing filter
     if (_selectedFurnishings.isNotEmpty) {
       filtered =
           filtered
@@ -367,7 +358,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
               .toList();
     }
 
-    // Posted by filter
     if (_selectedPostedBy != 'all') {
       filtered =
           filtered.where((property) {
@@ -705,135 +695,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return count;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
-        actions: [
-          // Filter button (always visible)
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _showFilterBottomSheet,
-                icon: const Icon(Icons.tune, color: Colors.black87),
-              ),
-              if (_getActiveFilterCount() > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${_getActiveFilterCount()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Location button (always visible)
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.location_on, color: Colors.black87),
-            onSelected: (String value) {
-              setState(() {
-                _selectedLocation = value;
-              });
-            },
-            itemBuilder: (BuildContext context) {
-              return _districts.map((String district) {
-                return PopupMenuItem<String>(
-                  value: district,
-                  child: Row(
-                    children: [
-                      if (_selectedLocation == district)
-                        const Icon(Icons.check, color: Colors.blue, size: 16),
-                      if (_selectedLocation == district)
-                        const SizedBox(width: 8),
-                      Text(district == 'all' ? 'All Kerala' : district),
-                    ],
-                  ),
-                );
-              }).toList();
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search Bar (only shown when not in app bar)
-          if (!_showAppBarSearch)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _buildSearchField(),
-            ),
-
-          // Properties List (with scroll controller)
-          Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              children: [
-                for (var property in filteredProperties)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildPropertyCard(property),
-                  ),
-                if (filteredProperties.isEmpty)
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No properties found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build the search field for the app bar
   Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
@@ -868,7 +729,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
-  // Build the main search field
   Widget _buildSearchField() {
     return TextField(
       controller: _searchController,
@@ -915,42 +775,126 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
-  Widget _buildPropertiesList() {
-    final properties = filteredProperties;
-
-    if (properties.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'No properties found',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters or search terms',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-            ),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: properties.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final property = properties[index];
-        return _buildPropertyCard(property);
-      },
+        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _showFilterBottomSheet,
+                icon: const Icon(Icons.tune, color: Colors.black87),
+              ),
+              if (_getActiveFilterCount() > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${_getActiveFilterCount()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.location_on, color: Colors.black87),
+            onSelected: (String value) {
+              setState(() {
+                _selectedLocation = value;
+              });
+            },
+            itemBuilder: (BuildContext context) {
+              return _districts.map((String district) {
+                return PopupMenuItem<String>(
+                  value: district,
+                  child: Row(
+                    children: [
+                      if (_selectedLocation == district)
+                        const Icon(Icons.check, color: Colors.blue, size: 16),
+                      if (_selectedLocation == district)
+                        const SizedBox(width: 8),
+                      Text(district == 'all' ? 'All Kerala' : district),
+                    ],
+                  ),
+                );
+              }).toList();
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (!_showAppBarSearch)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildSearchField(),
+            ),
+          Expanded(
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.only(top: 16),
+              children: [
+                for (var property in filteredProperties)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _buildPropertyCard(property),
+                  ),
+                if (filteredProperties.isEmpty)
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No properties found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -958,269 +902,270 @@ class _RealEstatePageState extends State<RealEstatePage> {
     final isFinanceAvailable = property.ifFinance == '1';
     final isFeatured = property.feature == '1';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.30),
-            blurRadius: 4,
-            spreadRadius: 1,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Main content
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Property Image
-              Container(
-                width: 140,
-                height: 190,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(0),
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          onTap: () {
+            // Navigation to property details page can be added here
+          },
+          child: Container(
+            width: constraints.maxWidth,
+            margin: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.30),
+                  blurRadius: 5,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 5),
                 ),
-                child: Stack(
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                      ),
-                      child: Image.asset(
-                        property.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                Icons.home,
-                                size: 40,
-                                color: Colors.grey.shade400,
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Container(
+                        width: 120,
+                        height: 138,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(0),
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(12),
+                              ),
+                              child: Image.asset(
+                                property.image,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey.shade200,
+                                    child: Icon(
+                                      Icons.home,
+                                      size: 40,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    if (isFeatured)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'FEATURED',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                            if (isFeatured)
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white),
+                                  ),
+                                  child: const Text(
+                                    'FEATURED',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              property.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              property.propertyType,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '₹ ${formatPriceInt(double.tryParse(property.price) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Palette.primaryblue,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  property.landMark,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.bed,
+                                    size: 8,
+                                    color: Colors.grey[700],
+                                  ),
+                                  '${property.filters['bedrooms']} Beds',
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.bathtub,
+                                    size: 8,
+                                    color: Colors.grey[700],
+                                  ),
+                                  '${property.filters['bathrooms']} Baths',
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.aspect_ratio,
+                                    size: 8,
+                                    color: Colors.grey[700],
+                                  ),
+                                  '${_formatNumber(int.tryParse(property.filters['area']?.toString() ?? '0') ?? 0)} sq ft',
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.chair,
+                                    size: 8,
+                                    color: Colors.grey[700],
+                                  ),
+                                  '${property.filters['furnishing']}',
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.apartment,
+                                    size: 8,
+                                    color: Colors.grey[700],
+                                  ),
+                                  'Floor ${property.filters['floor']}/${property.filters['totalFloors']}',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-
-              // Property Details
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title and Property Type
-                      Text(
-                        property.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: Colors.black87,
+                if (isFinanceAvailable)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Palette.primarylightblue,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.account_balance,
+                          size: 10,
+                          color: Colors.white,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        property.propertyType,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
+                        const SizedBox(width: 8),
+                        Text(
+                          'Finance Available',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Price
-                      Text(
-                        '₹ ${_formatPrice(int.tryParse(property.price) ?? 0)}',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Palette.primaryblue,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Location
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            property.landMark,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Property Details Row (Bedrooms, Bathrooms, Area)
-                      Row(
-                        children: [
-                          _buildDetailChip(
-                            Icon(Icons.bed, size: 14, color: Colors.grey[700]),
-                            '${property.filters['bedrooms']} Beds',
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.bathtub,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${property.filters['bathrooms']} Baths',
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.aspect_ratio,
-                              size: 10,
-                              color: Colors.grey[700],
-                            ),
-                            '${property.filters['area']} sq ft',
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Row(
-                        children: [
-                          _buildDetailChip(
-                            Icon(
-                              Icons.chair,
-                              size: 14,
-                              color: Colors.grey[700],
-                            ),
-                            '${property.filters['furnishing']}',
-                          ),
-                          const SizedBox(width: 4),
-                          _buildDetailChip(
-                            Icon(
-                              Icons.apartment,
-                              size: 14,
-                              color: Colors.grey[700],
-                            ),
-                            'Floor: ${property.filters['floor']}/${property.filters['totalFloors']}',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // Bottom section with finance info
-          if (isFinanceAvailable)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Palette.primarylightblue,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.account_balance, size: 16, color: Colors.black),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Finance Available',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black,
-                      fontWeight: FontWeight.w600,
+                      ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-        ],
-      ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildDetailChip(Widget icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           icon,
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 3),
+          Text(label, style: const TextStyle(fontSize: 9)),
         ],
       ),
     );
   }
 
-  String _formatPrice(int price) {
-    if (price >= 10000000) {
-      double crore = price / 10000000;
-      return '${crore.toStringAsFixed(crore == crore.round() ? 0 : 2)} Crore';
-    } else if (price >= 100000) {
-      double lakh = price / 100000;
-      return '${lakh.toStringAsFixed(lakh == lakh.round() ? 0 : 2)} Lakh';
-    } else if (price >= 1000) {
-      double thousand = price / 1000;
-      return '${thousand.toStringAsFixed(thousand == thousand.round() ? 0 : 1)}K';
+  String formatPriceInt(double price) {
+    final formatter = NumberFormat.decimalPattern('en_IN');
+    return formatter.format(price.round());
+  }
+
+  String _formatNumber(num number) {
+    if (number >= 100000) {
+      return '${(number / 100000).toStringAsFixed(2)}L';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
     } else {
-      return price.toString();
+      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
     }
   }
 }

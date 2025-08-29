@@ -6,16 +6,18 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
-  const AuctionProductDetailsPage({super.key, required Product product,});
+  const AuctionProductDetailsPage({super.key, required Product product});
 
   @override
-  State<AuctionProductDetailsPage> createState() => _AuctionProductDetailsPageState();
+  State<AuctionProductDetailsPage> createState() =>
+      _AuctionProductDetailsPageState();
 }
 
 class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   bool _isFavorited = false;
   int _currentBid = 990000; // Example current bid amount
   final int _minBidIncrement = 5000; // Minimum bid increment
@@ -73,19 +75,21 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -112,7 +116,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -163,9 +168,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -176,19 +182,22 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) => const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) => const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -353,8 +362,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     );
                     return;
                   }
-                  
-                  if (isIncrease && bidAmount < _currentBid + _minBidIncrement) {
+
+                  if (isIncrease &&
+                      bidAmount < _currentBid + _minBidIncrement) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
@@ -365,7 +375,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     );
                     return;
                   }
-                  
+
                   setState(() {
                     _currentBid = bidAmount;
                   });
@@ -431,10 +441,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: Colors.blue,
-                  ),
+                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
                   title: const Text('Select Date'),
                   subtitle: Text(
                     '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
@@ -461,10 +468,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  leading: const Icon(
-                    Icons.access_time,
-                    color: Colors.blue,
-                  ),
+                  leading: const Icon(Icons.access_time, color: Colors.blue),
                   title: const Text('Select Time'),
                   subtitle: Text(
                     selectedTime.format(context),
@@ -551,7 +555,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final auctionEndTime = DateTime.now().add(const Duration(days: 2, hours: 5));
+    final auctionEndTime = DateTime.now().add(
+      const Duration(days: 2, hours: 5),
+    );
     final timeLeft = auctionEndTime.difference(DateTime.now());
 
     return Scaffold(
@@ -586,11 +592,13 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  placeholder:
+                                      (context, url) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                  errorWidget:
+                                      (context, url, error) =>
+                                          const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -656,7 +664,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ],
                 ),
-                
+
                 // Current Highest Bid Banner
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -685,7 +693,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ),
                 ),
-                
+
                 // Auction Timer
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -708,7 +716,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ),
                 ),
-                
+
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -937,11 +945,27 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildBidHistoryItem('John D.', '₹1,020,000', '2 hours ago'),
-                      _buildBidHistoryItem('Sarah M.', '₹1,010,000', '3 hours ago'),
-                      _buildBidHistoryItem('Robert P.', '₹1,000,000', '5 hours ago'),
+                      _buildBidHistoryItem(
+                        'John D.',
+                        '₹1,020,000',
+                        '2 hours ago',
+                      ),
+                      _buildBidHistoryItem(
+                        'Sarah M.',
+                        '₹1,010,000',
+                        '3 hours ago',
+                      ),
+                      _buildBidHistoryItem(
+                        'Robert P.',
+                        '₹1,000,000',
+                        '5 hours ago',
+                      ),
                       _buildBidHistoryItem('Emma S.', '₹990,000', '1 day ago'),
-                      _buildBidHistoryItem('Michael T.', '₹980,000', '1 day ago'),
+                      _buildBidHistoryItem(
+                        'Michael T.',
+                        '₹980,000',
+                        '1 day ago',
+                      ),
                     ],
                   ),
                 ),
@@ -969,7 +993,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context, isIncrease: true),
+                      onPressed:
+                          () => _showBidDialog(context, isIncrease: true),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
@@ -1070,10 +1095,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 ),
                 Text(
                   time,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),

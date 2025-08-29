@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
-import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
-import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:lelamonline_flutter/feature/categories/services/details_service.dart'; // Import for ApiService
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart'; // Import for Attribute and AttributeVariation
 
 class MarketplacePost {
   final String id;
@@ -268,7 +269,7 @@ class MarketplaceService {
   }
 }
 
-// Product model (kept as provided for UI compatibility)
+// Product model
 class Product {
   final String id;
   final String slug;
@@ -360,16 +361,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
   String _listingType = 'sale';
-
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
   List<Product> _products = [];
   bool _isLoading = true;
   String? _errorMessage;
-
   final LocationService _locationService = LocationService();
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;
+  List<Attribute> attributes = []; // Added for attribute mapping
+  List<AttributeVariation> attributeVariations =
+      []; // Added for attribute mapping
+  Map<String, Map<String, String>> _productAttributeValues =
+      {}; // Cache for attribute values per product
 
   // Filter variables
   List<String> _selectedBrands = [];
@@ -417,6 +421,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _scrollController.addListener(_handleScroll);
     _fetchProducts();
     _fetchLocations();
+    _fetchAttributesAndVariations(); // Added to fetch attributes
   }
 
   @override
@@ -435,6 +440,16 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
+  Future<void> _fetchAttributesAndVariations() async {
+    try {
+      attributes = await ApiService.fetchAttributes();
+      attributeVariations = await ApiService.fetchAttributeVariations({});
+      setState(() {});
+    } catch (e) {
+      print('Error fetching attributes/variations: $e');
+    }
+  }
+
   Future<void> _fetchProducts() async {
     setState(() {
       _isLoading = true;
@@ -445,8 +460,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         categoryId: '1',
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
       );
+      final products = posts.map((post) => post.toProduct()).toList();
+      for (var product in products) {
+        _productAttributeValues[product.id] = _mapFiltersToValues(
+          product.filters,
+        );
+      }
       setState(() {
-        _products = posts.map((post) => post.toProduct()).toList();
+        _products = products;
         _isLoading = false;
       });
     } catch (e) {
@@ -455,6 +476,148 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _isLoading = false;
       });
     }
+  }
+
+  Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
+    final Map<String, String> attributeValues = {};
+
+    if (filters.containsKey('3')) {
+      final variationId = filters['3'] ?? '';
+      if (variationId.isNotEmpty) {
+        attributeValues['KM Range'] = variationId;
+      }
+    }
+
+    filters.forEach((attributeId, variationId) {
+      if (attributeId != '3' && variationId.isNotEmpty) {
+        final attribute = attributes.firstWhere(
+          (attr) => attr.id == attributeId,
+          orElse:
+              () => Attribute(
+                id: attributeId,
+                slug: '',
+                name: _getAttributeNameFromId(attributeId),
+                listOrder: '',
+                categoryId: '',
+                formValidation: '',
+                ifDetailsIcons: '',
+                detailsIcons: '',
+                detailsIconsOrder: '',
+                showFilter: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        );
+        final variationObj = attributeVariations.firstWhere(
+          (varAttr) =>
+              varAttr.id == variationId && varAttr.attributeId == attributeId,
+          orElse:
+              () => AttributeVariation(
+                id: variationId,
+                attributeId: attributeId,
+                name: variationId,
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        );
+        if (variationObj.name.isNotEmpty && variationObj.name != variationId) {
+          attributeValues[attribute.name] = variationObj.name;
+        } else {
+          attributeValues[attribute.name] = variationId;
+        }
+      }
+    });
+
+    return attributeValues;
+  }
+
+  String _getAttributeNameFromId(String id) {
+    switch (id) {
+      case '1':
+        return 'Year';
+      case '2':
+        return 'No of owners';
+      case '3':
+        return 'KM Range';
+      case '4':
+        return 'Fuel Type';
+      case '5':
+        return 'Transmission';
+      case '6':
+        return 'Service History';
+      case '7':
+        return 'Accident History';
+      case '8':
+        return 'Replacements';
+      case '9':
+        return 'Flood Affected';
+      case '10':
+        return 'Engine Condition';
+      case '11':
+        return 'Transmission Condition';
+      case '12':
+        return 'Suspension Condition';
+      case '13':
+        return 'Features';
+      case '14':
+        return 'Functions';
+      case '15':
+        return 'Battery';
+      case '16':
+        return 'Driver side front tyre';
+      case '17':
+        return 'Driver side rear tyre';
+      case '18':
+        return 'Co driver side front tyre';
+      case '19':
+        return 'Co driver side rear tyre';
+      case '20':
+        return 'Rust';
+      case '21':
+        return 'Emission Norms';
+      case '22':
+        return 'Status Of RC';
+      case '23':
+        return 'Registration valid till';
+      case '24':
+        return 'Insurance Type';
+      case '25':
+        return 'Insurance Upto';
+      case '26':
+        return 'Scratches';
+      case '27':
+        return 'Dents';
+      case '28':
+        return 'Sold by';
+      default:
+        return 'Unknown Attribute';
+    }
+  }
+
+  String _getLocationName(String zoneId) {
+    if (zoneId == 'all') return 'All Kerala';
+    final location = _locations.firstWhere(
+      (loc) => loc.id == zoneId,
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+    );
+    return location.name;
   }
 
   final List<String> _brands = [
@@ -531,32 +694,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return ['all', ..._locations.map((loc) => loc.name)];
   }
 
-  String _getLocationName(String zoneId) {
-    if (zoneId == 'all') return 'All Kerala';
-    final location = _locations.firstWhere(
-      (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId, // Fallback to zoneId if not found
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
-    );
-    return location.name;
-  }
-
-  final List<String> _listingTypes = ['sale', 'auction'];
-
   List<Product> get filteredProducts {
     List<Product> filtered = _products;
 
@@ -570,9 +707,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               product.model.toLowerCase(),
               product.modelVariation.toLowerCase(),
               _getLocationName(product.parentZoneId).toLowerCase(),
-              product.filters['fuel']?.toLowerCase() ?? '',
-              product.filters['transmission']?.toLowerCase() ?? '',
-              product.filters['year']?.toString() ?? '',
+              product.filters['4']?.toLowerCase() ?? '', // Fuel Type
+              product.filters['5']?.toLowerCase() ?? '', // Transmission
+              product.filters['1']?.toString() ?? '', // Year
               product.byDealer == '1' ? 'dealer' : 'owner',
             ].join(' ');
             return searchableText.contains(query);
@@ -627,7 +764,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       filtered =
           filtered.where((product) {
             int year =
-                int.tryParse(product.filters['year']?.toString() ?? '0') ?? 0;
+                int.tryParse(product.filters['1']?.toString() ?? '0') ?? 0;
             switch (_selectedYearRange) {
               case '2020 & Above':
                 return year >= 2020;
@@ -649,7 +786,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       filtered =
           filtered.where((product) {
             int owners =
-                int.tryParse(product.filters['owners']?.toString() ?? '0') ?? 0;
+                int.tryParse(product.filters['2']?.toString() ?? '0') ?? 0;
             switch (_selectedOwnersRange) {
               case '1st Owner':
                 return owners == 1;
@@ -670,7 +807,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           filtered
               .where(
                 (product) => _selectedFuelTypes.contains(
-                  product.filters['fuel']?.toString() ?? '',
+                  product.filters['4']?.toString() ?? '',
                 ),
               )
               .toList();
@@ -681,7 +818,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           filtered
               .where(
                 (product) => _selectedTransmissions.contains(
-                  product.filters['transmission']?.toString() ?? '',
+                  product.filters['5']?.toString() ?? '',
                 ),
               )
               .toList();
@@ -690,8 +827,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (_selectedKmRange != 'all') {
       filtered =
           filtered.where((product) {
-            int km =
-                int.tryParse(product.filters['km']?.toString() ?? '0') ?? 0;
+            int km = int.tryParse(product.filters['3']?.toString() ?? '0') ?? 0;
             switch (_selectedKmRange) {
               case 'Under 10K':
                 return km < 10000;
@@ -715,7 +851,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             switch (_selectedSoldBy) {
               case 'Owner':
                 return product.byDealer == '0';
-              // casevan 'Dealer':
               case 'Certified Dealer':
                 return product.byDealer == '1';
               default:
@@ -728,7 +863,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   String getImageUrl(String imagePath) {
-    // Remove any leading slashes to prevent double slashes
     final cleanedPath =
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/$cleanedPath';
@@ -1220,6 +1354,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             : _locations
                                 .firstWhere((loc) => loc.name == value)
                                 .id;
+                    _fetchProducts();
                   });
                 },
                 itemBuilder: (BuildContext context) {
@@ -1255,171 +1390,188 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ),
         ],
       ),
-      body:
-          _isLoadingLocations
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                children: [
-                  if (!_showAppBarSearch)
-                    Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: _buildSearchField(),
-                    ),
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap:
-                                  () => setState(() => _listingType = 'sale'),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      _listingType == 'sale'
-                                          ? Palette.primaryblue
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  'Market Place',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontWeight:
-                                        _listingType == 'sale'
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                    color:
-                                        _listingType == 'sale'
-                                            ? Colors.white
-                                            : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ),
-                            ),
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child:
+                _isLoadingLocations
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
+                      children: [
+                        if (!_showAppBarSearch)
+                          Container(
+                            color: Colors.white,
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: _buildSearchField(),
                           ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap:
-                                  () =>
-                                      setState(() => _listingType = 'auction'),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      _listingType == 'auction'
-                                          ? Palette.primaryblue
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  'Auction',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontWeight:
-                                        _listingType == 'auction'
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                    color:
-                                        _listingType == 'auction'
-                                            ? Colors.white
-                                            : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ),
+                        Container(
+                          color: Colors.grey.shade200,
+                          padding: const EdgeInsets.all(10),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(15),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child:
-                        _isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _errorMessage != null
-                            ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.error,
-                                    size: 64,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Error: $_errorMessage',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: _fetchProducts,
-                                    child: const Text('Retry'),
-                                  ),
-                                ],
-                              ),
-                            )
-                            : ListView(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.all(16),
+                            child: Row(
                               children: [
-                                for (var product in filteredProducts)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 16),
-                                    child: _buildProductCard(product),
-                                  ),
-                                if (filteredProducts.isEmpty)
-                                  Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.search_off,
-                                          size: 64,
-                                          color: Colors.grey.shade400,
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _listingType = 'sale';
+                                        _fetchProducts();
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            _listingType == 'sale'
+                                                ? Palette.white
+                                                : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'Market Place',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _listingType == 'sale'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                          color:
+                                              _listingType == 'sale'
+                                                  ? Colors.black
+                                                  : Colors.grey.shade600,
+                                          fontSize: 12,
                                         ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'No cars found',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            color: Colors.grey.shade600,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Try adjusting your filters or search terms',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey.shade500,
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _listingType = 'auction';
+                                        _fetchProducts();
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            _listingType == 'auction'
+                                                ? Palette.white
+                                                : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'Auction',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _listingType == 'auction'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                          color:
+                                              _listingType == 'auction'
+                                                  ? Colors.black
+                                                  : Colors.grey.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
+          if (!_isLoadingLocations)
+            _isLoading
+                ? const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+                : _errorMessage != null
+                ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: $_errorMessage',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchProducts,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                )
+                : filteredProducts.isEmpty
+                ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No cars found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final product = filteredProducts[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildProductCard(product),
+                    );
+                  }, childCount: filteredProducts.length),
+                ),
+        ],
+      ),
     );
   }
 
@@ -1427,221 +1579,340 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
     final isExchangeAvailable = product.ifExchange == '1';
+    final attributeValues = _productAttributeValues[product.id] ?? {};
 
-    return GestureDetector(
-      onTap: () {
-        if (isAuction) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AuctionProductDetailsPage(product: product),
-            ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => ProductDetailsPage(
-                    product: product,
-                    isAuction: product.ifAuction == "1",
-                  ),
-            ),
-          );
-          ;
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.30),
-              blurRadius: 5,
-              spreadRadius: 1,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: Container(
-                    width: 100,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomLeft: Radius.circular(0),
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.all(Radius.circular(12)),
-
-                      child: Image.network(
-                        'https://lelamonline.com/admin/${product.image}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          print(
-                            'Failed to load image: https://lelamonline.com/${product.image}',
-                          );
-                          print('Error: $error');
-                          return Container(
-                            color: Colors.grey.shade200,
-                            child: Icon(
-                              Icons.directions_car,
-                              size: 40,
-                              color: Colors.grey.shade400,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          onTap: () {
+            if (isAuction) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => AuctionProductDetailsPage(product: product),
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          product.modelVariation,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isAuction
-                                  ? '₹${_formatNumber(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}'
-                                  : '₹ ${_formatPriceWithLakh(double.tryParse(product.price) ?? 0)}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Palette.primaryblue,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 14,
-                              color: Colors.grey.shade500,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getLocationName(product.parentZoneId),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _buildDetailChip(
-                              Icon(
-                                Icons.calendar_today,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              '${product.filters['year']}',
-                            ),
-                            const SizedBox(width: 4),
-                            _buildDetailChip(
-                              Icon(
-                                Icons.person,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              _getOwnerText(product.filters['owners'] ?? '1'),
-                            ),
-                            const SizedBox(width: 4),
-                            _buildDetailChip(
-                              Icon(
-                                Icons.speed,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              '${_formatNumber(int.tryParse(product.filters['km']?.toString() ?? '0') ?? 0)} KM',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            _buildDetailChip(
-                              Icon(
-                                Icons.local_gas_station,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              '${product.filters['fuel']}',
-                            ),
-                            const SizedBox(width: 4),
-                            _buildDetailChip(
-                              Icon(
-                                Icons.settings,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              '${product.filters['transmission']}',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => MarketPlaceProductDetailsPage(
+                        product: product,
+                        isAuction: product.ifAuction == "1",
+                      ),
+                ),
+              );
+            }
+          },
+          child: Container(
+            width: constraints.maxWidth,
+            margin: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.30),
+                  blurRadius: 5,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
-            if (isAuction || isFinanceAvailable || isExchangeAvailable)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                decoration: BoxDecoration(
-                  color: isAuction ? Palette.primarylightblue : Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
-                  ),
-                ),
-                child:
-                    isAuction
-                        ? _buildAuctionInfo(product)
-                        : _buildFinanceExchangeInfo(
-                          isFinanceAvailable,
-                          isExchangeAvailable,
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Container(
+                        width: 120,
+                        height: 138,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(0),
+                          ),
                         ),
-              ),
-          ],
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(12),
+                          ),
+                          child: Image.network(
+                            'https://lelamonline.com/admin/${product.image}',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              print(
+                                'Failed to load image: https://lelamonline.com/${product.image}',
+                              );
+                              print('Error: $error');
+                              return Container(
+                                color: Colors.grey.shade200,
+                                child: Icon(
+                                  Icons.directions_car,
+                                  size: 40,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              product.modelVariation,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isAuction
+                                      ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
+                                      : '₹ ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Palette.primaryblue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _getLocationName(product.parentZoneId),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Existing chips
+                            Row(
+                              children: [
+                                _buildDetailChip(
+                                  Icons.calendar_today,
+                                  attributeValues['Year'] ?? 'N/A',
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icons.person,
+                                  _getOwnerText(
+                                    attributeValues['No of owners'] ?? 'N/A',
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icons.speed,
+                                  _formatKmRange(
+                                    attributeValues['KM Range'] ?? 'N/A',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                _buildDetailChip(
+                                  Icons.local_gas_station,
+                                  attributeValues['Fuel Type'] ?? 'N/A',
+                                ),
+                                const SizedBox(width: 4),
+                                _buildDetailChip(
+                                  Icons.settings,
+                                  attributeValues['Transmission'] ?? 'N/A',
+                                ),
+                              ],
+                            ),
+                            // New Details section
+                            const SizedBox(height: 8),
+                            // Container(
+                            //   padding: const EdgeInsets.all(8),
+                            //   decoration: BoxDecoration(
+                            //     color: Colors.grey.shade50,
+                            //     borderRadius: BorderRadius.circular(8),
+                            //   ),
+                            //   child: Column(
+                            //     crossAxisAlignment: CrossAxisAlignment.start,
+                            //     children: [
+                            //       const Text(
+                            //         'Details',
+                            //         style: TextStyle(
+                            //           fontSize: 14,
+                            //           fontWeight: FontWeight.bold,
+                            //         ),
+                            //       ),
+                            //       const SizedBox(height: 8),
+                            //       Row(
+                            //         children: [
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.calendar_today,
+                            //               attributeValues['Year'] ?? 'N/A',
+                            //             ),
+                            //           ),
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.person,
+                            //               _getOwnerText(
+                            //                 attributeValues['No of owners'] ??
+                            //                     'N/A',
+                            //               ),
+                            //             ),
+                            //           ),
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.speed,
+                            //               _formatKmRange(
+                            //                 attributeValues['KM Range'] ??
+                            //                     'N/A',
+                            //               ),
+                            //             ),
+                            //           ),
+                            //         ],
+                            //       ),
+                            //       const SizedBox(height: 8),
+                            //       Row(
+                            //         children: [
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.local_gas_station,
+                            //               attributeValues['Fuel Type'] ?? 'N/A',
+                            //             ),
+                            //           ),
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.settings,
+                            //               attributeValues['Transmission'] ??
+                            //                   'N/A',
+                            //             ),
+                            //           ),
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.build,
+                            //               attributeValues['Engine Condition'] ??
+                            //                   'N/A',
+                            //             ),
+                            //           ),
+                            //         ],
+                            //       ),
+                            //       const SizedBox(height: 8),
+                            //       Row(
+                            //         children: [
+                            //           Expanded(
+                            //             child: _buildDetailItem(
+                            //               Icons.directions_car,
+                            //               product.modelVariation.isNotEmpty
+                            //                   ? product.modelVariation
+                            //                   : 'N/A',
+                            //             ),
+                            //           ),
+                            //         ],
+                            //       ),
+                            //     ],
+                            //   ),
+                            // ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isAuction || isFinanceAvailable || isExchangeAvailable)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isAuction
+                                    ? Palette.primarylightblue
+                                    : Colors.white,
+                          ),
+                          child:
+                              isAuction
+                                  ? _buildAuctionInfo(product)
+                                  : _buildFinanceExchangeInfo(
+                                    isFinanceAvailable,
+                                    isExchangeAvailable,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        Icon(icon, size: 12, color: Colors.grey[700]),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDetailChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 8, color: Colors.grey[700]),
+          const SizedBox(width: 3),
+          Text(label, style: const TextStyle(fontSize: 9)),
+        ],
       ),
     );
   }
@@ -1691,26 +1962,23 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (!isFinanceAvailable && !isExchangeAvailable) {
       return const SizedBox.shrink();
     }
-
     if (isFinanceAvailable && isExchangeAvailable) {
       return Row(
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Palette.primarylightblue,
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: BoxDecoration(color: Palette.primarylightblue),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.account_balance, size: 12, color: Colors.white),
+                  Icon(Icons.account_balance, size: 12, color: Colors.black),
                   const SizedBox(width: 6),
                   Text(
                     'Finance Available',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1719,24 +1987,23 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          Container(width: 1, height: 30, color: Colors.black),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Palette.primarylightblue,
-                borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Palette.primarylightblue),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
+                  Icon(Icons.swap_horiz, size: 12, color: Colors.black),
                   const SizedBox(width: 6),
                   Text(
                     'Exchange Available',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1748,20 +2015,18 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         ],
       );
     }
-
     if (isFinanceAvailable) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Palette.primarylightblue,
-          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Palette.primarylightblue),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(Icons.account_balance, size: 12, color: Colors.black),
+            Icon(Icons.account_balance, size: 10, color: Colors.black),
             const SizedBox(width: 8),
             Text(
               'Finance Available',
@@ -1775,25 +2040,23 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         ),
       );
     }
-
     if (isExchangeAvailable) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Palette.primarylightblue,
-          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.blue.shade300),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(Icons.swap_horiz, size: 16, color: Colors.black),
+            Icon(Icons.swap_horiz, size: 10, color: Colors.black),
             const SizedBox(width: 8),
             Text(
               'Exchange Available',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 10,
                 color: Colors.black,
                 fontWeight: FontWeight.w600,
               ),
@@ -1802,63 +2065,32 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         ),
       );
     }
-
     return const SizedBox.shrink();
-  }
-
-  Widget _buildDetailChip(Widget icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          icon,
-          const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 8)),
-        ],
-      ),
-    );
   }
 
   String _getOwnerText(String owners) {
     switch (owners) {
       case '1':
+      case '19':
         return '1st Owner';
       case '2':
+      case '59':
         return '2nd Owner';
       case '3':
         return '3rd Owner';
       default:
-        return '${owners}th Owner';
+        return owners.isNotEmpty ? '${owners}th Owner' : 'N/A';
     }
   }
 
-  String _formatPriceWithLakh(double price) {
-    if (price >= 10000000) {
-      double crore = price / 10000000;
-      return '${crore.toStringAsFixed(crore == crore.roundToDouble() ? 0 : 2)} Crore';
-    } else if (price >= 100000) {
-      double lakh = price / 100000;
-      return '${lakh.toStringAsFixed(lakh == lakh.roundToDouble() ? 0 : 2)} Lakh';
-    } else if (price >= 1000) {
-      double thousand = price / 1000;
-      return '${thousand.toStringAsFixed(thousand == thousand.roundToDouble() ? 0 : 1)}K';
-    } else {
-      return price.toStringAsFixed(price == price.roundToDouble() ? 0 : 2);
-    }
+  String _formatPrice(double price) {
+    final formatter = NumberFormat.decimalPattern('en_IN');
+    return formatter.format(price.round());
   }
 
-  String _formatNumber(num number) {
-    if (number >= 100000) {
-      return '${(number / 100000).toStringAsFixed(2)}L';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    } else {
-      return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
-    }
+  String _formatKmRange(String value) {
+    if (value == 'N/A') return 'N/A';
+    final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
+    return '$number KM';
   }
 }

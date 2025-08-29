@@ -48,15 +48,47 @@ class ApiService {
     }
   }
 
-  static Future<List<AttributeVariation>> fetchAttributeVariations() async {
-    final response = await http.get(Uri.parse(attributeVariations));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return (data['data'] as List)
-          .map((e) => AttributeVariation.fromJson(e))
-          .toList();
-    } else {
-      throw Exception("Failed to load attribute variations");
+  static Future<List<AttributeVariation>> fetchAttributeVariations(
+    Map<String, dynamic> filters,
+  ) async {
+    List<AttributeVariation> allVariations = [];
+    for (String attributeId in filters.keys) {
+      try {
+        final response = await http.get(
+          Uri.parse(
+            '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId',
+          ),
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print(
+            'Attribute Variations for ID $attributeId: ${data['data']}',
+          ); // Debug
+          if (data['data'] is List) {
+            allVariations.addAll(
+              (data['data'] as List)
+                  .map((e) => AttributeVariation.fromJson(e))
+                  .toList(),
+            );
+          } else {
+            print(
+              'Skipping attribute_id=$attributeId: data is not a list (${data['data']})',
+            );
+          }
+        } else {
+          print(
+            'Failed to load variations for attribute_id=$attributeId: ${response.statusCode}',
+          );
+        }
+      } catch (e) {
+        print('Error fetching variations for attribute_id=$attributeId: $e');
+      }
     }
+    return allVariations;
   }
+
+  
 }
+
+
+

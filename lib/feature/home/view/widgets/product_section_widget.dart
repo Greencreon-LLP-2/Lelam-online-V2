@@ -160,12 +160,12 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(5),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.7,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        crossAxisSpacing: 5,
+        mainAxisSpacing: 5,
       ),
       itemCount: products.length,
       itemBuilder: (context, index) {
@@ -198,15 +198,15 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
         );
       },
 
-      splashColor: AppTheme.primaryColor.withOpacity(.1),
       borderRadius: BorderRadius.circular(12),
       child: Ink(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
+
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.shade200,
+              color: Colors.black.withOpacity(0.3),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -319,7 +319,6 @@ class _ProductSectionWidgetState extends State<ProductSectionWidget> {
               ],
             ),
 
-            // Verified Banner (only for featured products)
             if (product.feature == "1")
               Positioned(
                 top: 0,
@@ -367,7 +366,6 @@ class VerifiedBannerPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    // Add shadow
     final shadowPaint =
         Paint()
           ..color = Colors.blue.withOpacity(0.3)

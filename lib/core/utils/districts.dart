@@ -1,5 +1,5 @@
 const List<String> districts = [
-  'all kerala'
+  'all kerala',
   'Ernakulam',
   'Idukki',
   'Kannur',

@@ -97,19 +97,22 @@ class MarketplacePost {
       price: json['price'] ?? '',
       auctionPriceInterval: json['auction_price_intervel'] ?? '',
       auctionStartingPrice: json['auction_starting_price'] ?? '',
-      attributeId: json['attribute_id'] != null
-          ? List<String>.from(jsonDecode(json['attribute_id']))
-          : [],
-      attributeVariationsId: json['attribute_variations_id'] != null
-          ? List<String>.from(jsonDecode(json['attribute_variations_id']))
-          : [],
-      filters: json['filters'] != null
-          ? Map<String, List<String>>.from(
-              jsonDecode(json['filters']).map(
-                (key, value) => MapEntry(key, List<String>.from(value)),
-              ),
-            )
-          : {},
+      attributeId:
+          json['attribute_id'] != null
+              ? List<String>.from(jsonDecode(json['attribute_id']))
+              : [],
+      attributeVariationsId:
+          json['attribute_variations_id'] != null
+              ? List<String>.from(jsonDecode(json['attribute_variations_id']))
+              : [],
+      filters:
+          json['filters'] != null
+              ? Map<String, List<String>>.from(
+                jsonDecode(
+                  json['filters'],
+                ).map((key, value) => MapEntry(key, List<String>.from(value))),
+              )
+              : {},
       latitude: json['latitude'] ?? '',
       longitude: json['longitude'] ?? '',
       userZoneId: json['user_zone_id'] ?? '',

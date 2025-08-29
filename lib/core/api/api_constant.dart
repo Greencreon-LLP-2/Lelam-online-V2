@@ -13,6 +13,10 @@ const String usedCarsProducts =
     '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=1&user_zone_id=0';
 const String locations = '$baseUrl/list-location.php?token=$token';
 
+//====================== Post details =======================//
+const String attribute_name =
+    '$baseUrl//post-attribute-values.php?token=$token';
+
 //====================== Feature Posts ===============================//
 const String brand = '$baseUrl/list-brand.php?token=$token';
 const String brandModel = '$baseUrl/list-model.php?token=$token&brand_id=5';
@@ -21,4 +25,4 @@ const String modelVariations =
 const String attribute =
     '$baseUrl/filter-attribute.php?token=$token&category_id=0';
 const String attributeVariations =
-    '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=1';
+    '$baseUrl/filter-attribute-variations.php?token=$token';

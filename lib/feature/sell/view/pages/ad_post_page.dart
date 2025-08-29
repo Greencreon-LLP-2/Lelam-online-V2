@@ -423,7 +423,7 @@ class _AdPostFormState extends State<AdPostForm>
                   isRequired: true,
                   itemToString: (String item) => item,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
                   controller: _listPriceController,
                   label: 'List Price',
@@ -449,33 +449,33 @@ class _AdPostFormState extends State<AdPostForm>
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
-                CustomFormField(
-                  controller: _offerPriceController,
-                  label: 'Offer Price',
-                  prefixIcon: Icons.currency_rupee,
-                  isNumberInput: true,
-                  isRequired: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter the offer price';
-                    }
-                    final offerPrice = double.tryParse(value);
-                    if (offerPrice == null) {
-                      return 'Please enter a valid number';
-                    }
-                    if (_listPriceController.text.isNotEmpty) {
-                      final listPrice = double.tryParse(
-                        _listPriceController.text,
-                      );
-                      if (listPrice != null && offerPrice > listPrice) {
-                        return 'Offer price must be less than or equal to list price';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 5),
+                // CustomFormField(
+                //   controller: _offerPriceController,
+                //   label: 'Offer Price',
+                //   prefixIcon: Icons.currency_rupee,
+                //   isNumberInput: true,
+                //   isRequired: true,
+                //   validator: (value) {
+                //     if (value == null || value.isEmpty) {
+                //       return 'Please enter the offer price';
+                //     }
+                //     final offerPrice = double.tryParse(value);
+                //     if (offerPrice == null) {
+                //       return 'Please enter a valid number';
+                //     }
+                //     if (_listPriceController.text.isNotEmpty) {
+                //       final listPrice = double.tryParse(
+                //         _listPriceController.text,
+                //       );
+                //       if (listPrice != null && offerPrice > listPrice) {
+                //         return 'Offer price must be less than or equal to list price';
+                //       }
+                //     }
+                //     return null;
+                //   },
+                // ),
+                const SizedBox(height: 12),
                 CustomDropdownWidget<String>(
                   label: 'District',
                   value: _selectedDistrict,
@@ -489,14 +489,14 @@ class _AdPostFormState extends State<AdPostForm>
                   isRequired: true,
                   itemToString: (String item) => item,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
                   controller: _landMarkController,
                   label: 'Landmark',
                   prefixIcon: Icons.location_on_outlined,
                   alignLabelWithHint: true,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 CustomFormField(
                   controller: _descriptionController,
                   label: 'Description',
@@ -504,7 +504,7 @@ class _AdPostFormState extends State<AdPostForm>
                   alignLabelWithHint: true,
                   maxLines: 5,
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
