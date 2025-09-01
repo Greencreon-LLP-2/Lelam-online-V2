@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
@@ -385,6 +386,183 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedKmRange = 'all';
   String _selectedSoldBy = 'all';
 
+
+List<Brand> brands = [];
+  List<BrandModel> models = [];
+  List<ModelVariation> modelVariations = [];
+  List<AttributeValuePair> attributeValuePairs = [];
+
+  Future<void> _fetchAttributesAndVariations() async {
+    try {
+      attributes = await ApiService.fetchAttributes();
+      attributeVariations = await ApiService.fetchAttributeVariations({});
+      brands = await ApiService.fetchBrands();
+      models = await ApiService.fetchBrandModels();
+      modelVariations = await ApiService.fetchModelVariations();
+      attributeValuePairs = await AttributeValueService.fetchAttributeValuePairs();
+      setState(() {});
+    } catch (e) {
+      print('Error fetching attributes/variations/brands/models/modelVariations/attributeValuePairs: $e');
+    }
+  }
+
+  Map<String, String> _mapFiltersToValues(Map<String, String> filters, String brandId, String modelId, String modelVariationId) {
+    final Map<String, String> attributeValues = {};
+
+    // Helper function to find attribute value by ID
+    String findAttributeValue(String attributeName, String id) {
+      final pair = attributeValuePairs.firstWhere(
+        (pair) => pair.attributeName == attributeName && pair.attributeValue.contains(id),
+        orElse: () => AttributeValuePair(
+          attributeName: attributeName,
+          attributeValue: 'Unknown $attributeName',
+        ),
+      );
+      return pair.attributeValue;
+    }
+
+    // Map Brand
+    attributeValues['Brand'] = attributeValuePairs.isNotEmpty
+        ? findAttributeValue('brand', brandId)
+        : (brands.isNotEmpty
+            ? brands.firstWhere(
+                (b) => b.id == brandId,
+                orElse: () => Brand(
+                  id: brandId,
+                  slug: '',
+                  categoryId: '',
+                  name: 'Unknown Brand',
+                  image: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
+              ).name
+            : 'Unknown Brand');
+
+    // Map Model
+    attributeValues['Model'] = attributeValuePairs.isNotEmpty
+        ? findAttributeValue('model', modelId)
+        : (models.isNotEmpty
+            ? models.firstWhere(
+                (m) => m.id == modelId && m.brandId == brandId,
+                orElse: () => BrandModel(
+                  id: modelId,
+                  brandId: brandId,
+                  slug: '',
+                  name: 'Unknown Model',
+                  image: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
+              ).name
+            : 'Unknown Model');
+
+    // Map Model Variation
+    attributeValues['Model Variation'] = attributeValuePairs.isNotEmpty
+        ? findAttributeValue('model_variation', modelVariationId)
+        : (modelVariations.isNotEmpty
+            ? modelVariations.firstWhere(
+                (mv) => mv.id == modelVariationId && mv.brandModelId == modelId,
+                orElse: () => ModelVariation(
+                  id: modelVariationId,
+                  slug: '',
+                  brandId: brandId,
+                  brandModelId: modelId,
+                  name: 'Unknown Variation',
+                  image: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
+              ).name
+            : 'Unknown Variation');
+
+    // Map existing attributes (Year, Owners, KM, Fuel, Transmission)
+    final attributesToShow = {'1', '2', '3', '4', '5'};
+    filters.forEach((attributeId, variationId) {
+      if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
+        try {
+          final attribute = attributes.firstWhere(
+            (attr) => attr.id == attributeId,
+            orElse: () => Attribute(
+              id: attributeId,
+              slug: '',
+              name: _getAttributeNameFromId(attributeId),
+              listOrder: '',
+              categoryId: '',
+              formValidation: '',
+              ifDetailsIcons: '',
+              detailsIcons: '',
+              detailsIconsOrder: '',
+              showFilter: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
+          );
+
+          final variation = attributeVariations.firstWhere(
+            (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
+            orElse: () => AttributeVariation(
+              id: variationId,
+              attributeId: attributeId,
+              name: _getVariationNameFromId(attributeId, variationId),
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
+          );
+
+          attributeValues[attribute.name] = variation.name;
+        } catch (e) {
+          print('Error mapping attribute $attributeId: $e');
+        }
+      }
+    });
+
+    // Debug: Print mapped values
+    print('Mapped Values for Product:');
+    print('Brand: $brandId -> ${attributeValues['Brand']}');
+    print('Model: $modelId -> ${attributeValues['Model']}');
+    print('Model Variation: $modelVariationId -> ${attributeValues['Model Variation']}');
+    attributeValues.forEach((key, value) => print('$key: $value'));
+
+    return attributeValues;
+  }
+
+  Future<void> _fetchProducts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final posts = await _marketplaceService.fetchPosts(
+        categoryId: '1',
+        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+      );
+      final products = posts.map((post) => post.toProduct()).toList();
+      for (var product in products) {
+        _productAttributeValues[product.id] = _mapFiltersToValues(
+          product.filters,
+          product.brand,
+          product.model,
+          product.modelVariation,
+        );
+      }
+      setState(() {
+        _products = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
   // Scroll controller for dynamic search bar
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
@@ -440,99 +618,150 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  Future<void> _fetchAttributesAndVariations() async {
-    try {
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations({});
-      setState(() {});
-    } catch (e) {
-      print('Error fetching attributes/variations: $e');
-    }
-  }
+//   Future<void> _fetchAttributesAndVariations() async {
+//     try {
+//       attributes = await ApiService.fetchAttributes();
+//       attributeVariations = await ApiService.fetchAttributeVariations({});
+//       setState(() {});
+//     } catch (e) {
+//       print('Error fetching attributes/variations: $e');
+//     }
+//   }
 
-  Future<void> _fetchProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final posts = await _marketplaceService.fetchPosts(
-        categoryId: '1',
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
-      );
-      final products = posts.map((post) => post.toProduct()).toList();
-      for (var product in products) {
-        _productAttributeValues[product.id] = _mapFiltersToValues(
-          product.filters,
-        );
+//   Future<void> _fetchProducts() async {
+//     setState(() {
+//       _isLoading = true;
+//       _errorMessage = null;
+//     });
+//     try {
+//       final posts = await _marketplaceService.fetchPosts(
+//         categoryId: '1',
+//         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+//       );
+//       final products = posts.map((post) => post.toProduct()).toList();
+//       for (var product in products) {
+//         _productAttributeValues[product.id] = _mapFiltersToValues(
+//           product.filters,
+//         );
+//       }
+//       setState(() {
+//         _products = products;
+//         _isLoading = false;
+//       });
+//     } catch (e) {
+//       setState(() {
+//         _errorMessage = e.toString();
+//         _isLoading = false;
+//       });
+//     }
+//   }
+
+// Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
+//   final Map<String, String> attributeValues = {};
+
+//   // Process only the specific attributes we want to display
+//   final attributesToShow = {'1', '2', '3', '4', '5'}; // Year, Owners, KM, Fuel, Transmission
+
+//   filters.forEach((attributeId, variationId) {
+//     if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
+//       try {
+//         // Get attribute name
+//         final attribute = attributes.firstWhere(
+//           (attr) => attr.id == attributeId,
+//           orElse: () => Attribute(
+//             id: attributeId,
+//             slug: '',
+//             name: _getAttributeNameFromId(attributeId),
+//             listOrder: '',
+//             categoryId: '',
+//             formValidation: '',
+//             ifDetailsIcons: '',
+//             detailsIcons: '',
+//             detailsIconsOrder: '',
+//             showFilter: '',
+//             status: '',
+//             createdOn: '',
+//             updatedOn: '',
+//           ),
+//         );
+
+//         // Get variation name - try to find the actual name from attributeVariations
+//         final variation = attributeVariations.firstWhere(
+//           (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
+//           orElse: () => AttributeVariation(
+//             id: variationId,
+//             attributeId: attributeId,
+//             name: _getVariationNameFromId(attributeId, variationId), // Use helper function
+//             status: '',
+//             createdOn: '',
+//             updatedOn: '',
+//           ),
+//         );
+
+//         attributeValues[attribute.name] = variation.name;
+//       } catch (e) {
+//         print('Error mapping attribute $attributeId: $e');
+//       }
+//     }
+//   });
+
+//   return attributeValues;
+// }
+String _getVariationNameFromId(String attributeId, String variationId) {
+  // Map common variation IDs to their display names
+  switch (attributeId) {
+    case '1': // Year
+      return variationId; // Year is usually just the number
+    
+    case '2': // No of owners
+      switch (variationId) {
+        case '1':
+        case '19':
+          return '1st Owner';
+        case '2':
+        case '59':
+          return '2nd Owner';
+        case '3':
+          return '3rd Owner';
+        default:
+          return variationId.isNotEmpty ? '${variationId}th Owner' : 'N/A';
       }
-      setState(() {
-        _products = products;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
-  Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
-    final Map<String, String> attributeValues = {};
-
-    if (filters.containsKey('3')) {
-      final variationId = filters['3'] ?? '';
-      if (variationId.isNotEmpty) {
-        attributeValues['KM Range'] = variationId;
+    
+    case '3': // KM Range
+      return variationId.isNotEmpty ? '$variationId KM' : 'N/A';
+    
+    case '4': // Fuel Type
+      switch (variationId) {
+        case '8':
+          return 'Petrol';
+        case '9':
+          return 'Diesel';
+        case '10':
+          return 'CNG';
+        case '11':
+          return 'Electric';
+        case '12':
+          return 'Hybrid';
+        default:
+          return variationId;
       }
-    }
-
-    filters.forEach((attributeId, variationId) {
-      if (attributeId != '3' && variationId.isNotEmpty) {
-        final attribute = attributes.firstWhere(
-          (attr) => attr.id == attributeId,
-          orElse:
-              () => Attribute(
-                id: attributeId,
-                slug: '',
-                name: _getAttributeNameFromId(attributeId),
-                listOrder: '',
-                categoryId: '',
-                formValidation: '',
-                ifDetailsIcons: '',
-                detailsIcons: '',
-                detailsIconsOrder: '',
-                showFilter: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
-        );
-        final variationObj = attributeVariations.firstWhere(
-          (varAttr) =>
-              varAttr.id == variationId && varAttr.attributeId == attributeId,
-          orElse:
-              () => AttributeVariation(
-                id: variationId,
-                attributeId: attributeId,
-                name: variationId,
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
-        );
-        if (variationObj.name.isNotEmpty && variationObj.name != variationId) {
-          attributeValues[attribute.name] = variationObj.name;
-        } else {
-          attributeValues[attribute.name] = variationId;
-        }
+    
+    case '5': // Transmission
+      switch (variationId) {
+        case '13':
+          return 'Manual';
+        case '14':
+          return 'Automatic';
+        case '15':
+          return 'CVT';
+        default:
+          return variationId;
       }
-    });
-
-    return attributeValues;
+    
+    default:
+      return variationId;
   }
-
+}
   String _getAttributeNameFromId(String id) {
     switch (id) {
       case '1':
@@ -1575,314 +1804,262 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    final isAuction = product.ifAuction == '1';
-    final isFinanceAvailable = product.ifFinance == '1';
-    final isExchangeAvailable = product.ifExchange == '1';
-    final attributeValues = _productAttributeValues[product.id] ?? {};
+Widget _buildProductCard(Product product) {
+  final isAuction = product.ifAuction == '1';
+  final isFinanceAvailable = product.ifFinance == '1';
+  final isExchangeAvailable = product.ifExchange == '1';
+  final attributeValues = _productAttributeValues[product.id] ?? {};
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: () {
-            if (isAuction) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => AuctionProductDetailsPage(product: product),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return GestureDetector(
+        onTap: () {
+          if (isAuction) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AuctionProductDetailsPage(product: product),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MarketPlaceProductDetailsPage(
+                  product: product,
+                  isAuction: product.ifAuction == "1",
                 ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => MarketPlaceProductDetailsPage(
-                        product: product,
-                        isAuction: product.ifAuction == "1",
-                      ),
-                ),
-              );
-            }
-          },
-          child: Container(
-            width: constraints.maxWidth,
-            margin: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(0),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.30),
-                  blurRadius: 5,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Container(
-                        width: 120,
-                        height: 138,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(0),
-                          ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          width: constraints.maxWidth,
+          margin: EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.30),
+                blurRadius: 5,
+                spreadRadius: 1,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Container(
+                      width: 120,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(0),
                         ),
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(12),
-                          ),
-                          child: Image.network(
-                            'https://lelamonline.com/admin/${product.image}',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              print(
-                                'Failed to load image: https://lelamonline.com/${product.image}',
-                              );
-                              print('Error: $error');
-                              return Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(
-                                  Icons.directions_car,
-                                  size: 40,
-                                  color: Colors.grey.shade400,
-                                ),
-                              );
-                            },
-                          ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(12),
+                        ),
+                        child: Image.network(
+                          'https://lelamonline.com/admin/${product.image}',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Failed to load image: https://lelamonline.com/${product.image}');
+                            print('Error: $error');
+                            return Container(
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                Icons.directions_car,
+                                size: 40,
+                                color: Colors.grey.shade400,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${attributeValues['Brand'] ?? 'N/A'} ${attributeValues['Model'] ?? 'N/A'}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: Colors.black87,
                             ),
-                            Text(
-                              product.modelVariation,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            attributeValues['Model Variation'] ?? 'N/A',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
                             ),
-                            const SizedBox(height: 8),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            isAuction
+                                ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
+                                : '₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Palette.primaryblue,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _getLocationName(product.parentZoneId),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Display attributes with icons
+                          if (attributeValues.isNotEmpty)
                             Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  isAuction
-                                      ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
-                                      : '₹ ${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Palette.primaryblue,
-                                  ),
+                                // First row: Year, Owners, KM
+                                Row(
+                                  children: [
+                                    if (attributeValues['Year'] != null && attributeValues['Year']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.calendar_today,
+                                        attributeValues['Year']!,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['No of owners'] != null && attributeValues['No of owners']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.person,
+                                        attributeValues['No of owners']!,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['KM Range'] != null && attributeValues['KM Range']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.speed,
+                                        attributeValues['KM Range']!,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                // Second row: Fuel Type, Transmission
+                                Row(
+                                  children: [
+                                    if (attributeValues['Fuel Type'] != null && attributeValues['Fuel Type']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.local_gas_station,
+                                        attributeValues['Fuel Type']!,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['Transmission'] != null && attributeValues['Transmission']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.settings,
+                                        attributeValues['Transmission']!,
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.grey.shade500,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _getLocationName(product.parentZoneId),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            // Existing chips
-                            Row(
-                              children: [
-                                _buildDetailChip(
-                                  Icons.calendar_today,
-                                  attributeValues['Year'] ?? 'N/A',
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icons.person,
-                                  _getOwnerText(
-                                    attributeValues['No of owners'] ?? 'N/A',
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icons.speed,
-                                  _formatKmRange(
-                                    attributeValues['KM Range'] ?? 'N/A',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                _buildDetailChip(
-                                  Icons.local_gas_station,
-                                  attributeValues['Fuel Type'] ?? 'N/A',
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icons.settings,
-                                  attributeValues['Transmission'] ?? 'N/A',
-                                ),
-                              ],
-                            ),
-                            // New Details section
-                            const SizedBox(height: 8),
-                            // Container(
-                            //   padding: const EdgeInsets.all(8),
-                            //   decoration: BoxDecoration(
-                            //     color: Colors.grey.shade50,
-                            //     borderRadius: BorderRadius.circular(8),
-                            //   ),
-                            //   child: Column(
-                            //     crossAxisAlignment: CrossAxisAlignment.start,
-                            //     children: [
-                            //       const Text(
-                            //         'Details',
-                            //         style: TextStyle(
-                            //           fontSize: 14,
-                            //           fontWeight: FontWeight.bold,
-                            //         ),
-                            //       ),
-                            //       const SizedBox(height: 8),
-                            //       Row(
-                            //         children: [
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.calendar_today,
-                            //               attributeValues['Year'] ?? 'N/A',
-                            //             ),
-                            //           ),
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.person,
-                            //               _getOwnerText(
-                            //                 attributeValues['No of owners'] ??
-                            //                     'N/A',
-                            //               ),
-                            //             ),
-                            //           ),
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.speed,
-                            //               _formatKmRange(
-                            //                 attributeValues['KM Range'] ??
-                            //                     'N/A',
-                            //               ),
-                            //             ),
-                            //           ),
-                            //         ],
-                            //       ),
-                            //       const SizedBox(height: 8),
-                            //       Row(
-                            //         children: [
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.local_gas_station,
-                            //               attributeValues['Fuel Type'] ?? 'N/A',
-                            //             ),
-                            //           ),
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.settings,
-                            //               attributeValues['Transmission'] ??
-                            //                   'N/A',
-                            //             ),
-                            //           ),
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.build,
-                            //               attributeValues['Engine Condition'] ??
-                            //                   'N/A',
-                            //             ),
-                            //           ),
-                            //         ],
-                            //       ),
-                            //       const SizedBox(height: 8),
-                            //       Row(
-                            //         children: [
-                            //           Expanded(
-                            //             child: _buildDetailItem(
-                            //               Icons.directions_car,
-                            //               product.modelVariation.isNotEmpty
-                            //                   ? product.modelVariation
-                            //                   : 'N/A',
-                            //             ),
-                            //           ),
-                            //         ],
-                            //       ),
-                            //     ],
-                            //   ),
-                            // ),
-                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (isAuction || isFinanceAvailable || isExchangeAvailable)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 5,
                         ),
+                        decoration: BoxDecoration(
+                          color: isAuction ? Palette.primarylightblue : Colors.white,
+                        ),
+                        child: isAuction
+                            ? _buildAuctionInfo(product)
+                            : _buildFinanceExchangeInfo(
+                                isFinanceAvailable,
+                                isExchangeAvailable,
+                              ),
                       ),
                     ),
                   ],
                 ),
-                if (isAuction || isFinanceAvailable || isExchangeAvailable)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isAuction
-                                    ? Palette.primarylightblue
-                                    : Colors.white,
-                          ),
-                          child:
-                              isAuction
-                                  ? _buildAuctionInfo(product)
-                                  : _buildFinanceExchangeInfo(
-                                    isFinanceAvailable,
-                                    isExchangeAvailable,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+Widget _buildDetailChipWithIcon(IconData icon, String label) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 12, color: Colors.grey[700]),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
             ),
           ),
-        );
-      },
+          Text(value, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
     );
   }
 

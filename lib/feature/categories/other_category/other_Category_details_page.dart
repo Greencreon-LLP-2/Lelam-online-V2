@@ -1,48 +1,35 @@
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/categories/other_category/other_categoty.dart';
+import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
-import 'package:lelamonline_flutter/utils/palette.dart';
 
-class ProductDetailsPage extends StatefulWidget {
-  final dynamic product;
-  final bool isAuction;
+class BikeDetailsPage extends StatefulWidget {
+  final Bike bike;
 
-  const ProductDetailsPage({
-    super.key,
-    required this.product,
-    this.isAuction = false,
-  });
+  const BikeDetailsPage({super.key, required this.bike});
 
   @override
-  State<ProductDetailsPage> createState() => _ProductDetailsPageState();
+  State<BikeDetailsPage> createState() => _BikeDetailsPageState();
 }
 
-class _ProductDetailsPageState extends State<ProductDetailsPage> {
-  List<Attribute> attributes = [];
-  List<AttributeVariation> attributeVariations = [];
-  bool isLoadingDetails = false;
-  Map<String, String> attributeValues = {};
-  List<MapEntry<String, String>> orderedAttributeValues = [];
-
+class _BikeDetailsPageState extends State<BikeDetailsPage> {
+  bool _isLoadingLocations = true;
+  List<LocationData> _locations = [];
+  final LocationService _locationService = LocationService();
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
-  bool _isLoadingLocations = true;
-  List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
 
   @override
   void initState() {
     super.initState();
-    _fetchDetailsData();
+    _fetchLocations();
   }
 
   @override
@@ -52,283 +39,75 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchDetailsData() async {
+  Future<void> _fetchLocations() async {
     setState(() {
-      isLoadingDetails = true;
       _isLoadingLocations = true;
     });
 
     try {
       final locationResponse = await _locationService.fetchLocations();
       if (locationResponse != null && locationResponse.status) {
-        _locations = locationResponse.data;
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+        });
       } else {
         throw Exception('Failed to load locations');
       }
-
-      attributes = await ApiService.fetchAttributes();
-
-      attributeVariations = await ApiService.fetchAttributeVariations(
-        widget.product.filters,
-      );
-
-      final attributeValuePairs =
-          await AttributeValueService.fetchAttributeValuePairs();
-
-      _mapFiltersToValues(attributeValuePairs);
-
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
     } catch (e) {
-      print('Error fetching details: $e');
+      print('Error fetching locations: $e');
       setState(() {
-        isLoadingDetails = false;
         _isLoadingLocations = false;
       });
-    }
-  }
-
-  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters as Map<String, dynamic>;
-    attributeValues.clear();
-    orderedAttributeValues.clear();
-
-    print('Attribute Value Pairs: $attributeValuePairs');
-    print('Attribute Variations: $attributeVariations');
-    print('Filters: $filters');
-
-    final Set<String> processedAttributes = {};
-
-    for (var pair in attributeValuePairs) {
-      if (pair.attributeName.isNotEmpty &&
-          pair.attributeValue.isNotEmpty &&
-          !processedAttributes.contains(pair.attributeName)) {
-        attributeValues[pair.attributeName] = pair.attributeValue;
-        orderedAttributeValues.add(
-          MapEntry(pair.attributeName, pair.attributeValue),
-        );
-        processedAttributes.add(pair.attributeName);
-        print('Added from API: ${pair.attributeName} = ${pair.attributeValue}');
-      } else {
-        print('Skipped API pair: ${pair.attributeName} (duplicate or invalid)');
-      }
-    }
-
-    if (filters.containsKey('3')) {
-      final variationList = filters['3'] as List<dynamic>?;
-      if (variationList != null &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
-        attributeValues['KM Range'] = variationId;
-        final kmIndex = orderedAttributeValues.indexWhere(
-          (entry) => entry.key == 'KM Range',
-        );
-        if (kmIndex != -1) {
-          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
-        } else {
-          orderedAttributeValues.add(MapEntry('KM Range', variationId));
-        }
-        processedAttributes.add('KM Range');
-        print('Added KM Range from filters: $variationId');
-      }
-    }
-
-    filters.forEach((attributeId, variationList) {
-      if (attributeId != '3' &&
-          variationList is List &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
-        final attribute = attributes.firstWhere(
-          (attr) => attr.id == attributeId,
-          orElse:
-              () => Attribute(
-                id: attributeId,
-                slug: '',
-                name: _getAttributeNameFromId(attributeId),
-                listOrder: '',
-                categoryId: '',
-                formValidation: '',
-                ifDetailsIcons: '',
-                detailsIcons: '',
-                detailsIconsOrder: '',
-                showFilter: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
-        );
-        if (!processedAttributes.contains(attribute.name)) {
-          final variation = attributeVariations.firstWhere(
-            (varAttr) =>
-                varAttr.id == variationId && varAttr.attributeId == attributeId,
-            orElse:
-                () => AttributeVariation(
-                  id: variationId,
-                  attributeId: attributeId,
-                  name: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          print(
-            'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variation.name}',
-          );
-          if (variation.name.isNotEmpty && variation.name != variationId) {
-            attributeValues[attribute.name] = variation.name;
-            orderedAttributeValues.add(
-              MapEntry(attribute.name, variation.name),
-            );
-            processedAttributes.add(attribute.name);
-            print(
-              'Added from variations: ${attribute.name} = ${variation.name}',
-            );
-          } else {
-            print(
-              'Skipped variation: ${attribute.name} (invalid name or ID match)',
-            );
-          }
-        }
-      } else {
-        print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
-      }
-    });
-
-    print('Final attributeValues: $attributeValues');
-    print('Final orderedAttributeValues: $orderedAttributeValues');
-  }
-
-  String _getAttributeNameFromId(String id) {
-    switch (id) {
-      case '1':
-        return 'Year';
-      case '2':
-        return 'No of owners';
-      case '3':
-        return 'KM Range';
-      case '4':
-        return 'Fuel Type';
-      case '5':
-        return 'Transmission';
-      case '6':
-        return 'Service History';
-      case '7':
-        return 'Accident History';
-      case '8':
-        return 'Replacements';
-      case '9':
-        return 'Flood Affected';
-      case '10':
-        return 'Engine Condition';
-      case '11':
-        return 'Transmission Condition';
-      case '12':
-        return 'Suspension Condition';
-      case '13':
-        return 'Features';
-      case '14':
-        return 'Functions';
-      case '15':
-        return 'Battery';
-      case '16':
-        return 'Driver side front tyre';
-      case '17':
-        return 'Driver side rear tyre';
-      case '18':
-        return 'Co driver side front tyre';
-      case '19':
-        return 'Co driver side rear tyre';
-      case '20':
-        return 'Rust';
-      case '21':
-        return 'Emission Norms';
-      case '22':
-        return 'Status Of RC';
-      case '23':
-        return 'Registration valid till';
-      case '24':
-        return 'Insurance Type';
-      case '25':
-        return 'Insurance Upto';
-      case '26':
-        return 'Scratches';
-      case '27':
-        return 'Dents';
-      case '28':
-        return 'Sold by';
-      default:
-        return 'Unknown Attribute';
     }
   }
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
+    if (zoneId == '0') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
 
-  String get id => _getProperty('id') ?? '';
-  String get title => _getProperty('title') ?? '';
-  String get image => _getProperty('image') ?? '';
-  String get price => _getProperty('price') ?? '0';
-  String get landMark => _getProperty('landMark') ?? '';
-  String get createdOn => _getProperty('createdOn') ?? '';
-  String get createdBy => _getProperty('createdBy') ?? '';
-  String get byDealer => _getProperty('byDealer') ?? '0';
-
-  dynamic _getProperty(String propertyName) {
-    if (widget.product == null) return null;
-    switch (propertyName) {
-      case 'id':
-        return widget.product.id;
-      case 'title':
-        return widget.product.title;
-      case 'image':
-        return widget.product.image;
-      case 'price':
-        return widget.product.price;
-      case 'landMark':
-        return _getLocationName(widget.product.parentZoneId);
-      case 'createdOn':
-        return widget.product.createdOn;
-      case 'createdBy':
-        return widget.product.createdBy;
-      case 'byDealer':
-        return widget.product.byDealer;
-      default:
-        return null;
-    }
-  }
+  String get id => widget.bike.id;
+  String get title => widget.bike.title;
+  String get image => widget.bike.image;
+  String get price => widget.bike.price;
+  String get landMark => widget.bike.landMark;
+  String get createdOn => widget.bike.createdOn.split(' ')[0];
+  String get createdBy => widget.bike.createdBy;
+  bool get isFinanceAvailable => widget.bike.ifFinance == '1';
+  bool get isFeatured => widget.bike.feature == '1';
 
   List<String> get _images {
     if (image.isNotEmpty) {
-      return ['https://lelamonline.com/admin/$image'];
+      return [getImageUrl(image)];
     }
     return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+      'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?cs=srgb&dl=pexels-binyamin-mellish-106399.jpg&fm=jpg',
     ];
+  }
+
+  String getImageUrl(String imagePath) {
+    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
   void _resetZoom() {
@@ -377,21 +156,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -418,8 +195,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -470,10 +246,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -484,22 +259,21 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
+                                        placeholder: (context, url) =>
+                                            const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
+                                          Icons.error,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -552,12 +326,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ListTile(
                   leading: const Icon(
                     Icons.calendar_today,
-                    color: AppTheme.primaryColor,
+                    color: Palette.primaryblue,
                   ),
                   title: const Text('Select Date'),
                   subtitle: Text(
                     '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
+                    style: const TextStyle(color: Palette.primaryblue),
                   ),
                   onTap: () async {
                     final DateTime? picked = await showDatePicker(
@@ -628,31 +402,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
-  }
-
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-      case '1st Owner':
-        return '1st Owner';
-      case '2':
-      case '2nd Owner':
-        return '2nd Owner';
-      case '3':
-      case '3rd Owner':
-        return '3rd Owner';
-      default:
-        return owners.isNotEmpty ? owners : 'N/A';
-    }
-  }
-
-  String _formatNumber(String value) {
-    final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-
-    final formatter = NumberFormat.decimalPattern(
-      'en_IN',
-    );
-    return formatter.format(number);
   }
 
   Widget _buildDetailItem(IconData icon, String text) {
@@ -768,8 +517,23 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
+  // Parse filters from the API response
+  Map<String, dynamic> _parseFilters(String filtersJson) {
+    try {
+      if (filtersJson == 'null' || filtersJson.isEmpty) {
+        return {};
+      }
+      return jsonDecode(filtersJson);
+    } catch (e) {
+      print('Error parsing filters: $e');
+      return {};
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+   // final filters = _parseFilters(widget.bike.filters);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -800,14 +564,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                   imageUrl: _images[index],
                                   width: double.infinity,
                                   height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  fit: BoxFit.contain,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -833,6 +595,30 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               ),
                             ),
                           ),
+                          if (isFeatured)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white),
+                                ),
+                                child: const Text(
+                                  'FEATURED',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -894,16 +680,16 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -919,7 +705,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -950,6 +736,28 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                         ],
                       ),
+                      if (isFinanceAvailable)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance,
+                                size: 16,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Finance Available',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -980,64 +788,29 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        if (isLoadingDetails)
-                          const Center(child: CircularProgressIndicator())
-                        else
-                          Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        attributeValues['KM Range'] ?? '0',
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.person,
-                                      _getOwnerText(
-                                        attributeValues['No of owners'] ??
-                                            'N/A',
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                        Column(
+                          children: [
+                            _buildDetailItem(
+                              Icons.person,
+                              widget.bike.byDealer == '1' ? 'Dealer' : 'Owner',
+                            ),
+                            if (widget.bike.brand.isNotEmpty)
+                              _buildDetailItem(
+                                Icons.branding_watermark,
+                                'Brand: ${widget.bike.brand}',
                               ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.settings,
-                                      attributeValues['Transmission'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.build,
-                                      attributeValues['Engine Condition'] ??
-                                          'N/A',
-                                    ),
-                                  ),
-                                ],
+                            if (widget.bike.model.isNotEmpty)
+                              _buildDetailItem(
+                                Icons.directions_bike,
+                                'Model: ${widget.bike.model}',
                               ),
-                            ],
-                          ),
+                            // if (filters.isNotEmpty)
+                            //   ...filters.entries.map((entry) => _buildDetailItem(
+                            //         Icons.info,
+                            //         '${entry.key}: ${entry.value}',
+                            //       )),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1049,34 +822,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Seller Comments',
+                        'Description',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      if (isLoadingDetails)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.value != 'N/A' &&
-                                        entry.key != 'Co driver side rear tyre',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.key == 'No of owners'
-                                          ? _getOwnerText(entry.value)
-                                          : entry.value,
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
+                      Text(
+                        widget.bike.description.isNotEmpty
+                            ? widget.bike.description
+                            : 'No description available',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      ),
                     ],
                   ),
                 ),
@@ -1095,7 +853,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       _buildSellerInformationItem(
-                        createdBy,
+                        'User ${createdBy}',
                         'Member Since $createdOn',
                         context,
                       ),
@@ -1130,7 +888,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
-                // No background color
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -1155,7 +912,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           borderRadius: BorderRadius.zero,
                         ),
                       ),
-                      child: const Text('Place Bid'),
+                      child: const Text('Contact Seller'),
                     ),
                   ),
                   Expanded(

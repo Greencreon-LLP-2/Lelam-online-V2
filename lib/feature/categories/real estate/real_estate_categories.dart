@@ -1,23 +1,44 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/feature/categories/real%20estate/real_estate_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
 
-class Property {
+// MarketplacePost model (unchanged)
+class MarketplacePost {
   final String id;
   final String slug;
   final String title;
   final String categoryId;
   final String image;
-  final String type;
-  final String propertyType;
+  final String brand;
+  final String model;
+  final String modelVariation;
   final String description;
   final String price;
-  final Map<String, dynamic> filters;
+  final String auctionPriceInterval;
+  final String auctionStartingPrice;
+  final List<String> attributeId;
+  final List<String> attributeVariationsId;
+  final Map<String, List<String>> filters;
   final String latitude;
   final String longitude;
+  final String userZoneId;
+  final String parentZoneId;
   final String landMark;
+  final String ifAuction;
+  final String auctionStatus;
+  final String auctionStartin;
+  final String auctionEndin;
+  final String auctionAttempt;
   final String adminApproval;
   final String ifFinance;
+  final String ifExchange;
   final String feature;
   final String status;
   final String visiterCount;
@@ -28,22 +49,35 @@ class Property {
   final String createdOn;
   final String updatedOn;
 
-  Property({
+  MarketplacePost({
     required this.id,
     required this.slug,
     required this.title,
     required this.categoryId,
     required this.image,
-    required this.type,
-    required this.propertyType,
+    required this.brand,
+    required this.model,
+    required this.modelVariation,
     required this.description,
     required this.price,
+    required this.auctionPriceInterval,
+    required this.auctionStartingPrice,
+    required this.attributeId,
+    required this.attributeVariationsId,
     required this.filters,
     required this.latitude,
     required this.longitude,
+    required this.userZoneId,
+    required this.parentZoneId,
     required this.landMark,
+    required this.ifAuction,
+    required this.auctionStatus,
+    required this.auctionStartin,
+    required this.auctionEndin,
+    required this.auctionAttempt,
     required this.adminApproval,
     required this.ifFinance,
+    required this.ifExchange,
     required this.feature,
     required this.status,
     required this.visiterCount,
@@ -54,6 +88,133 @@ class Property {
     required this.createdOn,
     required this.updatedOn,
   });
+
+  factory MarketplacePost.fromJson(Map<String, dynamic> json) {
+    List<String> parseStringList(dynamic value) {
+      if (value == null) return [];
+      if (value is List) return List<String>.from(value);
+      if (value is String) {
+        try {
+          final decoded = jsonDecode(value);
+          if (decoded is List)
+            return List<String>.from(decoded.map((e) => e.toString()));
+        } catch (e) {
+          return value.split(',').map((e) => e.trim()).toList();
+        }
+      }
+      return [];
+    }
+
+    Map<String, List<String>> parseFilters(dynamic value) {
+      if (value == null) return {};
+      if (value is Map) {
+        return Map<String, List<String>>.from(
+          value.map(
+            (key, value) => MapEntry(key.toString(), parseStringList(value)),
+          ),
+        );
+      }
+      if (value is String) {
+        try {
+          final decoded = jsonDecode(value);
+          if (decoded is Map) {
+            return Map<String, List<String>>.from(
+              decoded.map(
+                (key, value) =>
+                    MapEntry(key.toString(), parseStringList(value)),
+              ),
+            );
+          }
+        } catch (e) {
+          return {};
+        }
+      }
+      return {};
+    }
+
+    return MarketplacePost(
+      id: json['id']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      categoryId: json['category_id']?.toString() ?? '',
+      image: json['image']?.toString() ?? '',
+      brand: json['brand']?.toString() ?? '',
+      model: json['model']?.toString() ?? '',
+      modelVariation: json['model_variation']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      price: json['price']?.toString() ?? '0',
+      auctionPriceInterval: json['auction_price_intervel']?.toString() ?? '0',
+      auctionStartingPrice: json['auction_starting_price']?.toString() ?? '0',
+      attributeId: parseStringList(json['attribute_id']),
+      attributeVariationsId: parseStringList(json['attribute_variations_id']),
+      filters: parseFilters(json['filters']),
+      latitude: json['latitude']?.toString() ?? '',
+      longitude: json['longitude']?.toString() ?? '',
+      userZoneId: json['user_zone_id']?.toString() ?? '',
+      parentZoneId: json['parent_zone_id']?.toString() ?? '',
+      landMark: json['land_mark']?.toString() ?? '',
+      ifAuction: json['if_auction']?.toString() ?? '0',
+      auctionStatus: json['auction_status']?.toString() ?? '',
+      auctionStartin: json['auction_startin']?.toString() ?? '',
+      auctionEndin: json['auction_endin']?.toString() ?? '',
+      auctionAttempt: json['auction_attempt']?.toString() ?? '0',
+      adminApproval: json['admin_approval']?.toString() ?? '0',
+      ifFinance: json['if_finance']?.toString() ?? '0',
+      ifExchange: json['if_exchange']?.toString() ?? '0',
+      feature: json['feature']?.toString() ?? '0',
+      status: json['status']?.toString() ?? '0',
+      visiterCount: json['visiter_count']?.toString() ?? '0',
+      ifSold: json['if_sold']?.toString() ?? '0',
+      ifExpired: json['if_expired']?.toString() ?? '0',
+      byDealer: json['by_dealer']?.toString() ?? '0',
+      createdBy: json['created_by']?.toString() ?? '',
+      createdOn: json['created_on']?.toString() ?? '',
+      updatedOn: json['updated_on']?.toString() ?? '',
+    );
+  }
+}
+
+// MarketplaceService (unchanged)
+class MarketplaceService {
+  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
+
+  Future<List<MarketplacePost>> fetchPosts({
+    required String categoryId,
+    required String userZoneId,
+  }) async {
+    final url =
+        '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody is List) {
+          return decodedBody.map((json) {
+            try {
+              return MarketplacePost.fromJson(json);
+            } catch (e) {
+              print('Error parsing post: $e');
+              print('Problematic JSON: $json');
+              throw Exception('Failed to parse post: $e');
+            }
+          }).toList();
+        } else if (decodedBody is Map && decodedBody.containsKey('data')) {
+          final data = decodedBody['data'] as List;
+          return data.map((json) => MarketplacePost.fromJson(json)).toList();
+        } else {
+          throw Exception('Unexpected API response format');
+        }
+      } else {
+        throw Exception('Failed to load posts: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error in fetchPosts: $e');
+      throw Exception('Error fetching posts: $e');
+    }
+  }
 }
 
 class RealEstatePage extends StatefulWidget {
@@ -66,8 +227,15 @@ class RealEstatePage extends StatefulWidget {
 class _RealEstatePageState extends State<RealEstatePage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
-
+  String _listingType = 'sale'; // Added for sale/auction toggle
   final TextEditingController _searchController = TextEditingController();
+  final MarketplaceService _marketplaceService = MarketplaceService();
+  final LocationService _locationService = LocationService();
+  List<MarketplacePost> _posts = [];
+  List<LocationData> _locations = [];
+  bool _isLoading = true;
+  bool _isLoadingLocations = true;
+  String? _errorMessage;
 
   // Filter variables
   List<String> _selectedPropertyTypes = [];
@@ -85,6 +253,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_handleScroll);
+    _fetchPosts();
+    _fetchLocations();
   }
 
   @override
@@ -103,95 +273,52 @@ class _RealEstatePageState extends State<RealEstatePage> {
     }
   }
 
-  final List<Property> _properties = List.generate(
-    20,
-    (index) => Property(
-      id: '${index + 1}',
-      slug: 'property-${index + 1}',
-      title:
-          [
-            'Modern 3BHK Apartment',
-            'Luxury Villa with Pool',
-            'Commercial Office Space',
-            'Prime Location Shop',
-            'Beachfront Villa',
-            '2BHK Premium Flat',
-            'Penthouse with Terrace',
-            'Family Independent House',
-            'Warehouse Space',
-            'Farmhouse with Garden',
-            'Studio Apartment',
-            'Duplex Villa',
-            'Industrial Plot',
-            'Residential Plot',
-            'Apartment for Rent',
-            'Luxury Apartment',
-            'Villa with Sea View',
-            'Office Space in CBD',
-            'Retail Shop',
-            'Bungalow with Garden',
-          ][index % 20],
-      categoryId: 'real-estate',
-      image: 'assets/images/property_${(index % 5) + 1}.jpg',
-      type: ['Residential', 'Commercial', 'Industrial'][index % 3],
-      propertyType:
-          [
-            'Apartment',
-            'Villa',
-            'Office',
-            'Shop',
-            'House',
-            'Penthouse',
-            'Duplex',
-            'Warehouse',
-            'Plot',
-            'Farmhouse',
-          ][index % 10],
-      description:
-          'Beautiful property with modern amenities and excellent location connectivity.',
-      price: '${(index + 1) * 500000 + 2000000}',
-      filters: {
-        'bedrooms': '${(index % 5) + 1}',
-        'bathrooms': '${(index % 4) + 1}',
-        'area': '${(index + 1) * 200 + 800}',
-        'furnishing': ['Furnished', 'Semi-Furnished', 'Unfurnished'][index % 3],
-        'floor': '${(index % 10) + 1}',
-        'totalFloors': '${(index % 5) + 5}',
-        'age': '${(index % 10) + 1}',
-      },
-      latitude: '19.0760',
-      longitude: '72.8777',
-      landMark:
-          [
-            'Ernakulam',
-            'Idukki',
-            'Kannur',
-            'Kasaragod',
-            'Kollam',
-            'Kottayam',
-            'Kozhikode',
-            'Malappuram',
-            'Palakkad',
-            'Pathanamthitta',
-            'Thiruvananthapuram',
-            'Thrissur',
-            'Wayanad',
-          ][index % 13],
-      adminApproval: '1',
-      ifFinance: index % 3 == 0 ? '1' : '0',
-      feature: index % 5 == 0 ? '1' : '0',
-      status: '1',
-      visiterCount: '${(index + 1) * 15}',
-      ifSold: '0',
-      ifExpired: '0',
-      byDealer: ['0', '1', '1'][index % 3],
-      createdBy: 'user_${index + 1}',
-      createdOn:
-          DateTime.now().subtract(Duration(days: index)).toIso8601String(),
-      updatedOn:
-          DateTime.now().subtract(Duration(hours: index)).toIso8601String(),
-    ),
-  );
+  Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+    try {
+      final locationResponse = await _locationService.fetchLocations();
+      if (locationResponse != null && locationResponse.status) {
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Failed to load locations');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading locations: $e';
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  Future<void> _fetchPosts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final posts = await _marketplaceService.fetchPosts(
+        categoryId: '2',
+        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+      );
+      setState(() {
+        _posts = posts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   final List<String> _propertyTypes = [
     'Apartment',
@@ -234,57 +361,63 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
   final List<String> _postedByOptions = ['all', 'Owner', 'Builder', 'Agent'];
 
-  final List<String> _districts = [
-    'all',
-    'Thiruvananthapuram',
-    'Kollam',
-    'Pathanamthitta',
-    'Alappuzha',
-    'Kottayam',
-    'Idukki',
-    'Ernakulam',
-    'Thrissur',
-    'Palakkad',
-    'Malappuram',
-    'Kozhikode',
-    'Wayanad',
-    'Kannur',
-    'Kasaragod',
-  ];
+  List<String> get _keralaCities {
+    return ['all', ..._locations.map((loc) => loc.name)];
+  }
 
-  List<Property> get filteredProperties {
-    List<Property> filtered = _properties;
+  List<MarketplacePost> get filteredPosts {
+    List<MarketplacePost> filtered = _posts;
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       filtered =
-          filtered.where((property) {
-            return property.title.toLowerCase().contains(query) ||
-                property.landMark.toLowerCase().contains(query) ||
-                property.propertyType.toLowerCase().contains(query);
+          filtered.where((post) {
+            final propertyType =
+                post.filters['propertyType']?.isNotEmpty ?? false
+                    ? post.filters['propertyType']!.first.toLowerCase()
+                    : '';
+            return post.title.toLowerCase().contains(query) ||
+                post.landMark.toLowerCase().contains(query) ||
+                propertyType.contains(query);
           }).toList();
     }
 
     if (_selectedLocation != 'all') {
       filtered =
           filtered
-              .where((property) => property.landMark == _selectedLocation)
-              .toList();
-    }
-
-    if (_selectedPropertyTypes.isNotEmpty) {
-      filtered =
-          filtered
               .where(
-                (property) => _selectedPropertyTypes.contains(property.type),
+                (post) =>
+                    post.userZoneId == _selectedLocation ||
+                    post.parentZoneId == _selectedLocation,
               )
               .toList();
     }
 
+    if (_listingType == 'auction') {
+      filtered = filtered.where((post) => post.ifAuction == '1').toList();
+    } else if (_listingType == 'sale') {
+      filtered = filtered.where((post) => post.ifAuction == '0').toList();
+    }
+
+    if (_selectedPropertyTypes.isNotEmpty) {
+      filtered =
+          filtered.where((post) {
+            final propertyType =
+                post.filters['propertyType']?.isNotEmpty ?? false
+                    ? post.filters['propertyType']!.first
+                    : '';
+            return _selectedPropertyTypes.contains(propertyType);
+          }).toList();
+    }
+
     if (_selectedPriceRange != 'all') {
       filtered =
-          filtered.where((property) {
-            int price = int.tryParse(property.price) ?? 0;
+          filtered.where((post) {
+            final priceStr =
+                _listingType == 'auction'
+                    ? post.auctionStartingPrice
+                    : post.price;
+            int price = int.tryParse(priceStr) ?? 0;
             switch (_selectedPriceRange) {
               case 'Under 50L':
                 return price < 5000000;
@@ -304,10 +437,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     if (_selectedBedroomRange != 'all') {
       filtered =
-          filtered.where((property) {
-            int bedrooms =
-                int.tryParse(property.filters['bedrooms']?.toString() ?? '0') ??
-                0;
+          filtered.where((post) {
+            final bedroomsStr =
+                post.filters['bedrooms']?.isNotEmpty ?? false
+                    ? post.filters['bedrooms']!.first
+                    : '0';
+            int bedrooms = int.tryParse(bedroomsStr) ?? 0;
             switch (_selectedBedroomRange) {
               case '1':
                 return bedrooms == 1;
@@ -327,9 +462,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     if (_selectedAreaRange != 'all') {
       filtered =
-          filtered.where((property) {
-            int area =
-                int.tryParse(property.filters['area']?.toString() ?? '0') ?? 0;
+          filtered.where((post) {
+            final areaStr =
+                post.filters['area']?.isNotEmpty ?? false
+                    ? post.filters['area']!.first
+                    : '0';
+            int area = int.tryParse(areaStr) ?? 0;
             switch (_selectedAreaRange) {
               case 'Under 500 sq ft':
                 return area < 500;
@@ -349,24 +487,24 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     if (_selectedFurnishings.isNotEmpty) {
       filtered =
-          filtered
-              .where(
-                (property) => _selectedFurnishings.contains(
-                  property.filters['furnishing'],
-                ),
-              )
-              .toList();
+          filtered.where((post) {
+            final furnishing =
+                post.filters['furnishing']?.isNotEmpty ?? false
+                    ? post.filters['furnishing']!.first
+                    : '';
+            return _selectedFurnishings.contains(furnishing);
+          }).toList();
     }
 
     if (_selectedPostedBy != 'all') {
       filtered =
-          filtered.where((property) {
+          filtered.where((post) {
             switch (_selectedPostedBy) {
               case 'Owner':
-                return property.byDealer == '0';
+                return post.byDealer == '0';
               case 'Builder':
               case 'Agent':
-                return property.byDealer == '1';
+                return post.byDealer == '1';
               default:
                 return true;
             }
@@ -457,6 +595,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 (value) => setModalState(
                                   () => _selectedPriceRange = value,
                                 ),
+                                subtitle:
+                                    _listingType == 'auction'
+                                        ? 'Filter by starting bid price'
+                                        : 'Filter by sale price',
                               ),
                               _buildSingleSelectFilterSection(
                                 'Bedrooms',
@@ -630,8 +772,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
     String title,
     List<String> options,
     String selectedValue,
-    ValueChanged<String> onChanged,
-  ) {
+    ValueChanged<String> onChanged, {
+    String? subtitle,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -640,6 +783,17 @@ class _RealEstatePageState extends State<RealEstatePage> {
           title,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -733,9 +887,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return TextField(
       controller: _searchController,
       onChanged: (value) {
-        setState(() {
-          _searchQuery = value;
-        });
+        setState(() => _searchQuery = value);
       },
       decoration: InputDecoration(
         hintText: 'Search by property type, location, features...',
@@ -773,6 +925,30 @@ class _RealEstatePageState extends State<RealEstatePage> {
         ),
       ),
     );
+  }
+
+  String _getLocationName(String zoneId) {
+    if (zoneId == 'all') return 'All Kerala';
+    final location = _locations.firstWhere(
+      (loc) => loc.id == zoneId,
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+    );
+    return location.name;
   }
 
   @override
@@ -816,52 +992,196 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 ),
             ],
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.location_on, color: Colors.black87),
-            onSelected: (String value) {
-              setState(() {
-                _selectedLocation = value;
-              });
-            },
-            itemBuilder: (BuildContext context) {
-              return _districts.map((String district) {
-                return PopupMenuItem<String>(
-                  value: district,
-                  child: Row(
-                    children: [
-                      if (_selectedLocation == district)
-                        const Icon(Icons.check, color: Colors.blue, size: 16),
-                      if (_selectedLocation == district)
-                        const SizedBox(width: 8),
-                      Text(district == 'all' ? 'All Kerala' : district),
-                    ],
-                  ),
-                );
-              }).toList();
-            },
-          ),
+          _isLoadingLocations
+              ? const CircularProgressIndicator()
+              : PopupMenuButton<String>(
+                icon: const Icon(Icons.location_on, color: Colors.black87),
+                onSelected: (String value) {
+                  setState(() {
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
+                    _fetchPosts();
+                  });
+                },
+                itemBuilder: (BuildContext context) {
+                  return _keralaCities.map((String city) {
+                    return PopupMenuItem<String>(
+                      value: city,
+                      child: Row(
+                        children: [
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const Icon(
+                              Icons.check,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const SizedBox(width: 8),
+                          Text(city == 'all' ? 'All Kerala' : city),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
         ],
       ),
-      body: Column(
-        children: [
-          if (!_showAppBarSearch)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _buildSearchField(),
-            ),
-          Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(top: 16),
-              children: [
-                for (var property in filteredProperties)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildPropertyCard(property),
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child:
+                _isLoadingLocations
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(
+                      children: [
+                        if (!_showAppBarSearch)
+                          Container(
+                            color: Colors.white,
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            child: _buildSearchField(),
+                          ),
+                        Container(
+                          color: Colors.grey.shade200,
+                          padding: const EdgeInsets.all(10),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _listingType = 'sale';
+                                        _fetchPosts();
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            _listingType == 'sale'
+                                                ? Palette.white
+                                                : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'Market Place',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight:
+                                              _listingType == 'sale'
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                          color:
+                                              _listingType == 'sale'
+                                                  ? Colors.black
+                                                  : Colors.grey.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Expanded(
+                                //   child: GestureDetector(
+                                //     onTap: () {
+                                //       setState(() {
+                                //         _listingType = 'auction';
+                                //         _fetchPosts();
+                                //       });
+                                //     },
+                                //     child: Container(
+                                //       padding: const EdgeInsets.symmetric(
+                                //         vertical: 12,
+                                //       ),
+                                //       decoration: BoxDecoration(
+                                //         color:
+                                //             _listingType == 'auction'
+                                //                 ? Palette.white
+                                //                 : Colors.transparent,
+                                //         borderRadius: BorderRadius.circular(10),
+                                //       ),
+                                //       child: Text(
+                                //         'Auction',
+                                //         textAlign: TextAlign.center,
+                                //         style: TextStyle(
+                                //           fontWeight:
+                                //               _listingType == 'auction'
+                                //                   ? FontWeight.w600
+                                //                   : FontWeight.normal,
+                                //           color:
+                                //               _listingType == 'auction'
+                                //                   ? Colors.black
+                                //                   : Colors.grey.shade600,
+                                //           fontSize: 12,
+                                //         ),
+                                //       ),
+                                //     ),
+                                //   ),
+                                // ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+          ),
+          if (!_isLoadingLocations)
+            _isLoading
+                ? const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+                : _errorMessage != null
+                ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: $_errorMessage',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchPosts,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
                   ),
-                if (filteredProperties.isEmpty)
-                  Center(
+                )
+                : filteredPosts.isEmpty
+                ? SliverToBoxAdapter(
+                  child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -890,23 +1210,51 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       ],
                     ),
                   ),
-              ],
-            ),
-          ),
+                )
+                : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final post = filteredPosts[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildPostCard(post),
+                    );
+                  }, childCount: filteredPosts.length),
+                ),
         ],
       ),
     );
   }
 
-  Widget _buildPropertyCard(Property property) {
-    final isFinanceAvailable = property.ifFinance == '1';
-    final isFeatured = property.feature == '1';
+  String getImageUrl(String imagePath) {
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://lelamonline.com/admin/$cleanedPath';
+  }
+
+  Widget _buildPostCard(MarketplacePost post) {
+    final isFinanceAvailable = post.ifFinance == '1';
+    final isFeatured = post.feature == '1';
+    final isAuction = post.ifAuction == '1';
+    final propertyType =
+        post.filters['propertyType']?.isNotEmpty ?? false
+            ? post.filters['propertyType']!.first
+            : 'N/A';
+    final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
           onTap: () {
-            // Navigation to property details page can be added here
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) => RealEstateProductDetailsPage(
+                      product: post,
+                      isAuction: isAuction,
+                    ),
+              ),
+            );
           },
           child: Container(
             width: constraints.maxWidth,
@@ -939,52 +1287,56 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             Radius.circular(0),
                           ),
                         ),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(12),
-                              ),
-                              child: Image.asset(
-                                property.image,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.grey.shade200,
-                                    child: Icon(
-                                      Icons.home,
-                                      size: 40,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  );
-                                },
-                              ),
+                        child: Container(
+                          width: 130,
+                          height: 138,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
                             ),
-                            if (isFeatured)
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.white),
-                                  ),
-                                  child: const Text(
-                                    'FEATURED',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                            image: DecorationImage(
+                              image: NetworkImage(getImageUrl(post.image)),
+                              fit:
+                                  BoxFit
+                                      .fill, // Ensures full image is visible, scaled to fit
+                              onError: (exception, stackTrace) {
+                                print(
+                                  'Failed to load image: ${getImageUrl(post.image)}',
+                                );
+                                print('Error: $exception');
+                              },
+                            ),
+                          ),
+                          child:
+                              isFeatured
+                                  ? Align(
+                                    alignment: Alignment.topLeft,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(
+                                        top: 8,
+                                        left: 8,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.white),
+                                      ),
+                                      child: const Text(
+                                        'FEATURED',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                                  )
+                                  : null,
                         ),
                       ),
                     ),
@@ -995,7 +1347,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              property.title,
+                              post.title,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
@@ -1004,16 +1356,18 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Text(
-                              property.propertyType,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
+                            // Text(
+                            //   propertyType,
+                            //   style: TextStyle(
+                            //     fontSize: 10,
+                            //     color: Colors.grey.shade600,
+                            //   ),
+                            // ),
                             const SizedBox(height: 8),
                             Text(
-                              '₹ ${formatPriceInt(double.tryParse(property.price) ?? 0)}',
+                              isAuction
+                                  ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
+                                  : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -1030,7 +1384,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  property.landMark,
+                                  _getLocationName(post.parentZoneId),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey.shade600,
@@ -1039,57 +1393,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.bed,
-                                    size: 8,
-                                    color: Colors.grey[700],
-                                  ),
-                                  '${property.filters['bedrooms']} Beds',
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.bathtub,
-                                    size: 8,
-                                    color: Colors.grey[700],
-                                  ),
-                                  '${property.filters['bathrooms']} Baths',
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.aspect_ratio,
-                                    size: 8,
-                                    color: Colors.grey[700],
-                                  ),
-                                  '${_formatNumber(int.tryParse(property.filters['area']?.toString() ?? '0') ?? 0)} sq ft',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.chair,
-                                    size: 8,
-                                    color: Colors.grey[700],
-                                  ),
-                                  '${property.filters['furnishing']}',
-                                ),
-                                const SizedBox(width: 4),
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.apartment,
-                                    size: 8,
-                                    color: Colors.grey[700],
-                                  ),
-                                  'Floor ${property.filters['floor']}/${property.filters['totalFloors']}',
-                                ),
-                              ],
+                            _buildDetailChip(
+                              Icon(
+                                Icons.person,
+                                size: 8,
+                                color: Colors.grey[700],
+                              ),
+                              sellerType,
                             ),
                           ],
                         ),
@@ -1097,39 +1407,33 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     ),
                   ],
                 ),
-                if (isFinanceAvailable)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Palette.primarylightblue,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(12),
-                        bottomRight: Radius.circular(12),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.account_balance,
-                          size: 10,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Finance Available',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                if (isAuction || isFinanceAvailable)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 5,
                           ),
+                          decoration: BoxDecoration(
+                            color:
+                                isAuction
+                                    ? Palette.primarylightblue
+                                    : Colors.white,
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
+                          ),
+                          child:
+                              isAuction
+                                  ? _buildAuctionInfo(post)
+                                  : _buildFinanceInfo(isFinanceAvailable),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -1139,10 +1443,71 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
+  Widget _buildAuctionInfo(MarketplacePost post) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.gavel, size: 16, color: Colors.black),
+            const SizedBox(width: 6),
+            Text(
+              'Attempts: ${post.auctionAttempt}/3',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white),
+          ),
+          child: const Text(
+            'AUCTION',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFinanceInfo(bool isFinanceAvailable) {
+    if (!isFinanceAvailable) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: Palette.primarylightblue),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(Icons.account_balance, size: 10, color: Colors.black),
+          const SizedBox(width: 8),
+          Text(
+            'Finance Available',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailChip(Widget icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
