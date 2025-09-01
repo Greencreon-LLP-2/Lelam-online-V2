@@ -2,223 +2,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart'; // Import for ApiService
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart'; // Import for Attribute and AttributeVariation
-
-class MarketplacePost {
-  final String id;
-  final String slug;
-  final String title;
-  final String categoryId;
-  final String image;
-  final String brand;
-  final String model;
-  final String modelVariation;
-  final String description;
-  final String price;
-  final String auctionPriceInterval;
-  final String auctionStartingPrice;
-  final List<String> attributeId;
-  final List<String> attributeVariationsId;
-  final Map<String, List<String>> filters;
-  final String latitude;
-  final String longitude;
-  final String userZoneId;
-  final String parentZoneId;
-  final String landMark;
-  final String ifAuction;
-  final String auctionStatus;
-  final String auctionStartin;
-  final String auctionEndin;
-  final String auctionAttempt;
-  final String adminApproval;
-  final String ifFinance;
-  final String ifExchange;
-  final String feature;
-  final String status;
-  final String visiterCount;
-  final String ifSold;
-  final String ifExpired;
-  final String byDealer;
-  final String createdBy;
-  final String createdOn;
-  final String updatedOn;
-
-  MarketplacePost({
-    required this.id,
-    required this.slug,
-    required this.title,
-    required this.categoryId,
-    required this.image,
-    required this.brand,
-    required this.model,
-    required this.modelVariation,
-    required this.description,
-    required this.price,
-    required this.auctionPriceInterval,
-    required this.auctionStartingPrice,
-    required this.attributeId,
-    required this.attributeVariationsId,
-    required this.filters,
-    required this.latitude,
-    required this.longitude,
-    required this.userZoneId,
-    required this.parentZoneId,
-    required this.landMark,
-    required this.ifAuction,
-    required this.auctionStatus,
-    required this.auctionStartin,
-    required this.auctionEndin,
-    required this.auctionAttempt,
-    required this.adminApproval,
-    required this.ifFinance,
-    required this.ifExchange,
-    required this.feature,
-    required this.status,
-    required this.visiterCount,
-    required this.ifSold,
-    required this.ifExpired,
-    required this.byDealer,
-    required this.createdBy,
-    required this.createdOn,
-    required this.updatedOn,
-  });
-
-  factory MarketplacePost.fromJson(Map<String, dynamic> json) {
-    List<String> parseStringList(dynamic value) {
-      if (value == null) return [];
-      if (value is List) return List<String>.from(value);
-      if (value is String) {
-        try {
-          final decoded = jsonDecode(value);
-          if (decoded is List)
-            return List<String>.from(decoded.map((e) => e.toString()));
-        } catch (e) {
-          return value.split(',').map((e) => e.trim()).toList();
-        }
-      }
-      return [];
-    }
-
-    Map<String, List<String>> parseFilters(dynamic value) {
-      if (value == null) return {};
-      if (value is Map) {
-        return Map<String, List<String>>.from(
-          value.map((key, value) {
-            return MapEntry(key.toString(), parseStringList(value));
-          }),
-        );
-      }
-      if (value is String) {
-        try {
-          final decoded = jsonDecode(value);
-          if (decoded is Map) {
-            return Map<String, List<String>>.from(
-              decoded.map((key, value) {
-                return MapEntry(key.toString(), parseStringList(value));
-              }),
-            );
-          }
-        } catch (e) {
-          return {};
-        }
-      }
-      return {};
-    }
-
-    return MarketplacePost(
-      id: json['id']?.toString() ?? '',
-      slug: json['slug']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
-      categoryId: json['category_id']?.toString() ?? '',
-      image: json['image']?.toString() ?? '',
-      brand: json['brand']?.toString() ?? '',
-      model: json['model']?.toString() ?? '',
-      modelVariation: json['model_variation']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
-      price: json['price']?.toString() ?? '0',
-      auctionPriceInterval: json['auction_price_intervel']?.toString() ?? '0',
-      auctionStartingPrice: json['auction_starting_price']?.toString() ?? '0',
-      attributeId: parseStringList(json['attribute_id']),
-      attributeVariationsId: parseStringList(json['attribute_variations_id']),
-      filters: parseFilters(json['filters']),
-      latitude: json['latitude']?.toString() ?? '',
-      longitude: json['longitude']?.toString() ?? '',
-      userZoneId: json['user_zone_id']?.toString() ?? '',
-      parentZoneId: json['parent_zone_id']?.toString() ?? '',
-      landMark: json['land_mark']?.toString() ?? '',
-      ifAuction: json['if_auction']?.toString() ?? '0',
-      auctionStatus: json['auction_status']?.toString() ?? '',
-      auctionStartin: json['auction_startin']?.toString() ?? '',
-      auctionEndin: json['auction_endin']?.toString() ?? '',
-      auctionAttempt: json['auction_attempt']?.toString() ?? '0',
-      adminApproval: json['admin_approval']?.toString() ?? '0',
-      ifFinance: json['if_finance']?.toString() ?? '0',
-      ifExchange: json['if_exchange']?.toString() ?? '0',
-      feature: json['feature']?.toString() ?? '0',
-      status: json['status']?.toString() ?? '0',
-      visiterCount: json['visiter_count']?.toString() ?? '0',
-      ifSold: json['if_sold']?.toString() ?? '0',
-      ifExpired: json['if_expired']?.toString() ?? '0',
-      byDealer: json['by_dealer']?.toString() ?? '0',
-      createdBy: json['created_by']?.toString() ?? '',
-      createdOn: json['created_on']?.toString() ?? '',
-      updatedOn: json['updated_on']?.toString() ?? '',
-    );
-  }
-
-  Product toProduct() {
-    final convertedFilters = filters.map(
-      (key, value) => MapEntry(key, value.isNotEmpty ? value.first : ''),
-    );
-
-    return Product(
-      id: id,
-      slug: slug,
-      title: title,
-      categoryId: categoryId,
-      image: image,
-      brand: brand,
-      model: model,
-      modelVariation: modelVariation,
-      description: description,
-      price: price,
-      auctionPriceIntervel: auctionPriceInterval,
-      auctionStartingPrice: auctionStartingPrice,
-      attributeId: attributeId,
-      attributeVariationsId: attributeVariationsId,
-      filters: convertedFilters,
-      latitude: latitude,
-      longitude: longitude,
-      userZoneId: userZoneId,
-      parentZoneId: parentZoneId,
-      landMark: landMark,
-      ifAuction: ifAuction,
-      auctionStatus: auctionStatus,
-      auctionStartin: auctionStartin,
-      auctionEndin: auctionEndin,
-      auctionAttempt: auctionAttempt,
-      adminApproval: adminApproval,
-      ifFinance: ifFinance,
-      ifExchange: ifExchange,
-      feature: feature,
-      status: status,
-      visiterCount: visiterCount,
-      ifSold: ifSold,
-      ifExpired: ifExpired,
-      byDealer: byDealer,
-      createdBy: createdBy,
-      createdOn: createdOn,
-      updatedOn: updatedOn,
-    );
-  }
-}
 
 // Marketplace Service
 class MarketplaceService {
@@ -386,183 +177,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedKmRange = 'all';
   String _selectedSoldBy = 'all';
 
-
-List<Brand> brands = [];
-  List<BrandModel> models = [];
-  List<ModelVariation> modelVariations = [];
-  List<AttributeValuePair> attributeValuePairs = [];
-
-  Future<void> _fetchAttributesAndVariations() async {
-    try {
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations({});
-      brands = await ApiService.fetchBrands();
-      models = await ApiService.fetchBrandModels();
-      modelVariations = await ApiService.fetchModelVariations();
-      attributeValuePairs = await AttributeValueService.fetchAttributeValuePairs();
-      setState(() {});
-    } catch (e) {
-      print('Error fetching attributes/variations/brands/models/modelVariations/attributeValuePairs: $e');
-    }
-  }
-
-  Map<String, String> _mapFiltersToValues(Map<String, String> filters, String brandId, String modelId, String modelVariationId) {
-    final Map<String, String> attributeValues = {};
-
-    // Helper function to find attribute value by ID
-    String findAttributeValue(String attributeName, String id) {
-      final pair = attributeValuePairs.firstWhere(
-        (pair) => pair.attributeName == attributeName && pair.attributeValue.contains(id),
-        orElse: () => AttributeValuePair(
-          attributeName: attributeName,
-          attributeValue: 'Unknown $attributeName',
-        ),
-      );
-      return pair.attributeValue;
-    }
-
-    // Map Brand
-    attributeValues['Brand'] = attributeValuePairs.isNotEmpty
-        ? findAttributeValue('brand', brandId)
-        : (brands.isNotEmpty
-            ? brands.firstWhere(
-                (b) => b.id == brandId,
-                orElse: () => Brand(
-                  id: brandId,
-                  slug: '',
-                  categoryId: '',
-                  name: 'Unknown Brand',
-                  image: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-              ).name
-            : 'Unknown Brand');
-
-    // Map Model
-    attributeValues['Model'] = attributeValuePairs.isNotEmpty
-        ? findAttributeValue('model', modelId)
-        : (models.isNotEmpty
-            ? models.firstWhere(
-                (m) => m.id == modelId && m.brandId == brandId,
-                orElse: () => BrandModel(
-                  id: modelId,
-                  brandId: brandId,
-                  slug: '',
-                  name: 'Unknown Model',
-                  image: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-              ).name
-            : 'Unknown Model');
-
-    // Map Model Variation
-    attributeValues['Model Variation'] = attributeValuePairs.isNotEmpty
-        ? findAttributeValue('model_variation', modelVariationId)
-        : (modelVariations.isNotEmpty
-            ? modelVariations.firstWhere(
-                (mv) => mv.id == modelVariationId && mv.brandModelId == modelId,
-                orElse: () => ModelVariation(
-                  id: modelVariationId,
-                  slug: '',
-                  brandId: brandId,
-                  brandModelId: modelId,
-                  name: 'Unknown Variation',
-                  image: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-              ).name
-            : 'Unknown Variation');
-
-    // Map existing attributes (Year, Owners, KM, Fuel, Transmission)
-    final attributesToShow = {'1', '2', '3', '4', '5'};
-    filters.forEach((attributeId, variationId) {
-      if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
-        try {
-          final attribute = attributes.firstWhere(
-            (attr) => attr.id == attributeId,
-            orElse: () => Attribute(
-              id: attributeId,
-              slug: '',
-              name: _getAttributeNameFromId(attributeId),
-              listOrder: '',
-              categoryId: '',
-              formValidation: '',
-              ifDetailsIcons: '',
-              detailsIcons: '',
-              detailsIconsOrder: '',
-              showFilter: '',
-              status: '',
-              createdOn: '',
-              updatedOn: '',
-            ),
-          );
-
-          final variation = attributeVariations.firstWhere(
-            (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
-            orElse: () => AttributeVariation(
-              id: variationId,
-              attributeId: attributeId,
-              name: _getVariationNameFromId(attributeId, variationId),
-              status: '',
-              createdOn: '',
-              updatedOn: '',
-            ),
-          );
-
-          attributeValues[attribute.name] = variation.name;
-        } catch (e) {
-          print('Error mapping attribute $attributeId: $e');
-        }
-      }
-    });
-
-    // Debug: Print mapped values
-    print('Mapped Values for Product:');
-    print('Brand: $brandId -> ${attributeValues['Brand']}');
-    print('Model: $modelId -> ${attributeValues['Model']}');
-    print('Model Variation: $modelVariationId -> ${attributeValues['Model Variation']}');
-    attributeValues.forEach((key, value) => print('$key: $value'));
-
-    return attributeValues;
-  }
-
-  Future<void> _fetchProducts() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final posts = await _marketplaceService.fetchPosts(
-        categoryId: '1',
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
-      );
-      final products = posts.map((post) => post.toProduct()).toList();
-      for (var product in products) {
-        _productAttributeValues[product.id] = _mapFiltersToValues(
-          product.filters,
-          product.brand,
-          product.model,
-          product.modelVariation,
-        );
-      }
-      setState(() {
-        _products = products;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
   // Scroll controller for dynamic search bar
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
@@ -618,95 +232,95 @@ List<Brand> brands = [];
     }
   }
 
-//   Future<void> _fetchAttributesAndVariations() async {
-//     try {
-//       attributes = await ApiService.fetchAttributes();
-//       attributeVariations = await ApiService.fetchAttributeVariations({});
-//       setState(() {});
-//     } catch (e) {
-//       print('Error fetching attributes/variations: $e');
-//     }
-//   }
+  Future<void> _fetchAttributesAndVariations() async {
+    try {
+      attributes = await ApiService.fetchAttributes();
+      attributeVariations = await ApiService.fetchAttributeVariations({});
+      setState(() {});
+    } catch (e) {
+      print('Error fetching attributes/variations: $e');
+    }
+  }
 
-//   Future<void> _fetchProducts() async {
-//     setState(() {
-//       _isLoading = true;
-//       _errorMessage = null;
-//     });
-//     try {
-//       final posts = await _marketplaceService.fetchPosts(
-//         categoryId: '1',
-//         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
-//       );
-//       final products = posts.map((post) => post.toProduct()).toList();
-//       for (var product in products) {
-//         _productAttributeValues[product.id] = _mapFiltersToValues(
-//           product.filters,
-//         );
-//       }
-//       setState(() {
-//         _products = products;
-//         _isLoading = false;
-//       });
-//     } catch (e) {
-//       setState(() {
-//         _errorMessage = e.toString();
-//         _isLoading = false;
-//       });
-//     }
-//   }
+  Future<void> _fetchProducts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final posts = await _marketplaceService.fetchPosts(
+        categoryId: '1',
+        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+      );
+      final products = posts.map((post) => post.toProduct()).toList();
+      for (var product in products) {
+        _productAttributeValues[product.id] = _mapFiltersToValues(
+          product.filters,
+        );
+      }
+      setState(() {
+        _products = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
-// Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
-//   final Map<String, String> attributeValues = {};
+Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
+  final Map<String, String> attributeValues = {};
 
-//   // Process only the specific attributes we want to display
-//   final attributesToShow = {'1', '2', '3', '4', '5'}; // Year, Owners, KM, Fuel, Transmission
+  // Process only the specific attributes we want to display
+  final attributesToShow = {'1', '2', '3', '4', '5'}; // Year, Owners, KM, Fuel, Transmission
 
-//   filters.forEach((attributeId, variationId) {
-//     if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
-//       try {
-//         // Get attribute name
-//         final attribute = attributes.firstWhere(
-//           (attr) => attr.id == attributeId,
-//           orElse: () => Attribute(
-//             id: attributeId,
-//             slug: '',
-//             name: _getAttributeNameFromId(attributeId),
-//             listOrder: '',
-//             categoryId: '',
-//             formValidation: '',
-//             ifDetailsIcons: '',
-//             detailsIcons: '',
-//             detailsIconsOrder: '',
-//             showFilter: '',
-//             status: '',
-//             createdOn: '',
-//             updatedOn: '',
-//           ),
-//         );
+  filters.forEach((attributeId, variationId) {
+    if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
+      try {
+        // Get attribute name
+        final attribute = attributes.firstWhere(
+          (attr) => attr.id == attributeId,
+          orElse: () => Attribute(
+            id: attributeId,
+            slug: '',
+            name: _getAttributeNameFromId(attributeId),
+            listOrder: '',
+            categoryId: '',
+            formValidation: '',
+            ifDetailsIcons: '',
+            detailsIcons: '',
+            detailsIconsOrder: '',
+            showFilter: '',
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+        );
 
-//         // Get variation name - try to find the actual name from attributeVariations
-//         final variation = attributeVariations.firstWhere(
-//           (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
-//           orElse: () => AttributeVariation(
-//             id: variationId,
-//             attributeId: attributeId,
-//             name: _getVariationNameFromId(attributeId, variationId), // Use helper function
-//             status: '',
-//             createdOn: '',
-//             updatedOn: '',
-//           ),
-//         );
+        // Get variation name - try to find the actual name from attributeVariations
+        final variation = attributeVariations.firstWhere(
+          (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
+          orElse: () => AttributeVariation(
+            id: variationId,
+            attributeId: attributeId,
+            name: _getVariationNameFromId(attributeId, variationId), // Use helper function
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+        );
 
-//         attributeValues[attribute.name] = variation.name;
-//       } catch (e) {
-//         print('Error mapping attribute $attributeId: $e');
-//       }
-//     }
-//   });
+        attributeValues[attribute.name] = variation.name;
+      } catch (e) {
+        print('Error mapping attribute $attributeId: $e');
+      }
+    }
+  });
 
-//   return attributeValues;
-// }
+  return attributeValues;
+}
 String _getVariationNameFromId(String attributeId, String variationId) {
   // Map common variation IDs to their display names
   switch (attributeId) {
@@ -1872,7 +1486,9 @@ Widget _buildProductCard(Product product) {
                           'https://lelamonline.com/admin/${product.image}',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
-                            print('Failed to load image: https://lelamonline.com/${product.image}');
+                            print(
+                              'Failed to load image: https://lelamonline.com/${product.image}',
+                            );
                             print('Error: $error');
                             return Container(
                               color: Colors.grey.shade200,
@@ -1894,7 +1510,7 @@ Widget _buildProductCard(Product product) {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${attributeValues['Brand'] ?? 'N/A'} ${attributeValues['Model'] ?? 'N/A'}',
+                            product.title,
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
@@ -1904,22 +1520,27 @@ Widget _buildProductCard(Product product) {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            attributeValues['Model Variation'] ?? 'N/A',
+                            product.modelVariation,
                             style: TextStyle(
                               fontSize: 10,
                               color: Colors.grey.shade600,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            isAuction
-                                ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
-                                : '₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: Palette.primaryblue,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isAuction
+                                    ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
+                                    : '₹ ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Palette.primaryblue,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -1940,25 +1561,33 @@ Widget _buildProductCard(Product product) {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          // Display attributes with icons
+                          
+                          // Show attributes with icons like in details page
                           if (attributeValues.isNotEmpty)
                             Column(
                               children: [
-                                // First row: Year, Owners, KM
+                                // First row of attributes
                                 Row(
                                   children: [
+                                    // Year
                                     if (attributeValues['Year'] != null && attributeValues['Year']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.calendar_today,
                                         attributeValues['Year']!,
                                       ),
+                                    
                                     const SizedBox(width: 4),
+                                    
+                                    // Owner
                                     if (attributeValues['No of owners'] != null && attributeValues['No of owners']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.person,
                                         attributeValues['No of owners']!,
                                       ),
+                                    
                                     const SizedBox(width: 4),
+                                    
+                                    // KM
                                     if (attributeValues['KM Range'] != null && attributeValues['KM Range']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.speed,
@@ -1966,16 +1595,22 @@ Widget _buildProductCard(Product product) {
                                       ),
                                   ],
                                 ),
+                                
                                 const SizedBox(height: 4),
-                                // Second row: Fuel Type, Transmission
+                                
+                                // Second row of attributes
                                 Row(
                                   children: [
+                                    // Fuel Type
                                     if (attributeValues['Fuel Type'] != null && attributeValues['Fuel Type']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.local_gas_station,
                                         attributeValues['Fuel Type']!,
                                       ),
+                                    
                                     const SizedBox(width: 4),
+                                    
+                                    // Transmission
                                     if (attributeValues['Transmission'] != null && attributeValues['Transmission']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.settings,
