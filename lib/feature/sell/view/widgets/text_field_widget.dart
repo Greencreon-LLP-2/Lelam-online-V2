@@ -5,30 +5,31 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 class CustomFormField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
-  final IconData prefixIcon;
+  final IconData? prefixIcon; // made nullable
   final String? Function(String?)? validator;
   final int? maxLines;
   final bool? isNumberInput;
   final bool alignLabelWithHint;
   final bool isRequired;
+  final void Function(String)? onChanged; // fixed type
 
   const CustomFormField({
     super.key,
     required this.controller,
     required this.label,
-    required this.prefixIcon,
+    this.prefixIcon, // not required anymore
     this.validator,
     this.maxLines = 1,
     this.isNumberInput = false,
     this.alignLabelWithHint = false,
     this.isRequired = false,
+    this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        // color: Colors.grey.shade50,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.shade300,
@@ -44,13 +45,11 @@ class CustomFormField extends StatelessWidget {
         keyboardType:
             isNumberInput == true ? TextInputType.number : TextInputType.text,
         inputFormatters:
-            isNumberInput == true
-                ? [FilteringTextInputFormatter.digitsOnly]
-                : null,
+            isNumberInput == true ? [FilteringTextInputFormatter.digitsOnly] : null,
         decoration: InputDecoration(
           labelText: isRequired ? '$label *' : label,
           alignLabelWithHint: alignLabelWithHint,
-          prefixIcon: Icon(prefixIcon),
+          prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null, // ✅ optional
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -63,14 +62,14 @@ class CustomFormField extends StatelessWidget {
           filled: true,
           fillColor: Colors.grey.shade50,
         ),
-        validator:
-            validator ??
+        validator: validator ??
             (value) {
               if (isRequired && (value == null || value.isEmpty)) {
                 return 'Please enter ${label.toLowerCase()}';
               }
               return null;
             },
+        onChanged: onChanged,
       ),
     );
   }

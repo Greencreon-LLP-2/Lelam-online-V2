@@ -6,7 +6,7 @@ class CustomDropdownWidget<T> extends StatelessWidget {
   final T? value;
   final List<T> items;
   final void Function(T?) onChanged;
-  final IconData prefixIcon;
+  final IconData? prefixIcon;
   final bool isRequired;
   final String? Function(T?)? validator;
   final String Function(T) itemToString;
@@ -17,13 +17,14 @@ class CustomDropdownWidget<T> extends StatelessWidget {
     required this.value,
     required this.items,
     required this.onChanged,
-    required this.prefixIcon,
+    this.prefixIcon,
     this.isRequired = false,
     this.validator,
     required this.itemToString,
+    required String hintText,
   });
 
-@override
+  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -40,7 +41,7 @@ class CustomDropdownWidget<T> extends StatelessWidget {
         value: items.contains(value) ? value : null, // Ensure value is valid
         decoration: InputDecoration(
           labelText: isRequired ? '$label *' : label,
-          prefixIcon: Icon(prefixIcon),
+         // prefixIcon: Icon(prefixIcon),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -53,21 +54,23 @@ class CustomDropdownWidget<T> extends StatelessWidget {
           filled: true,
           fillColor: Colors.grey.shade50,
         ),
-        items: items.isEmpty
-            ? [
-                DropdownMenuItem<T>(
-                  value: null,
-                  child: Text('No options available'),
-                )
-              ]
-            : items.map((T item) {
-                return DropdownMenuItem<T>(
-                  value: item,
-                  child: Text(itemToString(item)),
-                );
-              }).toList(),
+        items:
+            items.isEmpty
+                ? [
+                  DropdownMenuItem<T>(
+                    value: null,
+                    child: Text('No options available'),
+                  ),
+                ]
+                : items.map((T item) {
+                  return DropdownMenuItem<T>(
+                    value: item,
+                    child: Text(itemToString(item)),
+                  );
+                }).toList(),
         onChanged: items.isEmpty ? null : onChanged, // Disable if no items
-        validator: validator ??
+        validator:
+            validator ??
             (value) {
               if (isRequired && value == null) {
                 return 'Please select a ${label.toLowerCase()}';

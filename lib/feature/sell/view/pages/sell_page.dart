@@ -99,8 +99,7 @@ class _SellPageState extends State<SellPage> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final category = categories[index];
-                      final fallback =
-                          _fallbackCategories[category.id] ??
+                      final fallback = _fallbackCategories[category.id] ??
                           const CategoryItem(
                             name: 'Unknown',
                             icon: Icons.help_outline,
@@ -112,10 +111,9 @@ class _SellPageState extends State<SellPage> {
                           name: category.name,
                           icon: fallback.icon,
                           color: fallback.color,
-                          imageUrl:
-                              'https://lelamonline.com/admin/${category.image}',
+                          imageUrl: 'https://lelamonline.com/admin/${category.image}',
                         ),
-                        onTap: () => _navigateToAdPost(context, category.name),
+                        onTap: () => _navigateToAdPost(context, category.id), // Pass category.id
                       );
                     },
                   );
@@ -128,8 +126,8 @@ class _SellPageState extends State<SellPage> {
     );
   }
 
-  void _navigateToAdPost(BuildContext context, String categoryName) {
-    context.pushNamed(RouteNames.adPostPage, extra: categoryName);
+  void _navigateToAdPost(BuildContext context, String categoryId) {
+    context.pushNamed(RouteNames.adPostPage, extra: categoryId); // Pass categoryId
   }
 }
 
@@ -171,22 +169,17 @@ class _CategoryCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: categoryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
-                    image:
-                        category.imageUrl != null
-                            ? DecorationImage(
-                              image: NetworkImage(category.imageUrl!),
-                              fit: BoxFit.cover,
-                              onError:
-                                  (exception, stackTrace) => const AssetImage(
-                                    'assets/placeholder.png',
-                                  ),
-                            )
-                            : null,
+                    image: category.imageUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(category.imageUrl!),
+                            fit: BoxFit.cover,
+                            onError: (exception, stackTrace) => const AssetImage('assets/placeholder.png'),
+                          )
+                        : null,
                   ),
-                  child:
-                      category.imageUrl == null
-                          ? Icon(category.icon, color: categoryColor, size: 28)
-                          : null,
+                  child: category.imageUrl == null
+                      ? Icon(category.icon, color: categoryColor, size: 28)
+                      : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(

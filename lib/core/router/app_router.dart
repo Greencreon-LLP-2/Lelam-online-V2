@@ -86,10 +86,10 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.sellerProfilePage,
     ),
     GoRoute(
-      path: RouteNames.adPostPage,
+      path: '/ad-post',
       builder:
           (context, state) =>
-              AdPostPage(category: state.extra as String? ?? ''),
+              AdPostPage(categoryId: state.extra as String? ?? '1'),
       name: RouteNames.adPostPage,
     ),
     GoRoute(
