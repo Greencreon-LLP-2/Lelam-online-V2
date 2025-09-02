@@ -1,36 +1,43 @@
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
-class MarketPlaceProductDetailsPage extends StatefulWidget {
-  final dynamic product;
+class RealEstateProductDetailsPage extends StatefulWidget {
+  final MarketplacePost product;
   final bool isAuction;
 
-  const MarketPlaceProductDetailsPage({
+  const RealEstateProductDetailsPage({
     super.key,
     required this.product,
     this.isAuction = false,
   });
 
   @override
-  State<MarketPlaceProductDetailsPage> createState() =>
-      _MarketPlaceProductDetailsPageState();
+  State<RealEstateProductDetailsPage> createState() =>
+      _RealEstateProductDetailsPageState();
 }
 
-class _MarketPlaceProductDetailsPageState
-    extends State<MarketPlaceProductDetailsPage> {
+class _RealEstateProductDetailsPageState
+    extends State<RealEstateProductDetailsPage> {
   List<Attribute> attributes = [];
   List<AttributeVariation> attributeVariations = [];
   bool isLoadingDetails = false;
   Map<String, String> attributeValues = {};
   List<MapEntry<String, String>> orderedAttributeValues = [];
+
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
@@ -40,10 +47,19 @@ class _MarketPlaceProductDetailsPageState
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
 
+  String sellerName = 'Unknown';
+  String? sellerProfileImage;
+  int sellerNoOfPosts = 0;
+  String sellerActiveFrom = 'N/A';
+  bool isLoadingSeller = true;
+  String sellerErrorMessage = '';
+
+
   @override
   void initState() {
     super.initState();
     _fetchDetailsData();
+      _fetchSellerInfo();
   }
 
   @override
@@ -52,6 +68,48 @@ class _MarketPlaceProductDetailsPageState
     _transformationController.dispose();
     super.dispose();
   }
+
+Future<void> _fetchSellerInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' &&
+            jsonResponse['data'] is List &&
+            jsonResponse['data'].isNotEmpty) {
+          final data = jsonResponse['data'][0];
+          setState(() {
+            sellerName = data['name'] ?? 'Unknown';
+            sellerProfileImage = data['profile_image'];
+            sellerNoOfPosts = data['no_post'] ?? 0;
+            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            isLoadingSeller = false;
+          });
+        } else {
+          setState(() {
+            sellerErrorMessage = 'Invalid seller data';
+            isLoadingSeller = false;
+          });
+        }
+      } else {
+        setState(() {
+          sellerErrorMessage = 'Failed to load seller information';
+          isLoadingSeller = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        sellerErrorMessage = 'Error: $e';
+        isLoadingSeller = false;
+      });
+    }
+  }
+
 
   Future<void> _fetchDetailsData() async {
     setState(() {
@@ -71,6 +129,7 @@ class _MarketPlaceProductDetailsPageState
       attributeVariations = await ApiService.fetchAttributeVariations(
         widget.product.filters,
       );
+
       final attributeValuePairs =
           await AttributeValueService.fetchAttributeValuePairs();
 
@@ -90,195 +149,69 @@ class _MarketPlaceProductDetailsPageState
   }
 
   void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters as Map<String, dynamic>;
+    final filters = widget.product.filters;
     attributeValues.clear();
     orderedAttributeValues.clear();
 
     print('Attribute Value Pairs: $attributeValuePairs');
-    print(
-      'Attribute Variations: ${attributeVariations.map((v) => {'id': v.id, 'attribute_id': v.attributeId, 'name': v.name}).toList()}',
-    );
+    print('Attribute Variations: $attributeVariations');
     print('Filters: $filters');
 
     final Set<String> processedAttributes = {};
 
-    // Process attribute value pairs from API
-    for (var pair in attributeValuePairs) {
-      if (pair.attributeName.isNotEmpty &&
-          pair.attributeValue.isNotEmpty &&
-          !processedAttributes.contains(pair.attributeName)) {
-        attributeValues[pair.attributeName] = pair.attributeValue;
-        orderedAttributeValues.add(
-          MapEntry(pair.attributeName, pair.attributeValue),
+    // Map seller type from byDealer field
+    attributeValues['Seller Type'] =
+        widget.product.byDealer == '1' ? 'Dealer' : 'Owner';
+    orderedAttributeValues.add(
+      MapEntry('Seller Type', attributeValues['Seller Type']!),
+    );
+    processedAttributes.add('Seller Type');
+
+    // Map filters to attribute names and values
+    for (var attribute in attributes) {
+      final attributeId = attribute.id;
+      if (filters.containsKey(attributeId) &&
+          filters[attributeId]!.isNotEmpty &&
+          filters[attributeId]!.first.isNotEmpty) {
+        final filterValue = filters[attributeId]!.first;
+        // Check if the filter value is an ID that needs mapping
+        final variation = attributeVariations.firstWhere(
+          (variation) => variation.id == filterValue,
+          orElse:
+              () => AttributeVariation(
+                id: '',
+                name: filterValue,
+                attributeId: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ), // Fallback to filter value if no mapping
         );
-        processedAttributes.add(pair.attributeName);
-        print('Added from API: ${pair.attributeName} = ${pair.attributeValue}');
-      } else {
-        print('Skipped API pair: ${pair.attributeName} (duplicate or invalid)');
+        final value = variation.name.isNotEmpty ? variation.name : filterValue;
+        attributeValues[attribute.name] = value;
+        orderedAttributeValues.add(MapEntry(attribute.name, value));
+        processedAttributes.add(attribute.name);
+        print('Added from filters: ${attribute.name} = $value');
       }
     }
 
-    // Process KM Range (ID 3) specially
-    if (filters.containsKey('3')) {
-      String variationId;
-      if (filters['3'] is String) {
-        variationId = filters['3'] as String; // Handle string value
-      } else if (filters['3'] is List<dynamic> &&
-          (filters['3'] as List).isNotEmpty) {
-        variationId = (filters['3'] as List)[0].toString();
-      } else {
-        variationId = '';
-      }
-      if (variationId.isNotEmpty) {
-        attributeValues['KM Range'] = variationId;
-        final kmIndex = orderedAttributeValues.indexWhere(
-          (entry) => entry.key == 'KM Range',
-        );
-        if (kmIndex != -1) {
-          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
-        } else {
-          orderedAttributeValues.add(MapEntry('KM Range', variationId));
-        }
-        processedAttributes.add('KM Range');
-        print('Added KM Range from filters: $variationId');
-      }
-    }
-
-    // Process other filters
-    filters.forEach((attributeId, variation) {
-      if (attributeId != '3') {
-        String variationId;
-        if (variation is String) {
-          variationId = variation; // Handle string value
-        } else if (variation is List<dynamic> && variation.isNotEmpty) {
-          variationId = variation[0].toString();
-        } else {
-          print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
-          return;
-        }
-
-        if (variationId.isNotEmpty) {
-          final attribute = attributes.firstWhere(
-            (attr) => attr.id == attributeId,
-            orElse:
-                () => Attribute(
-                  id: attributeId,
-                  slug: '',
-                  name: _getAttributeNameFromId(attributeId),
-                  listOrder: '',
-                  categoryId: '',
-                  formValidation: '',
-                  ifDetailsIcons: '',
-                  detailsIcons: '',
-                  detailsIconsOrder: '',
-                  showFilter: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          if (!processedAttributes.contains(attribute.name)) {
-            final variationObj = attributeVariations.firstWhere(
-              (varAttr) =>
-                  varAttr.id == variationId &&
-                  varAttr.attributeId == attributeId,
-              orElse:
-                  () => AttributeVariation(
-                    id: variationId,
-                    attributeId: attributeId,
-                    name: '',
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
-            );
-            print(
-              'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variationObj.name}',
-            );
-            if (variationObj.name.isNotEmpty &&
-                variationObj.name != variationId) {
-              attributeValues[attribute.name] = variationObj.name;
-              orderedAttributeValues.add(
-                MapEntry(attribute.name, variationObj.name),
-              );
-              processedAttributes.add(attribute.name);
-              print(
-                'Added from variations: ${attribute.name} = ${variationObj.name}',
-              );
-            } else {
-              print(
-                'Skipped variation: ${attribute.name} (invalid name or ID match)',
-              );
-            }
-          }
-        }
-      }
-    });
-
-    print('Final attributeValues: $attributeValues');
-    print('Final orderedAttributeValues: $orderedAttributeValues');
-  }
-
-  String _getAttributeNameFromId(String id) {
-    switch (id) {
-      case '1':
-        return 'Year';
-      case '2':
-        return 'No of owners';
-      case '3':
-        return 'KM Range';
-      case '4':
-        return 'Fuel Type';
-      case '5':
-        return 'Transmission';
-      case '6':
-        return 'Service History';
-      case '7':
-        return 'Accident History';
-      case '8':
-        return 'Replacements';
-      case '9':
-        return 'Flood Affected';
-      case '10':
-        return 'Engine Condition';
-      case '11':
-        return 'Transmission Condition';
-      case '12':
-        return 'Suspension Condition';
-      case '13':
-        return 'Features';
-      case '14':
-        return 'Functions';
-      case '15':
-        return 'Battery';
-      case '16':
-        return 'Driver side front tyre';
-      case '17':
-        return 'Driver side rear tyre';
-      case '18':
-        return 'Co driver side front tyre';
-      case '19':
-        return 'Co driver side rear tyre';
-      case '20':
-        return 'Rust';
-      case '21':
-        return 'Emission Norms';
-      case '22':
-        return 'Status Of RC';
-      case '23':
-        return 'Registration valid till';
-      case '24':
-        return 'Insurance Type';
-      case '25':
-        return 'Insurance Upto';
-      case '26':
-        return 'Scratches';
-      case '27':
-        return 'Dents';
-      case '28':
-        return 'Sold by';
-      default:
-        return 'Unknown Attribute';
+    // Add auction-specific attributes if isAuction is true
+    if (widget.isAuction) {
+      attributeValues['Auction Starting Price'] = formatPriceInt(
+        double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+      );
+      attributeValues['Auction Attempts'] = widget.product.auctionAttempt;
+      orderedAttributeValues.add(
+        MapEntry(
+          'Auction Starting Price',
+          attributeValues['Auction Starting Price']!,
+        ),
+      );
+      orderedAttributeValues.add(
+        MapEntry('Auction Attempts', attributeValues['Auction Attempts']!),
+      );
+      processedAttributes.add('Auction Starting Price');
+      processedAttributes.add('Auction Attempts');
     }
   }
 
@@ -306,45 +239,23 @@ class _MarketPlaceProductDetailsPageState
     return location.name;
   }
 
-  String get id => _getProperty('id') ?? '';
-  String get title => _getProperty('title') ?? '';
-  String get image => _getProperty('image') ?? '';
-  String get price => _getProperty('price') ?? '0';
-  String get landMark => _getProperty('landMark') ?? '';
-  String get createdOn => _getProperty('createdOn') ?? '';
-  String get createdBy => _getProperty('createdBy') ?? '';
-  String get byDealer => _getProperty('byDealer') ?? '0';
-
-  dynamic _getProperty(String propertyName) {
-    if (widget.product == null) return null;
-    switch (propertyName) {
-      case 'id':
-        return widget.product.id;
-      case 'title':
-        return widget.product.title;
-      case 'image':
-        return widget.product.image;
-      case 'price':
-        return widget.product.price;
-      case 'landMark':
-        return _getLocationName(widget.product.parentZoneId);
-      case 'createdOn':
-        return widget.product.createdOn;
-      case 'createdBy':
-        return widget.product.createdBy;
-      case 'byDealer':
-        return widget.product.byDealer;
-      default:
-        return null;
-    }
-  }
+  String get id => widget.product.id;
+  String get title => widget.product.title;
+  String get image => widget.product.image;
+  String get price => widget.product.price;
+  String get landMark => _getLocationName(widget.product.parentZoneId);
+  String get createdOn => widget.product.createdOn;
+  String get createdBy => widget.product.createdBy;
+  String get byDealer => widget.product.byDealer;
+  bool get isFinanceAvailable => widget.product.ifFinance == '1';
+  bool get isFeatured => widget.product.feature == '1';
 
   List<String> get _images {
     if (image.isNotEmpty) {
       return ['https://lelamonline.com/admin/$image'];
     }
     return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+      'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?cs=srgb&dl=pexels-binyamin-mellish-106399.jpg&fm=jpg',
     ];
   }
 
@@ -647,28 +558,6 @@ class _MarketPlaceProductDetailsPageState
     return formatter.format(price.round());
   }
 
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-      case '1st Owner':
-        return '1st Owner';
-      case '2':
-      case '2nd Owner':
-        return '2nd Owner';
-      case '3':
-      case '3rd Owner':
-        return '3rd Owner';
-      default:
-        return owners.isNotEmpty ? owners : 'N/A';
-    }
-  }
-
-  String _formatNumber(String value) {
-    if (value == 'N/A') return 'N/A';
-    final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
-    return '$number KM';
-  }
-
   Widget _buildDetailItem(IconData icon, String text) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -702,54 +591,66 @@ class _MarketPlaceProductDetailsPageState
     );
   }
 
-  Widget _buildSellerInformationItem(
-    String name,
-    String memberSince,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSellerInformationItem(BuildContext context) {
+    return isLoadingSeller
+        ? const Center(child: CircularProgressIndicator())
+        : sellerErrorMessage.isNotEmpty
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.product.createdBy),
+              ),
+            );
+          },
+          child: Row(
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                memberSince,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  // Navigate to seller profile
-                },
-                child: const Text(
-                  'SEE PROFILE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             ],
           ),
-        ),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
-    );
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -780,6 +681,10 @@ class _MarketPlaceProductDetailsPageState
         ),
       ],
     );
+  }
+
+  String _stripHtmlTags(String htmlString) {
+    return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
   }
 
   @override
@@ -847,6 +752,30 @@ class _MarketPlaceProductDetailsPageState
                               ),
                             ),
                           ),
+                          if (isFeatured)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white),
+                                ),
+                                child: const Text(
+                                  'FEATURED',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -933,13 +862,25 @@ class _MarketPlaceProductDetailsPageState
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        widget.isAuction
+                            ? 'Starting Bid: ₹${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)}'
+                            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.blueAccent,
                         ),
                       ),
+                      if (widget.isAuction) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Max Bid: ₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -964,6 +905,28 @@ class _MarketPlaceProductDetailsPageState
                           ),
                         ],
                       ),
+                      if (isFinanceAvailable)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance,
+                                size: 16,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Finance Available',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -999,57 +962,17 @@ class _MarketPlaceProductDetailsPageState
                         else
                           Column(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.person,
-                                      _getOwnerText(
-                                        attributeValues['No of owners'] ??
-                                            'N/A',
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        attributeValues['KM Range'] ?? 'N/A',
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              _buildDetailItem(
+                                Icons.person,
+                                attributeValues['Seller Type'] ?? 'N/A',
                               ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.settings,
-                                      attributeValues['Transmission'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.build,
-                                      attributeValues['Engine Condition'] ??
-                                          'N/A',
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              if (widget.isAuction) ...[
+                                const SizedBox(height: 12),
+                                _buildDetailItem(
+                                  Icons.gavel,
+                                  'Attempts: ${attributeValues['Auction Attempts'] ?? '0'}/3',
+                                ),
+                              ],
                             ],
                           ),
                       ],
@@ -1078,19 +1001,39 @@ class _MarketPlaceProductDetailsPageState
                               orderedAttributeValues
                                   .where(
                                     (entry) =>
-                                        entry.value != 'N/A' &&
-                                        entry.key != 'Co driver side rear tyre',
+                                        entry.key != 'Seller Type' &&
+                                        entry.key != 'Auction Starting Price' &&
+                                        entry.key != 'Auction Attempts',
                                   )
                                   .map(
                                     (entry) => _buildSellerCommentItem(
                                       entry.key,
-                                      entry.key == 'No of owners'
-                                          ? _getOwnerText(entry.value)
-                                          : entry.value,
+                                      entry.value,
                                     ),
                                   )
                                   .toList(),
                         ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Description',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _stripHtmlTags(widget.product.description),
+                        style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      ),
                     ],
                   ),
                 ),
@@ -1109,8 +1052,7 @@ class _MarketPlaceProductDetailsPageState
                       ),
                       const SizedBox(height: 12),
                       _buildSellerInformationItem(
-                        createdBy,
-                        'Member Since $createdOn',
+                      
                         context,
                       ),
                     ],
@@ -1144,7 +1086,6 @@ class _MarketPlaceProductDetailsPageState
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
-                // No background color
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -1156,22 +1097,22 @@ class _MarketPlaceProductDetailsPageState
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Contact seller functionality
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primarypink,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                      ),
-                      child: const Text('Place Bid'),
-                    ),
-                  ),
+                          Expanded(
+  child: ElevatedButton(
+    onPressed: () {
+      showBidDialog(context); // Call the dialog function
+    },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Palette.primarypink,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 0),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+    ),
+    child: const Text('Place Bid'),
+  ),
+),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),

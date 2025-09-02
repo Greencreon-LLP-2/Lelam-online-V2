@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/categories/commercial/commercial_categories.dart';
-import 'package:lelamonline_flutter/feature/categories/real%20estate/real_estate_categories.dart';
-import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 
 class CategoriesPage extends StatelessWidget {
   const CategoriesPage({super.key});

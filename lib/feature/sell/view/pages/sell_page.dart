@@ -1,48 +1,63 @@
-// ignore_for_file: deprecated_member_use
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
+import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 
 class CategoryItem {
   final String name;
-  final IconData icon;
+  final IconData? icon; // Optional local icon for fallback
   final Color? color;
+  final String? imageUrl; // Network image URL
 
-  const CategoryItem({required this.name, required this.icon, this.color});
+  const CategoryItem({
+    required this.name,
+    this.icon,
+    this.color,
+    this.imageUrl,
+  });
 }
 
-class SellPage extends StatelessWidget {
+class SellPage extends StatefulWidget {
   const SellPage({super.key});
 
-  static const List<CategoryItem> _categories = [
-    CategoryItem(
+  @override
+  State<SellPage> createState() => _SellPageState();
+}
+
+class _SellPageState extends State<SellPage> {
+  late Future<List<CategoryModel>> _categoriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoriesFuture = CategoryService().fetchCategories();
+  }
+
+  // Fallback icons and colors for categories based on ID
+  final Map<String, CategoryItem> _fallbackCategories = {
+    '1': const CategoryItem(
       name: 'Used Cars',
       icon: Icons.directions_car_outlined,
       color: Colors.blue,
     ),
-    CategoryItem(
+    '2': const CategoryItem(
       name: 'Real Estate',
       icon: Icons.home_work_outlined,
       color: Colors.green,
     ),
-    CategoryItem(
+    '3': const CategoryItem(
       name: 'Commercial Vehicles',
       icon: Icons.local_shipping_outlined,
       color: Colors.orange,
     ),
-    CategoryItem(
-      name: 'Mobile Phones',
-      icon: Icons.smartphone_outlined,
-      color: Colors.purple,
-    ),
-    CategoryItem(
+    '4': const CategoryItem(
       name: 'Other',
       icon: Icons.more_horiz_outlined,
       color: Colors.grey,
     ),
-  ];
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -65,15 +80,44 @@ class SellPage extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                itemCount: _categories.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  return _CategoryCard(
-                    category: category,
-                    onTap: () => _navigateToAdPost(context, category.name),
+              child: FutureBuilder<List<CategoryModel>>(
+                future: _categoriesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No categories found'));
+                  }
+
+                  final categories = snapshot.data!;
+
+                  return ListView.separated(
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: categories.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      final fallback =
+                          _fallbackCategories[category.id] ??
+                          const CategoryItem(
+                            name: 'Unknown',
+                            icon: Icons.help_outline,
+                            color: Colors.grey,
+                          );
+
+                      return _CategoryCard(
+                        category: CategoryItem(
+                          name: category.name,
+                          icon: fallback.icon,
+                          color: fallback.color,
+                          imageUrl:
+                              'https://lelamonline.com/admin/${category.image}',
+                        ),
+                        onTap: () => _navigateToAdPost(context, category.name),
+                      );
+                    },
                   );
                 },
               ),
@@ -127,8 +171,22 @@ class _CategoryCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: categoryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
+                    image:
+                        category.imageUrl != null
+                            ? DecorationImage(
+                              image: NetworkImage(category.imageUrl!),
+                              fit: BoxFit.cover,
+                              onError:
+                                  (exception, stackTrace) => const AssetImage(
+                                    'assets/placeholder.png',
+                                  ),
+                            )
+                            : null,
                   ),
-                  child: Icon(category.icon, color: categoryColor, size: 28),
+                  child:
+                      category.imageUrl == null
+                          ? Icon(category.icon, color: categoryColor, size: 28)
+                          : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(

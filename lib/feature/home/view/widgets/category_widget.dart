@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:lelamonline_flutter/feature/categories/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
-import 'package:lelamonline_flutter/feature/categories/other_category/other_categoty.dart';
-import 'package:lelamonline_flutter/feature/categories/real%20estate/real_estate_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
-import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 
 class CategoryWidget extends StatefulWidget {
   const CategoryWidget({super.key});

@@ -26,3 +26,6 @@ const String attribute =
     '$baseUrl/filter-attribute.php?token=$token&category_id=0';
 const String attributeVariations =
     '$baseUrl/filter-attribute-variations.php?token=$token';
+
+//seller information
+

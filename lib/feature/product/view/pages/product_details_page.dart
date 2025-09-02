@@ -1,13 +1,21 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+
+const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
 class ProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -39,10 +47,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
 
+  String sellerName = 'Unknown';
+  String? sellerProfileImage;
+  int sellerNoOfPosts = 0;
+  String sellerActiveFrom = 'N/A';
+  bool isLoadingSeller = true;
+  String sellerErrorMessage = '';
+
   @override
   void initState() {
     super.initState();
     _fetchDetailsData();
+    _fetchSellerInfo();
   }
 
   @override
@@ -50,6 +66,47 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchSellerInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' &&
+            jsonResponse['data'] is List &&
+            jsonResponse['data'].isNotEmpty) {
+          final data = jsonResponse['data'][0];
+          setState(() {
+            sellerName = data['name'] ?? 'Unknown';
+            sellerProfileImage = data['profile_image'];
+            sellerNoOfPosts = data['no_post'] ?? 0;
+            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            isLoadingSeller = false;
+          });
+        } else {
+          setState(() {
+            sellerErrorMessage = 'Invalid seller data';
+            isLoadingSeller = false;
+          });
+        }
+      } else {
+        setState(() {
+          sellerErrorMessage = 'Failed to load seller information';
+          isLoadingSeller = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        sellerErrorMessage = 'Error: $e';
+        isLoadingSeller = false;
+      });
+    }
   }
 
   Future<void> _fetchDetailsData() async {
@@ -649,9 +706,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String _formatNumber(String value) {
     final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
-    final formatter = NumberFormat.decimalPattern(
-      'en_IN',
-    );
+    final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(number);
   }
 
@@ -688,54 +743,66 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
-  Widget _buildSellerInformationItem(
-    String name,
-    String memberSince,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSellerInformationItem(BuildContext context) {
+    return isLoadingSeller
+        ? const Center(child: CircularProgressIndicator())
+        : sellerErrorMessage.isNotEmpty
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.product.createdBy),
+              ),
+            );
+          },
+          child: Row(
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                memberSince,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  // Navigate to seller profile
-                },
-                child: const Text(
-                  'SEE PROFILE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             ],
           ),
-        ),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
-    );
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -1094,11 +1161,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(
-                        createdBy,
-                        'Member Since $createdOn',
-                        context,
-                      ),
+                      _buildSellerInformationItem(context), // Updated call
                     ],
                   ),
                 ),
@@ -1142,22 +1205,22 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Contact seller functionality
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primarypink,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                      ),
-                      child: const Text('Place Bid'),
-                    ),
-                  ),
+              Expanded(
+  child: ElevatedButton(
+    onPressed: () {
+      showBidDialog(context); // Call the dialog function
+    },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Palette.primarypink,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 0),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+    ),
+    child: const Text('Place Bid'),
+  ),
+),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),

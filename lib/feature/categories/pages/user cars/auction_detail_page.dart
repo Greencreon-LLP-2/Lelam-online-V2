@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/feature/categories/user%20cars/used_cars_categorie.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
   const AuctionProductDetailsPage({super.key, required Product product});

@@ -1,35 +1,64 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/feature/categories/other_category/other_categoty.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
+    hide baseUrl, token;
+import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
+import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 
-class BikeDetailsPage extends StatefulWidget {
-  final Bike bike;
+class CommercialVehicleDetailsPage extends StatefulWidget {
+  final MarketplacePost post;
+  final bool isAuction;
 
-  const BikeDetailsPage({super.key, required this.bike});
+  const CommercialVehicleDetailsPage({
+    super.key,
+    required this.post,
+    this.isAuction = false,
+  });
 
   @override
-  State<BikeDetailsPage> createState() => _BikeDetailsPageState();
+  State<CommercialVehicleDetailsPage> createState() =>
+      _CommercialVehicleDetailsPageState();
 }
 
-class _BikeDetailsPageState extends State<BikeDetailsPage> {
-  bool _isLoadingLocations = true;
-  List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
+class _CommercialVehicleDetailsPageState
+    extends State<CommercialVehicleDetailsPage> {
+  List<Attribute> attributes = [];
+  List<AttributeVariation> attributeVariations = [];
+  bool isLoadingDetails = false;
+  Map<String, String> attributeValues = {};
+  List<MapEntry<String, String>> orderedAttributeValues = [];
+
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  bool _isLoadingLocations = true;
+  List<LocationData> _locations = [];
+  final LocationService _locationService = LocationService();
+
+  String sellerName = 'Unknown';
+  String? sellerProfileImage;
+  int sellerNoOfPosts = 0;
+  String sellerActiveFrom = 'N/A';
+  bool isLoadingSeller = true;
+  String sellerErrorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _fetchLocations();
+    _fetchDetailsData();
+    _fetchSellerInfo();
   }
 
   @override
@@ -39,75 +68,191 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchLocations() async {
+  Future<void> _fetchSellerInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.post.createdBy}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' &&
+            jsonResponse['data'] is List &&
+            jsonResponse['data'].isNotEmpty) {
+          final data = jsonResponse['data'][0];
+          setState(() {
+            sellerName = data['name'] ?? 'Unknown';
+            sellerProfileImage = data['profile_image'];
+            sellerNoOfPosts = data['no_post'] ?? 0;
+            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            isLoadingSeller = false;
+          });
+        } else {
+          setState(() {
+            sellerErrorMessage = 'Invalid seller data';
+            isLoadingSeller = false;
+          });
+        }
+      } else {
+        setState(() {
+          sellerErrorMessage = 'Failed to load seller information';
+          isLoadingSeller = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        sellerErrorMessage = 'Error: $e';
+        isLoadingSeller = false;
+      });
+    }
+  }
+
+  Future<void> _fetchDetailsData() async {
     setState(() {
+      isLoadingDetails = true;
       _isLoadingLocations = true;
     });
 
     try {
       final locationResponse = await _locationService.fetchLocations();
       if (locationResponse != null && locationResponse.status) {
-        setState(() {
-          _locations = locationResponse.data;
-          _isLoadingLocations = false;
-        });
+        _locations = locationResponse.data;
       } else {
         throw Exception('Failed to load locations');
       }
-    } catch (e) {
-      print('Error fetching locations: $e');
+
+      attributes = await ApiService.fetchAttributes();
+      attributeVariations = await ApiService.fetchAttributeVariations(
+        widget.post.filters,
+      );
+
+      final attributeValuePairs =
+          await AttributeValueService.fetchAttributeValuePairs();
+
+      _mapFiltersToValues(attributeValuePairs);
+
       setState(() {
+        isLoadingDetails = false;
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      print('Error fetching details: $e');
+      setState(() {
+        isLoadingDetails = false;
         _isLoadingLocations = false;
       });
     }
   }
 
+  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
+    final filters = widget.post.filters;
+    attributeValues.clear();
+    orderedAttributeValues.clear();
+
+    print('Attribute Value Pairs: $attributeValuePairs');
+    print('Attribute Variations: $attributeVariations');
+    print('Filters: $filters');
+
+    final Set<String> processedAttributes = {};
+
+    // Map seller type from byDealer field
+    attributeValues['Seller Type'] =
+        widget.post.byDealer == '1' ? 'Dealer' : 'Owner';
+    orderedAttributeValues.add(
+      MapEntry('Seller Type', attributeValues['Seller Type']!),
+    );
+    processedAttributes.add('Seller Type');
+
+    // Map filters to attribute names and values
+    for (var attribute in attributes) {
+      final attributeId = attribute.id;
+      if (filters.containsKey(attributeId) &&
+          filters[attributeId]!.isNotEmpty &&
+          filters[attributeId]!.first.isNotEmpty) {
+        final filterValue = filters[attributeId]!.first;
+        final variation = attributeVariations.firstWhere(
+          (variation) => variation.id == filterValue,
+          orElse:
+              () => AttributeVariation(
+                id: '',
+                name: filterValue,
+                attributeId: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        );
+        final value = variation.name.isNotEmpty ? variation.name : filterValue;
+        attributeValues[attribute.name] = value;
+        orderedAttributeValues.add(MapEntry(attribute.name, value));
+        processedAttributes.add(attribute.name);
+        print('Added from filters: ${attribute.name} = $value');
+      }
+    }
+
+    // Add auction-specific attributes if isAuction is true
+    if (widget.isAuction) {
+      attributeValues['Auction Starting Price'] = formatPriceInt(
+        double.tryParse(widget.post.auctionStartingPrice) ?? 0,
+      );
+      attributeValues['Auction Attempts'] = widget.post.auctionAttempt;
+      orderedAttributeValues.add(
+        MapEntry(
+          'Auction Starting Price',
+          attributeValues['Auction Starting Price']!,
+        ),
+      );
+      orderedAttributeValues.add(
+        MapEntry('Auction Attempts', attributeValues['Auction Attempts']!),
+      );
+      processedAttributes.add('Auction Starting Price');
+      processedAttributes.add('Auction Attempts');
+    }
+  }
+
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
-    if (zoneId == '0') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
 
-  String get id => widget.bike.id;
-  String get title => widget.bike.title;
-  String get image => widget.bike.image;
-  String get price => widget.bike.price;
-  String get landMark => widget.bike.landMark;
-  String get createdOn => widget.bike.createdOn.split(' ')[0];
-  String get createdBy => widget.bike.createdBy;
-  bool get isFinanceAvailable => widget.bike.ifFinance == '1';
-  bool get isFeatured => widget.bike.feature == '1';
+  String get id => widget.post.id;
+  String get title => widget.post.title;
+  String get image => widget.post.image;
+  String get price => widget.post.price;
+  String get landMark => _getLocationName(widget.post.parentZoneId);
+  String get createdOn => widget.post.createdOn;
+  String get createdBy => widget.post.createdBy;
+  bool get isFinanceAvailable => widget.post.ifFinance == '1';
+  bool get isFeatured => widget.post.feature == '1';
 
   List<String> get _images {
     if (image.isNotEmpty) {
-      return [getImageUrl(image)];
+      return ['https://lelamonline.com/admin/$image'];
     }
     return [
       'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?cs=srgb&dl=pexels-binyamin-mellish-106399.jpg&fm=jpg',
     ];
-  }
-
-  String getImageUrl(String imagePath) {
-    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-    return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
   void _resetZoom() {
@@ -156,19 +301,21 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -195,7 +342,8 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -246,9 +394,10 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -259,21 +408,22 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -399,6 +549,12 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     );
   }
 
+  String getImageUrl(String imagePath) {
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    return 'https://lelamonline.com/admin/$cleanedPath';
+  }
+
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
@@ -437,54 +593,66 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     );
   }
 
-  Widget _buildSellerInformationItem(
-    String name,
-    String memberSince,
-    BuildContext context,
-  ) {
-    return Row(
-      children: [
-        const CircleAvatar(
-          backgroundImage: AssetImage('assets/images/avatar.gif'),
-          radius: 30,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSellerInformationItem(BuildContext context) {
+    return isLoadingSeller
+        ? const Center(child: CircularProgressIndicator())
+        : sellerErrorMessage.isNotEmpty
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.post.createdBy),
+              ),
+            );
+          },
+          child: Row(
             children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                memberSince,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () {
-                  // Navigate to seller profile
-                },
-                child: const Text(
-                  'SEE PROFILE',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blueAccent,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             ],
           ),
-        ),
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-      ],
-    );
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -517,23 +685,12 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     );
   }
 
-  // Parse filters from the API response
-  Map<String, dynamic> _parseFilters(String filtersJson) {
-    try {
-      if (filtersJson == 'null' || filtersJson.isEmpty) {
-        return {};
-      }
-      return jsonDecode(filtersJson);
-    } catch (e) {
-      print('Error parsing filters: $e');
-      return {};
-    }
+  String _stripHtmlTags(String htmlString) {
+    return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
   }
 
   @override
   Widget build(BuildContext context) {
-   // final filters = _parseFilters(widget.bike.filters);
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -565,11 +722,13 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.contain,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  placeholder:
+                                      (context, url) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                  errorWidget:
+                                      (context, url, error) =>
+                                          const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -680,16 +839,16 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -705,13 +864,25 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        widget.isAuction
+                            ? 'Starting Bid: ₹${formatPriceInt(double.tryParse(widget.post.auctionStartingPrice) ?? 0)}'
+                            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.blueAccent,
                         ),
                       ),
+                      if (widget.isAuction) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Max Bid: ₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -788,31 +959,63 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        Column(
-                          children: [
-                            _buildDetailItem(
-                              Icons.person,
-                              widget.bike.byDealer == '1' ? 'Dealer' : 'Owner',
-                            ),
-                            if (widget.bike.brand.isNotEmpty)
+                        if (isLoadingDetails)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Column(
+                            children: [
                               _buildDetailItem(
-                                Icons.branding_watermark,
-                                'Brand: ${widget.bike.brand}',
+                                Icons.person,
+                                attributeValues['Seller Type'] ?? 'N/A',
                               ),
-                            if (widget.bike.model.isNotEmpty)
-                              _buildDetailItem(
-                                Icons.directions_bike,
-                                'Model: ${widget.bike.model}',
-                              ),
-                            // if (filters.isNotEmpty)
-                            //   ...filters.entries.map((entry) => _buildDetailItem(
-                            //         Icons.info,
-                            //         '${entry.key}: ${entry.value}',
-                            //       )),
-                          ],
-                        ),
+                              if (widget.isAuction) ...[
+                                const SizedBox(height: 12),
+                                _buildDetailItem(
+                                  Icons.gavel,
+                                  'Attempts: ${attributeValues['Auction Attempts'] ?? '0'}/3',
+                                ),
+                              ],
+                            ],
+                          ),
                       ],
                     ),
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seller Comments',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (isLoadingDetails)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        Column(
+                          children:
+                              orderedAttributeValues
+                                  .where(
+                                    (entry) =>
+                                        entry.key != 'Seller Type' &&
+                                        entry.key != 'Auction Starting Price' &&
+                                        entry.key != 'Auction Attempts',
+                                  )
+                                  .map(
+                                    (entry) => _buildSellerCommentItem(
+                                      entry.key,
+                                      entry.value,
+                                    ),
+                                  )
+                                  .toList(),
+                        ),
+                    ],
                   ),
                 ),
                 const Divider(),
@@ -830,9 +1033,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        widget.bike.description.isNotEmpty
-                            ? widget.bike.description
-                            : 'No description available',
+                        _stripHtmlTags(widget.post.description),
                         style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                       ),
                     ],
@@ -852,11 +1053,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(
-                        'User ${createdBy}',
-                        'Member Since $createdOn',
-                        context,
-                      ),
+                      _buildSellerInformationItem(context),
                     ],
                   ),
                 ),
@@ -902,7 +1099,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Contact seller functionality
+                        showBidDialog(context); // Call the dialog function
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Palette.primarypink,
@@ -912,7 +1109,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                           borderRadius: BorderRadius.zero,
                         ),
                       ),
-                      child: const Text('Contact Seller'),
+                      child: const Text('Place Bid'),
                     ),
                   ),
                   Expanded(

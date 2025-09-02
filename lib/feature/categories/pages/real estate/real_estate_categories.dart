@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/feature/categories/real%20estate/real_estate_details_page.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/commercial/user%20cars/detail_page/auction_detail_page.dart';
-import 'package:lelamonline_flutter/feature/categories/user%20cars/market_used_cars_page.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 
 // MarketplacePost model (unchanged)
 class MarketplacePost {

@@ -23,7 +23,7 @@ class CustomDropdownWidget<T> extends StatelessWidget {
     required this.itemToString,
   });
 
-  @override
+@override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -37,7 +37,7 @@ class CustomDropdownWidget<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonFormField<T>(
-        value: value,
+        value: items.contains(value) ? value : null, // Ensure value is valid
         decoration: InputDecoration(
           labelText: isRequired ? '$label *' : label,
           prefixIcon: Icon(prefixIcon),
@@ -53,16 +53,21 @@ class CustomDropdownWidget<T> extends StatelessWidget {
           filled: true,
           fillColor: Colors.grey.shade50,
         ),
-        items:
-            items.map((T item) {
-              return DropdownMenuItem<T>(
-                value: item,
-                child: Text(itemToString(item)),
-              );
-            }).toList(),
-        onChanged: onChanged,
-        validator:
-            validator ??
+        items: items.isEmpty
+            ? [
+                DropdownMenuItem<T>(
+                  value: null,
+                  child: Text('No options available'),
+                )
+              ]
+            : items.map((T item) {
+                return DropdownMenuItem<T>(
+                  value: item,
+                  child: Text(itemToString(item)),
+                );
+              }).toList(),
+        onChanged: items.isEmpty ? null : onChanged, // Disable if no items
+        validator: validator ??
             (value) {
               if (isRequired && value == null) {
                 return 'Please select a ${label.toLowerCase()}';
