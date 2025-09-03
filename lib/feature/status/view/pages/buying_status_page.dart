@@ -4,7 +4,7 @@ import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 class BuyingStatusPage extends StatelessWidget {
-  const BuyingStatusPage({super.key});
+  const BuyingStatusPage({super.key, String? userId});
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/otp_verification_page.dart';
+import 'package:lelamonline_flutter/feature/authentication/views/pages/signup_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/categories/view/categories_page.dart';
@@ -97,11 +98,17 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const LoginPage(),
       name: RouteNames.loginPage,
     ),
+GoRoute(
+      path: RouteNames.signupPage,
+      builder: (context, state) => const SignUpPage(),
+      name: RouteNames.signupPage,
+    ),
     GoRoute(
       path: RouteNames.otpVerificationPage,
-      builder:
-          (context, state) =>
-              OtpVerificationPage(phoneNumber: state.extra as String? ?? ''),
+      builder: (context, state) => OtpVerificationPage(
+        data: state.extra as Map<String, dynamic>? ??
+            {'phone': '', 'testOtp': null, 'userData': null},
+      ),
       name: RouteNames.otpVerificationPage,
     ),
     GoRoute(

@@ -5,34 +5,55 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
+import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart'; // Import for ApiService
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart'; // Import for Attribute and AttributeVariation
+import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 
 // Marketplace Service
 class MarketplaceService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
+  static const String userId = '2';
+
+  // Cache for posts
+  static final Map<String, List<MarketplacePost>> _postsCache = {};
+  // Cache for attributes and variations
+  static List<Attribute>? _attributesCache;
+  static List<AttributeVariation>? _attributeVariationsCache;
 
   Future<List<MarketplacePost>> fetchPosts({
     required String categoryId,
     required String userZoneId,
+    required String listingType,
   }) async {
-    final url =
-        '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+    // Create a cache key based on parameters
+    final cacheKey = '$categoryId-$userZoneId-$listingType';
+
+    // Check if data exists in cache
+    if (_postsCache.containsKey(cacheKey)) {
+      print('Returning cached posts for $cacheKey');
+      return _postsCache[cacheKey]!;
+    }
+
+    final endpoint = listingType == 'auction'
+        ? '$baseUrl/list-category-post-auction.php'
+        : '$baseUrl/list-category-post-marketplace.php';
+
+    final url = listingType == 'auction'
+        ? '$endpoint?token=$token&category_id=$categoryId&user_id=$userId&user_zone_id=$userZoneId'
+        : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
 
     try {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
-        // First decode the response body
         final decodedBody = jsonDecode(response.body);
 
-        // Check if the response is a List
         if (decodedBody is List) {
-          return decodedBody.map((json) {
+          final posts = decodedBody.map((json) {
             try {
               return MarketplacePost.fromJson(json);
             } catch (e) {
@@ -41,23 +62,50 @@ class MarketplaceService {
               throw Exception('Failed to parse post: $e');
             }
           }).toList();
-        }
-        // Handle case where API returns a Map with data
-        else if (decodedBody is Map && decodedBody.containsKey('data')) {
+          _postsCache[cacheKey] = posts; // Store in cache
+          return posts;
+        } else if (decodedBody is Map && decodedBody.containsKey('data')) {
           final data = decodedBody['data'] as List;
-          return data.map((json) => MarketplacePost.fromJson(json)).toList();
-        }
-        // Handle unexpected format
-        else {
+          final posts = data.map((json) => MarketplacePost.fromJson(json)).toList();
+          _postsCache[cacheKey] = posts; // Store in cache
+          return posts;
+        } else {
           throw Exception('Unexpected API response format');
         }
       } else {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts: $e');
+      print('Error in fetchPosts ($listingType): $e');
       throw Exception('Error fetching posts: $e');
     }
+  }
+
+  // Fetch attributes with caching
+  Future<List<Attribute>> fetchAttributes() async {
+    if (_attributesCache != null) {
+      print('Returning cached attributes');
+      return _attributesCache!;
+    }
+    _attributesCache = await ApiService.fetchAttributes();
+    return _attributesCache!;
+  }
+
+  // Fetch attribute variations with caching
+  Future<List<AttributeVariation>> fetchAttributeVariations(Map<String, String> params) async {
+    if (_attributeVariationsCache != null) {
+      print('Returning cached attribute variations');
+      return _attributeVariationsCache!;
+    }
+    _attributeVariationsCache = await ApiService.fetchAttributeVariations(params);
+    return _attributeVariationsCache!;
+  }
+
+  // Clear cache (for refresh)
+  static void clearCache() {
+    _postsCache.clear();
+    _attributesCache = null;
+    _attributeVariationsCache = null;
   }
 }
 
@@ -161,11 +209,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   final LocationService _locationService = LocationService();
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;
-  List<Attribute> attributes = []; // Added for attribute mapping
-  List<AttributeVariation> attributeVariations =
-      []; // Added for attribute mapping
-  Map<String, Map<String, String>> _productAttributeValues =
-      {}; // Cache for attribute values per product
+  List<Attribute> attributes = [];
+  List<AttributeVariation> attributeVariations = [];
+  Map<String, Map<String, String>> _productAttributeValues = {};
 
   // Filter variables
   List<String> _selectedBrands = [];
@@ -177,7 +223,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedKmRange = 'all';
   String _selectedSoldBy = 'all';
 
-  // Scroll controller for dynamic search bar
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
 
@@ -191,9 +236,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
-            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
-          );
+          print('Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}');
         });
       } else {
         throw Exception('Failed to load locations');
@@ -213,7 +256,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _scrollController.addListener(_handleScroll);
     _fetchProducts();
     _fetchLocations();
-    _fetchAttributesAndVariations(); // Added to fetch attributes
+    _fetchAttributesAndVariations();
   }
 
   @override
@@ -232,54 +275,71 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  Future<void> _fetchAttributesAndVariations() async {
-    try {
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations({});
-      setState(() {});
-    } catch (e) {
-      print('Error fetching attributes/variations: $e');
-    }
-  }
 
-  Future<void> _fetchProducts() async {
+
+ Future<void> _fetchAttributesAndVariations() async {
+  try {
+    attributes = await _marketplaceService.fetchAttributes();
+    attributeVariations = await _marketplaceService.fetchAttributeVariations({});
+    // Fetch attribute-value pairs
+    final attributeValuePairs = await AttributeValueService.fetchAttributeValuePairs();
     setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+      // Store attribute-value pairs or process them as needed
+      _productAttributeValues = _mapAttributeValuePairs(attributeValuePairs);
     });
-    try {
-      final posts = await _marketplaceService.fetchPosts(
-        categoryId: '1',
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
-      );
-      final products = posts.map((post) => post.toProduct()).toList();
-      for (var product in products) {
-        _productAttributeValues[product.id] = _mapFiltersToValues(
-          product.filters,
-        );
-      }
-      setState(() {
-        _products = products;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
+  } catch (e) {
+    print('Error fetching attributes/variations/pairs: $e');
   }
+}
+Future<void> _fetchProducts({bool forceRefresh = false}) async {
+  if (forceRefresh) {
+    MarketplaceService.clearCache();
+  }
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+  });
+  try {
+    final posts = await _marketplaceService.fetchPosts(
+      categoryId: '1',
+      userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+      listingType: _listingType,
+    );
+    final products = posts.map((post) => post.toProduct()).toList();
+    // Fetch attribute-value pairs
+    final attributeValuePairs = await AttributeValueService.fetchAttributeValuePairs();
+    setState(() {
+      _products = products;
+      _productAttributeValues = _mapAttributeValuePairs(attributeValuePairs);
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      _errorMessage = e.toString();
+      _isLoading = false;
+    });
+  }
+}
 
-Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
-  final Map<String, String> attributeValues = {};
+Map<String, Map<String, String>> _mapAttributeValuePairs(List<AttributeValuePair> attributeValuePairs) {
+  final Map<String, Map<String, String>> productAttributeValues = {};
+  for (var product in _products) {
+    final Map<String, String> attributeValues = {};
+    final Set<String> processedAttributes = {};
 
-  // Process only the specific attributes we want to display
-  final attributesToShow = {'1', '2', '3', '4', '5'}; // Year, Owners, KM, Fuel, Transmission
+    // Map API-provided attribute-value pairs
+    for (var pair in attributeValuePairs) {
+      if (pair.attributeName.isNotEmpty &&
+          pair.attributeValue.isNotEmpty &&
+          !processedAttributes.contains(pair.attributeName)) {
+        attributeValues[pair.attributeName] = pair.attributeValue;
+        processedAttributes.add(pair.attributeName);
+      }
+    }
 
-  filters.forEach((attributeId, variationId) {
-    if (variationId.isNotEmpty && attributesToShow.contains(attributeId)) {
-      try {
-        // Get attribute name
+    // Map product filters to values
+    product.filters.forEach((attributeId, variationId) {
+      if (variationId.isNotEmpty) {
         final attribute = attributes.firstWhere(
           (attr) => attr.id == attributeId,
           orElse: () => Attribute(
@@ -299,20 +359,78 @@ Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
           ),
         );
 
-        // Get variation name - try to find the actual name from attributeVariations
         final variation = attributeVariations.firstWhere(
           (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
           orElse: () => AttributeVariation(
             id: variationId,
             attributeId: attributeId,
-            name: _getVariationNameFromId(attributeId, variationId), // Use helper function
+            name: _getVariationNameFromId(attributeId, variationId),
             status: '',
             createdOn: '',
             updatedOn: '',
           ),
         );
 
-        attributeValues[attribute.name] = variation.name;
+        if (!processedAttributes.contains(attribute.name) && variation.name.isNotEmpty) {
+          attributeValues[attribute.name] = variation.name;
+          processedAttributes.add(attribute.name);
+        }
+      }
+    });
+
+    productAttributeValues[product.id] = attributeValues;
+  }
+  return productAttributeValues;
+}
+Map<String, String> _mapFiltersToValues(Map<String, String> filters, String productId) {
+  final Map<String, String> attributeValues = {};
+  final Set<String> processedAttributes = {};
+
+  // Use cached attribute-value pairs if available
+  if (_productAttributeValues.containsKey(productId)) {
+    attributeValues.addAll(_productAttributeValues[productId]!);
+    processedAttributes.addAll(attributeValues.keys);
+  }
+
+  // Map remaining filters
+  filters.forEach((attributeId, variationId) {
+    if (variationId.isNotEmpty && !processedAttributes.contains(_getAttributeNameFromId(attributeId))) {
+      try {
+        final attribute = attributes.firstWhere(
+          (attr) => attr.id == attributeId,
+          orElse: () => Attribute(
+            id: attributeId,
+            slug: '',
+            name: _getAttributeNameFromId(attributeId),
+            listOrder: '',
+            categoryId: '',
+            formValidation: '',
+            ifDetailsIcons: '',
+            detailsIcons: '',
+            detailsIconsOrder: '',
+            showFilter: '',
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+        );
+
+        final variation = attributeVariations.firstWhere(
+          (varAttr) => varAttr.id == variationId && varAttr.attributeId == attributeId,
+          orElse: () => AttributeVariation(
+            id: variationId,
+            attributeId: attributeId,
+            name: _getVariationNameFromId(attributeId, variationId),
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
+        );
+
+        if (variation.name.isNotEmpty) {
+          attributeValues[attribute.name] = variation.name;
+          processedAttributes.add(attribute.name);
+        }
       } catch (e) {
         print('Error mapping attribute $attributeId: $e');
       }
@@ -321,61 +439,57 @@ Map<String, String> _mapFiltersToValues(Map<String, String> filters) {
 
   return attributeValues;
 }
-String _getVariationNameFromId(String attributeId, String variationId) {
-  // Map common variation IDs to their display names
-  switch (attributeId) {
-    case '1': // Year
-      return variationId; // Year is usually just the number
-    
-    case '2': // No of owners
-      switch (variationId) {
-        case '1':
-        case '19':
-          return '1st Owner';
-        case '2':
-        case '59':
-          return '2nd Owner';
-        case '3':
-          return '3rd Owner';
-        default:
-          return variationId.isNotEmpty ? '${variationId}th Owner' : 'N/A';
-      }
-    
-    case '3': // KM Range
-      return variationId.isNotEmpty ? '$variationId KM' : 'N/A';
-    
-    case '4': // Fuel Type
-      switch (variationId) {
-        case '8':
-          return 'Petrol';
-        case '9':
-          return 'Diesel';
-        case '10':
-          return 'CNG';
-        case '11':
-          return 'Electric';
-        case '12':
-          return 'Hybrid';
-        default:
-          return variationId;
-      }
-    
-    case '5': // Transmission
-      switch (variationId) {
-        case '13':
-          return 'Manual';
-        case '14':
-          return 'Automatic';
-        case '15':
-          return 'CVT';
-        default:
-          return variationId;
-      }
-    
-    default:
-      return variationId;
+
+  String _getVariationNameFromId(String attributeId, String variationId) {
+    switch (attributeId) {
+      case '1':
+        return variationId;
+      case '2':
+        switch (variationId) {
+          case '1':
+          case '19':
+            return '1st Owner';
+          case '2':
+          case '59':
+            return '2nd Owner';
+          case '3':
+            return '3rd Owner';
+          default:
+            return variationId.isNotEmpty ? '${variationId}th Owner' : 'N/A';
+        }
+      case '3':
+        return variationId.isNotEmpty ? '$variationId KM' : 'N/A';
+      case '4':
+        switch (variationId) {
+          case '8':
+            return 'Petrol';
+          case '9':
+            return 'Diesel';
+          case '10':
+            return 'CNG';
+          case '11':
+            return 'Electric';
+          case '12':
+            return 'Hybrid';
+          default:
+            return variationId;
+        }
+      case '5':
+        switch (variationId) {
+          case '13':
+            return 'Manual';
+          case '14':
+            return 'Automatic';
+          case '15':
+            return 'CVT';
+          default:
+            return variationId;
+        }
+      default:
+        return variationId;
+    }
   }
-}
+
   String _getAttributeNameFromId(String id) {
     switch (id) {
       case '1':
@@ -443,22 +557,21 @@ String _getVariationNameFromId(String attributeId, String variationId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -542,28 +655,24 @@ String _getVariationNameFromId(String attributeId, String variationId) {
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
-      filtered =
-          filtered.where((product) {
-            final searchableText = [
-              product.title.toLowerCase(),
-              product.brand.toLowerCase(),
-              product.model.toLowerCase(),
-              product.modelVariation.toLowerCase(),
-              _getLocationName(product.parentZoneId).toLowerCase(),
-              product.filters['4']?.toLowerCase() ?? '', // Fuel Type
-              product.filters['5']?.toLowerCase() ?? '', // Transmission
-              product.filters['1']?.toString() ?? '', // Year
-              product.byDealer == '1' ? 'dealer' : 'owner',
-            ].join(' ');
-            return searchableText.contains(query);
-          }).toList();
+      filtered = filtered.where((product) {
+        final searchableText = [
+          product.title.toLowerCase(),
+          product.brand.toLowerCase(),
+          product.model.toLowerCase(),
+          product.modelVariation.toLowerCase(),
+          _getLocationName(product.parentZoneId).toLowerCase(),
+          product.filters['4']?.toLowerCase() ?? '',
+          product.filters['5']?.toLowerCase() ?? '',
+          product.filters['1']?.toString() ?? '',
+          product.byDealer == '1' ? 'dealer' : 'owner',
+        ].join(' ');
+        return searchableText.contains(query);
+      }).toList();
     }
 
     if (_selectedLocation != 'all') {
-      filtered =
-          filtered
-              .where((product) => product.parentZoneId == _selectedLocation)
-              .toList();
+      filtered = filtered.where((product) => product.parentZoneId == _selectedLocation).toList();
     }
 
     if (_listingType == 'auction') {
@@ -573,141 +682,115 @@ String _getVariationNameFromId(String attributeId, String variationId) {
     }
 
     if (_selectedBrands.isNotEmpty) {
-      filtered =
-          filtered
-              .where((product) => _selectedBrands.contains(product.brand))
-              .toList();
+      filtered = filtered.where((product) => _selectedBrands.contains(product.brand)).toList();
     }
 
     if (_selectedPriceRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int price =
-                product.ifAuction == '1'
-                    ? (int.tryParse(product.auctionStartingPrice) ?? 0)
-                    : (int.tryParse(product.price) ?? 0);
-            switch (_selectedPriceRange) {
-              case 'Under ₹2 Lakh':
-                return price < 200000;
-              case '₹2-5 Lakh':
-                return price >= 200000 && price < 500000;
-              case '₹5-10 Lakh':
-                return price >= 500000 && price < 1000000;
-              case '₹10-20 Lakh':
-                return price >= 1000000 && price < 2000000;
-              case 'Above ₹20 Lakh':
-                return price >= 2000000;
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((product) {
+        int price = product.ifAuction == '1'
+            ? (int.tryParse(product.auctionStartingPrice) ?? 0)
+            : (int.tryParse(product.price) ?? 0);
+        switch (_selectedPriceRange) {
+          case 'Under ₹2 Lakh':
+            return price < 200000;
+          case '₹2-5 Lakh':
+            return price >= 200000 && price < 500000;
+          case '₹5-10 Lakh':
+            return price >= 500000 && price < 1000000;
+          case '₹10-20 Lakh':
+            return price >= 1000000 && price < 2000000;
+          case 'Above ₹20 Lakh':
+            return price >= 2000000;
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     if (_selectedYearRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int year =
-                int.tryParse(product.filters['1']?.toString() ?? '0') ?? 0;
-            switch (_selectedYearRange) {
-              case '2020 & Above':
-                return year >= 2020;
-              case '2018-2019':
-                return year >= 2018 && year <= 2019;
-              case '2015-2017':
-                return year >= 2015 && year <= 2017;
-              case '2010-2014':
-                return year >= 2010 && year <= 2014;
-              case 'Below 2010':
-                return year < 2010;
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((product) {
+        int year = int.tryParse(product.filters['1']?.toString() ?? '0') ?? 0;
+        switch (_selectedYearRange) {
+          case '2020 & Above':
+            return year >= 2020;
+          case '2018-2019':
+            return year >= 2018 && year <= 2019;
+          case '2015-2017':
+            return year >= 2015 && year <= 2017;
+          case '2010-2014':
+            return year >= 2010 && year <= 2014;
+          case 'Below 2010':
+            return year < 2010;
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     if (_selectedOwnersRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int owners =
-                int.tryParse(product.filters['2']?.toString() ?? '0') ?? 0;
-            switch (_selectedOwnersRange) {
-              case '1st Owner':
-                return owners == 1;
-              case '2nd Owner':
-                return owners == 2;
-              case '3rd Owner':
-                return owners == 3;
-              case '4+ Owners':
-                return owners >= 4;
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((product) {
+        int owners = int.tryParse(product.filters['2']?.toString() ?? '0') ?? 0;
+        switch (_selectedOwnersRange) {
+          case '1st Owner':
+            return owners == 1;
+          case '2nd Owner':
+            return owners == 2;
+          case '3rd Owner':
+            return owners == 3;
+          case '4+ Owners':
+            return owners >= 4;
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     if (_selectedFuelTypes.isNotEmpty) {
-      filtered =
-          filtered
-              .where(
-                (product) => _selectedFuelTypes.contains(
-                  product.filters['4']?.toString() ?? '',
-                ),
-              )
-              .toList();
+      filtered = filtered.where((product) => _selectedFuelTypes.contains(product.filters['4']?.toString() ?? '')).toList();
     }
 
     if (_selectedTransmissions.isNotEmpty) {
-      filtered =
-          filtered
-              .where(
-                (product) => _selectedTransmissions.contains(
-                  product.filters['5']?.toString() ?? '',
-                ),
-              )
-              .toList();
+      filtered = filtered.where((product) => _selectedTransmissions.contains(product.filters['5']?.toString() ?? '')).toList();
     }
 
     if (_selectedKmRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int km = int.tryParse(product.filters['3']?.toString() ?? '0') ?? 0;
-            switch (_selectedKmRange) {
-              case 'Under 10K':
-                return km < 10000;
-              case '10K-30K':
-                return km >= 10000 && km < 30000;
-              case '30K-50K':
-                return km >= 30000 && km < 50000;
-              case '50K-80K':
-                return km >= 50000 && km < 80000;
-              case 'Above 80K':
-                return km >= 80000;
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((product) {
+        int km = int.tryParse(product.filters['3']?.toString() ?? '0') ?? 0;
+        switch (_selectedKmRange) {
+          case 'Under 10K':
+            return km < 10000;
+          case '10K-30K':
+            return km >= 10000 && km < 30000;
+          case '30K-50K':
+            return km >= 30000 && km < 50000;
+          case '50K-80K':
+            return km >= 50000 && km < 80000;
+          case 'Above 80K':
+            return km >= 80000;
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     if (_selectedSoldBy != 'all') {
-      filtered =
-          filtered.where((product) {
-            switch (_selectedSoldBy) {
-              case 'Owner':
-                return product.byDealer == '0';
-              case 'Certified Dealer':
-                return product.byDealer == '1';
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((product) {
+        switch (_selectedSoldBy) {
+          case 'Owner':
+            return product.byDealer == '0';
+          case 'Certified Dealer':
+            return product.byDealer == '1';
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     return filtered;
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath =
-        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/$cleanedPath';
   }
 
@@ -716,203 +799,180 @@ String _getVariationNameFromId(String attributeId, String variationId) {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _listingType == 'auction' ? 'Filter Auction Cars' : 'Filter Cars',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: () {
+                        setModalState(() {
+                          _selectedBrands.clear();
+                          _selectedPriceRange = 'all';
+                          _selectedYearRange = 'all';
+                          _selectedOwnersRange = 'all';
+                          _selectedFuelTypes.clear();
+                          _selectedTransmissions.clear();
+                          _selectedKmRange = 'all';
+                          _selectedSoldBy = 'all';
+                        });
+                      },
+                      child: const Text(
+                        'Clear All',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                      _buildMultiSelectFilterSection(
+                        'Brand',
+                        _brands,
+                        _selectedBrands,
+                        setModalState,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Filter Cars',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedBrands.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedYearRange = 'all';
-                                  _selectedOwnersRange = 'all';
-                                  _selectedFuelTypes.clear();
-                                  _selectedTransmissions.clear();
-                                  _selectedKmRange = 'all';
-                                  _selectedSoldBy = 'all';
-                                });
-                              },
-                              child: Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      _buildSingleSelectFilterSection(
+                        'Price Range',
+                        _priceRanges,
+                        _selectedPriceRange,
+                        (value) => setModalState(() => _selectedPriceRange = value),
+                        subtitle: _listingType == 'auction' ? 'Filter by starting bid price' : 'Filter by sale price',
                       ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildMultiSelectFilterSection(
-                                'Brand',
-                                _brands,
-                                _selectedBrands,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Price Range',
-                                _priceRanges,
-                                _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
-                                subtitle:
-                                    _listingType == 'auction'
-                                        ? 'Filter by starting bid price'
-                                        : 'Filter by sale price',
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Year',
-                                _yearRanges,
-                                _selectedYearRange,
-                                (value) => setModalState(
-                                  () => _selectedYearRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Number of Owners',
-                                _ownerRanges,
-                                _selectedOwnersRange,
-                                (value) => setModalState(
-                                  () => _selectedOwnersRange = value,
-                                ),
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Fuel Type',
-                                _fuelTypes,
-                                _selectedFuelTypes,
-                                setModalState,
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Transmission',
-                                _transmissions,
-                                _selectedTransmissions,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'KM Driven',
-                                _kmRanges,
-                                _selectedKmRange,
-                                (value) => setModalState(
-                                  () => _selectedKmRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Sold By',
-                                _soldByOptions,
-                                _selectedSoldBy,
-                                (value) => setModalState(
-                                  () => _selectedSoldBy = value,
-                                ),
-                              ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
+                      _buildSingleSelectFilterSection(
+                        'Year',
+                        _yearRanges,
+                        _selectedYearRange,
+                        (value) => setModalState(() => _selectedYearRange = value),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      _buildSingleSelectFilterSection(
+                        'Number of Owners',
+                        _ownerRanges,
+                        _selectedOwnersRange,
+                        (value) => setModalState(() => _selectedOwnersRange = value),
                       ),
+                      _buildMultiSelectFilterSection(
+                        'Fuel Type',
+                        _fuelTypes,
+                        _selectedFuelTypes,
+                        setModalState,
+                      ),
+                      _buildMultiSelectFilterSection(
+                        'Transmission',
+                        _transmissions,
+                        _selectedTransmissions,
+                        setModalState,
+                      ),
+                      _buildSingleSelectFilterSection(
+                        'KM Driven',
+                        _kmRanges,
+                        _selectedKmRange,
+                        (value) => setModalState(() => _selectedKmRange = value),
+                      ),
+                      _buildSingleSelectFilterSection(
+                        'Sold By',
+                        _soldByOptions,
+                        _selectedSoldBy,
+                        (value) => setModalState(() => _selectedSoldBy = value),
+                      ),
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -934,48 +994,37 @@ String _getVariationNameFromId(String attributeId, String variationId) {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -1011,41 +1060,30 @@ String _getVariationNameFromId(String attributeId, String variationId) {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  displayText,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -1078,18 +1116,17 @@ String _getVariationNameFromId(String attributeId, String variationId) {
           hintText: 'Search cars...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -1110,18 +1147,17 @@ String _getVariationNameFromId(String attributeId, String variationId) {
         hintText: 'Search by brand, model, location, fuel type...',
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-                : null,
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200),
@@ -1188,59 +1224,49 @@ String _getVariationNameFromId(String attributeId, String variationId) {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchProducts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
-                            ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
+                  icon: const Icon(Icons.location_on, color: Colors.black87),
+                  onSelected: (String value) {
+                    setState(() {
+                      _selectedLocation = value == 'all'
+                          ? 'all'
+                          : _locations.firstWhere((loc) => loc.name == value).id;
+                      _fetchProducts();
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return _keralaCities.map((String city) {
+                      return PopupMenuItem<String>(
+                        value: city,
+                        child: Row(
+                          children: [
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const Icon(
+                                Icons.check,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const SizedBox(width: 8),
+                            Text(city == 'all' ? 'All Kerala' : city),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
         ],
       ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
+      body: RefreshIndicator(
+        onRefresh: () => _fetchProducts(forceRefresh: true),
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: _isLoadingLocations
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
                       children: [
                         if (!_showAppBarSearch)
                           Container(
@@ -1267,28 +1293,17 @@ String _getVariationNameFromId(String attributeId, String variationId) {
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
                                       decoration: BoxDecoration(
-                                        color:
-                                            _listingType == 'sale'
-                                                ? Palette.white
-                                                : Colors.transparent,
+                                        color: _listingType == 'sale' ? Palette.white : Colors.transparent,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
                                         'Market Place',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontWeight:
-                                              _listingType == 'sale'
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                          color:
-                                              _listingType == 'sale'
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
+                                          fontWeight: _listingType == 'sale' ? FontWeight.w600 : FontWeight.normal,
+                                          color: _listingType == 'sale' ? Colors.black : Colors.grey.shade600,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -1304,28 +1319,17 @@ String _getVariationNameFromId(String attributeId, String variationId) {
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
                                       decoration: BoxDecoration(
-                                        color:
-                                            _listingType == 'auction'
-                                                ? Palette.white
-                                                : Colors.transparent,
+                                        color: _listingType == 'auction' ? Palette.white : Colors.transparent,
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
                                         'Auction',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          fontWeight:
-                                              _listingType == 'auction'
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                          color:
-                                              _listingType == 'auction'
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
+                                          fontWeight: _listingType == 'auction' ? FontWeight.w600 : FontWeight.normal,
+                                          color: _listingType == 'auction' ? Colors.black : Colors.grey.shade600,
                                           fontSize: 12,
                                         ),
                                       ),
@@ -1338,87 +1342,88 @@ String _getVariationNameFromId(String attributeId, String variationId) {
                         ),
                       ],
                     ),
-          ),
-          if (!_isLoadingLocations)
-            _isLoading
-                ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-                : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
+            ),
+            if (!_isLoadingLocations)
+              _isLoading
+                  ? const SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _errorMessage != null
+                      ? SliverToBoxAdapter(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Error: $_errorMessage',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () => _fetchProducts(forceRefresh: true),
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchProducts,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : filteredProducts.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No cars found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final product = filteredProducts[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildProductCard(product),
-                    );
-                  }, childCount: filteredProducts.length),
-                ),
-        ],
+                        )
+                      : filteredProducts.isEmpty
+                          ? SliverToBoxAdapter(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No cars found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Try adjusting your filters or search terms',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate((context, index) {
+                                final product = filteredProducts[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _buildProductCard(product),
+                                );
+                              }, childCount: filteredProducts.length),
+                            ),
+          ],
+        ),
       ),
     );
   }
 
-Widget _buildProductCard(Product product) {
+  Widget _buildProductCard(Product product) {
   final isAuction = product.ifAuction == '1';
   final isFinanceAvailable = product.ifFinance == '1';
   final isExchangeAvailable = product.ifExchange == '1';
@@ -1441,7 +1446,7 @@ Widget _buildProductCard(Product product) {
               MaterialPageRoute(
                 builder: (context) => MarketPlaceProductDetailsPage(
                   product: product,
-                  isAuction: product.ifAuction == "1",
+                  isAuction: product.ifAuction == '1',
                 ),
               ),
             );
@@ -1474,32 +1479,52 @@ Widget _buildProductCard(Product product) {
                       height: 150,
                       decoration: BoxDecoration(
                         color: Colors.grey.shade200,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(0),
-                        ),
+                        borderRadius: const BorderRadius.all(Radius.circular(0)),
                       ),
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(12),
-                        ),
-                        child: Image.network(
-                          'https://lelamonline.com/admin/${product.image}',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            print(
-                              'Failed to load image: https://lelamonline.com/${product.image}',
-                            );
-                            print('Error: $error');
-                            return Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                Icons.directions_car,
-                                size: 40,
-                                color: Colors.grey.shade400,
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.all(Radius.circular(12)),
+                            child: Image.network(
+                              'https://lelamonline.com/admin/${product.image}',
+                              fit: BoxFit.fill,
+                              height: 400,
+                              width: 200,
+                              errorBuilder: (context, error, stackTrace) {
+                                print('Failed to load image: https://lelamonline.com/${product.image}');
+                                print('Error: $error');
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(
+                                    Icons.directions_car,
+                                    size: 40,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          if (isAuction)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'AUCTION',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -1532,14 +1557,22 @@ Widget _buildProductCard(Product product) {
                             children: [
                               Text(
                                 isAuction
-                                    ? '₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ₹${_formatPrice(double.tryParse(product.price) ?? 0)}'
-                                    : '₹ ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                    ? 'Starting Bid: ₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)}'
+                                    : '₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   color: Palette.primaryblue,
                                 ),
                               ),
+                              if (isAuction)
+                                Text(
+                                  'Max Bid: ₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 4),
@@ -1561,56 +1594,39 @@ Widget _buildProductCard(Product product) {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          
-                          // Show attributes with icons like in details page
                           if (attributeValues.isNotEmpty)
                             Column(
                               children: [
-                                // First row of attributes
                                 Row(
                                   children: [
-                                    // Year
                                     if (attributeValues['Year'] != null && attributeValues['Year']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.calendar_today,
                                         attributeValues['Year']!,
                                       ),
-                                    
                                     const SizedBox(width: 4),
-                                    
-                                    // Owner
                                     if (attributeValues['No of owners'] != null && attributeValues['No of owners']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.person,
-                                        attributeValues['No of owners']!,
+                                        _getOwnerText(attributeValues['No of owners']!),
                                       ),
-                                    
                                     const SizedBox(width: 4),
-                                    
-                                    // KM
                                     if (attributeValues['KM Range'] != null && attributeValues['KM Range']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.speed,
-                                        attributeValues['KM Range']!,
+                                        _formatKmRange(attributeValues['KM Range']!),
                                       ),
                                   ],
                                 ),
-                                
                                 const SizedBox(height: 4),
-                                
-                                // Second row of attributes
                                 Row(
                                   children: [
-                                    // Fuel Type
                                     if (attributeValues['Fuel Type'] != null && attributeValues['Fuel Type']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.local_gas_station,
                                         attributeValues['Fuel Type']!,
                                       ),
-                                    
                                     const SizedBox(width: 4),
-                                    
-                                    // Transmission
                                     if (attributeValues['Transmission'] != null && attributeValues['Transmission']!.isNotEmpty)
                                       _buildDetailChipWithIcon(
                                         Icons.settings,
@@ -1656,29 +1672,31 @@ Widget _buildProductCard(Product product) {
     },
   );
 }
-Widget _buildDetailChipWithIcon(IconData icon, String label) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-    decoration: BoxDecoration(
-      color: Colors.grey.shade100,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: Colors.grey[700]),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.black87,
+
+  Widget _buildDetailChipWithIcon(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: Colors.grey.shade700),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black87,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1689,10 +1707,16 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
+              color: Colors.grey.shade700,
             ),
           ),
-          Text(value, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+            ),
+          ),
         ],
       ),
     );
@@ -1702,13 +1726,16 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        Icon(icon, size: 12, color: Colors.grey[700]),
+        Icon(icon, size: 12, color: Colors.grey.shade700),
         const SizedBox(width: 4),
         Flexible(
           child: Text(
             text,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+            ),
           ),
         ),
       ],
@@ -1721,51 +1748,61 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 8, color: Colors.grey[700]),
+          Icon(icon, size: 8, color: Colors.grey.shade700),
           const SizedBox(width: 3),
-          Text(label, style: const TextStyle(fontSize: 9)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 9),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAuctionInfo(Product product) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.gavel, size: 16, color: Colors.black),
-            const SizedBox(width: 6),
-            Text(
-              'Attempts: ${product.auctionAttempt}/3',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white),
-          ),
-          child: Text(
-            'AUCTION',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+Widget _buildAuctionInfo(Product product) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          const Icon(Icons.gavel, size: 16, color: Colors.black),
+          const SizedBox(width: 6),
+          Text(
+            'Attempts: ${product.auctionAttempt}/3',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-      ],
-    );
-  }
+        ],
+      ),
+      const VerticalDivider(
+        color: Colors.black,
+        thickness: 1,
+        width: 20, // space between line and content
+      ),
+      // Example right-side content (uncomment if needed)
+      // Container(
+      //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      //   decoration: BoxDecoration(
+      //     color: Colors.red,
+      //     borderRadius: BorderRadius.circular(12),
+      //     border: Border.all(color: Colors.white),
+      //   ),
+      //   child: const Text(
+      //     'AUCTION',
+      //     style: TextStyle(
+      //       fontSize: 10,
+      //       color: Colors.white,
+      //       fontWeight: FontWeight.bold,
+      //     ),
+      //   ),
+      // ),
+    ],
+  );
+}
+
 
   Widget _buildFinanceExchangeInfo(
     bool isFinanceAvailable,
@@ -1785,9 +1822,9 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.account_balance, size: 12, color: Colors.black),
+                  const Icon(Icons.account_balance, size: 12, color: Colors.black),
                   const SizedBox(width: 6),
-                  Text(
+                  const Text(
                     'Finance Available',
                     style: TextStyle(
                       fontSize: 11,
@@ -1810,9 +1847,9 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  Icon(Icons.swap_horiz, size: 12, color: Colors.black),
+                  const Icon(Icons.swap_horiz, size: 12, color: Colors.black),
                   const SizedBox(width: 6),
-                  Text(
+                  const Text(
                     'Exchange Available',
                     style: TextStyle(
                       fontSize: 10,
@@ -1838,9 +1875,9 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(Icons.account_balance, size: 10, color: Colors.black),
+            const Icon(Icons.account_balance, size: 10, color: Colors.black),
             const SizedBox(width: 8),
-            Text(
+            const Text(
               'Finance Available',
               style: TextStyle(
                 fontSize: 10,
@@ -1863,9 +1900,9 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+            const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
             const SizedBox(width: 8),
-            Text(
+            const Text(
               'Exchange Available',
               style: TextStyle(
                 fontSize: 10,
@@ -1880,29 +1917,33 @@ Widget _buildDetailChipWithIcon(IconData icon, String label) {
     return const SizedBox.shrink();
   }
 
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-      case '19':
-        return '1st Owner';
-      case '2':
-      case '59':
-        return '2nd Owner';
-      case '3':
-        return '3rd Owner';
-      default:
-        return owners.isNotEmpty ? '${owners}th Owner' : 'N/A';
-    }
+String _getOwnerText(String owners) {
+  switch (owners) {
+    case '1':
+    case '19':
+    case '1st Owner':
+      return '1st Owner';
+    case '2':
+    case '59':
+    case '2nd Owner':
+      return '2nd Owner';
+    case '3':
+    case '3rd Owner':
+      return '3rd Owner';
+    default:
+      return owners.isNotEmpty ? owners : 'N/A';
   }
+}
 
   String _formatPrice(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
   }
 
-  String _formatKmRange(String value) {
-    if (value == 'N/A') return 'N/A';
-    final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
-    return '$number KM';
-  }
+String _formatKmRange(String value) {
+  if (value == 'N/A') return 'N/A';
+  final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  final formatter = NumberFormat.decimalPattern('en_IN');
+  return '${formatter.format(number)} KM';
+}
 }

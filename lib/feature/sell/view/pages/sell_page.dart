@@ -20,7 +20,7 @@ class CategoryItem {
 }
 
 class SellPage extends StatefulWidget {
-  const SellPage({super.key});
+  const SellPage({super.key, String? userId});
 
   @override
   State<SellPage> createState() => _SellPageState();

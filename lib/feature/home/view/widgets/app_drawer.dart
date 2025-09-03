@@ -6,7 +6,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 
 class AppDrawerWidget extends StatelessWidget {
-  const AppDrawerWidget({super.key});
+  const AppDrawerWidget({super.key, String? userId});
 
   @override
   Widget build(BuildContext context) {

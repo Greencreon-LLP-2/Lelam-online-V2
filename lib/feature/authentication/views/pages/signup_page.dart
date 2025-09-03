@@ -8,94 +8,123 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:convert';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _isOtpMode = true;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleSubmit() async {
+  Future<void> _handleSignUp() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        if (_isOtpMode) {
-          const bool isTestMode = kDebugMode;
-          String testOtp = '9021';
+        const bool isTestMode = kDebugMode;
+        String testOtp = '9021'; // For testing
 
-          final headers = {
-            'token': '5cb2c9b569416b5db1604e0e12478ded',
-            'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
-          };
+        if (isTestMode) {
+          if (mounted) {
+            context.pushNamed(
+              RouteNames.otpVerificationPage,
+              extra: {
+                'phone': '+91${_phoneController.text}',
+                'testOtp': testOtp,
+                'userId': null,
+              },
+            );
+            Fluttertoast.showToast(
+              msg: 'Test OTP sent: $testOtp',
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.BOTTOM,
+              backgroundColor: Colors.green.withOpacity(0.8),
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+          }
+          setState(() => _isLoading = false);
+          return;
+        }
 
-          // Send OTP
-          final otpRequest = http.Request(
-            'GET',
-            Uri.parse(
-              'https://lelamonline.com/admin/api/v1/otp-send.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile_code=91&mobile=${_phoneController.text}&otp=$testOtp',
-            ),
-          );
-          otpRequest.headers.addAll(headers);
-          final otpResponse = await otpRequest.send();
-          final otpResponseBody = await otpResponse.stream.bytesToString();
+        final headers = {
+          'token': '5cb2c9b569416b5db1604e0e12478ded',
+          'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
+        };
 
-          if (otpResponse.statusCode == 200) {
-            // Fetch user details to get user_id
-            final userRequest = http.Request(
+        // Register user
+        final registerRequest = http.Request(
+          'GET',
+          Uri.parse(
+            'https://lelamonline.com/admin/api/v1/register.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile_code=91&mobile=${_phoneController.text}',
+          ),
+        );
+        registerRequest.headers.addAll(headers);
+        final registerResponse = await registerRequest.send();
+        final responseBody = await registerResponse.stream.bytesToString();
+
+        if (registerResponse.statusCode == 200) {
+          final jsonResponse = jsonDecode(responseBody);
+          if (jsonResponse['status'] == true) {
+            final userId = jsonResponse['data']?.toString(); // e.g., "525"
+            if (userId == null) {
+              throw Exception('User ID not found in response');
+            }
+
+            // Send OTP
+            final otpRequest = http.Request(
               'GET',
               Uri.parse(
-                'https://lelamonline.com/admin/api/v1/user.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile=${_phoneController.text}',
+                'https://lelamonline.com/admin/api/v1/otp-send.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile_code=91&mobile=${_phoneController.text}&otp=9021',
               ),
             );
-            userRequest.headers.addAll(headers);
-            final userResponse = await userRequest.send();
-            final userResponseBody = await userResponse.stream.bytesToString();
+            otpRequest.headers.addAll(headers);
+            final otpResponse = await otpRequest.send();
+            final otpResponseBody = await otpResponse.stream.bytesToString();
 
-            if (userResponse.statusCode == 200) {
-              final userDetails = jsonDecode(userResponseBody);
-              final userId = userDetails['user_id']?.toString(); // e.g., "482"
-              if (userId == null) {
-                throw Exception('User ID not found');
-              }
-              if (mounted) {
-                context.pushNamed(
-                  RouteNames.otpVerificationPage,
-                  extra: {
-                    'phone': '+91${_phoneController.text}',
-                    'testOtp': isTestMode ? testOtp : null,
-                    'userId': userId,
-                  },
-                );
+            if (otpResponse.statusCode == 200) {
+              if (kDebugMode) {
                 Fluttertoast.showToast(
-                  msg: isTestMode
-                      ? 'Test OTP sent: $testOtp'
-                      : 'OTP sent to ${_phoneController.text}',
+                  msg: 'OTP sent: 9021', // Show OTP for testing
                   toastLength: Toast.LENGTH_LONG,
                   gravity: ToastGravity.BOTTOM,
                   backgroundColor: Colors.green.withOpacity(0.8),
                   textColor: Colors.white,
                   fontSize: 16.0,
                 );
+              } else {
+                Fluttertoast.showToast(
+                  msg: 'OTP sent to ${_phoneController.text}',
+                  toastLength: Toast.LENGTH_SHORT,
+                  gravity: ToastGravity.BOTTOM,
+                  backgroundColor: Colors.green.withOpacity(0.8),
+                  textColor: Colors.white,
+                  fontSize: 16.0,
+                );
+              }
+              if (mounted) {
+                context.pushNamed(
+                  RouteNames.otpVerificationPage,
+                  extra: {
+                    'phone': '+91${_phoneController.text}',
+                    'testOtp': null,
+                    'userId': userId,
+                  },
+                );
               }
             } else {
               if (mounted) {
                 Fluttertoast.showToast(
-                  msg: 'Failed to fetch user: ${userResponse.reasonPhrase}',
+                  msg: 'Failed to send OTP: ${otpResponse.reasonPhrase}',
                   toastLength: Toast.LENGTH_SHORT,
                   gravity: ToastGravity.BOTTOM,
                   backgroundColor: Colors.red.withOpacity(0.8),
@@ -107,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
           } else {
             if (mounted) {
               Fluttertoast.showToast(
-                msg: 'Failed to send OTP: ${otpResponse.reasonPhrase}',
+                msg: 'Registration failed: Invalid response',
                 toastLength: Toast.LENGTH_SHORT,
                 gravity: ToastGravity.BOTTOM,
                 backgroundColor: Colors.red.withOpacity(0.8),
@@ -117,10 +146,9 @@ class _LoginPageState extends State<LoginPage> {
             }
           }
         } else {
-          // Password login (not implemented as per requirement)
           if (mounted) {
             Fluttertoast.showToast(
-              msg: 'Password login not supported',
+              msg: 'Error sending OTP: ${registerResponse.reasonPhrase}',
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.BOTTOM,
               backgroundColor: Colors.red.withOpacity(0.8),
@@ -169,7 +197,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 const SizedBox(height: 60),
                 Text(
-                  'Welcome Back',
+                  'Create Account',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
@@ -177,37 +205,13 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to continue',
+                  'Enter your mobile number to sign up',
                   style: Theme.of(context)
                       .textTheme
                       .bodyLarge
                       ?.copyWith(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 48),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Use Password',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                    const SizedBox(width: 8),
-                    Switch(
-                      value: !_isOtpMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _isOtpMode = !value;
-                        });
-                      },
-                      activeColor: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Use OTP',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                  ],
-                ),
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[50],
@@ -268,8 +272,8 @@ class _LoginPageState extends State<LoginPage> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your phone number';
                             }
-                            if (value.length < 10) {
-                              return 'Please enter a valid phone number';
+                            if (value.length != 10) {
+                              return 'Please enter a valid 10-digit phone number';
                             }
                             return null;
                           },
@@ -278,63 +282,11 @@ class _LoginPageState extends State<LoginPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                if (!_isOtpMode) ...[
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!, width: 1),
-                    ),
-                    child: TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(fontSize: 16),
-                      decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: TextStyle(color: Colors.grey[400]),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.lock_outline,
-                          size: 20,
-                          color: AppTheme.primaryColor,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.grey[600],
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        errorStyle: const TextStyle(height: 0.8),
-                      ),
-                      validator: (value) {
-                        if (!_isOtpMode && (value == null || value.isEmpty)) {
-                          return 'Please enter your password';
-                        }
-                        if (!_isOtpMode && value != null && value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   child: TextButton(
-                    onPressed: _isLoading ? null : _handleSubmit,
+                    onPressed: _isLoading ? null : _handleSignUp,
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: AppTheme.primaryColor,
@@ -353,39 +305,21 @@ class _LoginPageState extends State<LoginPage> {
                                   AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : Text(
-                            _isOtpMode ? 'Send OTP' : 'Sign In',
-                            style: const TextStyle(fontSize: 16),
+                        : const Text(
+                            'Sign Up',
+                            style: TextStyle(fontSize: 16),
                           ),
                   ),
                 ),
                 const Spacer(),
                 Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'By continuing, you agree to our Terms and Privacy Policy',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.grey[600]),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () {
-                          context.pushNamed(RouteNames.signupPage);
-                        },
-                        child: Text(
-                          "Don't have an account? Sign Up",
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'By signing up, you agree to our Terms and Privacy Policy',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 24),

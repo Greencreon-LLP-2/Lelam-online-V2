@@ -8,7 +8,9 @@ import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_wi
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final String? userId;
+
+  const HomePage({super.key, this.userId});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -33,28 +35,28 @@ class _HomePageState extends State<HomePage> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            spacing: 2,
             children: [
-              //!TOP section
+              // Top section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    //!Location section
+                    // Location section
                     Row(
                       children: [
                         const Icon(Icons.location_on),
                         const SizedBox(width: 8),
                         DropdownButton<String>(
                           value: _selectedDistrict,
-                          hint: const Text('All Kerala'),
-                          items:
-                              districts.map((district) {
-                                return DropdownMenuItem<String>(
-                                  value: district,
-                                  child: Text(district),
-                                );
-                              }).toList(),
+                          hint: Text(widget.userId != null
+                              ? 'User ID: ${widget.userId}'
+                              : 'All Kerala'),
+                          items: districts.map((district) {
+                            return DropdownMenuItem<String>(
+                              value: district,
+                              child: Text(district),
+                            );
+                          }).toList(),
                           onChanged: (String? newValue) {
                             setState(() {
                               _selectedDistrict = newValue;
@@ -65,25 +67,27 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ],
                     ),
-
-                    Spacer(),
-                    //!Notification section
+                    const Spacer(),
+                    // Notification section
                     IconButton(
                       onPressed: () {
                         context.pushNamed(RouteNames.notificationPage);
                       },
-                      icon: Icon(Icons.notifications),
+                      icon: const Icon(Icons.notifications),
                     ),
-                    // IconButton(
-                    //   onPressed: () {
-                    //     context.pushNamed(RouteNames.loginPage);
-                    //   },
-                    //   icon: Icon(Icons.person),
-                    // ),
                   ],
                 ),
               ),
-              //!Search section
+              // User ID display
+              if (widget.userId != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Logged in as User ID: ${widget.userId}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              // Search section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SearchButtonWidget(
@@ -95,18 +99,15 @@ class _HomePageState extends State<HomePage> {
                   },
                 ),
               ),
-
-              //!Banner section
-              BannerWidget(),
-
-              //!Category section
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
+              // Banner section
+              const BannerWidget(),
+              // Category section
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
                 child: CategoryWidget(),
               ),
-
-              //!Product section
-              ProductSectionWidget(searchQuery: _searchQuery),
+              // Product section
+              ProductSectionWidget(searchQuery: _searchQuery, userId: widget.userId),
             ],
           ),
         ),

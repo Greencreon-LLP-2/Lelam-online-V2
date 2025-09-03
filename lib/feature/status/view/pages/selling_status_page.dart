@@ -3,7 +3,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_ads_widget.dart';
 
 class SellingStatusPage extends StatelessWidget {
-  const SellingStatusPage({super.key});
+  const SellingStatusPage({super.key, String? userId});
 
   @override
   Widget build(BuildContext context) {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ShortListPage extends StatelessWidget {
-  const ShortListPage({super.key});
+  const ShortListPage({super.key, String? userId});
 
   @override
   Widget build(BuildContext context) {
