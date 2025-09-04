@@ -19,14 +19,18 @@ import 'package:lelamonline_flutter/feature/settings/view/pages/settings_page.da
 import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
+import 'package:lelamonline_flutter/utils/please_login_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: RouteNames.mainscaffold,
   routes: [
     GoRoute(
       path: RouteNames.mainscaffold,
-      builder: (context, state) => const MainScaffold(),
       name: RouteNames.mainscaffold,
+      builder: (context, state) {
+        final params = state.extra as Map<String, dynamic>?;
+        return MainScaffold(userId: params?['userId'] as String?);
+      },
     ),
     GoRoute(
       path: RouteNames.categoriespage,
@@ -44,10 +48,16 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.buyingStatusPage,
     ),
     GoRoute(
-      path: RouteNames.sellingstatuspage,
-      builder: (context, state) => const SellingStatusPage(),
-      name: RouteNames.sellingstatuspage,
-    ),
+  path: RouteNames.sellingstatuspage,
+  name: RouteNames.sellingstatuspage,
+  builder: (context, state) {
+    final extra = state.extra as Map<String, dynamic>?;
+    return SellingStatusPage(
+      userId: extra?['userId'],
+      adData: extra?['adData'],
+    );
+  },
+),
     GoRoute(
       path: RouteNames.sellpage,
       builder: (context, state) => const SellPage(),
@@ -88,28 +98,38 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/ad-post',
-      builder:
-          (context, state) =>
-              AdPostPage(categoryId: state.extra as String? ?? '1'),
       name: RouteNames.adPostPage,
+      builder:
+          (context, state) => AdPostPage(
+            extra: state.extra as Map<String, dynamic>?, // Pass extra correctly
+          ),
     ),
     GoRoute(
-      path: RouteNames.loginPage,
-      builder: (context, state) => const LoginPage(),
+      path: '/login',
       name: RouteNames.loginPage,
+      builder:
+          (context, state) => LoginPage(
+            extra:
+                state.extra is Map<String, dynamic>
+                    ? state.extra as Map<String, dynamic>
+                    : null,
+          ),
     ),
-GoRoute(
+    GoRoute(
       path: RouteNames.signupPage,
       builder: (context, state) => const SignUpPage(),
       name: RouteNames.signupPage,
     ),
     GoRoute(
-      path: RouteNames.otpVerificationPage,
-      builder: (context, state) => OtpVerificationPage(
-        data: state.extra as Map<String, dynamic>? ??
-            {'phone': '', 'testOtp': null, 'userData': null},
-      ),
+      path: '/otp-verification',
       name: RouteNames.otpVerificationPage,
+      builder:
+          (context, state) => OtpVerificationPage(
+            extra:
+                state.extra is Map<String, dynamic>
+                    ? state.extra as Map<String, dynamic>
+                    : {},
+          ),
     ),
     GoRoute(
       path: RouteNames.usedCarsPage,
@@ -122,6 +142,11 @@ GoRoute(
           (context, state) =>
               const MarketPlaceProductDetailsPage(product: null),
       name: RouteNames.marketPlaceProductDetailsPage,
+    ),
+    GoRoute(
+      path: RouteNames.pleaseLoginPage,
+      builder: (context, state) => const PleaseLoginPage(),
+      name: RouteNames.pleaseLoginPage,
     ),
   ],
   errorBuilder:

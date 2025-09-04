@@ -13,6 +13,7 @@ import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -48,6 +49,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
   String sellerActiveFrom = 'N/A';
+  String? userId;
 
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
@@ -95,10 +97,18 @@ dynamic _getProperty(String propertyName) {
   @override
   void initState() {
     super.initState();
+    _loadUserId();
     _fetchData();
     _fetchSellerInfo();
   }
-
+Future<void> _loadUserId() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId') ?? 'Unknown';
+    });
+    // Print userId in debug console
+    debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
+  }
  Future<void> _fetchData() async {
   setState(() {
     _isLoading = true;
@@ -812,70 +822,88 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
                       child: ElevatedButton(
                         onPressed: () async {
                           final String amount = bidAmountController.text;
-                          if (amount.isNotEmpty) {
-                            final int bidAmount = int.tryParse(amount) ?? 0;
-                            final double minimumPrice = _currentBid + _minBidIncrement;
-                            if (bidAmount <= _currentBid) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            if (bidAmount < minimumPrice) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
+                          if (amount.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a bid amount'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
 
-                            try {
-                              final success = await _auctionService.placeBid(
-                                id,
-                                '4', // Replace with actual user_id
-                                bidAmount,
-                              );
-                              if (success) {
-                                setState(() {
-                                  _currentBid = bidAmount;
-                                  _bidHistory.insert(0, {
-                                    'bidder': 'You', // Replace with actual user name
-                                    'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
-                                    'time': 'Just now',
-                                  });
+                          final int bidAmount = int.tryParse(amount) ?? 0;
+                          final double minimumPrice = _currentBid + _minBidIncrement;
+                          if (bidAmount <= _currentBid) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+                          if (bidAmount < minimumPrice) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (userId == null || userId == 'Unknown') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please log in to place a bid'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            final success = await _auctionService.placeBid(
+                              id,
+                              userId!, // Use actual userId from SharedPreferences
+                              bidAmount,
+                            );
+                            if (success) {
+                              setState(() {
+                                _currentBid = bidAmount;
+                                _bidHistory.insert(0, {
+                                  'bidder': 'You', // Replace with actual user name if available
+                                  'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
+                                  'time': 'Just now',
                                 });
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Bid placed successfully!'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Failed to place bid'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
+                              });
+                              Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error placing bid: $e'),
+                                const SnackBar(
+                                  content: Text('Bid placed successfully!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to place bid'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                             }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error placing bid: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
                           }
                         },
                         style: ElevatedButton.styleFrom(

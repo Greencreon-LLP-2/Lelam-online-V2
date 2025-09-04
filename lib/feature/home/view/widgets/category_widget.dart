@@ -7,7 +7,8 @@ import 'package:lelamonline_flutter/feature/categories/services/categories_servi
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 
 class CategoryWidget extends StatefulWidget {
-  const CategoryWidget({super.key});
+  final String? userId;
+  const CategoryWidget({super.key,this.userId});
 
   @override
   State<CategoryWidget> createState() => _CategoryWidgetState();
@@ -52,14 +53,14 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                     case "1":
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => UsedCarsPage()),
+                        MaterialPageRoute(builder: (context) => UsedCarsPage(userId: widget.userId)),
                       );
                       break;
                     case "2":
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => RealEstatePage(),
+                          builder: (context) => RealEstatePage(userId: widget.userId),
                         ),
                       );
                       break;
@@ -67,14 +68,14 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CommercialVehiclesPage(),
+                          builder: (context) => CommercialVehiclesPage(userId: widget.userId),
                         ),
                       );
                       break;
                     case '4':
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => OthersPage()),
+                        MaterialPageRoute(builder: (context) => OthersPage(userId: widget.userId)),
                       );
                       break;
                     // case "4":

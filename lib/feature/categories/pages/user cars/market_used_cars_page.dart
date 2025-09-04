@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
@@ -9,19 +10,21 @@ import 'package:lelamonline_flutter/feature/categories/models/details_model.dart
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
-import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
+  final String? userId;
 
   const MarketPlaceProductDetailsPage({
     super.key,
     required this.product,
     this.isAuction = false,
+    this.userId,
   });
 
   @override
@@ -51,13 +54,215 @@ class _MarketPlaceProductDetailsPageState
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
+  String? userId;
+  double _minBidIncrement = 1000; // Example minimum increment, adjust as needed
+  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
+  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
+  bool _isLoadingBid = true;
 
+  Future<void> _saveBidData(int bidAmount) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String currentDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    final String expirationDate = DateFormat('dd-MM-yyyy').format(
+      DateTime.now().add(const Duration(days: 7)),
+    );
+
+    final Map<String, dynamic> bidData = {
+      'id': id,
+      'userId': userId,
+      'post_id': id,
+      'carImage': image.isNotEmpty ? 'https://lelamonline.com/admin/$image' : '',
+      'title': title,
+      'appId': attributeValues['Model Variation'] ?? 'N/A',
+      'bidDate': currentDate,
+      'expirationDate': expirationDate,
+      'targetPrice': price,
+      'bidPrice': bidAmount.toString(),
+      'location': landMark,
+      'store': byDealer == '1' ? 'Dealer' : 'Individual',
+    };
+
+    List<String> existingBids = prefs.getStringList('userBids') ?? [];
+    existingBids.add(jsonEncode(bidData));
+    await prefs.setStringList('userBids', existingBids);
+  }
+
+void showProductBidDialog(BuildContext context) {
+  final TextEditingController _bidController = TextEditingController();
+  bool isDialogOpen = true; // Track dialog state to prevent premature disposal
+
+  void showThankYouDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Thank You',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Your bid has been placed successfully.\nCheck "My Bids" in status or call support.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close Thank You dialog
+                if (isDialogOpen) {
+                  Navigator.of(context).pop(); // Close main bid dialog
+                  isDialogOpen = false;
+                  _bidController.dispose(); // Dispose controller once
+                }
+              },
+              child: const Text('OK', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close Thank You dialog
+                if (isDialogOpen) {
+                  Navigator.of(context).pop(); // Close main bid dialog
+                  isDialogOpen = false;
+                  _bidController.dispose(); // Dispose controller once
+                }
+                // Placeholder for call support
+                // Optionally add: launchUrl(Uri(scheme: 'tel', path: 'YOUR_SUPPORT_NUMBER'));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Call Support'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text(
+          'Place Your Bid Amount',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Bid Amount *',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bidController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: false),
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(
+                hintText: 'Enter amount',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close main bid dialog
+              isDialogOpen = false;
+              _bidController.dispose(); // Dispose controller once
+            },
+            child: const Text('Close', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final String amount = _bidController.text;
+              if (amount.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a bid amount'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final int bidAmount = int.tryParse(amount) ?? 0;
+              if (bidAmount < _minBidIncrement) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              if (userId == null || userId == 'Unknown') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please log in to place a bid'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              try {
+                // Log bid data for debugging
+                debugPrint('Saving bid: post_id=$id, user_id=$userId, bidamt=$bidAmount');
+                
+                // Save bid data to SharedPreferences
+                await _saveBidData(bidAmount);
+                showThankYouDialog();
+              } catch (e) {
+                debugPrint('Error saving bid: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error saving bid: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Submit'),
+          ),
+        ],
+      );
+    },
+  ).then((_) {
+    // Handle dialog dismissal (e.g., tapping outside)
+    if (isDialogOpen) {
+      isDialogOpen = false;
+      _bidController.dispose();
+    }
+  });
+}
 
   @override
   void initState() {
     super.initState();
+    _loadUserId();
     _fetchDetailsData();
-       _fetchSellerInfo();
+    _fetchSellerInfo();
+  }
+
+  Future<void> _loadUserId() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+    });
+    debugPrint('MarketPlaceProductDetailsPage - Loaded userId: $userId');
   }
 
   @override
@@ -66,11 +271,12 @@ class _MarketPlaceProductDetailsPageState
     _transformationController.dispose();
     super.dispose();
   }
-Future<void> _fetchSellerInfo() async {
+
+  Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
         ),
       );
 
@@ -106,6 +312,7 @@ Future<void> _fetchSellerInfo() async {
       });
     }
   }
+
   Future<void> _fetchDetailsData() async {
     setState(() {
       isLoadingDetails = true;
@@ -155,7 +362,6 @@ Future<void> _fetchSellerInfo() async {
 
     final Set<String> processedAttributes = {};
 
-    // Process attribute value pairs from API
     for (var pair in attributeValuePairs) {
       if (pair.attributeName.isNotEmpty &&
           pair.attributeValue.isNotEmpty &&
@@ -171,11 +377,10 @@ Future<void> _fetchSellerInfo() async {
       }
     }
 
-    // Process KM Range (ID 3) specially
     if (filters.containsKey('3')) {
       String variationId;
       if (filters['3'] is String) {
-        variationId = filters['3'] as String; // Handle string value
+        variationId = filters['3'] as String;
       } else if (filters['3'] is List<dynamic> &&
           (filters['3'] as List).isNotEmpty) {
         variationId = (filters['3'] as List)[0].toString();
@@ -197,12 +402,11 @@ Future<void> _fetchSellerInfo() async {
       }
     }
 
-    // Process other filters
     filters.forEach((attributeId, variation) {
       if (attributeId != '3') {
         String variationId;
         if (variation is String) {
-          variationId = variation; // Handle string value
+          variationId = variation;
         } else if (variation is List<dynamic> && variation.isNotEmpty) {
           variationId = variation[0].toString();
         } else {
@@ -213,37 +417,35 @@ Future<void> _fetchSellerInfo() async {
         if (variationId.isNotEmpty) {
           final attribute = attributes.firstWhere(
             (attr) => attr.id == attributeId,
-            orElse:
-                () => Attribute(
-                  id: attributeId,
-                  slug: '',
-                  name: _getAttributeNameFromId(attributeId),
-                  listOrder: '',
-                  categoryId: '',
-                  formValidation: '',
-                  ifDetailsIcons: '',
-                  detailsIcons: '',
-                  detailsIconsOrder: '',
-                  showFilter: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
+            orElse: () => Attribute(
+              id: attributeId,
+              slug: '',
+              name: _getAttributeNameFromId(attributeId),
+              listOrder: '',
+              categoryId: '',
+              formValidation: '',
+              ifDetailsIcons: '',
+              detailsIcons: '',
+              detailsIconsOrder: '',
+              showFilter: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
           );
           if (!processedAttributes.contains(attribute.name)) {
             final variationObj = attributeVariations.firstWhere(
               (varAttr) =>
                   varAttr.id == variationId &&
                   varAttr.attributeId == attributeId,
-              orElse:
-                  () => AttributeVariation(
-                    id: variationId,
-                    attributeId: attributeId,
-                    name: '',
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
+              orElse: () => AttributeVariation(
+                id: variationId,
+                attributeId: attributeId,
+                name: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
             );
             print(
               'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variationObj.name}',
@@ -339,22 +541,21 @@ Future<void> _fetchSellerInfo() async {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -447,21 +648,19 @@ Future<void> _fetchSellerInfo() async {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -488,8 +687,7 @@ Future<void> _fetchSellerInfo() async {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -529,9 +727,7 @@ Future<void> _fetchSellerInfo() async {
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
+                                      duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -540,10 +736,9 @@ Future<void> _fetchSellerInfo() async {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -554,22 +749,19 @@ Future<void> _fetchSellerInfo() async {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
+                                        placeholder: (context, url) => const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) => const Icon(
+                                          Icons.error,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -755,66 +947,65 @@ Future<void> _fetchSellerInfo() async {
     );
   }
 
- Widget _buildSellerInformationItem(BuildContext context) {
+  Widget _buildSellerInformationItem(BuildContext context) {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        SellerInformationPage(userId: widget.product.createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SellerInformationPage(userId: widget.product.createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage: sellerProfileImage != null &&
+                              sellerProfileImage!.isNotEmpty
+                          ? CachedNetworkImageProvider(sellerProfileImage!)
+                          : const AssetImage('assets/images/avatar.gif')
+                              as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 
   Widget _buildQuestionsSection() {
@@ -849,6 +1040,7 @@ Future<void> _fetchSellerInfo() async {
 
   @override
   Widget build(BuildContext context) {
+    final isUserLoggedIn = userId != null && userId != 'Unknown';
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -858,6 +1050,13 @@ Future<void> _fetchSellerInfo() async {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'User ID: ${userId ?? 'Unknown'}',
+                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                ),
                 Stack(
                   children: [
                     SizedBox(
@@ -880,13 +1079,11 @@ Future<void> _fetchSellerInfo() async {
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -973,16 +1170,16 @@ Future<void> _fetchSellerInfo() async {
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -1076,8 +1273,7 @@ Future<void> _fetchSellerInfo() async {
                                     child: _buildDetailItem(
                                       Icons.person,
                                       _getOwnerText(
-                                        attributeValues['No of owners'] ??
-                                            'N/A',
+                                        attributeValues['No of owners'] ?? 'N/A',
                                       ),
                                     ),
                                   ),
@@ -1109,8 +1305,7 @@ Future<void> _fetchSellerInfo() async {
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.build,
-                                      attributeValues['Engine Condition'] ??
-                                          'N/A',
+                                      attributeValues['Engine Condition'] ?? 'N/A',
                                     ),
                                   ),
                                 ],
@@ -1139,22 +1334,21 @@ Future<void> _fetchSellerInfo() async {
                         const Center(child: CircularProgressIndicator())
                       else
                         Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.value != 'N/A' &&
-                                        entry.key != 'Co driver side rear tyre',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.key == 'No of owners'
-                                          ? _getOwnerText(entry.value)
-                                          : entry.value,
-                                    ),
-                                  )
-                                  .toList(),
+                          children: orderedAttributeValues
+                              .where(
+                                (entry) =>
+                                    entry.value != 'N/A' &&
+                                    entry.key != 'Co driver side rear tyre',
+                              )
+                              .map(
+                                (entry) => _buildSellerCommentItem(
+                                  entry.key,
+                                  entry.key == 'No of owners'
+                                      ? _getOwnerText(entry.value)
+                                      : entry.value,
+                                ),
+                              )
+                              .toList(),
                         ),
                     ],
                   ),
@@ -1173,10 +1367,7 @@ Future<void> _fetchSellerInfo() async {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(
-                        
-                        context,
-                      ),
+                      _buildSellerInformationItem(context),
                     ],
                   ),
                 ),
@@ -1208,7 +1399,6 @@ Future<void> _fetchSellerInfo() async {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
-                // No background color
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -1220,22 +1410,22 @@ Future<void> _fetchSellerInfo() async {
               ),
               child: Row(
                 children: [
-                Expanded(
-  child: ElevatedButton(
-    onPressed: () {
-      showBidDialog(context); // Call the dialog function
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Palette.primarypink,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-    ),
-    child: const Text('Place Bid'),
-  ),
-),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        showProductBidDialog(context); // Updated to new dialog name
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primarypink,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
+                      ),
+                      child: const Text('Place Bid'),
+                    ),
+                  ),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),

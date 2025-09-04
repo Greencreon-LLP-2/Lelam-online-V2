@@ -339,7 +339,7 @@ class Bike extends MarketplacePost {
 }
 
 class OthersPage extends StatefulWidget {
-  const OthersPage({super.key});
+  const OthersPage({super.key, String? userId});
 
   @override
   State<OthersPage> createState() => _OthersPageState();

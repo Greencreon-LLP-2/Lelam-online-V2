@@ -1,15 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final Map<String, dynamic>? extra;
+
+  const LoginPage({super.key, this.extra});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -30,79 +32,173 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // Normalize mobile number by removing country code, spaces, or special characters
+  String _normalizeMobileNumber(String? mobile) {
+    if (mobile == null || mobile.isEmpty) return '';
+    return mobile
+        .replaceAll('+91', '')
+        .replaceAll('91', '')
+        .replaceAll(
+          RegExp(r'[\s\-\(\)]'),
+          '',
+        ) // Remove spaces, dashes, parentheses
+        .replaceAll(RegExp(r'^\+?0*'), '') // Remove leading zeros or +
+        .trim();
+  }
+
   Future<void> _handleSubmit() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
-      try {
-        if (_isOtpMode) {
-          const bool isTestMode = kDebugMode;
-          String testOtp = '9021';
+    if (!_formKey.currentState!.validate()) {
+      if (kDebugMode) {
+        print('Form validation failed');
+      }
+      Fluttertoast.showToast(
+        msg: 'Please enter a valid phone number',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
 
-          final headers = {
-            'token': '5cb2c9b569416b5db1604e0e12478ded',
-            'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
-          };
+    setState(() => _isLoading = true);
+    try {
+      if (_isOtpMode) {
+        const bool isTestMode = kDebugMode;
+        const String testOtp = '9021';
+        const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+        const String token = '5cb2c9b569416b5db1604e0e12478ded';
+        final String mobile = _phoneController.text;
+        final String normalizedMobile = _normalizeMobileNumber(mobile);
 
-          // Send OTP
+        if (kDebugMode) {
+          print(
+            'Entered mobile: "$mobile", Normalized mobile: "$normalizedMobile"',
+          );
+        }
+
+        // Step 1: Check if the phone number is registered using index.php
+        final userCheckRequest = http.Request(
+          'GET',
+          Uri.parse('$baseUrl/index.php?token=$token'),
+        );
+        userCheckRequest.headers.addAll({
+          'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
+        });
+        final userCheckResponse = await userCheckRequest.send();
+        final userCheckResponseBody =
+            await userCheckResponse.stream.bytesToString();
+
+        if (userCheckResponse.statusCode == 200) {
+          if (kDebugMode) {
+            print('index.php raw response: $userCheckResponseBody');
+          }
+
+          dynamic userListResponse;
+          try {
+            userListResponse = jsonDecode(userCheckResponseBody);
+          } catch (e) {
+            if (kDebugMode) {
+              print('Failed to parse index.php response: $e');
+              print('Raw response: $userCheckResponseBody');
+            }
+            throw Exception('Failed to parse response from index.php: $e');
+          }
+
+          // Check if response has the expected structure
+          if (userListResponse is! Map ||
+              userListResponse['status'] != 'true' ||
+              userListResponse['data'] is! List) {
+            if (kDebugMode) {
+              print('Invalid response structure: $userListResponse');
+            }
+            throw Exception(
+              'Invalid user list format: Expected a map with status "true" and data as a list',
+            );
+          }
+
+          final userList = userListResponse['data'] as List<dynamic>;
+          if (kDebugMode) {
+            print('Parsed user list: $userList');
+          }
+
+          final user = userList.firstWhere((user) {
+            final apiMobile = _normalizeMobileNumber(
+              user['mobile']?.toString(),
+            );
+            final apiMobileCode = user['mobile_code']?.toString() ?? '';
+            if (kDebugMode) {
+              print(
+                'Comparing API mobile: "$apiMobile" (code: "$apiMobileCode") with input: "$normalizedMobile"',
+              );
+            }
+            return apiMobile == normalizedMobile &&
+                (apiMobileCode == '91' || apiMobileCode.isEmpty);
+          }, orElse: () => null);
+
+          if (user == null) {
+            if (mounted) {
+              Fluttertoast.showToast(
+                msg: 'Phone number not registered. Please sign up.',
+                toastLength: Toast.LENGTH_LONG,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: Colors.red.withOpacity(0.8),
+                textColor: Colors.white,
+                fontSize: 16.0,
+              );
+            }
+            if (kDebugMode) {
+              print('No user found for mobile: $normalizedMobile');
+            }
+            return;
+          }
+
+          final userId = user['user_id']?.toString();
+          if (userId == null) {
+            if (kDebugMode) {
+              print('User found but user_id is null: $user');
+            }
+            throw Exception('User ID not found');
+          }
+
+          if (kDebugMode) {
+            print('Found user with user_id: $userId');
+          }
+
+          // Step 2: Send OTP using login.php
           final otpRequest = http.Request(
             'GET',
             Uri.parse(
-              'https://lelamonline.com/admin/api/v1/otp-send.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile_code=91&mobile=${_phoneController.text}&otp=$testOtp',
+              '$baseUrl/login.php?token=$token&mobile_code=91&mobile=$mobile',
             ),
           );
-          otpRequest.headers.addAll(headers);
+          otpRequest.headers.addAll({
+            'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
+          });
           final otpResponse = await otpRequest.send();
           final otpResponseBody = await otpResponse.stream.bytesToString();
 
           if (otpResponse.statusCode == 200) {
-            // Fetch user details to get user_id
-            final userRequest = http.Request(
-              'GET',
-              Uri.parse(
-                'https://lelamonline.com/admin/api/v1/user.php?token=5cb2c9b569416b5db1604e0e12478ded&mobile=${_phoneController.text}',
-              ),
-            );
-            userRequest.headers.addAll(headers);
-            final userResponse = await userRequest.send();
-            final userResponseBody = await userResponse.stream.bytesToString();
-
-            if (userResponse.statusCode == 200) {
-              final userDetails = jsonDecode(userResponseBody);
-              final userId = userDetails['user_id']?.toString(); // e.g., "482"
-              if (userId == null) {
-                throw Exception('User ID not found');
-              }
-              if (mounted) {
-                context.pushNamed(
-                  RouteNames.otpVerificationPage,
-                  extra: {
-                    'phone': '+91${_phoneController.text}',
+            if (mounted) {
+              final extra =
+                  (widget.extra ?? {})..addAll({
+                    'phone': '+91$mobile',
                     'testOtp': isTestMode ? testOtp : null,
                     'userId': userId,
-                  },
-                );
-                Fluttertoast.showToast(
-                  msg: isTestMode
-                      ? 'Test OTP sent: $testOtp'
-                      : 'OTP sent to ${_phoneController.text}',
-                  toastLength: Toast.LENGTH_LONG,
-                  gravity: ToastGravity.BOTTOM,
-                  backgroundColor: Colors.green.withOpacity(0.8),
-                  textColor: Colors.white,
-                  fontSize: 16.0,
-                );
-              }
-            } else {
-              if (mounted) {
-                Fluttertoast.showToast(
-                  msg: 'Failed to fetch user: ${userResponse.reasonPhrase}',
-                  toastLength: Toast.LENGTH_SHORT,
-                  gravity: ToastGravity.BOTTOM,
-                  backgroundColor: Colors.red.withOpacity(0.8),
-                  textColor: Colors.white,
-                  fontSize: 16.0,
-                );
-              }
+                  });
+              context.pushNamed(RouteNames.otpVerificationPage, extra: extra);
+              Fluttertoast.showToast(
+                msg:
+                    isTestMode
+                        ? 'Test OTP sent: $testOtp'
+                        : 'OTP sent to +91$mobile',
+                toastLength: Toast.LENGTH_LONG,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: Colors.green.withOpacity(0.8),
+                textColor: Colors.white,
+                fontSize: 16.0,
+              );
             }
           } else {
             if (mounted) {
@@ -115,12 +211,16 @@ class _LoginPageState extends State<LoginPage> {
                 fontSize: 16.0,
               );
             }
+            if (kDebugMode) {
+              print(
+                'login.php failed: ${otpResponse.statusCode} ${otpResponse.reasonPhrase}',
+              );
+            }
           }
         } else {
-          // Password login (not implemented as per requirement)
           if (mounted) {
             Fluttertoast.showToast(
-              msg: 'Password login not supported',
+              msg: 'Failed to check user: ${userCheckResponse.reasonPhrase}',
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.BOTTOM,
               backgroundColor: Colors.red.withOpacity(0.8),
@@ -128,11 +228,16 @@ class _LoginPageState extends State<LoginPage> {
               fontSize: 16.0,
             );
           }
+          if (kDebugMode) {
+            print(
+              'index.php failed: ${userCheckResponse.statusCode} ${userCheckResponse.reasonPhrase}',
+            );
+          }
         }
-      } catch (e) {
+      } else {
         if (mounted) {
           Fluttertoast.showToast(
-            msg: 'Error: ${e.toString()}',
+            msg: 'Password login not supported',
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.red.withOpacity(0.8),
@@ -140,10 +245,24 @@ class _LoginPageState extends State<LoginPage> {
             fontSize: 16.0,
           );
         }
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Fluttertoast.showToast(
+          msg: 'Error: ${e.toString()}',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+      if (kDebugMode) {
+        print('Error in _handleSubmit: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -171,17 +290,16 @@ class _LoginPageState extends State<LoginPage> {
                 Text(
                   'Welcome Back',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Sign in to continue',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(color: Colors.grey[600]),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 48),
                 Row(
@@ -343,20 +461,22 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                    child:
+                        _isLoading
+                            ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                            : Text(
+                              _isOtpMode ? 'Send OTP' : 'Sign In',
+                              style: const TextStyle(fontSize: 16),
                             ),
-                          )
-                        : Text(
-                            _isOtpMode ? 'Send OTP' : 'Sign In',
-                            style: const TextStyle(fontSize: 16),
-                          ),
                   ),
                 ),
                 const Spacer(),
@@ -365,10 +485,9 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Text(
                         'By continuing, you agree to our Terms and Privacy Policy',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Colors.grey[600]),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),

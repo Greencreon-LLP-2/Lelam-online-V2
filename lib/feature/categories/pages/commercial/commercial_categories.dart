@@ -205,7 +205,7 @@ class MarketplaceService {
 }
 
 class CommercialVehiclesPage extends StatefulWidget {
-  const CommercialVehiclesPage({super.key});
+  const CommercialVehiclesPage({super.key, String? userId});
 
   @override
   State<CommercialVehiclesPage> createState() => _CommercialVehiclesPageState();

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';

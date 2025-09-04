@@ -218,7 +218,7 @@ class MarketplaceService {
 }
 
 class RealEstatePage extends StatefulWidget {
-  const RealEstatePage({super.key});
+  const RealEstatePage({super.key, String? userId});
 
   @override
   State<RealEstatePage> createState() => _RealEstatePageState();

@@ -4,12 +4,13 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CategoryItem {
   final String name;
-  final IconData? icon; // Optional local icon for fallback
+  final IconData? icon;
   final Color? color;
-  final String? imageUrl; // Network image URL
+  final String? imageUrl;
 
   const CategoryItem({
     required this.name,
@@ -20,7 +21,9 @@ class CategoryItem {
 }
 
 class SellPage extends StatefulWidget {
-  const SellPage({super.key, String? userId});
+  final String? userId;
+
+  const SellPage({super.key, this.userId});
 
   @override
   State<SellPage> createState() => _SellPageState();
@@ -35,7 +38,6 @@ class _SellPageState extends State<SellPage> {
     _categoriesFuture = CategoryService().fetchCategories();
   }
 
-  // Fallback icons and colors for categories based on ID
   final Map<String, CategoryItem> _fallbackCategories = {
     '1': const CategoryItem(
       name: 'Used Cars',
@@ -99,7 +101,8 @@ class _SellPageState extends State<SellPage> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final category = categories[index];
-                      final fallback = _fallbackCategories[category.id] ??
+                      final fallback =
+                          _fallbackCategories[category.id] ??
                           const CategoryItem(
                             name: 'Unknown',
                             icon: Icons.help_outline,
@@ -111,9 +114,10 @@ class _SellPageState extends State<SellPage> {
                           name: category.name,
                           icon: fallback.icon,
                           color: fallback.color,
-                          imageUrl: 'https://lelamonline.com/admin/${category.image}',
+                          imageUrl:
+                              'https://lelamonline.com/admin/${category.image}',
                         ),
-                        onTap: () => _navigateToAdPost(context, category.id), // Pass category.id
+                        onTap: () => _navigateToAdPost(context, category.id),
                       );
                     },
                   );
@@ -127,7 +131,10 @@ class _SellPageState extends State<SellPage> {
   }
 
   void _navigateToAdPost(BuildContext context, String categoryId) {
-    context.pushNamed(RouteNames.adPostPage, extra: categoryId); // Pass categoryId
+    context.pushNamed(
+      RouteNames.adPostPage,
+      extra: {'categoryId': categoryId, 'userId': widget.userId},
+    );
   }
 }
 
@@ -169,17 +176,22 @@ class _CategoryCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: categoryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
-                    image: category.imageUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(category.imageUrl!),
-                            fit: BoxFit.cover,
-                            onError: (exception, stackTrace) => const AssetImage('assets/placeholder.png'),
-                          )
-                        : null,
+                    image:
+                        category.imageUrl != null
+                            ? DecorationImage(
+                              image: NetworkImage(category.imageUrl!),
+                              fit: BoxFit.cover,
+                              onError:
+                                  (exception, stackTrace) => const AssetImage(
+                                    'assets/placeholder.png',
+                                  ),
+                            )
+                            : null,
                   ),
-                  child: category.imageUrl == null
-                      ? Icon(category.icon, color: categoryColor, size: 28)
-                      : null,
+                  child:
+                      category.imageUrl == null
+                          ? Icon(category.icon, color: categoryColor, size: 28)
+                          : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(

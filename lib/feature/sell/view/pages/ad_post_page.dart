@@ -1,18 +1,21 @@
-// ignore_for_file: deprecated_member_use, use_build_context_synchronously
-
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+// [Brand, BrandModel, ModelVariation, Attribute, AttributeVariation classes unchanged]
 class Brand {
   final String id;
   final String slug;
@@ -128,9 +131,6 @@ class Attribute {
   final String listOrder;
   final String categoryId;
   final String formValidation;
-//  final String ifDetailsIcons;
-//  final String detailsIcons;
-//  final String detailsIconsOrder;
   final String showFilter;
   final String status;
   final String createdOn;
@@ -143,9 +143,6 @@ class Attribute {
     required this.listOrder,
     required this.categoryId,
     required this.formValidation,
-    //required this.ifDetailsIcons,
-   // required this.detailsIcons,
-   // required this.detailsIconsOrder,
     required this.showFilter,
     required this.status,
     required this.createdOn,
@@ -160,9 +157,6 @@ class Attribute {
       listOrder: json['list_order']?.toString() ?? '',
       categoryId: json['category_id']?.toString() ?? '',
       formValidation: json['form_validation']?.toString() ?? '',
-    //ifDetailsIcons: json['if_details_icons']?.toString() ?? '',
-    //  detailsIcons: json['details_icons']?.toString() ?? '',
-     // detailsIconsOrder: json['details_icons_order']?.toString() ?? '',
       showFilter: json['show_filter']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       createdOn: json['created_on']?.toString() ?? '',
@@ -207,7 +201,9 @@ class AttributeValueService {
   static Future<List<Brand>> fetchBrands(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-brand.php?token=$token&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-brand.php?token=$token&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -217,11 +213,14 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Brands API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          final brands = (data['data'] as List)
-              .map((e) => Brand.fromJson(e))
-              .where((brand) => brand.categoryId == categoryId)
-              .toList();
-          print('Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}');
+          final brands =
+              (data['data'] as List)
+                  .map((e) => Brand.fromJson(e))
+                  .where((brand) => brand.categoryId == categoryId)
+                  .toList();
+          print(
+            'Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}',
+          );
           return brands;
         }
         print('No brands found for category_id: $categoryId');
@@ -235,10 +234,15 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<BrandModel>> fetchBrandModels(String brandId, String categoryId) async {
+  static Future<List<BrandModel>> fetchBrandModels(
+    String brandId,
+    String categoryId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -246,16 +250,25 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Brand models API response for brand_id $brandId, category_id $categoryId: $data');
+        print(
+          'Brand models API response for brand_id $brandId, category_id $categoryId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          final models = (data['data'] as List).map((e) => BrandModel.fromJson(e)).toList();
+          final models =
+              (data['data'] as List)
+                  .map((e) => BrandModel.fromJson(e))
+                  .toList();
           print('Fetched brand models: ${models.map((m) => m.name).toList()}');
           return models;
         }
-        print('No brand models found for brand_id: $brandId, category_id: $categoryId');
+        print(
+          'No brand models found for brand_id: $brandId, category_id: $categoryId',
+        );
         return [];
       }
-      print('Failed to fetch brand models: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch brand models: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching brand models: $e');
@@ -263,10 +276,15 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<ModelVariation>> fetchModelVariations(String brandModelId, String categoryId) async {
+  static Future<List<ModelVariation>> fetchModelVariations(
+    String brandModelId,
+    String categoryId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -274,17 +292,28 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data');
+        print(
+          'Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          final variations = (data['data'] as List).map((e) => ModelVariation.fromJson(e)).toList();
+          final variations =
+              (data['data'] as List)
+                  .map((e) => ModelVariation.fromJson(e))
+                  .toList();
           print('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
-          print('Model variations names: ${variations.map((v) => v.name).toSet()}');
+          print(
+            'Model variations names: ${variations.map((v) => v.name).toSet()}',
+          );
           return variations;
         }
-        print('No model variations found for brands_model_id: $brandModelId, category_id: $categoryId');
+        print(
+          'No model variations found for brands_model_id: $brandModelId, category_id: $categoryId',
+        );
         return [];
       }
-      print('Failed to fetch model variations: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch model variations: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching model variations: $e');
@@ -295,7 +324,9 @@ class AttributeValueService {
   static Future<List<Attribute>> fetchAttributes(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -305,12 +336,16 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Attributes API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List).map((e) => Attribute.fromJson(e)).toList();
+          return (data['data'] as List)
+              .map((e) => Attribute.fromJson(e))
+              .toList();
         }
         print('No attributes found for category_id: $categoryId');
         return [];
       }
-      print('Failed to fetch attributes: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch attributes: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching attributes: $e');
@@ -318,10 +353,14 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<AttributeVariation>> fetchAttributeVariations(String attributeId) async {
+  static Future<List<AttributeVariation>> fetchAttributeVariations(
+    String attributeId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId'),
+        Uri.parse(
+          '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -329,25 +368,34 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Attribute variations API response for attribute_id $attributeId: $data');
+        print(
+          'Attribute variations API response for attribute_id $attributeId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List).map((e) => AttributeVariation.fromJson(e)).toList();
+          return (data['data'] as List)
+              .map((e) => AttributeVariation.fromJson(e))
+              .toList();
         }
         print('No variations found for attribute_id: $attributeId');
         return [];
       }
-      print('Failed to fetch attribute variations: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch attribute variations: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
-      print('Error fetching attribute variations for attribute_id $attributeId: $e');
+      print(
+        'Error fetching attribute variations for attribute_id $attributeId: $e',
+      );
       return [];
     }
   }
 }
 
 class AdPostPage extends StatefulWidget {
-  final String categoryId;
-  const AdPostPage({super.key, required this.categoryId});
+  final Map<String, dynamic>? extra; // Contains categoryId and userId
+
+  const AdPostPage({super.key, this.extra});
 
   @override
   State<AdPostPage> createState() => _AdPostPageState();
@@ -355,10 +403,54 @@ class AdPostPage extends StatefulWidget {
 
 class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
+  String? _categoryId;
+  String? _userId;
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    print('Received extra: ${widget.extra}');
+    if (widget.extra != null) {
+      final categoryId = widget.extra!['categoryId'];
+      final userId = widget.extra!['userId'];
+      _categoryId = categoryId is String ? categoryId : null;
+      _userId = userId is String ? userId : 'Unknown';
+      if (categoryId != null && categoryId is! String) {
+        print(
+          'Error: categoryId is not a String, got type ${categoryId.runtimeType}: $categoryId',
+        );
+        Fluttertoast.showToast(
+          msg: 'Invalid category ID format',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+      if (userId != null && userId is! String) {
+        print(
+          'Error: userId is not a String, got type ${userId.runtimeType}: $userId',
+        );
+      }
+    } else {
+      print('Error: extra is null');
+      _categoryId = null;
+      _userId = 'Unknown';
+      Fluttertoast.showToast(
+        msg: 'No category or user ID provided',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
     }
   }
 
@@ -394,7 +486,8 @@ class _AdPostPageState extends State<AdPostPage> {
       ),
       body: AdPostForm(
         formKey: _formKey,
-        categoryId: widget.categoryId,
+        categoryId: _categoryId ?? '',
+        userId: _userId,
         onSubmit: _submitForm,
       ),
     );
@@ -404,12 +497,14 @@ class _AdPostPageState extends State<AdPostPage> {
 class AdPostForm extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final String categoryId;
+  final String? userId;
   final VoidCallback onSubmit;
 
   const AdPostForm({
     super.key,
     required this.formKey,
     required this.categoryId,
+    this.userId,
     required this.onSubmit,
   });
 
@@ -417,8 +512,8 @@ class AdPostForm extends StatefulWidget {
   State<AdPostForm> createState() => _AdPostFormState();
 }
 
-class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateMixin {
-  String? _categoryId;
+class _AdPostFormState extends State<AdPostForm>
+    with SingleTickerProviderStateMixin {
   List<Brand> _brands = [];
   List<BrandModel> _brandModels = [];
   List<ModelVariation> _modelVariations = [];
@@ -442,15 +537,14 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _imageError = false;
-  final int _maxImages = 10; // Allow up to 10 images
-  int _coverImageIndex = 0; // Tracks the index of the cover image
+  final int _maxImages = 10;
+  int _coverImageIndex = 0;
   final Map<String, TextEditingController> _attributeControllers = {};
-
-  String? _selectedDistrict = districts.isNotEmpty ? districts[0] : 'Thiruvananthapuram';
+  String? _selectedDistrict;
 
   List<String> _getRequiredAttributes(String categoryId) {
     switch (categoryId) {
-      case '1': // Used Cars
+      case '1':
         return [
           'Year',
           'No of owners',
@@ -459,23 +553,12 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           'KM Range',
           'Sold by',
         ];
-      case '2': // Real Estate
-        return [
-          'Property Type',
-          'Area',
-          'Location',
-        ];
-      case '3': // Commercial Vehicles
-        return [
-          'Vehicle Type',
-          'Year',
-          'Fuel Type',
-        ];
-      case '4': // Others
-        return [
-          'Item Type',
-          'Condition',
-        ];
+      case '2':
+        return ['Property Type', 'Area', 'Location'];
+      case '3':
+        return ['Vehicle Type', 'Year', 'Fuel Type'];
+      case '4':
+        return ['Item Type', 'Condition'];
       default:
         return [];
     }
@@ -485,10 +568,14 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     setState(() {
       _modelVariations = modelVariations;
       if (_selectedModelVariation != null &&
-          !modelVariations.any((item) => item.id == _selectedModelVariation!.id)) {
+          !modelVariations.any(
+            (item) => item.id == _selectedModelVariation!.id,
+          )) {
         _selectedModelVariation = null;
       }
-      print('Updated model variations: ${modelVariations.map((v) => v.name).toList()}');
+      print(
+        'Updated model variations: ${modelVariations.map((v) => v.name).toList()}',
+      );
     });
   }
 
@@ -499,15 +586,17 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_animationController);
     _animationController.forward();
+    _selectedDistrict = districts.isNotEmpty ? districts[0] : null;
     _fetchInitialData();
   }
 
   Future<void> _fetchInitialData() async {
-    _categoryId = widget.categoryId;
-    if (_categoryId == null || _categoryId!.isEmpty) {
-      print('Error: categoryId is null or empty');
+    if (widget.categoryId.isEmpty) {
       Fluttertoast.showToast(
         msg: 'Error: No category selected',
         toastLength: Toast.LENGTH_SHORT,
@@ -518,9 +607,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       );
       return;
     }
-    print('Fetching initial data for category_id: $_categoryId');
 
-    // Clear previous data to prevent cross-category contamination
     setState(() {
       _brands = [];
       _brandModels = [];
@@ -536,15 +623,17 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       _attributeControllers.clear();
     });
 
-    // Fetch brands for the category
-    final brands = await AttributeValueService.fetchBrands(_categoryId!);
+    final brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
       _brands = brands;
-      print('Loaded brands for category $_categoryId: ${brands.map((b) => b.name).toList()}');
+      print(
+        'Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}',
+      );
     });
 
-    // Fetch attributes for the category
-    final attributes = await AttributeValueService.fetchAttributes(_categoryId!);
+    final attributes = await AttributeValueService.fetchAttributes(
+      widget.categoryId,
+    );
     setState(() {
       _attributes = attributes;
       _attributeIdMap = {for (var attr in attributes) attr.name: attr.id};
@@ -552,30 +641,38 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       for (var attr in attributes) {
         _attributeControllers[attr.name] = TextEditingController();
       }
-      print('Loaded attributes for category $_categoryId: ${attributes.map((a) => a.name).toList()}');
+      print(
+        'Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}',
+      );
     });
 
-    // Fetch attribute variations
     for (var attr in attributes) {
-      final variations = await AttributeValueService.fetchAttributeVariations(attr.id);
+      final variations = await AttributeValueService.fetchAttributeVariations(
+        attr.id,
+      );
       setState(() {
         _attributeVariations[attr.name] = variations;
-        print('Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}');
+        print(
+          'Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}',
+        );
       });
     }
   }
 
   Future<void> _fetchModelVariations(String brandModelId) async {
-    final modelVariations = await AttributeValueService.fetchModelVariations(brandModelId, _categoryId!);
-    final uniqueModelVariations = modelVariations.asMap().entries.fold<List<ModelVariation>>(
-      [],
-      (uniqueList, entry) {
-        if (!uniqueList.any((item) => item.id == entry.value.id)) {
-          uniqueList.add(entry.value);
-        }
-        return uniqueList;
-      },
+    final modelVariations = await AttributeValueService.fetchModelVariations(
+      brandModelId,
+      widget.categoryId,
     );
+    final uniqueModelVariations = modelVariations
+        .asMap()
+        .entries
+        .fold<List<ModelVariation>>([], (uniqueList, entry) {
+          if (!uniqueList.any((item) => item.id == entry.value.id)) {
+            uniqueList.add(entry.value);
+          }
+          return uniqueList;
+        });
     _updateModelVariations(uniqueModelVariations);
   }
 
@@ -586,7 +683,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: Text('Maximum $_maxImages images allowed'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -601,7 +700,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           setState(() {
             _selectedImages.add(image);
             _imageError = false;
-            // If this is the first image, set it as cover
             if (_selectedImages.length == 1) {
               _coverImageIndex = 0;
             }
@@ -614,14 +712,16 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         );
         if (images != null && images.isNotEmpty) {
           setState(() {
-            final newImages = images.take(_maxImages - _selectedImages.length).toList();
+            final newImages =
+                images.take(_maxImages - _selectedImages.length).toList();
             _selectedImages.addAll(newImages);
             _imageError = false;
-            // If no images existed before, set the first new image as cover
             if (_selectedImages.length == newImages.length) {
               _coverImageIndex = 0;
             }
-            print('Added gallery images: ${newImages.map((img) => img.path).toList()}');
+            print(
+              'Added gallery images: ${newImages.map((img) => img.path).toList()}',
+            );
           });
         }
       }
@@ -631,7 +731,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: Text('Error picking image: $e'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -641,16 +743,17 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => ImageSourceBottomSheetWidget(
-        onCameraTap: () {
-          Navigator.pop(context);
-          _pickImage(ImageSource.camera);
-        },
-        onGalleryTap: () {
-          Navigator.pop(context);
-          _pickImage(ImageSource.gallery);
-        },
-      ),
+      builder:
+          (context) => ImageSourceBottomSheetWidget(
+            onCameraTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.camera);
+            },
+            onGalleryTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.gallery);
+            },
+          ),
     );
   }
 
@@ -662,14 +765,15 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         if (variations != null && variations.isNotEmpty) {
           final variation = variations.firstWhere(
             (v) => v.name == selectedValue,
-            orElse: () => AttributeVariation(
-              id: '',
-              attributeId: _attributeIdMap[attrName] ?? '',
-              name: '',
-              status: '',
-              createdOn: '',
-              updatedOn: '',
-            ),
+            orElse:
+                () => AttributeVariation(
+                  id: '',
+                  attributeId: _attributeIdMap[attrName] ?? '',
+                  name: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
           );
           if (variation.id.isNotEmpty) {
             filters[_attributeIdMap[attrName] ?? ''] = [variation.id];
@@ -679,16 +783,162 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         }
       }
     });
-    if (_categoryId == '1' && _registrationValidTillController.text.isNotEmpty) {
+    if (widget.categoryId == '1' &&
+        _registrationValidTillController.text.isNotEmpty) {
       final regId = _attributeIdMap['Registration valid till'] ?? '27';
       filters[regId] = [_registrationValidTillController.text];
     }
-    if (_categoryId == '1' && _insuranceUptoController.text.isNotEmpty) {
+    if (widget.categoryId == '1' && _insuranceUptoController.text.isNotEmpty) {
       final insId = _attributeIdMap['Insurance Upto'] ?? '28';
       filters[insId] = [_insuranceUptoController.text];
     }
     print('Filters: $filters');
     return filters;
+  }
+
+ Future<void> _submitForm() async {
+  setState(() {
+    _imageError = _selectedImages.isEmpty;
+  });
+  if (_imageError || !widget.formKey.currentState!.validate()) {
+    return;
+  }
+
+  if (widget.categoryId.isEmpty) {
+    Fluttertoast.showToast(
+      msg: 'Category ID is missing',
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+    return;
+  }
+
+  // Convert all selected images to base64
+  List<String> imageBase64List = [];
+  List<String> imagePathList = [];
+  for (var image in _selectedImages) {
+    final imageBytes = await image.readAsBytes();
+    imageBase64List.add(base64Encode(imageBytes));
+    imagePathList.add(image.path);
+  }
+
+  final requiredAttributes = _getRequiredAttributes(widget.categoryId);
+  final missingAttributes = requiredAttributes.where(
+    (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
+  ).toList();
+  if (missingAttributes.isNotEmpty) {
+    Fluttertoast.showToast(
+      msg: 'Please select: ${missingAttributes.join(", ")}',
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+    return;
+  }
+
+  // Prepare ad data
+  final ad = {
+    'status': 'Pending',
+    'views': 0,
+    'comments': 0,
+    'title': _titleController.text,
+    'appId': 'LAD-${DateTime.now().millisecondsSinceEpoch % 1000}',
+    'postedDate': DateFormat('dd-MM-yyyy').format(DateTime.now()),
+    'expDate': DateFormat('dd-MM-yyyy').format(DateTime.now().add(const Duration(days: 30))),
+    'price': _listPriceController.text,
+    'category': _getCategoryName(widget.categoryId),
+    'itemIn': 'Market Place',
+    'auctionAttempt': '0/3',
+    'auctionPrice': 'xxxx*',
+    'meetingsDone': '0',
+    'location': _selectedDistrict ?? 'Unknown',
+    'imageBase64List': imageBase64List, // Store list of base64 images
+    'imagePathList': imagePathList, // Store list of image paths
+    'coverImageIndex': _coverImageIndex, // Store cover image index
+    'rejectionMsg': null,
+    'userId': widget.userId ?? 'Unknown',
+    'filters': jsonEncode(getFilters()),
+    'brand': _selectedBrand?.id ?? '',
+    'model': _selectedBrandModel?.id ?? '',
+    'model_variation': _selectedModelVariation?.id ?? '',
+    'description': _descriptionController.text,
+    'land_mark': _landMarkController.text,
+    'district': _selectedDistrict ?? '',
+    'registration_valid_till': _registrationValidTillController.text,
+    'insurance_upto': _insuranceUptoController.text,
+  };
+
+  try {
+    // Save ad to SharedPreferences
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final List<String> adStrings = prefs.getStringList('userAds') ?? [];
+    
+    // Check if this ad already exists to avoid duplicates
+    final adId = ad['appId'];
+    final existingAdIndex = adStrings.indexWhere((adString) {
+      try {
+        final existingAd = jsonDecode(adString) as Map<String, dynamic>;
+        return existingAd['appId'] == adId;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    // If ad exists, replace it; otherwise, add it
+    if (existingAdIndex != -1) {
+      adStrings[existingAdIndex] = jsonEncode(ad);
+      print('Replaced existing ad in SharedPreferences');
+    } else {
+      adStrings.add(jsonEncode(ad));
+      print('Added new ad to SharedPreferences');
+    }
+
+    await prefs.setStringList('userAds', adStrings);
+    print('Saved ${adStrings.length} ads to SharedPreferences');
+
+    Fluttertoast.showToast(
+      msg: 'Ad saved successfully',
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+
+    // Navigate to SellingStatusPage with ad data
+    context.pushNamed(
+      RouteNames.sellingstatuspage,
+      extra: {
+        'userId': widget.userId ?? 'Unknown',
+        'adData': ad,
+      },
+    );
+  } catch (e) {
+    print('Error saving ad: $e');
+    Fluttertoast.showToast(
+      msg: 'Error saving ad: $e',
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+  }
+}
+
+  String _getCategoryName(String categoryId) {
+    const categoryMap = {
+      '1': 'Used Cars',
+      '2': 'Real Estate',
+      '3': 'Commercial Vehicles',
+      '4': 'Other',
+    };
+    return categoryMap[categoryId] ?? 'Unknown';
   }
 
   Widget _buildImagePicker() {
@@ -770,7 +1020,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                           height: double.infinity,
                           fit: BoxFit.cover,
                         ),
-                        // Cover Photo Label
                         if (index == _coverImageIndex)
                           Positioned(
                             bottom: 8,
@@ -778,9 +1027,15 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10.0,
+                                  sigmaY: 10.0,
+                                ),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.5),
                                     borderRadius: BorderRadius.circular(12),
@@ -797,14 +1052,16 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                               ),
                             ),
                           ),
-                        // Set as Cover Button
                         Positioned(
                           top: 8,
                           left: 8,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                              filter: ImageFilter.blur(
+                                sigmaX: 10.0,
+                                sigmaY: 10.0,
+                              ),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -814,7 +1071,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                                   icon: Icon(
                                     Icons.star,
                                     size: 20,
-                                    color: index == _coverImageIndex ? Colors.yellow : Colors.white,
+                                    color:
+                                        index == _coverImageIndex
+                                            ? Colors.yellow
+                                            : Colors.white,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -827,25 +1087,30 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                             ),
                           ),
                         ),
-                        // Remove Image Button
                         Positioned(
                           top: 8,
                           right: 8,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                              filter: ImageFilter.blur(
+                                sigmaX: 10.0,
+                                sigmaY: 10.0,
+                              ),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: IconButton(
-                                  icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
                                   onPressed: () {
                                     setState(() {
                                       _selectedImages.removeAt(index);
-                                      // Adjust cover image index if necessary
                                       if (_selectedImages.isNotEmpty) {
                                         if (index < _coverImageIndex) {
                                           _coverImageIndex--;
@@ -855,7 +1120,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                                       } else {
                                         _coverImageIndex = 0;
                                       }
-                                      print('Removed image at index: $index, new cover index: $_coverImageIndex');
+                                      print(
+                                        'Removed image at index: $index, new cover index: $_coverImageIndex',
+                                      );
                                     });
                                   },
                                 ),
@@ -882,386 +1149,223 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     );
   }
 
-  void _submitForm() async {
-    setState(() {
-      _imageError = _selectedImages.isEmpty;
-    });
-    if (_imageError || !widget.formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (_categoryId == null) {
-      Fluttertoast.showToast(
-        msg: 'Category ID is missing',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
-      return;
-    }
-
-    final requiredAttributes = _getRequiredAttributes(_categoryId!);
-    final missingAttributes = requiredAttributes
-        .where((attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty)
-        .toList();
-    if (missingAttributes.isNotEmpty) {
-      Fluttertoast.showToast(
-        msg: 'Please select: ${missingAttributes.join(", ")}',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
-      return;
-    }
-
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('${AttributeValueService.baseUrl}/add-post.php'),
+  Widget _buildImageSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Add Photos',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _selectedImages.isEmpty
+            ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [_buildImagePicker()],
+            )
+            : _buildImagePicker(),
+        const SizedBox(height: 24),
+      ],
     );
-    request.headers.addAll({'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln'});
-    request.fields.addAll({
-      'token': AttributeValueService.token,
-      'user_id': '4',
-      'title': _titleController.text,
-      'category_id': _categoryId!,
-      'brand': _selectedBrand?.id ?? '',
-      'model': _selectedBrandModel?.id ?? '',
-      'model_variation': _selectedModelVariation?.id ?? '',
-      'description': _descriptionController.text,
-      'price': _listPriceController.text,
-      'filters': jsonEncode(getFilters()),
-      'parent_zone_id': '2',
-      'land_mark': _landMarkController.text,
-      'district': _selectedDistrict ?? '',
-    });
-
-    // Add cover image first (if it exists)
-    if (_selectedImages.isNotEmpty) {
-      request.files.add(await http.MultipartFile.fromPath('images[]', _selectedImages[_coverImageIndex].path, filename: 'cover_${_selectedImages[_coverImageIndex].name}'));
-      // Add remaining images
-      for (var i = 0; i < _selectedImages.length; i++) {
-        if (i != _coverImageIndex) {
-          request.files.add(await http.MultipartFile.fromPath('images[]', _selectedImages[i].path));
-        }
-      }
-    }
-
-    try {
-      final response = await request.send();
-      final responseString = await response.stream.bytesToString();
-      print('Add post response: $responseString');
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(responseString);
-        if (responseData['status'] == 'true') {
-          Fluttertoast.showToast(
-            msg: 'Ad posted successfully',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.green.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-          widget.onSubmit();
-        } else {
-          Fluttertoast.showToast(
-            msg: 'Failed to post ad: ${responseData['message']}',
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.red.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-        }
-      } else {
-        Fluttertoast.showToast(
-          msg: 'Failed to post ad: HTTP ${response.statusCode}',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.8),
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-      }
-    } catch (e) {
-      print('Error submitting form: $e');
-      Fluttertoast.showToast(
-        msg: 'Error: $e',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
-    }
   }
 
-  // IconData _getIconForAttribute(String attributeName) {
-  //   switch (attributeName) {
-  //     case 'Year':
-  //       return Icons.calendar_today;
-  //     case 'No of owners':
-  //       return Icons.person;
-  //     case 'Fuel Type':
-  //       return Icons.local_gas_station;
-  //     case 'Transmission':
-  //       return Icons.settings;
-  //     case 'KM Range':
-  //       return Icons.speed;
-  //     case 'Sold by':
-  //       return Icons.person;
-  //     case 'Property Type':
-  //       return Icons.home;
-  //     case 'Area':
-  //       return Icons.square_foot;
-  //     case 'Location':
-  //       return Icons.location_on;
-  //     case 'Vehicle Type':
-  //       return Icons.directions_car;
-  //     case 'Item Type':
-  //       return Icons.category;
-  //     case 'Condition':
-  //       return Icons.check_circle;
-  //     default:
-  //       return Icons.info;
-  //   }
-  // }
-
-  Widget _buildFormFields() {
-    List<Widget> fields = [];
-
-    // Add Photos Section
-    fields.addAll([
-      const SizedBox(height: 24),
-      const Text(
-        'Add Photos',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
+  Widget _buildKeyInfoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Key Information',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      _selectedImages.isEmpty
-          ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [_buildImagePicker()])
-          : _buildImagePicker(),
-      const SizedBox(height: 24),
-    ]);
-
-    // Key Information Section
-    fields.addAll([
-      const Text(
-        'Key Information',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 16),
-      CustomDropdownWidget<Brand>(
-        label: _categoryId == '2' ? 'Property Developer' : 'Brand',
-        value: _selectedBrand,
-        items: _brands,
-        onChanged: (Brand? newValue) async {
-          setState(() {
-            _selectedBrand = newValue;
-            _selectedBrandModel = null;
-            _selectedModelVariation = null;
-            _brandModels = [];
-            _modelVariations = [];
-            print('Selected brand: ${newValue?.name} (ID: ${newValue?.id})');
-          });
-          if (newValue != null && _categoryId != null) {
-            final brandModels = await AttributeValueService.fetchBrandModels(newValue.id, _categoryId!);
+        const SizedBox(height: 16),
+        CustomDropdownWidget<Brand>(
+          label: widget.categoryId == '2' ? 'Property Developer' : 'Brand',
+          value: _selectedBrand,
+          items: _brands,
+          onChanged: (Brand? newValue) async {
             setState(() {
-              _brandModels = brandModels;
-              print('Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}');
-            });
-          }
-        },
-      //  prefixIcon: Icons.branding_watermark,
-        isRequired: true,
-        itemToString: (Brand item) => item.name,
-        validator: (Brand? value) => value == null ? 'Please select a ${_categoryId == '2' ? 'property developer' : 'brand'}' : null,
-        hintText: '',
-      ),
-      const SizedBox(height: 12),
-    ]);
-
-    // Conditionally show Brand Model dropdown if models are available
-    if (_brandModels.isNotEmpty) {
-      fields.addAll([
-        CustomDropdownWidget<BrandModel>(
-          label: _categoryId == '2' ? 'Project' : 'Model',
-          value: _selectedBrandModel,
-          items: _brandModels,
-          onChanged: (BrandModel? newValue) async {
-            setState(() {
-              _selectedBrandModel = newValue;
+              _selectedBrand = newValue;
+              _selectedBrandModel = null;
               _selectedModelVariation = null;
+              _brandModels = [];
               _modelVariations = [];
-              print('Selected brand model: ${newValue?.name} (ID: ${newValue?.id})');
+              print('Selected brand: ${newValue?.name} (ID: ${newValue?.id})');
             });
-            if (newValue != null && _categoryId != null) {
-              await _fetchModelVariations(newValue.id);
+            if (newValue != null) {
+              final brandModels = await AttributeValueService.fetchBrandModels(
+                newValue.id,
+                widget.categoryId,
+              );
+              setState(() {
+                _brandModels = brandModels;
+                print(
+                  'Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}',
+                );
+              });
             }
           },
-         // prefixIcon: Icons.model_training,
           isRequired: true,
-          itemToString: (BrandModel item) => item.name,
-          validator: (BrandModel? value) => value == null ? 'Please select a ${_categoryId == '2' ? 'project' : 'model'}' : null,
+          itemToString: (Brand item) => item.name,
+          validator:
+              (Brand? value) =>
+                  value == null
+                      ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
+                      : null,
           hintText: '',
         ),
         const SizedBox(height: 12),
-      ]);
-    }
-
-    // Conditionally show Model Variation dropdown if variations are available
-    if (_modelVariations.isNotEmpty) {
-      fields.addAll([
-        CustomDropdownWidget<ModelVariation>(
-          label: 'Model Variation',
-          value: _selectedModelVariation,
-          items: _modelVariations,
-          onChanged: (ModelVariation? newValue) {
-            setState(() {
-              _selectedModelVariation = newValue;
-              print('Selected model variation: ${newValue?.name} (ID: ${newValue?.id})');
-            });
-          },
-         // prefixIcon: Icons.category,
-          isRequired: false,
-          itemToString: (ModelVariation item) => item.name,
-          validator: null,
-          hintText: 'Select a variation',
-        ),
-        const SizedBox(height: 12),
-      ]);
-    }
-
-    fields.addAll([
-      CustomFormField(
-        controller: _titleController,
-        label: 'Title',
-       // prefixIcon: Icons.title,
-        isRequired: true,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter a title';
-          }
-          return null;
-        },
-        onChanged: (value) {},
-      ),
-      const SizedBox(height: 12),
-      CustomFormField(
-        controller: _listPriceController,
-        label: 'List Price',
-       // prefixIcon: Icons.currency_rupee,
-        isNumberInput: true,
-        isRequired: true,
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Please enter the list price';
-          }
-          final listPrice = double.tryParse(value);
-          if (listPrice == null) {
-            return 'Please enter a valid number';
-          }
-          if (_offerPriceController.text.isNotEmpty) {
-            final offerPrice = double.tryParse(_offerPriceController.text);
-            if (offerPrice != null && offerPrice > listPrice) {
-              return 'List price must be greater than or equal to offer price';
+        if (_brandModels.isNotEmpty)
+          CustomDropdownWidget<BrandModel>(
+            label: widget.categoryId == '2' ? 'Project' : 'Model',
+            value: _selectedBrandModel,
+            items: _brandModels,
+            onChanged: (BrandModel? newValue) async {
+              setState(() {
+                _selectedBrandModel = newValue;
+                _selectedModelVariation = null;
+                _modelVariations = [];
+                print(
+                  'Selected brand model: ${newValue?.name} (ID: ${newValue?.id})',
+                );
+              });
+              if (newValue != null) {
+                await _fetchModelVariations(newValue.id);
+              }
+            },
+            isRequired: true,
+            itemToString: (BrandModel item) => item.name,
+            validator:
+                (BrandModel? value) =>
+                    value == null
+                        ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
+                        : null,
+            hintText: '',
+          ),
+        if (_brandModels.isNotEmpty) const SizedBox(height: 12),
+        if (_modelVariations.isNotEmpty)
+          CustomDropdownWidget<ModelVariation>(
+            label: 'Model Variation',
+            value: _selectedModelVariation,
+            items: _modelVariations,
+            onChanged: (ModelVariation? newValue) {
+              setState(() {
+                _selectedModelVariation = newValue;
+                print(
+                  'Selected model variation: ${newValue?.name} (ID: ${newValue?.id})',
+                );
+              });
+            },
+            isRequired: false,
+            itemToString: (ModelVariation item) => item.name,
+            validator: null,
+            hintText: 'Select a variation',
+          ),
+        if (_modelVariations.isNotEmpty) const SizedBox(height: 12),
+        CustomFormField(
+          controller: _titleController,
+          label: 'Title',
+          isRequired: true,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter a title';
             }
-          }
-          return null;
-        },
-        onChanged: (value) {},
-      ),
-      const SizedBox(height: 12),
-      // CustomFormField(
-      //   controller: _offerPriceController,
-      //   label: 'Offer Price',
-      //   prefixIcon: Icons.currency_rupee,
-      //   isNumberInput: true,
-      //   validator: (value) {
-      //     if (value == null || value.isEmpty) return null;
-      //     final offerPrice = double.tryParse(value);
-      //     if (offerPrice == null) {
-      //       return 'Please enter a valid number';
-      //     }
-      //     if (_listPriceController.text.isNotEmpty) {
-      //       final listPrice = double.tryParse(_listPriceController.text);
-      //       if (listPrice != null && offerPrice > listPrice) {
-      //         return 'Offer price must be less than or equal to list price';
-      //       }
-      //     }
-      //     return null;
-      //   },
-      //   onChanged: (value) {},
-      // ),
-      const SizedBox(height: 12),
-      CustomDropdownWidget<String>(
-        label: 'District',
-        value: _selectedDistrict,
-        items: districts,
-        onChanged: (String? newValue) {
-          setState(() {
-            _selectedDistrict = newValue;
-          });
-        },
-       // prefixIcon: Icons.location_on_outlined,
-        isRequired: true,
-        itemToString: (String item) => item,
-        validator: (String? value) => value == null ? 'Please select a district' : null,
-        hintText: '',
-      ),
-      const SizedBox(height: 12),
-      CustomFormField(
-        controller: _landMarkController,
-        label: 'Landmark',
-       // prefixIcon: Icons.location_on_outlined,
-        alignLabelWithHint: true,
-        onChanged: (value) {},
-      ),
-      const SizedBox(height: 12),
-    ]);
-
-    if (_categoryId == '1') {
-      fields.addAll([
-        CustomFormField(
-          controller: _registrationValidTillController,
-          label: 'Registration Valid Till',
-       //   prefixIcon: Icons.date_range,
+            return null;
+          },
           onChanged: (value) {},
         ),
         const SizedBox(height: 12),
         CustomFormField(
-          controller: _insuranceUptoController,
-          label: 'Insurance Upto',
-        //  prefixIcon: Icons.security,
+          controller: _listPriceController,
+          label: 'List Price',
+          isNumberInput: true,
+          isRequired: true,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter the list price';
+            }
+            final listPrice = double.tryParse(value);
+            if (listPrice == null) {
+              return 'Please enter a valid number';
+            }
+            if (_offerPriceController.text.isNotEmpty) {
+              final offerPrice = double.tryParse(_offerPriceController.text);
+              if (offerPrice != null && offerPrice > listPrice) {
+                return 'List price must be greater than or equal to offer price';
+              }
+            }
+            return null;
+          },
           onChanged: (value) {},
         ),
         const SizedBox(height: 12),
-      ]);
-    }
+        CustomDropdownWidget<String>(
+          label: 'District',
+          value: _selectedDistrict,
+          items: districts.isNotEmpty ? districts : ['No districts available'],
+          onChanged: (String? newValue) {
+            if (newValue != null && newValue != 'No districts available') {
+              setState(() {
+                _selectedDistrict = newValue;
+                print('Selected district: $newValue');
+              });
+            }
+          },
+          isRequired: true,
+          itemToString: (String item) => item,
+          validator:
+              (String? value) =>
+                  value == null || value == 'No districts available'
+                      ? 'Please select a district'
+                      : null,
+          hintText: '',
+        ),
+        const SizedBox(height: 12),
+        CustomFormField(
+          controller: _landMarkController,
+          label: 'Landmark',
+          alignLabelWithHint: true,
+          onChanged: (value) {},
+        ),
+        const SizedBox(height: 12),
+        if (widget.categoryId == '1') ...[
+          CustomFormField(
+            controller: _registrationValidTillController,
+            label: 'Registration Valid Till',
+            onChanged: (value) {},
+          ),
+          const SizedBox(height: 12),
+          CustomFormField(
+            controller: _insuranceUptoController,
+            label: 'Insurance Upto',
+            onChanged: (value) {},
+          ),
+          const SizedBox(height: 12),
+        ],
+        CustomFormField(
+          controller: _descriptionController,
+          label: 'Description',
+          alignLabelWithHint: true,
+          maxLines: 5,
+          onChanged: (value) {},
+        ),
+      ],
+    );
+  }
 
-    fields.add(CustomFormField(
-      controller: _descriptionController,
-      label: 'Description',
-     // prefixIcon: Icons.description_outlined,
-      alignLabelWithHint: true,
-      maxLines: 5,
-      onChanged: (value) {},
-    ));
+  Widget _buildMoreInfoSection() {
+    if (_attributes.isEmpty) return const SizedBox.shrink();
 
-    // More Info Section
-    if (_attributes.isNotEmpty) {
-      fields.addAll([
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         const SizedBox(height: 24),
         const Text(
           'More Info',
@@ -1272,92 +1376,114 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           ),
         ),
         const SizedBox(height: 16),
-      ]);
+        ..._attributes.map((attr) {
+          final isRequired = _getRequiredAttributes(
+            widget.categoryId,
+          ).contains(attr.name);
+          final hasVariations =
+              _attributeVariations[attr.name]?.isNotEmpty ?? false;
 
-      fields.addAll(_attributes.map((attr) {
-        final isRequired = _getRequiredAttributes(_categoryId ?? '').contains(attr.name);
-        final hasVariations = _attributeVariations[attr.name]?.isNotEmpty ?? false;
-
-        if (hasVariations) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: CustomDropdownWidget<String>(
-              label: attr.name,
-              value: _selectedAttributes[attr.name],
-              items: _attributeVariations[attr.name]?.map((v) => v.name).toList() ?? ['No options available'],
-              onChanged: (String? newValue) {
-                if (newValue != null && newValue != 'No options available') {
+          if (hasVariations) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: CustomDropdownWidget<String>(
+                label: attr.name,
+                value: _selectedAttributes[attr.name],
+                items:
+                    _attributeVariations[attr.name]
+                        ?.map((v) => v.name)
+                        .toList() ??
+                    ['No options available'],
+                onChanged: (String? newValue) {
+                  if (newValue != null && newValue != 'No options available') {
+                    setState(() {
+                      _selectedAttributes[attr.name] = newValue;
+                      print('Selected ${attr.name}: $newValue');
+                    });
+                  }
+                },
+                isRequired: isRequired,
+                itemToString: (String item) => item,
+                validator:
+                    isRequired
+                        ? (value) {
+                          if (value == null ||
+                              value.isEmpty ||
+                              value == 'No options available') {
+                            return 'Please select ${attr.name}';
+                          }
+                          return null;
+                        }
+                        : null,
+                hintText: '',
+              ),
+            );
+          } else {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: CustomFormField(
+                controller: _attributeControllers[attr.name]!,
+                label: attr.name,
+                isRequired: isRequired,
+                validator:
+                    isRequired
+                        ? (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter ${attr.name}';
+                          }
+                          return null;
+                        }
+                        : null,
+                onChanged: (value) {
                   setState(() {
-                    _selectedAttributes[attr.name] = newValue;
-                    print('Selected ${attr.name}: $newValue');
+                    _selectedAttributes[attr.name] = value;
+                    print('Entered ${attr.name}: $value');
                   });
-                }
-              },
-            //  prefixIcon: _getIconForAttribute(attr.name),
-              isRequired: isRequired,
-              itemToString: (String item) => item,
-              validator: isRequired
-                  ? (value) {
-                      if (value == null || value.isEmpty || value == 'No options available') {
-                        return 'Please select ${attr.name}';
-                      }
-                      return null;
-                    }
-                  : null,
-              hintText: '',
-            ),
-          );
-        } else {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: CustomFormField(
-              controller: _attributeControllers[attr.name]!,
-              label: attr.name,
-              //prefixIcon: _getIconForAttribute(attr.name),
-              isRequired: isRequired,
-              validator: isRequired
-                  ? (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter ${attr.name}';
-                      }
-                      return null;
-                    }
-                  : null,
-              onChanged: (value) {
-                setState(() {
-                  _selectedAttributes[attr.name] = value;
-                  print('Entered ${attr.name}: $value');
-                });
-              },
-            ),
-          );
-        }
-      }).toList());
-    }
+                },
+              ),
+            );
+          }
+        }),
+      ],
+    );
+  }
 
-    fields.addAll([
-      const SizedBox(height: 24),
-      SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: _submitForm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-          ),
-          child: const Text(
-            'Post Ad',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+  Widget _buildSubmitButton() {
+    return Column(
+      children: [
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _submitForm,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: const RoundedRectangleBorder(),
+            ),
+            child: const Text(
+              'Post Ad',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
-      ),
-      const SizedBox(height: 24),
-    ]);
+        const SizedBox(height: 24),
+      ],
+    );
+  }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.center, children: fields);
+  Widget _buildFormFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildImageSection(),
+        _buildKeyInfoSection(),
+        _buildMoreInfoSection(),
+        _buildSubmitButton(),
+      ],
+    );
   }
 
   @override
@@ -1367,10 +1493,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: widget.formKey,
-            child: _buildFormFields(),
-          ),
+          child: Form(key: widget.formKey, child: _buildFormFields()),
         ),
       ),
     );

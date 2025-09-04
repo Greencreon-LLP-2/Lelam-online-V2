@@ -170,7 +170,7 @@ class AppDrawerWidget extends StatelessWidget {
             isfavourite: true,
             isLogOut: true,
             icon: Icons.logout,
-            title: 'Log Out',
+            title: 'Login',
             onTap: () {
               Navigator.pop(context); // Close the drawer first
 
