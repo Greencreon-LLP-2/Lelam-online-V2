@@ -12,9 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MainScaffold extends StatefulWidget {
   final String? userId;
-   final Map<String, dynamic>? adData;
+  final Map<String, dynamic>? adData;
 
-  const MainScaffold({super.key, this.userId,this.adData});
+  const MainScaffold({super.key, this.userId, this.adData});
 
   @override
   State<MainScaffold> createState() => _MainScaffoldState();
@@ -24,14 +24,14 @@ class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
   bool isStatus = false;
   String? userId;
-   Map<String, dynamic>? adData; 
+  Map<String, dynamic>? adData;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
     _loadUserId();
-      adData = widget.adData;
+    adData = widget.adData;
   }
 
   Future<void> _loadUserId() async {
@@ -50,12 +50,10 @@ class _MainScaffoldState extends State<MainScaffold> {
     isStatus
         ? BuyingStatusPage(userId: userId)
         : const Center(child: Text('Support')),
-    isStatus 
+    isStatus
         ? SellingStatusPage(userId: userId, adData: adData) // Pass adData here
         : SellPage(userId: userId),
-    isStatus 
-        ? ShortListPage(userId: userId) 
-        : StatusPage(userId: userId),
+    isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
     Center(
       child: Text(
         'Profile: User ID ${userId ?? 'Unknown'}',

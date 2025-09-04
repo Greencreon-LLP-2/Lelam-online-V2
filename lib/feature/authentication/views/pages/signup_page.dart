@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -18,13 +19,12 @@ class SignUpPage extends StatefulWidget {
 class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _nameController = TextEditingController();
+
   bool _isLoading = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -38,91 +38,79 @@ class _SignUpPageState extends State<SignUpPage> {
         .trim();
   }
 
-  Future<void> _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) {
-      if (kDebugMode) print('Form validation failed');
-      Fluttertoast.showToast(
-        msg: 'Please enter valid details',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
-      return;
-    }
+Future<void> _handleSignUp() async {
+  if (!_formKey.currentState!.validate()) {
+    if (kDebugMode) print('Form validation failed');
+    Fluttertoast.showToast(
+      msg: 'Please enter valid details',
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+    return;
+  }
 
-    setState(() => _isLoading = true);
-    try {
-      const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-      const String token = '5cb2c9b569416b5db1604e0e12478ded';
-      final String mobile = _phoneController.text;
-      final String name = _nameController.text;
-      final String normalizedMobile = _normalizeMobileNumber(mobile);
+  setState(() => _isLoading = true);
+  try {
+    const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+    const String token = '5cb2c9b569416b5db1604e0e12478ded';
+    final String mobile = _phoneController.text;
 
-      if (kDebugMode) print('SignUp - Entered mobile: "$mobile", Name: "$name"');
+    final String normalizedMobile = _normalizeMobileNumber(mobile);
 
-      // Call signup API (assumed endpoint)
-      final signupRequest = http.Request(
-        'POST',
-        Uri.parse('$baseUrl/signup.php?token=$token'),
-      );
-      signupRequest.headers.addAll({
-        'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
-        'Content-Type': 'application/json',
-      });
-      signupRequest.body = jsonEncode({
-        'mobile': normalizedMobile,
-        'mobile_code': '91',
-        'name': name,
-      });
+    if (kDebugMode) print('SignUp - Entered mobile: "$mobile", normalized: "$normalizedMobile"');
 
-      final signupResponse = await signupRequest.send();
-      final signupResponseBody = await signupResponse.stream.bytesToString();
+    // Use the correct register endpoint with GET method
+    final url = Uri.parse('$baseUrl/register.php?token=$token&mobile_code=91&mobile=$normalizedMobile');
+    
+    final request = http.Request('GET', url);
+    request.headers.addAll({
+      'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
+    });
 
-      if (signupResponse.statusCode == 200) {
-        if (kDebugMode) print('signup.php response: $signupResponseBody');
-        final responseData = jsonDecode(signupResponseBody);
-        if (responseData['status'] != 'true' || responseData['user_id'] == null) {
-          throw Exception('Signup failed: ${responseData['message'] ?? 'Unknown error'}');
-        }
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
 
-        final userId = responseData['user_id'].toString();
-        if (mounted) {
-          Fluttertoast.showToast(
-            msg: 'Signup successful, OTP sent to +91$mobile',
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.green.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-          context.pushNamed(
-            RouteNames.otpVerificationPage,
-            extra: {
-              'phone': '+91$mobile',
-              'testOtp': kDebugMode ? '9021' : null,
-              'userId': userId,
-            },
-          );
-        }
-      } else {
-        if (mounted) {
-          Fluttertoast.showToast(
-            msg: 'Signup failed: ${signupResponse.reasonPhrase}',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.red.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-        }
-        if (kDebugMode) print('signup.php failed: ${signupResponse.statusCode} ${signupResponse.reasonPhrase}');
+    if (response.statusCode == 200) {
+      if (kDebugMode) print('register.php response: $responseBody');
+      final responseData = jsonDecode(responseBody);
+      
+      // Check the response structure based on the actual response
+      if (responseData['status'] != true) { // Note: boolean true, not string 'true'
+        throw Exception('Registration failed: ${responseData['message'] ?? 'Unknown error'}');
       }
-    } catch (e) {
+
+      // The user ID is in the 'data' field, not 'user_id'
+      final userId = responseData['data'].toString();
       if (mounted) {
         Fluttertoast.showToast(
-          msg: 'Error: ${e.toString()}',
+          msg: 'Registration successful, OTP sent to +91$normalizedMobile',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        
+        // Store userId in SharedPreferences immediately after signup
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userId', userId);
+        
+        context.pushNamed(
+          RouteNames.otpVerificationPage,
+          extra: {
+            'phone': '+91$normalizedMobile',
+            'testOtp': kDebugMode ? '9021' : null,
+            'userId': userId, // Ensure userId is passed correctly
+          },
+        );
+      }
+    } else {
+      if (mounted) {
+        Fluttertoast.showToast(
+          msg: 'Registration failed: ${response.reasonPhrase}',
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red.withOpacity(0.8),
@@ -130,12 +118,24 @@ class _SignUpPageState extends State<SignUpPage> {
           fontSize: 16.0,
         );
       }
-      if (kDebugMode) print('Error in _handleSignUp: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (kDebugMode) print('register.php failed: ${response.statusCode} ${response.reasonPhrase}');
     }
+  } catch (e) {
+    if (mounted) {
+      Fluttertoast.showToast(
+        msg: 'Error: ${e.toString()}',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
+    if (kDebugMode) print('Error in _handleSignUp: $e');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,25 +169,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 48),
-                TextFormField(
-                  controller: _nameController,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Full Name',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey[200]!),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    errorStyle: const TextStyle(height: 0.8),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter your name';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
+           
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[50],

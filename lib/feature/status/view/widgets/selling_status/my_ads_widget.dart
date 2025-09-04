@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/tab_bar_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class MyAdsWidget extends StatefulWidget {
   final String? userId;
@@ -70,6 +73,19 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         }
       }
 
+      // Sort ads by postedDate in descending order (newest first)
+      final dateFormat = DateFormat('dd-MM-yyyy');
+      savedAds.sort((a, b) {
+        try {
+          final dateA = dateFormat.parse(a['postedDate'] as String);
+          final dateB = dateFormat.parse(b['postedDate'] as String);
+          return dateB.compareTo(dateA); // Newest first
+        } catch (e) {
+          print('Error parsing dates for sorting: $e');
+          return 0; // Keep original order if parsing fails
+        }
+      });
+
       setState(() {
         ads = savedAds;
       });
@@ -83,6 +99,48 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     setState(() {
       isLoading = false;
     });
+  }
+
+  Future<void> _deleteAd(String adId) async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final List<String> adStrings = prefs.getStringList('userAds') ?? [];
+
+      // Remove the ad with the given adId
+      adStrings.removeWhere((adString) {
+        try {
+          final ad = jsonDecode(adString) as Map<String, dynamic>;
+          return ad['appId'] == adId;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      await prefs.setStringList('userAds', adStrings);
+      print('Deleted ad $adId from SharedPreferences');
+
+      // Reload ads to update UI
+      await _loadAds();
+
+      Fluttertoast.showToast(
+        msg: 'Ad deleted successfully',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    } catch (e) {
+      print('Error deleting ad: $e');
+      Fluttertoast.showToast(
+        msg: 'Error deleting ad: $e',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
 
   DecorationImage? _getImageDecoration(Map<String, dynamic> ad, int imageIndex) {
@@ -232,6 +290,36 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 Text(
                   '${ad['comments']}',
                   style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(width: 12),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      // Navigate to AdPostForm with categoryId and adData
+                      context.pushNamed(
+                        RouteNames.adPostPage,
+                        extra: {
+                          'userId': widget.userId ?? 'Unknown',
+                          'categoryId': ad['categoryId']?.toString() ?? '', // Ensure categoryId is passed
+                          'adData': ad, // Pass full ad details for editing
+                        },
+                      );
+                      print('Navigating to edit ad ${ad['appId']} with categoryId ${ad['categoryId']}');
+                    } else if (value == 'delete') {
+                      _deleteAd(ad['appId'] as String);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete'),
+                    ),
+                  ],
                 ),
               ],
             ),

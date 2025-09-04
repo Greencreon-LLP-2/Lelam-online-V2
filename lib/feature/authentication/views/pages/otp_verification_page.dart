@@ -27,7 +27,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
     super.dispose();
   }
 
- Future<void> _verifyOtp() async {
+Future<void> _verifyOtp() async {
   if (!_formKey.currentState!.validate()) return;
 
   setState(() => _isLoading = true);
@@ -41,9 +41,16 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
     // Simulate OTP verification (replace with actual API call)
     if (testOtp != null && otp == testOtp || otp == '9021') { // Example condition
-      // Store userId in SharedPreferences
+      // Store userId in SharedPreferences (if not already stored)
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userId', userId ?? '');
+      String finalUserId = userId ?? '';
+      
+      // If userId wasn't passed from signup, try to get it from SharedPreferences
+      if (finalUserId.isEmpty) {
+        finalUserId = prefs.getString('userId') ?? '';
+      } else {
+        await prefs.setString('userId', finalUserId);
+      }
 
       if (mounted) {
         Fluttertoast.showToast(
@@ -54,11 +61,16 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
           textColor: Colors.white,
           fontSize: 16.0,
         );
-        // Navigate to MainScaffold with userId
-        context.pushReplacementNamed(
-          RouteNames.mainscaffold,
-          extra: {'userId': userId},
-        );
+        
+        // Navigate to MainScaffold with userId - ensure it's not null/empty
+        if (finalUserId.isNotEmpty) {
+          context.pushReplacementNamed(
+            RouteNames.mainscaffold,
+            extra: {'userId': finalUserId},
+          );
+        } else {
+          throw Exception('User ID not available after OTP verification');
+        }
       }
     } else {
       if (mounted) {
@@ -91,6 +103,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final String? testOtp = widget.extra['testOtp'] as String?;
+    
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -120,7 +134,36 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                   'Enter the OTP sent to ${widget.extra['phone'] ?? 'your phone'}',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 48),
+                
+                // Show test OTP in debug mode
+                if (kDebugMode && testOtp != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.amber[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Test OTP: $testOtp',
+                            style: TextStyle(
+                              color: Colors.amber[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 32),
                 TextFormField(
                   controller: _otpController,
                   keyboardType: TextInputType.number,
@@ -165,6 +208,28 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
                         : const Text('Verify OTP', style: TextStyle(fontSize: 16)),
                   ),
                 ),
+                
+                // Add a button to auto-fill the test OTP in debug mode
+                if (kDebugMode && testOtp != null) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _otpController.text = testOtp;
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Auto-fill Test OTP', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

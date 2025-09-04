@@ -13,9 +13,9 @@ import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// [Brand, BrandModel, ModelVariation, Attribute, AttributeVariation classes unchanged]
 class Brand {
   final String id;
   final String slug;
@@ -201,9 +201,7 @@ class AttributeValueService {
   static Future<List<Brand>> fetchBrands(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/list-brand.php?token=$token&category_id=$categoryId',
-        ),
+        Uri.parse('$baseUrl/list-brand.php?token=$token&category_id=$categoryId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -213,14 +211,11 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Brands API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          final brands =
-              (data['data'] as List)
-                  .map((e) => Brand.fromJson(e))
-                  .where((brand) => brand.categoryId == categoryId)
-                  .toList();
-          print(
-            'Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}',
-          );
+          final brands = (data['data'] as List)
+              .map((e) => Brand.fromJson(e))
+              .where((brand) => brand.categoryId == categoryId)
+              .toList();
+          print('Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}');
           return brands;
         }
         print('No brands found for category_id: $categoryId');
@@ -234,15 +229,10 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<BrandModel>> fetchBrandModels(
-    String brandId,
-    String categoryId,
-  ) async {
+  static Future<List<BrandModel>> fetchBrandModels(String brandId, String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId',
-        ),
+        Uri.parse('$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -250,25 +240,16 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
-          'Brand models API response for brand_id $brandId, category_id $categoryId: $data',
-        );
+        print('Brand models API response for brand_id $brandId, category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          final models =
-              (data['data'] as List)
-                  .map((e) => BrandModel.fromJson(e))
-                  .toList();
+          final models = (data['data'] as List).map((e) => BrandModel.fromJson(e)).toList();
           print('Fetched brand models: ${models.map((m) => m.name).toList()}');
           return models;
         }
-        print(
-          'No brand models found for brand_id: $brandId, category_id: $categoryId',
-        );
+        print('No brand models found for brand_id: $brandId, category_id: $categoryId');
         return [];
       }
-      print(
-        'Failed to fetch brand models: ${response.statusCode} ${response.body}',
-      );
+      print('Failed to fetch brand models: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
       print('Error fetching brand models: $e');
@@ -276,15 +257,10 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<ModelVariation>> fetchModelVariations(
-    String brandModelId,
-    String categoryId,
-  ) async {
+  static Future<List<ModelVariation>> fetchModelVariations(String brandModelId, String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId',
-        ),
+        Uri.parse('$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -292,28 +268,17 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
-          'Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data',
-        );
+        print('Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          final variations =
-              (data['data'] as List)
-                  .map((e) => ModelVariation.fromJson(e))
-                  .toList();
+          final variations = (data['data'] as List).map((e) => ModelVariation.fromJson(e)).toList();
           print('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
-          print(
-            'Model variations names: ${variations.map((v) => v.name).toSet()}',
-          );
+          print('Model variations names: ${variations.map((v) => v.name).toSet()}');
           return variations;
         }
-        print(
-          'No model variations found for brands_model_id: $brandModelId, category_id: $categoryId',
-        );
+        print('No model variations found for brands_model_id: $brandModelId, category_id: $categoryId');
         return [];
       }
-      print(
-        'Failed to fetch model variations: ${response.statusCode} ${response.body}',
-      );
+      print('Failed to fetch model variations: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
       print('Error fetching model variations: $e');
@@ -324,9 +289,7 @@ class AttributeValueService {
   static Future<List<Attribute>> fetchAttributes(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId',
-        ),
+        Uri.parse('$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -336,16 +299,12 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Attributes API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List)
-              .map((e) => Attribute.fromJson(e))
-              .toList();
+          return (data['data'] as List).map((e) => Attribute.fromJson(e)).toList();
         }
         print('No attributes found for category_id: $categoryId');
         return [];
       }
-      print(
-        'Failed to fetch attributes: ${response.statusCode} ${response.body}',
-      );
+      print('Failed to fetch attributes: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
       print('Error fetching attributes: $e');
@@ -353,14 +312,10 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<AttributeVariation>> fetchAttributeVariations(
-    String attributeId,
-  ) async {
+  static Future<List<AttributeVariation>> fetchAttributeVariations(String attributeId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId',
-        ),
+        Uri.parse('$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -368,32 +323,24 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
-          'Attribute variations API response for attribute_id $attributeId: $data',
-        );
+        print('Attribute variations API response for attribute_id $attributeId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List)
-              .map((e) => AttributeVariation.fromJson(e))
-              .toList();
+          return (data['data'] as List).map((e) => AttributeVariation.fromJson(e)).toList();
         }
         print('No variations found for attribute_id: $attributeId');
         return [];
       }
-      print(
-        'Failed to fetch attribute variations: ${response.statusCode} ${response.body}',
-      );
+      print('Failed to fetch attribute variations: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
-      print(
-        'Error fetching attribute variations for attribute_id $attributeId: $e',
-      );
+      print('Error fetching attribute variations for attribute_id $attributeId: $e');
       return [];
     }
   }
 }
 
 class AdPostPage extends StatefulWidget {
-  final Map<String, dynamic>? extra; // Contains categoryId and userId
+  final Map<String, dynamic>? extra; // Contains categoryId, userId, and adData
 
   const AdPostPage({super.key, this.extra});
 
@@ -405,6 +352,7 @@ class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
   String? _categoryId;
   String? _userId;
+  Map<String, dynamic>? _adData;
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
@@ -417,16 +365,13 @@ class _AdPostPageState extends State<AdPostPage> {
     super.initState();
     print('Received extra: ${widget.extra}');
     if (widget.extra != null) {
-      final categoryId = widget.extra!['categoryId'];
-      final userId = widget.extra!['userId'];
-      _categoryId = categoryId is String ? categoryId : null;
-      _userId = userId is String ? userId : 'Unknown';
-      if (categoryId != null && categoryId is! String) {
-        print(
-          'Error: categoryId is not a String, got type ${categoryId.runtimeType}: $categoryId',
-        );
+      _categoryId = widget.extra!['categoryId']?.toString();
+      _userId = widget.extra!['userId']?.toString() ?? 'Unknown';
+      _adData = widget.extra!['adData'] as Map<String, dynamic>?;
+      if (_categoryId == null) {
+        print('Error: categoryId is missing or invalid in extra: ${widget.extra}');
         Fluttertoast.showToast(
-          msg: 'Invalid category ID format',
+          msg: 'Invalid category ID',
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red.withOpacity(0.8),
@@ -434,10 +379,8 @@ class _AdPostPageState extends State<AdPostPage> {
           fontSize: 16.0,
         );
       }
-      if (userId != null && userId is! String) {
-        print(
-          'Error: userId is not a String, got type ${userId.runtimeType}: $userId',
-        );
+      if (_adData != null) {
+        print('Editing ad: ${_adData!['appId']}');
       }
     } else {
       print('Error: extra is null');
@@ -461,9 +404,9 @@ class _AdPostPageState extends State<AdPostPage> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text(
-          'Post your Ad',
-          style: TextStyle(
+        title: Text(
+          _adData != null ? 'Edit Ad' : 'Post your Ad',
+          style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
@@ -474,7 +417,7 @@ class _AdPostPageState extends State<AdPostPage> {
           TextButton(
             onPressed: _submitForm,
             child: Text(
-              'Post',
+              _adData != null ? 'Update' : 'Post',
               style: TextStyle(
                 color: AppTheme.primaryColor,
                 fontSize: 16,
@@ -488,6 +431,7 @@ class _AdPostPageState extends State<AdPostPage> {
         formKey: _formKey,
         categoryId: _categoryId ?? '',
         userId: _userId,
+        adData: _adData,
         onSubmit: _submitForm,
       ),
     );
@@ -498,6 +442,7 @@ class AdPostForm extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final String categoryId;
   final String? userId;
+  final Map<String, dynamic>? adData;
   final VoidCallback onSubmit;
 
   const AdPostForm({
@@ -505,6 +450,7 @@ class AdPostForm extends StatefulWidget {
     required this.formKey,
     required this.categoryId,
     this.userId,
+    this.adData,
     required this.onSubmit,
   });
 
@@ -512,8 +458,7 @@ class AdPostForm extends StatefulWidget {
   State<AdPostForm> createState() => _AdPostFormState();
 }
 
-class _AdPostFormState extends State<AdPostForm>
-    with SingleTickerProviderStateMixin {
+class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateMixin {
   List<Brand> _brands = [];
   List<BrandModel> _brandModels = [];
   List<ModelVariation> _modelVariations = [];
@@ -545,14 +490,7 @@ class _AdPostFormState extends State<AdPostForm>
   List<String> _getRequiredAttributes(String categoryId) {
     switch (categoryId) {
       case '1':
-        return [
-          'Year',
-          'No of owners',
-          'Fuel Type',
-          'Transmission',
-          'KM Range',
-          'Sold by',
-        ];
+        return ['Year', 'No of owners', 'Fuel Type', 'Transmission', 'KM Range', 'Sold by'];
       case '2':
         return ['Property Type', 'Area', 'Location'];
       case '3':
@@ -568,14 +506,10 @@ class _AdPostFormState extends State<AdPostForm>
     setState(() {
       _modelVariations = modelVariations;
       if (_selectedModelVariation != null &&
-          !modelVariations.any(
-            (item) => item.id == _selectedModelVariation!.id,
-          )) {
+          !modelVariations.any((item) => item.id == _selectedModelVariation!.id)) {
         _selectedModelVariation = null;
       }
-      print(
-        'Updated model variations: ${modelVariations.map((v) => v.name).toList()}',
-      );
+      print('Updated model variations: ${modelVariations.map((v) => v.name).toList()}');
     });
   }
 
@@ -586,13 +520,75 @@ class _AdPostFormState extends State<AdPostForm>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(_animationController);
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
     _animationController.forward();
     _selectedDistrict = districts.isNotEmpty ? districts[0] : null;
+
+    // Pre-fill form with adData if provided
+    if (widget.adData != null) {
+      final ad = widget.adData!;
+      _titleController.text = ad['title'] ?? '';
+      _listPriceController.text = ad['price'] ?? '';
+      _descriptionController.text = ad['description'] ?? '';
+      _landMarkController.text = ad['land_mark'] ?? '';
+      _registrationValidTillController.text = ad['registration_valid_till'] ?? '';
+      _insuranceUptoController.text = ad['insurance_upto'] ?? '';
+      _selectedDistrict = ad['district'] ?? (districts.isNotEmpty ? districts[0] : null);
+      _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
+      // Load images
+      if (ad['imagePathList'] != null && (ad['imagePathList'] as List).isNotEmpty) {
+        _selectedImages.addAll((ad['imagePathList'] as List).map((path) => XFile(path as String)));
+      } else if (ad['imageBase64List'] != null && (ad['imageBase64List'] as List).isNotEmpty) {
+        _convertBase64ToFiles(ad['imageBase64List'] as List);
+      } else if (ad['imagePath'] != null && (ad['imagePath'] as String).isNotEmpty) {
+        _selectedImages.add(XFile(ad['imagePath'] as String));
+      } else if (ad['imageBase64'] != null && (ad['imageBase64'] as String).isNotEmpty) {
+        _convertBase64ToFile(ad['imageBase64'] as String);
+      }
+      print('Pre-filled form with adData: ${ad['appId']}');
+    }
+
     _fetchInitialData();
+  }
+
+  Future<void> _convertBase64ToFiles(List base64Images) async {
+    final tempDir = await getTemporaryDirectory();
+    final List<XFile> files = [];
+    for (int i = 0; i < base64Images.length; i++) {
+      try {
+        final bytes = base64Decode(base64Images[i] as String);
+        final fileName = 'ad_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+        final file = File('${tempDir.path}/$fileName');
+        await file.writeAsBytes(bytes);
+        files.add(XFile(file.path));
+      } catch (e) {
+        print('Error converting base64 image $i: $e');
+      }
+    }
+    setState(() {
+      _selectedImages.addAll(files);
+      if (_coverImageIndex >= _selectedImages.length) {
+        _coverImageIndex = 0;
+      }
+    });
+  }
+
+  Future<void> _convertBase64ToFile(String base64Image) async {
+    try {
+      final bytes = base64Decode(base64Image);
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'ad_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+      setState(() {
+        _selectedImages.add(XFile(file.path));
+        if (_coverImageIndex >= _selectedImages.length) {
+          _coverImageIndex = 0;
+        }
+      });
+    } catch (e) {
+      print('Error converting single base64 image: $e');
+    }
   }
 
   Future<void> _fetchInitialData() async {
@@ -623,17 +619,66 @@ class _AdPostFormState extends State<AdPostForm>
       _attributeControllers.clear();
     });
 
+    // Fetch brands
     final brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
       _brands = brands;
-      print(
-        'Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}',
-      );
+      print('Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}');
+      // Set selected brand from adData
+      if (widget.adData != null && widget.adData!['brand'] != null) {
+        _selectedBrand = brands.firstWhere(
+          (b) => b.id == widget.adData!['brand'],
+          orElse: () => Brand(id: '', slug: '', categoryId: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+        );
+        if (_selectedBrand!.id.isEmpty) _selectedBrand = null;
+      }
     });
 
-    final attributes = await AttributeValueService.fetchAttributes(
-      widget.categoryId,
-    );
+    // Fetch brand models if brand is selected
+    if (_selectedBrand != null) {
+      final brandModels = await AttributeValueService.fetchBrandModels(_selectedBrand!.id, widget.categoryId);
+      setState(() {
+        _brandModels = brandModels;
+        print('Loaded brand models for brand ${_selectedBrand!.name}: ${brandModels.map((m) => m.name).toList()}');
+        // Set selected brand model from adData
+        if (widget.adData != null && widget.adData!['model'] != null) {
+          _selectedBrandModel = brandModels.firstWhere(
+            (m) => m.id == widget.adData!['model'],
+            orElse: () => BrandModel(id: '', brandId: '', slug: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+          );
+          if (_selectedBrandModel!.id.isEmpty) _selectedBrandModel = null;
+        }
+      });
+
+      // Fetch model variations if brand model is selected
+      if (_selectedBrandModel != null) {
+        final modelVariations = await AttributeValueService.fetchModelVariations(_selectedBrandModel!.id, widget.categoryId);
+        final uniqueModelVariations = modelVariations.asMap().entries.fold<List<ModelVariation>>(
+          [],
+          (uniqueList, entry) {
+            if (!uniqueList.any((item) => item.id == entry.value.id)) {
+              uniqueList.add(entry.value);
+            }
+            return uniqueList;
+          },
+        );
+        setState(() {
+          _modelVariations = uniqueModelVariations;
+          print('Loaded model variations: ${uniqueModelVariations.map((v) => v.name).toList()}');
+          // Set selected model variation from adData
+          if (widget.adData != null && widget.adData!['model_variation'] != null) {
+            _selectedModelVariation = uniqueModelVariations.firstWhere(
+              (v) => v.id == widget.adData!['model_variation'],
+              orElse: () => ModelVariation(id: '', slug: '', brandId: '', brandModelId: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+            );
+            if (_selectedModelVariation!.id.isEmpty) _selectedModelVariation = null;
+          }
+        });
+      }
+    }
+
+    // Fetch attributes
+    final attributes = await AttributeValueService.fetchAttributes(widget.categoryId);
     setState(() {
       _attributes = attributes;
       _attributeIdMap = {for (var attr in attributes) attr.name: attr.id};
@@ -641,38 +686,57 @@ class _AdPostFormState extends State<AdPostForm>
       for (var attr in attributes) {
         _attributeControllers[attr.name] = TextEditingController();
       }
-      print(
-        'Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}',
-      );
+      print('Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}');
+      // Set selected attributes from adData.filters
+      if (widget.adData != null && widget.adData!['filters'] != null) {
+        try {
+          final filters = jsonDecode(widget.adData!['filters'] as String) as Map<String, dynamic>;
+          for (var attr in attributes) {
+            final attrId = attr.id;
+            if (filters.containsKey(attrId) && filters[attrId] is List && (filters[attrId] as List).isNotEmpty) {
+              final variationId = filters[attrId][0].toString();
+              _selectedAttributes[attr.name] = variationId; // Will be updated to name after fetching variations
+            }
+          }
+        } catch (e) {
+          print('Error parsing filters from adData: $e');
+        }
+      }
     });
 
+    // Fetch attribute variations and update selected attributes
     for (var attr in attributes) {
-      final variations = await AttributeValueService.fetchAttributeVariations(
-        attr.id,
-      );
+      final variations = await AttributeValueService.fetchAttributeVariations(attr.id);
       setState(() {
         _attributeVariations[attr.name] = variations;
-        print(
-          'Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}',
-        );
+        print('Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}');
+        // Update selected attributes with variation names
+        if (_selectedAttributes[attr.name] != null) {
+          final variationId = _selectedAttributes[attr.name];
+          final variation = variations.firstWhere(
+            (v) => v.id == variationId,
+            orElse: () => AttributeVariation(id: '', attributeId: '', name: variationId ?? '', status: '', createdOn: '', updatedOn: ''),
+          );
+          _selectedAttributes[attr.name] = variation.name.isNotEmpty ? variation.name : variationId;
+          if (_attributeControllers[attr.name] != null) {
+            _attributeControllers[attr.name]!.text = variation.name.isNotEmpty ? variation.name : variationId ?? '';
+          }
+        }
       });
     }
   }
 
   Future<void> _fetchModelVariations(String brandModelId) async {
-    final modelVariations = await AttributeValueService.fetchModelVariations(
-      brandModelId,
-      widget.categoryId,
+    final modelVariations = await AttributeValueService.fetchModelVariations(brandModelId, widget.categoryId);
+    final uniqueModelVariations = modelVariations.asMap().entries.fold<List<ModelVariation>>(
+      [],
+      (uniqueList, entry) {
+        if (!uniqueList.any((item) => item.id == entry.value.id)) {
+          uniqueList.add(entry.value);
+        }
+        return uniqueList;
+      },
     );
-    final uniqueModelVariations = modelVariations
-        .asMap()
-        .entries
-        .fold<List<ModelVariation>>([], (uniqueList, entry) {
-          if (!uniqueList.any((item) => item.id == entry.value.id)) {
-            uniqueList.add(entry.value);
-          }
-          return uniqueList;
-        });
     _updateModelVariations(uniqueModelVariations);
   }
 
@@ -683,19 +747,14 @@ class _AdPostFormState extends State<AdPostForm>
           content: Text('Maximum $_maxImages images allowed'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
     }
     try {
       if (source == ImageSource.camera) {
-        final XFile? image = await _imagePicker.pickImage(
-          source: source,
-          imageQuality: 80,
-        );
+        final XFile? image = await _imagePicker.pickImage(source: source, imageQuality: 80);
         if (image != null) {
           setState(() {
             _selectedImages.add(image);
@@ -707,21 +766,16 @@ class _AdPostFormState extends State<AdPostForm>
           });
         }
       } else {
-        final List<XFile>? images = await _imagePicker.pickMultiImage(
-          imageQuality: 80,
-        );
+        final List<XFile>? images = await _imagePicker.pickMultiImage(imageQuality: 80);
         if (images != null && images.isNotEmpty) {
           setState(() {
-            final newImages =
-                images.take(_maxImages - _selectedImages.length).toList();
+            final newImages = images.take(_maxImages - _selectedImages.length).toList();
             _selectedImages.addAll(newImages);
             _imageError = false;
             if (_selectedImages.length == newImages.length) {
               _coverImageIndex = 0;
             }
-            print(
-              'Added gallery images: ${newImages.map((img) => img.path).toList()}',
-            );
+            print('Added gallery images: ${newImages.map((img) => img.path).toList()}');
           });
         }
       }
@@ -731,9 +785,7 @@ class _AdPostFormState extends State<AdPostForm>
           content: Text('Error picking image: $e'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
     }
@@ -743,17 +795,16 @@ class _AdPostFormState extends State<AdPostForm>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => ImageSourceBottomSheetWidget(
-            onCameraTap: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.camera);
-            },
-            onGalleryTap: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.gallery);
-            },
-          ),
+      builder: (context) => ImageSourceBottomSheetWidget(
+        onCameraTap: () {
+          Navigator.pop(context);
+          _pickImage(ImageSource.camera);
+        },
+        onGalleryTap: () {
+          Navigator.pop(context);
+          _pickImage(ImageSource.gallery);
+        },
+      ),
     );
   }
 
@@ -765,26 +816,19 @@ class _AdPostFormState extends State<AdPostForm>
         if (variations != null && variations.isNotEmpty) {
           final variation = variations.firstWhere(
             (v) => v.name == selectedValue,
-            orElse:
-                () => AttributeVariation(
-                  id: '',
-                  attributeId: _attributeIdMap[attrName] ?? '',
-                  name: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
+            orElse: () => AttributeVariation(id: '', attributeId: _attributeIdMap[attrName] ?? '', name: '', status: '', createdOn: '', updatedOn: ''),
           );
           if (variation.id.isNotEmpty) {
             filters[_attributeIdMap[attrName] ?? ''] = [variation.id];
+          } else {
+            filters[_attributeIdMap[attrName] ?? ''] = [selectedValue];
           }
         } else {
           filters[_attributeIdMap[attrName] ?? ''] = [selectedValue];
         }
       }
     });
-    if (widget.categoryId == '1' &&
-        _registrationValidTillController.text.isNotEmpty) {
+    if (widget.categoryId == '1' && _registrationValidTillController.text.isNotEmpty) {
       final regId = _attributeIdMap['Registration valid till'] ?? '27';
       filters[regId] = [_registrationValidTillController.text];
     }
@@ -796,140 +840,135 @@ class _AdPostFormState extends State<AdPostForm>
     return filters;
   }
 
- Future<void> _submitForm() async {
-  setState(() {
-    _imageError = _selectedImages.isEmpty;
-  });
-  if (_imageError || !widget.formKey.currentState!.validate()) {
-    return;
-  }
-
-  if (widget.categoryId.isEmpty) {
-    Fluttertoast.showToast(
-      msg: 'Category ID is missing',
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.red.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
-    return;
-  }
-
-  // Convert all selected images to base64
-  List<String> imageBase64List = [];
-  List<String> imagePathList = [];
-  for (var image in _selectedImages) {
-    final imageBytes = await image.readAsBytes();
-    imageBase64List.add(base64Encode(imageBytes));
-    imagePathList.add(image.path);
-  }
-
-  final requiredAttributes = _getRequiredAttributes(widget.categoryId);
-  final missingAttributes = requiredAttributes.where(
-    (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
-  ).toList();
-  if (missingAttributes.isNotEmpty) {
-    Fluttertoast.showToast(
-      msg: 'Please select: ${missingAttributes.join(", ")}',
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.red.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
-    return;
-  }
-
-  // Prepare ad data
-  final ad = {
-    'status': 'Pending',
-    'views': 0,
-    'comments': 0,
-    'title': _titleController.text,
-    'appId': 'LAD-${DateTime.now().millisecondsSinceEpoch % 1000}',
-    'postedDate': DateFormat('dd-MM-yyyy').format(DateTime.now()),
-    'expDate': DateFormat('dd-MM-yyyy').format(DateTime.now().add(const Duration(days: 30))),
-    'price': _listPriceController.text,
-    'category': _getCategoryName(widget.categoryId),
-    'itemIn': 'Market Place',
-    'auctionAttempt': '0/3',
-    'auctionPrice': 'xxxx*',
-    'meetingsDone': '0',
-    'location': _selectedDistrict ?? 'Unknown',
-    'imageBase64List': imageBase64List, // Store list of base64 images
-    'imagePathList': imagePathList, // Store list of image paths
-    'coverImageIndex': _coverImageIndex, // Store cover image index
-    'rejectionMsg': null,
-    'userId': widget.userId ?? 'Unknown',
-    'filters': jsonEncode(getFilters()),
-    'brand': _selectedBrand?.id ?? '',
-    'model': _selectedBrandModel?.id ?? '',
-    'model_variation': _selectedModelVariation?.id ?? '',
-    'description': _descriptionController.text,
-    'land_mark': _landMarkController.text,
-    'district': _selectedDistrict ?? '',
-    'registration_valid_till': _registrationValidTillController.text,
-    'insurance_upto': _insuranceUptoController.text,
-  };
-
-  try {
-    // Save ad to SharedPreferences
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final List<String> adStrings = prefs.getStringList('userAds') ?? [];
-    
-    // Check if this ad already exists to avoid duplicates
-    final adId = ad['appId'];
-    final existingAdIndex = adStrings.indexWhere((adString) {
-      try {
-        final existingAd = jsonDecode(adString) as Map<String, dynamic>;
-        return existingAd['appId'] == adId;
-      } catch (e) {
-        return false;
-      }
+  Future<void> _submitForm() async {
+    setState(() {
+      _imageError = _selectedImages.isEmpty;
     });
-
-    // If ad exists, replace it; otherwise, add it
-    if (existingAdIndex != -1) {
-      adStrings[existingAdIndex] = jsonEncode(ad);
-      print('Replaced existing ad in SharedPreferences');
-    } else {
-      adStrings.add(jsonEncode(ad));
-      print('Added new ad to SharedPreferences');
+    if (_imageError || !widget.formKey.currentState!.validate()) {
+      return;
     }
 
-    await prefs.setStringList('userAds', adStrings);
-    print('Saved ${adStrings.length} ads to SharedPreferences');
+    if (widget.categoryId.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Category ID is missing',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
 
-    Fluttertoast.showToast(
-      msg: 'Ad saved successfully',
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.green.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
+    final requiredAttributes = _getRequiredAttributes(widget.categoryId);
+    final missingAttributes = requiredAttributes.where(
+      (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
+    ).toList();
+    if (missingAttributes.isNotEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Please select: ${missingAttributes.join(", ")}',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      return;
+    }
 
-    // Navigate to SellingStatusPage with ad data
-    context.pushNamed(
-      RouteNames.sellingstatuspage,
-      extra: {
-        'userId': widget.userId ?? 'Unknown',
-        'adData': ad,
-      },
-    );
-  } catch (e) {
-    print('Error saving ad: $e');
-    Fluttertoast.showToast(
-      msg: 'Error saving ad: $e',
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.red.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
+    // Save images to temporary directory
+    List<String> imagePathList = [];
+    for (var image in _selectedImages) {
+      imagePathList.add(image.path);
+    }
+
+    // Prepare ad data
+    final ad = {
+      'status': widget.adData != null ? widget.adData!['status'] : 'Pending',
+      'views': widget.adData != null ? widget.adData!['views'] : 0,
+      'comments': widget.adData != null ? widget.adData!['comments'] : 0,
+      'title': _titleController.text,
+      'appId': widget.adData != null ? widget.adData!['appId'] : 'LAD-${DateTime.now().millisecondsSinceEpoch % 1000}',
+      'postedDate': widget.adData != null ? widget.adData!['postedDate'] : DateFormat('dd-MM-yyyy').format(DateTime.now()),
+      'expDate': DateFormat('dd-MM-yyyy').format(DateTime.now().add(const Duration(days: 30))),
+      'price': _listPriceController.text,
+      'category': _getCategoryName(widget.categoryId),
+      'categoryId': widget.categoryId,
+      'itemIn': 'Market Place',
+      'auctionAttempt': widget.adData != null ? widget.adData!['auctionAttempt'] : '0/3',
+      'auctionPrice': widget.adData != null ? widget.adData!['auctionPrice'] : 'xxxx*',
+      'meetingsDone': widget.adData != null ? widget.adData!['meetingsDone'] : '0',
+      'location': _selectedDistrict ?? 'Unknown',
+      'imagePathList': imagePathList,
+      'coverImageIndex': _coverImageIndex,
+      'rejectionMsg': widget.adData != null ? widget.adData!['rejectionMsg'] : null,
+      'userId': widget.userId ?? 'Unknown',
+      'filters': jsonEncode(getFilters()),
+      'brand': _selectedBrand?.id ?? '',
+      'model': _selectedBrandModel?.id ?? '',
+      'model_variation': _selectedModelVariation?.id ?? '',
+      'description': _descriptionController.text,
+      'land_mark': _landMarkController.text,
+      'district': _selectedDistrict ?? '',
+      'registration_valid_till': _registrationValidTillController.text,
+      'insurance_upto': _insuranceUptoController.text,
+    };
+
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final List<String> adStrings = prefs.getStringList('userAds') ?? [];
+
+      // Update or add ad
+      final adId = ad['appId'];
+      final existingAdIndex = adStrings.indexWhere((adString) {
+        try {
+          final existingAd = jsonDecode(adString) as Map<String, dynamic>;
+          return existingAd['appId'] == adId;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      if (existingAdIndex != -1) {
+        adStrings[existingAdIndex] = jsonEncode(ad);
+        print('Updated ad $adId in SharedPreferences');
+      } else {
+        adStrings.add(jsonEncode(ad));
+        print('Added new ad $adId to SharedPreferences');
+      }
+
+      await prefs.setStringList('userAds', adStrings);
+      print('Saved ${adStrings.length} ads to SharedPreferences');
+
+      Fluttertoast.showToast(
+        msg: widget.adData != null ? 'Ad updated successfully' : 'Ad saved successfully',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+
+      // Navigate to SellingStatusPage
+      context.pushNamed(
+        RouteNames.sellingstatuspage,
+        extra: {
+          'userId': widget.userId ?? 'Unknown',
+          'adData': ad,
+        },
+      );
+    } catch (e) {
+      print('Error saving ad: $e');
+      Fluttertoast.showToast(
+        msg: 'Error saving ad: $e',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
-}
 
   String _getCategoryName(String categoryId) {
     const categoryMap = {
@@ -1027,15 +1066,9 @@ class _AdPostFormState extends State<AdPostForm>
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 10.0,
-                                  sigmaY: 10.0,
-                                ),
+                                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.5),
                                     borderRadius: BorderRadius.circular(12),
@@ -1058,10 +1091,7 @@ class _AdPostFormState extends State<AdPostForm>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: 10.0,
-                                sigmaY: 10.0,
-                              ),
+                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -1071,10 +1101,7 @@ class _AdPostFormState extends State<AdPostForm>
                                   icon: Icon(
                                     Icons.star,
                                     size: 20,
-                                    color:
-                                        index == _coverImageIndex
-                                            ? Colors.yellow
-                                            : Colors.white,
+                                    color: index == _coverImageIndex ? Colors.yellow : Colors.white,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -1093,10 +1120,7 @@ class _AdPostFormState extends State<AdPostForm>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: 10.0,
-                                sigmaY: 10.0,
-                              ),
+                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -1120,9 +1144,7 @@ class _AdPostFormState extends State<AdPostForm>
                                       } else {
                                         _coverImageIndex = 0;
                                       }
-                                      print(
-                                        'Removed image at index: $index, new cover index: $_coverImageIndex',
-                                      );
+                                      print('Removed image at index: $index, new cover index: $_coverImageIndex');
                                     });
                                   },
                                 ),
@@ -1163,10 +1185,7 @@ class _AdPostFormState extends State<AdPostForm>
         ),
         const SizedBox(height: 16),
         _selectedImages.isEmpty
-            ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [_buildImagePicker()],
-            )
+            ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [_buildImagePicker()])
             : _buildImagePicker(),
         const SizedBox(height: 24),
       ],
@@ -1200,25 +1219,16 @@ class _AdPostFormState extends State<AdPostForm>
               print('Selected brand: ${newValue?.name} (ID: ${newValue?.id})');
             });
             if (newValue != null) {
-              final brandModels = await AttributeValueService.fetchBrandModels(
-                newValue.id,
-                widget.categoryId,
-              );
+              final brandModels = await AttributeValueService.fetchBrandModels(newValue.id, widget.categoryId);
               setState(() {
                 _brandModels = brandModels;
-                print(
-                  'Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}',
-                );
+                print('Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}');
               });
             }
           },
           isRequired: true,
           itemToString: (Brand item) => item.name,
-          validator:
-              (Brand? value) =>
-                  value == null
-                      ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
-                      : null,
+          validator: (Brand? value) => value == null ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}' : null,
           hintText: '',
         ),
         const SizedBox(height: 12),
@@ -1232,9 +1242,7 @@ class _AdPostFormState extends State<AdPostForm>
                 _selectedBrandModel = newValue;
                 _selectedModelVariation = null;
                 _modelVariations = [];
-                print(
-                  'Selected brand model: ${newValue?.name} (ID: ${newValue?.id})',
-                );
+                print('Selected brand model: ${newValue?.name} (ID: ${newValue?.id})');
               });
               if (newValue != null) {
                 await _fetchModelVariations(newValue.id);
@@ -1242,11 +1250,7 @@ class _AdPostFormState extends State<AdPostForm>
             },
             isRequired: true,
             itemToString: (BrandModel item) => item.name,
-            validator:
-                (BrandModel? value) =>
-                    value == null
-                        ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
-                        : null,
+            validator: (BrandModel? value) => value == null ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}' : null,
             hintText: '',
           ),
         if (_brandModels.isNotEmpty) const SizedBox(height: 12),
@@ -1258,9 +1262,7 @@ class _AdPostFormState extends State<AdPostForm>
             onChanged: (ModelVariation? newValue) {
               setState(() {
                 _selectedModelVariation = newValue;
-                print(
-                  'Selected model variation: ${newValue?.name} (ID: ${newValue?.id})',
-                );
+                print('Selected model variation: ${newValue?.name} (ID: ${newValue?.id})');
               });
             },
             isRequired: false,
@@ -1320,11 +1322,7 @@ class _AdPostFormState extends State<AdPostForm>
           },
           isRequired: true,
           itemToString: (String item) => item,
-          validator:
-              (String? value) =>
-                  value == null || value == 'No districts available'
-                      ? 'Please select a district'
-                      : null,
+          validator: (String? value) => value == null || value == 'No districts available' ? 'Please select a district' : null,
           hintText: '',
         ),
         const SizedBox(height: 12),
@@ -1377,11 +1375,8 @@ class _AdPostFormState extends State<AdPostForm>
         ),
         const SizedBox(height: 16),
         ..._attributes.map((attr) {
-          final isRequired = _getRequiredAttributes(
-            widget.categoryId,
-          ).contains(attr.name);
-          final hasVariations =
-              _attributeVariations[attr.name]?.isNotEmpty ?? false;
+          final isRequired = _getRequiredAttributes(widget.categoryId).contains(attr.name);
+          final hasVariations = _attributeVariations[attr.name]?.isNotEmpty ?? false;
 
           if (hasVariations) {
             return Padding(
@@ -1389,11 +1384,7 @@ class _AdPostFormState extends State<AdPostForm>
               child: CustomDropdownWidget<String>(
                 label: attr.name,
                 value: _selectedAttributes[attr.name],
-                items:
-                    _attributeVariations[attr.name]
-                        ?.map((v) => v.name)
-                        .toList() ??
-                    ['No options available'],
+                items: _attributeVariations[attr.name]?.map((v) => v.name).toList() ?? ['No options available'],
                 onChanged: (String? newValue) {
                   if (newValue != null && newValue != 'No options available') {
                     setState(() {
@@ -1404,17 +1395,14 @@ class _AdPostFormState extends State<AdPostForm>
                 },
                 isRequired: isRequired,
                 itemToString: (String item) => item,
-                validator:
-                    isRequired
-                        ? (value) {
-                          if (value == null ||
-                              value.isEmpty ||
-                              value == 'No options available') {
-                            return 'Please select ${attr.name}';
-                          }
-                          return null;
+                validator: isRequired
+                    ? (value) {
+                        if (value == null || value.isEmpty || value == 'No options available') {
+                          return 'Please select ${attr.name}';
                         }
-                        : null,
+                        return null;
+                      }
+                    : null,
                 hintText: '',
               ),
             );
@@ -1425,15 +1413,14 @@ class _AdPostFormState extends State<AdPostForm>
                 controller: _attributeControllers[attr.name]!,
                 label: attr.name,
                 isRequired: isRequired,
-                validator:
-                    isRequired
-                        ? (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter ${attr.name}';
-                          }
-                          return null;
+                validator: isRequired
+                    ? (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter ${attr.name}';
                         }
-                        : null,
+                        return null;
+                      }
+                    : null,
                 onChanged: (value) {
                   setState(() {
                     _selectedAttributes[attr.name] = value;
@@ -1463,9 +1450,9 @@ class _AdPostFormState extends State<AdPostForm>
               elevation: 0,
               shape: const RoundedRectangleBorder(),
             ),
-            child: const Text(
-              'Post Ad',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            child: Text(
+              widget.adData != null ? 'Update Ad' : 'Post Ad',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
           ),
         ),

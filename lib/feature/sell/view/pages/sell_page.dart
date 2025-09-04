@@ -5,6 +5,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class CategoryItem {
   final String name;
@@ -35,7 +36,24 @@ class _SellPageState extends State<SellPage> {
   @override
   void initState() {
     super.initState();
+    _checkUserId();
     _categoriesFuture = CategoryService().fetchCategories();
+  }
+
+  void _checkUserId() {
+    if (widget.userId == null || widget.userId!.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Fluttertoast.showToast(
+          msg: 'Please log in to sell items',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        context.replaceNamed(RouteNames.pleaseLoginPage);
+      });
+    }
   }
 
   final Map<String, CategoryItem> _fallbackCategories = {
@@ -63,6 +81,10 @@ class _SellPageState extends State<SellPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.userId == null || widget.userId!.isEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -131,6 +153,18 @@ class _SellPageState extends State<SellPage> {
   }
 
   void _navigateToAdPost(BuildContext context, String categoryId) {
+    if (widget.userId == null || widget.userId!.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Please log in to create a listing',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      context.replaceNamed(RouteNames.pleaseLoginPage);
+      return;
+    }
     context.pushNamed(
       RouteNames.adPostPage,
       extra: {'categoryId': categoryId, 'userId': widget.userId},
