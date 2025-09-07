@@ -48,16 +48,16 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.buyingStatusPage,
     ),
     GoRoute(
-  path: RouteNames.sellingstatuspage,
-  name: RouteNames.sellingstatuspage,
-  builder: (context, state) {
-    final extra = state.extra as Map<String, dynamic>?;
-    return SellingStatusPage(
-      userId: extra?['userId'],
-      adData: extra?['adData'],
-    );
-  },
-),
+      path: RouteNames.sellingstatuspage,
+      name: RouteNames.sellingstatuspage,
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return SellingStatusPage(
+          userId: extra?['userId'],
+          adData: extra?['adData'],
+        );
+      },
+    ),
     GoRoute(
       path: RouteNames.sellpage,
       builder: (context, state) => const SellPage(),

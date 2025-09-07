@@ -1,3 +1,4 @@
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -32,11 +33,14 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadUserId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
-    });
-    if (kDebugMode) {
-      print('HomePage - Loaded userId: $userId');
+    final storedUserId = prefs.getString('userId');
+    if (mounted) {
+      setState(() {
+        userId = storedUserId?.isNotEmpty == true ? storedUserId : widget.userId;
+      });
+      // if (kDebugMode) {
+      //   print('HomePage - Loaded userId: "$userId" (SharedPreferences: "$storedUserId", widget.userId: "${widget.userId}")');
+      // }
     }
   }
 
@@ -48,6 +52,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // if (kDebugMode) {
+    //   print('HomePage - Building with userId: "$userId", _selectedDistrict: "$_selectedDistrict"');
+    // }
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -66,9 +73,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(width: 8),
                         DropdownButton<String>(
                           value: _selectedDistrict,
-                          hint: Text(userId != null && userId != 'Unknown'
-                              ? 'User ID: $userId'
-                              : 'All Kerala'),
+                          hint: Text('All Kerala'),
                           items: districts.map((district) {
                             return DropdownMenuItem<String>(
                               value: district,
@@ -76,9 +81,14 @@ class _HomePageState extends State<HomePage> {
                             );
                           }).toList(),
                           onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedDistrict = newValue;
-                            });
+                            if (mounted) {
+                              setState(() {
+                                _selectedDistrict = newValue;
+                              });
+                              // if (kDebugMode) {
+                              //   print('HomePage - Selected district: "$_selectedDistrict"');
+                              // }
+                            }
                           },
                           underline: const SizedBox(),
                           icon: const SizedBox.shrink(),
@@ -88,6 +98,9 @@ class _HomePageState extends State<HomePage> {
                     const Spacer(),
                     IconButton(
                       onPressed: () {
+                        // if (kDebugMode) {
+                        //   print('HomePage - Notification icon pressed, navigating to notification page with userId: "$userId"');
+                        // }
                         context.pushNamed(RouteNames.notificationPage, extra: {'userId': userId});
                       },
                       icon: const Icon(Icons.notifications),
@@ -98,22 +111,28 @@ class _HomePageState extends State<HomePage> {
               if (userId != null && userId != 'Unknown')
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    'Logged in as User ID: $userId',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
+                  // child: Text(
+                  //   'Logged in as User ID: $userId',
+                  //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  // ),
                 ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SearchButtonWidget(
                   controller: _searchController,
                   onSearch: (query) {
-                    setState(() {
-                      _searchQuery = query;
-                    });
+                    if (mounted) {
+                      setState(() {
+                        _searchQuery = query;
+                      });
+                      // if (kDebugMode) {
+                      //   print('HomePage - Search query updated: "$_searchQuery"');
+                      // }
+                    }
                   },
                 ),
               ),
+              const SizedBox(height: 5,),
               const BannerWidget(),
               // Pass userId to CategoryWidget
               Padding(

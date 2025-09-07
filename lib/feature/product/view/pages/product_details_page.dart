@@ -1,5 +1,5 @@
-import 'dart:convert';
 
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -13,6 +13,7 @@ import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
@@ -43,9 +44,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  bool _isShortlisted = false;
+  bool _isLoadingShortlist = false;
+  String? _shortlistErrorMessage;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
+  final _storage = const FlutterSecureStorage();
 
   String sellerName = 'Unknown';
   String? sellerProfileImage;
@@ -59,6 +64,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     super.initState();
     _fetchDetailsData();
     _fetchSellerInfo();
+    _fetchShortlistStatus();
   }
 
   @override
@@ -106,6 +112,121 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         sellerErrorMessage = 'Error: $e';
         isLoadingSeller = false;
       });
+    }
+  }
+
+  Future<void> _fetchShortlistStatus() async {
+    final userId = await _storage.read(key: 'userId');
+    if (userId == null) {
+      setState(() {
+        _shortlistErrorMessage = 'Please log in to view shortlist status';
+      });
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/shortlist.php?token=$token&user_id=$userId&post_id=${widget.product.id}',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' && jsonResponse['data'] != null) {
+          setState(() {
+            _isShortlisted = jsonResponse['data']['status'] == '1';
+          });
+        } else {
+          setState(() {
+            _shortlistErrorMessage = 'Failed to fetch shortlist status';
+          });
+        }
+      } else {
+        setState(() {
+          _shortlistErrorMessage =
+              'Failed to fetch shortlist status: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _shortlistErrorMessage = 'Error fetching shortlist status: $e';
+      });
+    }
+  }
+
+  Future<void> _toggleShortlist() async {
+    final userId = await _storage.read(key: 'userId');
+    if (userId == null) {
+      setState(() {
+        _shortlistErrorMessage = 'Please log in to shortlist';
+      });
+      // Optionally, redirect to login page
+      // context.pushNamed(RouteNames.pleaseLoginPage);
+      return;
+    }
+
+    setState(() {
+      _isLoadingShortlist = true;
+      _shortlistErrorMessage = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shortlist.php'),
+        body: {
+          'token': token,
+          'user_id': userId,
+          'post_id': widget.product.id,
+          'status': _isShortlisted ? '0' : '1', // Toggle status
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true') {
+          setState(() {
+            _isShortlisted = !_isShortlisted;
+            _isLoadingShortlist = false;
+          });
+        } else {
+          setState(() {
+            _shortlistErrorMessage = jsonResponse['message'] ?? 'Failed to update shortlist';
+            _isLoadingShortlist = false;
+          });
+        }
+      } else {
+        setState(() {
+          _shortlistErrorMessage = 'Failed to update shortlist: ${response.statusCode}';
+          _isLoadingShortlist = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _shortlistErrorMessage = 'Error toggling shortlist: $e';
+        _isLoadingShortlist = false;
+      });
+    }
+
+    // Show feedback to user
+    if (_shortlistErrorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_shortlistErrorMessage!),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isShortlisted
+                ? 'Added to shortlist'
+                : 'Removed from shortlist',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
 
@@ -683,7 +804,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   String formatPriceInt(double price) {
-    final formatter = NumberFormat.decimalPattern('en_IN');
+    final formatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     return formatter.format(price.round());
   }
 
@@ -705,7 +826,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
   String _formatNumber(String value) {
     final number = int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(number);
   }
@@ -916,6 +1036,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           const Spacer(),
                           IconButton(
                             icon: Icon(
+                              _isShortlisted
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color: _isShortlisted ? Colors.yellow : Colors.white,
+                            ),
+                            onPressed: _isLoadingShortlist ? null : _toggleShortlist,
+                          ),
+                          IconButton(
+                            icon: Icon(
                               _isFavorited
                                   ? Icons.favorite
                                   : Icons.favorite_border,
@@ -986,7 +1115,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        widget.isAuction
+                            ? '₹${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(widget.product.price) ?? 0)}'
+                            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -1161,7 +1292,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(context), // Updated call
+                      _buildSellerInformationItem(context),
                     ],
                   ),
                 ),
@@ -1193,7 +1324,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
-                // No background color
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -1205,22 +1335,22 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               ),
               child: Row(
                 children: [
-              Expanded(
-  child: ElevatedButton(
-    onPressed: () {
-      showBidDialog(context); // Call the dialog function
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Palette.primarypink,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-    ),
-    child: const Text('Place Bid'),
-  ),
-),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        showBidDialog(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primarypink,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
+                      ),
+                      child: const Text('Place Bid'),
+                    ),
+                  ),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),

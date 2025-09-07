@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +11,7 @@ import 'package:lelamonline_flutter/feature/categories/services/attribute_valueP
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -47,7 +47,6 @@ class _MarketPlaceProductDetailsPageState
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
-
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
@@ -55,199 +54,10 @@ class _MarketPlaceProductDetailsPageState
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
   String? userId;
-  double _minBidIncrement = 1000; // Example minimum increment, adjust as needed
+  double _minBidIncrement = 1000;
   final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
   final String _token = '5cb2c9b569416b5db1604e0e12478ded';
-  bool _isLoadingBid = true;
-
-  Future<void> _saveBidData(int bidAmount) async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String currentDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
-    final String expirationDate = DateFormat('dd-MM-yyyy').format(
-      DateTime.now().add(const Duration(days: 7)),
-    );
-
-    final Map<String, dynamic> bidData = {
-      'id': id,
-      'userId': userId,
-      'post_id': id,
-      'carImage': image.isNotEmpty ? 'https://lelamonline.com/admin/$image' : '',
-      'title': title,
-      'appId': attributeValues['Model Variation'] ?? 'N/A',
-      'bidDate': currentDate,
-      'expirationDate': expirationDate,
-      'targetPrice': price,
-      'bidPrice': bidAmount.toString(),
-      'location': landMark,
-      'store': byDealer == '1' ? 'Dealer' : 'Individual',
-    };
-
-    List<String> existingBids = prefs.getStringList('userBids') ?? [];
-    existingBids.add(jsonEncode(bidData));
-    await prefs.setStringList('userBids', existingBids);
-  }
-
-void showProductBidDialog(BuildContext context) {
-  final TextEditingController _bidController = TextEditingController();
-  bool isDialogOpen = true; // Track dialog state to prevent premature disposal
-
-  void showThankYouDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Thank You',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Your bid has been placed successfully.\nCheck "My Bids" in status or call support.',
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close Thank You dialog
-                if (isDialogOpen) {
-                  Navigator.of(context).pop(); // Close main bid dialog
-                  isDialogOpen = false;
-                  _bidController.dispose(); // Dispose controller once
-                }
-              },
-              child: const Text('OK', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close Thank You dialog
-                if (isDialogOpen) {
-                  Navigator.of(context).pop(); // Close main bid dialog
-                  isDialogOpen = false;
-                  _bidController.dispose(); // Dispose controller once
-                }
-                // Placeholder for call support
-                // Optionally add: launchUrl(Uri(scheme: 'tel', path: 'YOUR_SUPPORT_NUMBER'));
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Call Support'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text(
-          'Place Your Bid Amount',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Bid Amount *',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _bidController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: false),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                hintText: 'Enter amount',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close main bid dialog
-              isDialogOpen = false;
-              _bidController.dispose(); // Dispose controller once
-            },
-            child: const Text('Close', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final String amount = _bidController.text;
-              if (amount.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a bid amount'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final int bidAmount = int.tryParse(amount) ?? 0;
-              if (bidAmount < _minBidIncrement) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              if (userId == null || userId == 'Unknown') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please log in to place a bid'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              try {
-                // Log bid data for debugging
-                debugPrint('Saving bid: post_id=$id, user_id=$userId, bidamt=$bidAmount');
-                
-                // Save bid data to SharedPreferences
-                await _saveBidData(bidAmount);
-                showThankYouDialog();
-              } catch (e) {
-                debugPrint('Error saving bid: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error saving bid: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Submit'),
-          ),
-        ],
-      );
-    },
-  ).then((_) {
-    // Handle dialog dismissal (e.g., tapping outside)
-    if (isDialogOpen) {
-      isDialogOpen = false;
-      _bidController.dispose();
-    }
-  });
-}
+  bool _isLoadingBid = false;
 
   @override
   void initState() {
@@ -255,6 +65,7 @@ void showProductBidDialog(BuildContext context) {
     _loadUserId();
     _fetchDetailsData();
     _fetchSellerInfo();
+    _checkShortlistStatus();
   }
 
   Future<void> _loadUserId() async {
@@ -263,6 +74,408 @@ void showProductBidDialog(BuildContext context) {
       userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
     });
     debugPrint('MarketPlaceProductDetailsPage - Loaded userId: $userId');
+  }
+
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') return;
+
+    try {
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId';
+      debugPrint('Checking shortlist status: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('list-shortlist.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true && responseData['data'] is List) {
+          final shortlisted = responseData['data'].any(
+            (item) => item['post_id'] == id && item['user_id'] == userId,
+          );
+          setState(() {
+            _isFavorited = shortlisted;
+          });
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('shortlist_$userId', responseBody);
+          debugPrint('Shortlist status cached for userId: $userId');
+        }
+      } else {
+        debugPrint('Failed to check shortlist: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error checking shortlist status: $e');
+      final prefs = await SharedPreferences.getInstance();
+      final cachedShortlist = prefs.getString('shortlist_$userId');
+      if (cachedShortlist != null) {
+        final responseData = jsonDecode(cachedShortlist);
+        if (responseData['status'] == true && responseData['data'] is List) {
+          final shortlisted = responseData['data'].any(
+            (item) => item['post_id'] == id && item['user_id'] == userId,
+          );
+          setState(() {
+            _isFavorited = shortlisted;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (userId == null || userId == 'Unknown') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to add to shortlist'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=$id';
+      debugPrint('Adding to shortlist: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('add-to-shortlist.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true) {
+          setState(() {
+            _isFavorited = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Added to shortlist'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          final prefs = await SharedPreferences.getInstance();
+          final cachedShortlist = prefs.getString('shortlist_$userId');
+          List<dynamic> shortlistData = [];
+          if (cachedShortlist != null) {
+            final data = jsonDecode(cachedShortlist);
+            if (data['status'] == true && data['data'] is List) {
+              shortlistData = data['data'];
+            }
+          }
+          shortlistData.add({
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+            'user_id': userId,
+            'post_id': id,
+            'created_on': DateFormat(
+              'yyyy-MM-dd HH:mm:ss',
+            ).format(DateTime.now()),
+            'updated_on': DateFormat(
+              'yyyy-MM-dd HH:mm:ss',
+            ).format(DateTime.now()),
+          });
+          await prefs.setString(
+            'shortlist_$userId',
+            jsonEncode({'status': true, 'data': shortlistData, 'code': 0}),
+          );
+          debugPrint('Shortlist updated in SharedPreferences');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to add to shortlist'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding to shortlist: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<String> _saveBidData(int bidAmount) async {
+    if (userId == null || userId == 'Unknown') {
+      throw Exception('Please log in to place a bid');
+    }
+
+    try {
+      setState(() {
+        _isLoadingBid = true;
+      });
+
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/place-bid.php?token=$_token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+      debugPrint('Placing bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('place-bid.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true) {
+          // Cache the bid locally
+          final prefs = await SharedPreferences.getInstance();
+          final cachedBids = prefs.getStringList('userBids') ?? [];
+          final newBid = {
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+            'user_id': userId,
+            'post_id': id,
+            'if_auction': widget.isAuction ? '1' : '0',
+            'if_auction_end': '0',
+            'status': '1',
+            'created_on': DateFormat(
+              'yyyy-MM-dd HH:mm:ss',
+            ).format(DateTime.now()),
+            'updated_on': DateFormat(
+              'yyyy-MM-dd HH:mm:ss',
+            ).format(DateTime.now()),
+            'bidPrice': bidAmount.toString(),
+            'targetPrice': price,
+            'title': title,
+            'carImage': image,
+            'appId': 'AD_$id',
+            'bidDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+            'expirationDate': DateFormat(
+              'yyyy-MM-dd',
+            ).format(DateTime.now().add(Duration(days: 7))),
+            'location': landMark,
+            'store': byDealer == '1' ? 'Dealer' : 'Individual',
+            'fromHighBids': bidAmount >= (double.tryParse(price) ?? 0),
+            'fromLowBids': bidAmount < (double.tryParse(price) ?? 0),
+          };
+          cachedBids.add(jsonEncode(newBid));
+          await prefs.setStringList('userBids', cachedBids);
+          debugPrint('Bid cached: $newBid');
+
+          return responseData['data'] ?? 'Bid placed successfully';
+        } else {
+          throw Exception('Failed to place bid: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to place bid: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error placing bid: $e');
+      throw e;
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
+      });
+    }
+  }
+
+  void showProductBidDialog(BuildContext context) {
+    final TextEditingController _bidController = TextEditingController();
+    bool isDialogOpen = true;
+
+    void showResponseDialog(String message, bool isSuccess) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text(
+              isSuccess ? 'Thank You' : 'Error',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            content: Text(message, style: const TextStyle(fontSize: 16)),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  if (isDialogOpen) {
+                    Navigator.of(context).pop();
+                    isDialogOpen = false;
+                    _bidController.dispose();
+                  }
+                  if (isSuccess) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyBidsWidget(
+                              baseUrl: _baseUrl,
+                              token: _token,
+                              userId: userId,
+                            ),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('OK', style: TextStyle(color: Colors.grey)),
+              ),
+              if (isSuccess)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    if (isDialogOpen) {
+                      Navigator.of(context).pop();
+                      isDialogOpen = false;
+                      _bidController.dispose();
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyBidsWidget(
+                              baseUrl: _baseUrl,
+                              token: _token,
+                              userId: userId,
+                            ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Call Support'),
+                ),
+            ],
+          );
+        },
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Place Your Bid Amount',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Bid Amount *',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _bidController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: false,
+                ),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  hintText: 'Enter amount',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+              ),
+              if (_isLoadingBid)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                isDialogOpen = false;
+                _bidController.dispose();
+              },
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed:
+                  _isLoadingBid
+                      ? null
+                      : () async {
+                        final String amount = _bidController.text;
+                        if (amount.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a bid amount'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final int bidAmount = int.tryParse(amount) ?? 0;
+                        if (bidAmount < _minBidIncrement) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (userId == null || userId == 'Unknown') {
+                          showResponseDialog(
+                            'Please log in to place a bid',
+                            false,
+                          );
+                          return;
+                        }
+
+                        try {
+                          final String responseMessage = await _saveBidData(
+                            bidAmount,
+                          );
+                          showResponseDialog(responseMessage, true);
+                        } catch (e) {
+                          showResponseDialog('Error placing bid: $e', false);
+                        }
+                      },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      if (isDialogOpen) {
+        isDialogOpen = false;
+        _bidController.dispose();
+      }
+    });
   }
 
   @override
@@ -341,7 +554,7 @@ void showProductBidDialog(BuildContext context) {
         _isLoadingLocations = false;
       });
     } catch (e) {
-      print('Error fetching details: $e');
+      debugPrint('Error fetching details: $e');
       setState(() {
         isLoadingDetails = false;
         _isLoadingLocations = false;
@@ -354,11 +567,11 @@ void showProductBidDialog(BuildContext context) {
     attributeValues.clear();
     orderedAttributeValues.clear();
 
-    print('Attribute Value Pairs: $attributeValuePairs');
-    print(
+    debugPrint('Attribute Value Pairs: $attributeValuePairs');
+    debugPrint(
       'Attribute Variations: ${attributeVariations.map((v) => {'id': v.id, 'attribute_id': v.attributeId, 'name': v.name}).toList()}',
     );
-    print('Filters: $filters');
+    debugPrint('Filters: $filters');
 
     final Set<String> processedAttributes = {};
 
@@ -371,9 +584,13 @@ void showProductBidDialog(BuildContext context) {
           MapEntry(pair.attributeName, pair.attributeValue),
         );
         processedAttributes.add(pair.attributeName);
-        print('Added from API: ${pair.attributeName} = ${pair.attributeValue}');
+        debugPrint(
+          'Added from API: ${pair.attributeName} = ${pair.attributeValue}',
+        );
       } else {
-        print('Skipped API pair: ${pair.attributeName} (duplicate or invalid)');
+        debugPrint(
+          'Skipped API pair: ${pair.attributeName} (duplicate or invalid)',
+        );
       }
     }
 
@@ -398,7 +615,7 @@ void showProductBidDialog(BuildContext context) {
           orderedAttributeValues.add(MapEntry('KM Range', variationId));
         }
         processedAttributes.add('KM Range');
-        print('Added KM Range from filters: $variationId');
+        debugPrint('Added KM Range from filters: $variationId');
       }
     }
 
@@ -410,44 +627,48 @@ void showProductBidDialog(BuildContext context) {
         } else if (variation is List<dynamic> && variation.isNotEmpty) {
           variationId = variation[0].toString();
         } else {
-          print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
+          debugPrint(
+            'Skipped filter: attribute_id=$attributeId (empty or invalid)',
+          );
           return;
         }
 
         if (variationId.isNotEmpty) {
           final attribute = attributes.firstWhere(
             (attr) => attr.id == attributeId,
-            orElse: () => Attribute(
-              id: attributeId,
-              slug: '',
-              name: _getAttributeNameFromId(attributeId),
-              listOrder: '',
-              categoryId: '',
-              formValidation: '',
-              ifDetailsIcons: '',
-              detailsIcons: '',
-              detailsIconsOrder: '',
-              showFilter: '',
-              status: '',
-              createdOn: '',
-              updatedOn: '',
-            ),
+            orElse:
+                () => Attribute(
+                  id: attributeId,
+                  slug: '',
+                  name: _getAttributeNameFromId(attributeId),
+                  listOrder: '',
+                  categoryId: '',
+                  formValidation: '',
+                  ifDetailsIcons: '',
+                  detailsIcons: '',
+                  detailsIconsOrder: '',
+                  showFilter: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
           );
           if (!processedAttributes.contains(attribute.name)) {
             final variationObj = attributeVariations.firstWhere(
               (varAttr) =>
                   varAttr.id == variationId &&
                   varAttr.attributeId == attributeId,
-              orElse: () => AttributeVariation(
-                id: variationId,
-                attributeId: attributeId,
-                name: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
+              orElse:
+                  () => AttributeVariation(
+                    id: variationId,
+                    attributeId: attributeId,
+                    name: '',
+                    status: '',
+                    createdOn: '',
+                    updatedOn: '',
+                  ),
             );
-            print(
+            debugPrint(
               'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variationObj.name}',
             );
             if (variationObj.name.isNotEmpty &&
@@ -457,11 +678,11 @@ void showProductBidDialog(BuildContext context) {
                 MapEntry(attribute.name, variationObj.name),
               );
               processedAttributes.add(attribute.name);
-              print(
+              debugPrint(
                 'Added from variations: ${attribute.name} = ${variationObj.name}',
               );
             } else {
-              print(
+              debugPrint(
                 'Skipped variation: ${attribute.name} (invalid name or ID match)',
               );
             }
@@ -470,8 +691,8 @@ void showProductBidDialog(BuildContext context) {
       }
     });
 
-    print('Final attributeValues: $attributeValues');
-    print('Final orderedAttributeValues: $orderedAttributeValues');
+    debugPrint('Final attributeValues: $attributeValues');
+    debugPrint('Final orderedAttributeValues: $orderedAttributeValues');
   }
 
   String _getAttributeNameFromId(String id) {
@@ -541,21 +762,22 @@ void showProductBidDialog(BuildContext context) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -647,20 +869,22 @@ void showProductBidDialog(BuildContext context) {
                               tag: 'image_$index',
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
-                                fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                fit: BoxFit.fill,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -687,7 +911,8 @@ void showProductBidDialog(BuildContext context) {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -727,7 +952,9 @@ void showProductBidDialog(BuildContext context) {
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -736,9 +963,10 @@ void showProductBidDialog(BuildContext context) {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -748,20 +976,23 @@ void showProductBidDialog(BuildContext context) {
                                       borderRadius: BorderRadius.circular(6),
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
-                                        fit: BoxFit.cover,
-                                        placeholder: (context, url) => const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        fit: BoxFit.fill,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) => const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -861,7 +1092,7 @@ void showProductBidDialog(BuildContext context) {
             ),
             ElevatedButton(
               onPressed: () {
-                print(
+                debugPrint(
                   'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                 );
                 Navigator.pop(context);
@@ -951,61 +1182,62 @@ void showProductBidDialog(BuildContext context) {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-            ? Center(
-                child: Text(
-                  sellerErrorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              )
-            : GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          SellerInformationPage(userId: widget.product.createdBy),
-                    ),
-                  );
-                },
-                child: Row(
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.product.createdBy),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage: sellerProfileImage != null &&
-                              sellerProfileImage!.isNotEmpty
-                          ? CachedNetworkImageProvider(sellerProfileImage!)
-                          : const AssetImage('assets/images/avatar.gif')
-                              as ImageProvider,
-                      radius: 30,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sellerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Member Since $sellerActiveFrom',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Posts: $sellerNoOfPosts',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                        ],
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
                   ],
                 ),
-              );
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -1078,12 +1310,14 @@ void showProductBidDialog(BuildContext context) {
                                   imageUrl: _images[index],
                                   width: double.infinity,
                                   height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  fit: BoxFit.fitWidth,
+                                  placeholder:
+                                      (context, url) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                  errorWidget:
+                                      (context, url, error) =>
+                                          const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -1130,11 +1364,7 @@ void showProductBidDialog(BuildContext context) {
                                   : Icons.favorite_border,
                               color: _isFavorited ? Colors.red : Colors.white,
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
+                            onPressed: _toggleFavorite,
                           ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
@@ -1170,16 +1400,16 @@ void showProductBidDialog(BuildContext context) {
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -1273,7 +1503,8 @@ void showProductBidDialog(BuildContext context) {
                                     child: _buildDetailItem(
                                       Icons.person,
                                       _getOwnerText(
-                                        attributeValues['No of owners'] ?? 'N/A',
+                                        attributeValues['No of owners'] ??
+                                            'N/A',
                                       ),
                                     ),
                                   ),
@@ -1305,7 +1536,8 @@ void showProductBidDialog(BuildContext context) {
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.build,
-                                      attributeValues['Engine Condition'] ?? 'N/A',
+                                      attributeValues['Engine Condition'] ??
+                                          'N/A',
                                     ),
                                   ),
                                 ],
@@ -1334,21 +1566,22 @@ void showProductBidDialog(BuildContext context) {
                         const Center(child: CircularProgressIndicator())
                       else
                         Column(
-                          children: orderedAttributeValues
-                              .where(
-                                (entry) =>
-                                    entry.value != 'N/A' &&
-                                    entry.key != 'Co driver side rear tyre',
-                              )
-                              .map(
-                                (entry) => _buildSellerCommentItem(
-                                  entry.key,
-                                  entry.key == 'No of owners'
-                                      ? _getOwnerText(entry.value)
-                                      : entry.value,
-                                ),
-                              )
-                              .toList(),
+                          children:
+                              orderedAttributeValues
+                                  .where(
+                                    (entry) =>
+                                        entry.value != 'N/A' &&
+                                        entry.key != 'Co driver side rear tyre',
+                                  )
+                                  .map(
+                                    (entry) => _buildSellerCommentItem(
+                                      entry.key,
+                                      entry.key == 'No of owners'
+                                          ? _getOwnerText(entry.value)
+                                          : entry.value,
+                                    ),
+                                  )
+                                  .toList(),
                         ),
                     ],
                   ),
@@ -1412,9 +1645,7 @@ void showProductBidDialog(BuildContext context) {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        showProductBidDialog(context); // Updated to new dialog name
-                      },
+                      onPressed: () => showProductBidDialog(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Palette.primarypink,
                         foregroundColor: Colors.white,

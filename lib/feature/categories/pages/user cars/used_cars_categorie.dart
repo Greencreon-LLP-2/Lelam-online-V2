@@ -241,10 +241,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
-   if (_userId == null && _listingType == 'auction') {
-    context.pushNamed(RouteNames.pleaseLoginPage, extra: {'redirectToAuctions': true});
-    return;
-  }
+    if (_userId == null && _listingType == 'auction') {
+      context.pushNamed(
+        RouteNames.pleaseLoginPage,
+        extra: {'redirectToAuctions': true},
+      );
+      return;
+    }
     if (forceRefresh) {
       MarketplaceService.clearCache();
     }
@@ -257,7 +260,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         categoryId: '1',
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
         listingType: _listingType,
-        userId: _userId ?? '2', // Fallback to default userId if null
+        userId: _userId ?? '2',
       );
       final products = posts.map((post) => post.toProduct()).toList();
       final attributeValuePairs =
@@ -1369,39 +1372,57 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                       ),
                                     ),
                                   ),
-                               Expanded(
-  child: GestureDetector(
-    onTap: () {
-      if (_userId == null) {
-        if (kDebugMode) {
-          print('Auction button clicked, but userId is null');
-        }
-        context.pushNamed(RouteNames.pleaseLoginPage, extra: {'redirectToAuctions': true});
-      } else {
-        setState(() {
-          _listingType = 'auction';
-          _fetchProducts();
-        });
-      }
-    },
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: _listingType == 'auction' ? Palette.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        'Auction',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontWeight: _listingType == 'auction' ? FontWeight.w600 : FontWeight.normal,
-          color: _listingType == 'auction' ? Colors.black : Colors.grey.shade600,
-          fontSize: 12,
-        ),
-      ),
-    ),
-  ),
-),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        if (_userId == null) {
+                                          if (kDebugMode) {
+                                            print(
+                                              'Auction button clicked, but userId is null',
+                                            );
+                                          }
+                                          context.pushNamed(
+                                            RouteNames.pleaseLoginPage,
+                                            extra: {'redirectToAuctions': true},
+                                          );
+                                        } else {
+                                          setState(() {
+                                            _listingType = 'auction';
+                                            _fetchProducts();
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              _listingType == 'auction'
+                                                  ? Palette.white
+                                                  : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Auction',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontWeight:
+                                                _listingType == 'auction'
+                                                    ? FontWeight.w600
+                                                    : FontWeight.normal,
+                                            color:
+                                                _listingType == 'auction'
+                                                    ? Colors.black
+                                                    : Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1493,6 +1514,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
     final isExchangeAvailable = product.ifExchange == '1';
+    final isFeatured = product.feature == '1';
     final attributeValues = _productAttributeValues[product.id] ?? {};
 
     return LayoutBuilder(
@@ -1525,7 +1547,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             margin: EdgeInsets.zero,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(0),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.30),
@@ -1544,7 +1565,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                       padding: const EdgeInsets.only(left: 10),
                       child: Container(
                         width: 120,
-                        height: 150,
+                        height: 155,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: const BorderRadius.all(
@@ -1559,8 +1580,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                               ),
                               child: Image.network(
                                 'https://lelamonline.com/admin/${product.image}',
-                                fit: BoxFit.fill,
-                                height: 400,
+                                fit: BoxFit.cover,
+                                height: 700,
                                 width: 200,
                                 errorBuilder: (context, error, stackTrace) {
                                   print(
@@ -1611,15 +1632,30 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              product.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Row(
+                              children: [
+                                if (isFeatured)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Icon(
+                                      Icons.verified,
+                                      size: 16,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    product.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: Colors.black87,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                             Text(
                               product.modelVariation,
@@ -1634,22 +1670,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                               children: [
                                 Text(
                                   isAuction
-                                      ? 'Starting Bid: ₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)}'
-                                      : '₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                      ? '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}'
+                                      : '${_formatPrice(double.tryParse(product.price) ?? 0)}',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: Palette.primaryblue,
                                   ),
                                 ),
-                                if (isAuction)
-                                  Text(
-                                    'Max Bid: ₹${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -1742,8 +1770,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 5,
+                            horizontal: 0,
+                            vertical: 0,
                           ),
                           decoration: BoxDecoration(
                             color:
@@ -1773,14 +1801,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Widget _buildDetailChipWithIcon(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: Colors.grey.shade700),
+          Icon(icon, size: 8, color: Colors.grey.shade700),
           const SizedBox(width: 4),
           Text(
             label,
@@ -1949,7 +1974,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   String _formatPrice(double price) {
-    final formatter = NumberFormat.decimalPattern('en_IN');
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
     return formatter.format(price.round());
   }
 

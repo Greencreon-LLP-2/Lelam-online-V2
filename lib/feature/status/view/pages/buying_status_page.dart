@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart' hide MyMeetingsWidget;
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 class BuyingStatusPage extends StatelessWidget {

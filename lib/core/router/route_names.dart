@@ -20,6 +20,8 @@ class RouteNames {
   static const String marketPlaceProductDetailsPage = '/usedCarsDetailPage';
   static const String signupPage = '/signup';
   static const String pleaseLoginPage = '/pleaseLoginPage';
-    static const String myAddPage = '/myAddPage';
-
+  static const String myAddPage = '/myAddPage';
+  static const String realEstatePage = '/realEstatePage';
+  static const String commercialPage = '/commercialPage';
+  static const String othersPage = '/othersPage';
 }

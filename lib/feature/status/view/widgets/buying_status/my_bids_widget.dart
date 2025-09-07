@@ -1,13 +1,40 @@
-// ignore_for_file: deprecated_member_use
-
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class MyMeetingsWidget extends StatelessWidget {
+  final String baseUrl;
+  final String token;
+  final String? userId;
+  final String initialStatus;
+  final String? postId;
+  final String? bidId;
+  final Map<String, dynamic>? bid;
+
+  const MyMeetingsWidget({
+    super.key,
+    required this.baseUrl,
+    required this.token,
+    this.userId,
+    required this.initialStatus,
+    this.postId,
+    this.bidId,
+    this.bid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text('My Meetings Page - Bid ID: $bidId'),
+      ),
+    );
+  }
+}
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -30,11 +57,119 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   List<Map<String, dynamic>> bids = [];
   bool isLoading = true;
   String? error;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _loadBids();
+    _loadUserIdAndBids();
+  }
+
+  Future<void> _loadUserIdAndBids() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userId = widget.userId ?? prefs.getString('userId') ?? 'Unknown';
+    });
+    debugPrint('MyBidsWidget - Loaded userId: $_userId');
+    await _loadBids();
+  }
+
+  Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId'),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+        },
+      );
+      
+      debugPrint('post-details.php full response for post_id $postId: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Check the response structure
+        if (data['status'] == true || data['status'] == 'true') {
+          Map<String, dynamic>? postData;
+          
+          if (data['data'] is List && data['data'].isNotEmpty) {
+            postData = data['data'][0];
+          } else if (data['data'] is Map) {
+            postData = data['data'];
+          }
+          
+          if (postData != null) {
+            debugPrint('Post details extracted: ${postData.toString()}');
+            
+            return {
+              'title': postData['title'] ?? 'Unknown Vehicle (ID: $postId)',
+              'price': postData['price'] ?? '0',
+              'image': postData['image'] ?? '',
+              'parent_zone_id': postData['parent_zone_id'] ?? 'Unknown Location',
+              'by_dealer': postData['by_dealer'] ?? '0',
+              'land_mark': postData['land_mark'] ?? 'Unknown Location',
+            };
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching post details for post_id $postId: $e');
+      return null;
+    }
+  }
+
+  Future<int> _fetchMeetingAttempts(String bidId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${widget.baseUrl}/meetings.php?token=${widget.token}&bid_id=$bidId'),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+        },
+      );
+      debugPrint('meetings.php response for bid_id $bidId: ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true && data['data'] is List) {
+          return data['data'].length;
+        }
+      }
+      return 0;
+    } catch (e) {
+      debugPrint('Error fetching meeting attempts for bid_id $bidId: $e');
+      return 0;
+    }
+  }
+
+  // NEW: Fetch bid amount from a separate endpoint
+  Future<String> _fetchBidAmount(String bidId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${widget.baseUrl}/bid-details.php?token=${widget.token}&bid_id=$bidId'),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true) {
+          // Try different possible field names for bid amount
+          if (data['data'] is Map) {
+            return data['data']['bid_amount'] ?? 
+                   data['data']['amount'] ?? 
+                   data['data']['price'] ?? '0';
+          }
+        }
+      }
+      return '0';
+    } catch (e) {
+      debugPrint('Error fetching bid amount for bid_id $bidId: $e');
+      return '0';
+    }
   }
 
   Future<void> _loadBids() async {
@@ -43,15 +178,125 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       error = null;
     });
 
-    try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final List<String> bidStrings = prefs.getStringList('userBids') ?? [];
-      bids = bidStrings.map((bid) => jsonDecode(bid) as Map<String, dynamic>).toList();
-
+    if (_userId == null || _userId == 'Unknown') {
       setState(() {
         isLoading = false;
+        error = 'Please log in to view your bids';
       });
+      return;
+    }
+
+    try {
+      final headers = {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+      };
+
+      List<Map<String, dynamic>> allBids = [];
+
+      // Fetch low bids
+      final lowBidsResponse = await http.get(
+        Uri.parse('${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId'),
+        headers: headers,
+      );
+      
+      debugPrint('my-bids-low.php status: ${lowBidsResponse.statusCode}');
+      final lowBidsBody = lowBidsResponse.body;
+      debugPrint('my-bids-low.php response: $lowBidsBody');
+
+      if (lowBidsResponse.statusCode == 200) {
+        final lowBidsData = jsonDecode(lowBidsBody);
+        if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
+          final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
+          for (var bid in lowBids) {
+            bid['fromLowBids'] = true;
+            allBids.add(bid);
+          }
+        }
+      }
+
+      // Fetch high bids
+      final highBidsResponse = await http.get(
+        Uri.parse('${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId'),
+        headers: headers,
+      );
+      
+      debugPrint('my-bids-high.php status: ${highBidsResponse.statusCode}');
+      final highBidsBody = highBidsResponse.body;
+      debugPrint('my-bids-high.php response: $highBidsBody');
+
+      if (highBidsResponse.statusCode == 200) {
+        final highBidsData = jsonDecode(highBidsBody);
+        if (highBidsData['status'] == true && highBidsData['data'] is List) {
+          final highBids = List<Map<String, dynamic>>.from(highBidsData['data']);
+          for (var bid in highBids) {
+            bid['fromHighBids'] = true;
+            allBids.add(bid);
+          }
+        }
+      }
+
+      debugPrint('Total bids fetched: ${allBids.length}');
+
+      // Fetch details for each bid
+      for (var bid in allBids) {
+        debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
+        
+        // Fetch post details
+        final postDetails = await _fetchPostDetails(bid['post_id']);
+        if (postDetails != null) {
+          bid['title'] = postDetails['title'];
+          bid['carImage'] = '${widget.baseUrl}/${postDetails['image']}'.replaceAll('//', '/');
+          bid['targetPrice'] = postDetails['price'];
+          bid['location'] = postDetails['land_mark'] ?? postDetails['parent_zone_id'];
+          bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
+          bid['appId'] = 'APP_${bid['post_id']}';
+          
+          // Parse dates
+          try {
+            final createdDate = DateTime.parse(bid['created_on']);
+            bid['bidDate'] = DateFormat('yyyy-MM-dd').format(createdDate);
+            bid['expirationDate'] = DateFormat('yyyy-MM-dd').format(createdDate.add(Duration(days: 7)));
+          } catch (e) {
+            bid['bidDate'] = 'N/A';
+            bid['expirationDate'] = 'N/A';
+          }
+          
+          // Fetch meeting attempts
+          bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
+          
+          // Fetch bid amount
+          bid['bidPrice'] = await _fetchBidAmount(bid['id']);
+        } else {
+          // Add fallback data if post details not found
+          bid['title'] = 'Unknown Vehicle (ID: ${bid['post_id']})';
+          bid['carImage'] = '';
+          bid['targetPrice'] = '0';
+          bid['location'] = 'Unknown Location';
+          bid['store'] = 'Individual';
+          bid['appId'] = 'APP_${bid['post_id']}';
+          bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
+          bid['expirationDate'] = 'N/A';
+          bid['meetingAttempts'] = 0;
+          bid['bidPrice'] = '0';
+        }
+        
+        debugPrint('Bid processed: ${bid['title']}');
+      }
+
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('userBids', allBids.map((b) => jsonEncode(b)).toList());
+
+      setState(() {
+        bids = allBids;
+        isLoading = false;
+      });
+      
+      debugPrint('Bids loaded successfully: ${bids.length} items');
+
     } catch (e) {
+      debugPrint('Error loading bids: $e');
       setState(() {
         isLoading = false;
         error = 'Error loading bids: $e';
@@ -63,14 +308,16 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     return bids.where((bid) {
       final double bidPrice = double.tryParse(bid['bidPrice'] ?? '0') ?? 0;
       final double targetPrice = double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
-
+      
       if (selectedBidType == 'Low Bids') {
-        return bidPrice < targetPrice;
+        return bidPrice < targetPrice || (bid.containsKey('fromLowBids') && bid['fromLowBids'] == true);
       } else {
-        return bidPrice >= targetPrice;
+        return bidPrice >= targetPrice || (bid.containsKey('fromHighBids') && bid['fromHighBids'] == true);
       }
     }).toList();
   }
+
+  // ... rest of your methods (proceedMeetingWithBid, proceedMeetingWithoutBid, increaseBid) ...
 
   @override
   Widget build(BuildContext context) {
@@ -80,21 +327,11 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       backgroundColor: Colors.grey[50],
       body: Column(
         children: [
-          // Header with tab selector
           Container(
             color: Colors.white,
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                const Text(
-                  'My Bids',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 20),
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
@@ -107,14 +344,20 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                         child: MyBidItem(
                           title: 'Low Bids',
                           isSelected: selectedBidType == 'Low Bids',
-                          onTap: () => setState(() => selectedBidType = 'Low Bids'),
+                          onTap: () {
+                            setState(() => selectedBidType = 'Low Bids');
+                            _loadBids();
+                          },
                         ),
                       ),
                       Expanded(
                         child: MyBidItem(
                           title: 'High Bids',
                           isSelected: selectedBidType == 'High Bids',
-                          onTap: () => setState(() => selectedBidType = 'High Bids'),
+                          onTap: () {
+                            setState(() => selectedBidType = 'High Bids');
+                            _loadBids();
+                          },
                         ),
                       ),
                     ],
@@ -123,8 +366,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
               ],
             ),
           ),
-          
-          // Content area
           Expanded(
             child: Container(
               color: Colors.grey[50],
@@ -152,6 +393,11 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                   color: Colors.red,
                                 ),
                                 textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadUserIdAndBids,
+                                child: const Text('Retry'),
                               ),
                             ],
                           ),
@@ -191,11 +437,15 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                               padding: const EdgeInsets.all(16),
                               itemCount: filteredBids.length,
                               itemBuilder: (context, index) {
+                                final bid = filteredBids[index];
                                 return BidCard(
-                                  bid: filteredBids[index],
+                                  bid: bid,
                                   baseUrl: widget.baseUrl,
                                   token: widget.token,
-                                  userId: widget.userId ?? filteredBids[index]['userId'],
+                                  userId: _userId ?? bid['user_id'] ?? '482',
+                                 // onProceedWithBid: () => _proceedMeetingWithBid(context, bid),
+                                 // onProceedWithoutBid: () => _proceedMeetingWithoutBid(context, bid),
+                                  // onIncreaseBid: () => _increaseBid(context, bid),
                                 );
                               },
                             ),
@@ -206,12 +456,14 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     );
   }
 }
-
 class BidCard extends StatelessWidget {
   final Map<String, dynamic> bid;
   final String baseUrl;
   final String token;
   final String userId;
+  // final VoidCallback onProceedWithBid;
+  // final VoidCallback onProceedWithoutBid;
+  // final VoidCallback onIncreaseBid;
 
   const BidCard({
     super.key,
@@ -219,315 +471,18 @@ class BidCard extends StatelessWidget {
     required this.baseUrl,
     required this.token,
     required this.userId,
+    // required this.onProceedWithBid,
+    // required this.onProceedWithoutBid,
+    // required this.onIncreaseBid,
   });
-
-  Future<void> _increaseBid(BuildContext context) async {
-    final TextEditingController bidController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.trending_up, color: AppTheme.primaryColor),
-              SizedBox(width: 8),
-              Text('Increase Bid'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Current bid: ₹${NumberFormat('#,##0').format(double.tryParse(bid['bidPrice'] ?? '0') ?? 0)}',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: bidController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                decoration: InputDecoration(
-                  hintText: 'Enter new bid amount',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  prefixText: '₹ ',
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final String amount = bidController.text;
-                if (amount.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter a bid amount')),
-                  );
-                  return;
-                }
-                final int newBidAmount = int.tryParse(amount) ?? 0;
-                if (newBidAmount <= (double.tryParse(bid['bidPrice'] ?? '0') ?? 0)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('New bid must be higher than current bid')),
-                  );
-                  return;
-                }
-
-                try {
-                  final response = await http.get(
-                    Uri.parse('$baseUrl/increase-bid.php?token=$token&user_id=$userId&post_id=${bid['post_id']}&bidamt=$newBidAmount'),
-                    headers: {
-                      'token': token,
-                      'Cookie': 'PHPSESSID=gbqbiugaqg3gco8kaespjf8lnp',
-                    },
-                  );
-
-                  debugPrint('Increase bid response: ${response.body}');
-                  try {
-                    final responseData = jsonDecode(response.body);
-                    if (response.statusCode == 200 && responseData['status'] == true) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(responseData['data'] ?? 'Bid increased successfully')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to increase bid: ${responseData['data'] ?? 'Unknown error'}')),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error parsing response: ${response.body}')),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error increasing bid: $e')),
-                  );
-                }
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Submit'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _proceedMeetingWithBid(BuildContext context) async {
-    final TextEditingController timeController = TextEditingController(text: '07:30:00');
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.schedule, color: AppTheme.primaryColor),
-              SizedBox(width: 8),
-              Text('Schedule Meeting'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Set meeting time with your current bid'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: timeController,
-                decoration: InputDecoration(
-                  hintText: 'Enter meeting time (HH:mm:ss)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final String meetingTime = timeController.text;
-                if (!RegExp(r'^\d{2}:\d{2}:\d{2}$').hasMatch(meetingTime)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invalid time format. Use HH:mm:ss')),
-                  );
-                  return;
-                }
-
-                try {
-                  final response = await http.get(
-                    Uri.parse('$baseUrl/procced-meeting-with-bid.php?token=$token&user_id=$userId&post_id=${bid['post_id']}&customerbid_id=${bid['id']}&meeting_times=$meetingTime'),
-                    headers: {
-                      'token': token,
-                      'Cookie': 'PHPSESSID=gbqbiugaqg3gco8kaespjf8lnp',
-                    },
-                  );
-
-                  debugPrint('Proceed meeting with bid response: ${response.body}');
-                  try {
-                    final responseData = jsonDecode(response.body);
-                    if (response.statusCode == 200 && responseData['status'] == true) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(responseData['data'] ?? 'Meeting scheduled successfully')),
-                      );
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MyMeetingsWidget(
-                            baseUrl: baseUrl,
-                            token: token,
-                            userId: userId,
-                            initialStatus: 'Meeting Request',
-                            postId: bid['post_id'],
-                            bidId: bid['id'],
-                            bid: {
-                              ...bid,
-                              'meeting_time': meetingTime,
-                              'meeting_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-                            },
-                          ),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to schedule meeting: ${responseData['data'] ?? 'Unknown error'}')),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error parsing response: ${response.body}')),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error scheduling meeting: $e')),
-                  );
-                }
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Submit'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _proceedMeetingWithoutBid(BuildContext context) async {
-    DateTime selectedDate = DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-
-    if (picked != null) {
-      final String meetingDate = DateFormat('yyyy-MM-dd').format(picked);
-      try {
-        final response = await http.get(
-          Uri.parse('$baseUrl/procced-meeting-without-bid.php?token=$token&user_id=$userId&post_id=${bid['post_id']}&meeting_date=$meetingDate'),
-          headers: {
-            'token': token,
-            'Cookie': 'PHPSESSID=gbqbiugaqg3gco8kaespjf8lnp',
-          },
-        );
-
-        debugPrint('Proceed meeting without bid response: ${response.body}');
-        try {
-          final responseData = jsonDecode(response.body);
-          if (response.statusCode == 200 && responseData['status'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(responseData['data'] ?? 'Meeting scheduled successfully')),
-            );
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MyMeetingsWidget(
-                  baseUrl: baseUrl,
-                  token: token,
-                  userId: userId,
-                  initialStatus: 'Meeting Request',
-                  postId: bid['post_id'],
-                  bid: {
-                    ...bid,
-                    'meeting_date': meetingDate,
-                    'meeting_time': 'N/A',
-                  },
-                ),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to schedule meeting: ${responseData['data'] ?? 'Unknown error'}')),
-            );
-          }
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error parsing response: ${response.body}')),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error scheduling meeting: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _scheduleMeeting(BuildContext context) async {
-    DateTime selectedDate = DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-
-    if (picked != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Meeting scheduled for ${DateFormat('yyyy-MM-dd').format(picked)}')),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final double bidPrice = double.tryParse(bid['bidPrice'] ?? '0') ?? 0;
     final double targetPrice = double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
-    final bool isLowBid = bidPrice < targetPrice;
+    final bool isLowBid =
+        bidPrice < targetPrice ||
+        (bid.containsKey('fromLowBids') && bid['fromLowBids'] == true);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -547,6 +502,7 @@ class BidCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,27 +514,29 @@ class BidCard extends StatelessWidget {
                         width: 90,
                         height: 90,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          width: 90,
-                          height: 90,
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppTheme.primaryColor,
+                        placeholder:
+                            (context, url) => Container(
+                              width: 90,
+                              height: 90,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          width: 90,
-                          height: 90,
-                          color: Colors.grey[200],
-                          child: Icon(
-                            Icons.car_rental,
-                            color: Colors.grey[400],
-                            size: 40,
-                          ),
-                        ),
+                        errorWidget:
+                            (context, url, error) => Container(
+                              width: 90,
+                              height: 90,
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.directions_car,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                            ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -590,7 +548,8 @@ class BidCard extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  bid['title'] ?? 'N/A',
+                                  bid['title'] ??
+                                      'Unknown Vehicle (ID: ${bid['post_id']})',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -599,9 +558,15 @@ class BidCard extends StatelessWidget {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: isLowBid ? Colors.orange[50] : Colors.green[50],
+                                  color:
+                                      isLowBid
+                                          ? Colors.orange[50]
+                                          : Colors.green[50],
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -609,7 +574,10 @@ class BidCard extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
-                                    color: isLowBid ? Colors.orange[700] : Colors.green[700],
+                                    color:
+                                        isLowBid
+                                            ? Colors.orange[700]
+                                            : Colors.green[700],
                                   ),
                                 ),
                               ),
@@ -618,67 +586,74 @@ class BidCard extends StatelessWidget {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(Icons.directions_car, size: 14, color: Colors.grey[500]),
+                              Icon(
+                                Icons.directions_car,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
                               const SizedBox(width: 4),
                               Text(
-                                'Model: ${bid['appId'] ?? 'N/A'}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                'APPid: ${bid['appId'] ?? 'APP_${bid['post_id']}'}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  '${bid['location'] ?? 'N/A'} • ${bid['store'] ?? 'N/A'}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  'Location: ${bid['location'] ?? 'Unknown Location'}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Target Price',
-                                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                                    ),
-                                    Text(
-                                      '₹${NumberFormat('#,##0').format(targetPrice)}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ],
+                              Icon(
+                                Icons.store,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Seller: ${bid['store'] ?? 'Unknown Seller'}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
                                 ),
                               ),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Your Bid',
-                                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                                    ),
-                                    Text(
-                                      '₹${NumberFormat('#,##0').format(bidPrice)}',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: isLowBid ? Colors.orange[700] : Colors.green[700],
-                                      ),
-                                    ),
-                                  ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.meeting_room,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Meeting Attempts: ${bid['meetingAttempts'] ?? 0}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
                                 ),
                               ),
                             ],
@@ -695,48 +670,63 @@ class BidCard extends StatelessWidget {
                         ),
                         child: const Icon(Icons.more_vert, size: 16),
                       ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      onSelected: (value) async {
-                        if (value == 'increase_bid') {
-                          await _increaseBid(context);
-                        } else if (value == 'proceed_with_bid') {
-                          await _proceedMeetingWithBid(context);
-                        } else if (value == 'proceed_without_bid') {
-                          await _proceedMeetingWithoutBid(context);
-                        }
-                      },
-                      itemBuilder: (BuildContext context) => [
-                        const PopupMenuItem<String>(
-                          value: 'increase_bid',
-                          child: Row(
-                            children: [
-                              Icon(Icons.trending_up, size: 16, color: AppTheme.primaryColor),
-                              SizedBox(width: 8),
-                              Text('Increase Bid'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'proceed_with_bid',
-                          child: Row(
-                            children: [
-                              Icon(Icons.schedule, size: 16, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Text('Meeting with Bid'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'proceed_without_bid',
-                          child: Row(
-                            children: [
-                              Icon(Icons.event, size: 16, color: Colors.orange),
-                              SizedBox(width: 8),
-                              Text('Meeting without Bid'),
-                            ],
-                          ),
-                        ),
-                      ],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      // onSelected: (value) {
+                      //   if (value == 'increase_bid') {
+                      //     onIncreaseBid();
+                      //   } else if (value == 'proceed_with_bid') {
+                      //     onProceedWithBid();
+                      //   } else if (value == 'proceed_without_bid') {
+                      //     onProceedWithoutBid();
+                      //   }
+                      // },
+                      itemBuilder:
+                          (BuildContext context) => [
+                            const PopupMenuItem<String>(
+                              value: 'increase_bid',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.trending_up,
+                                    size: 16,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Increase Bid'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'proceed_with_bid',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.schedule,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Meeting with Bid'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'proceed_without_bid',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.event,
+                                    size: 16,
+                                    color: Colors.orange,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Meeting without Bid'),
+                                ],
+                              ),
+                            ),
+                          ],
                     ),
                   ],
                 ),
@@ -744,42 +734,105 @@ class BidCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Bid: ${bid['bidDate'] ?? 'N/A'}',
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bid Date',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
                             ),
-                          ],
-                        ),
+                          ),
+                          Text(
+                            bid['bidDate'] ??
+                                bid['created_on']?.split(' ')[0] ??
+                                'N/A',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Expires: ${bid['expirationDate'] ?? 'N/A'}',
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Expiration Date',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
                             ),
-                          ],
-                        ),
+                          ),
+                          Text(
+                            bid['expirationDate'] ?? 'N/A',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Target Price',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          Text(
+                            targetPrice == 0
+                                ? 'N/A'
+                                : '₹${NumberFormat('#,##0').format(targetPrice)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Bid',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          Text(
+                            bidPrice == 0
+                                ? 'N/A'
+                                : '₹${NumberFormat('#,##0').format(bidPrice)}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color:
+                                  isLowBid
+                                      ? Colors.orange[700]
+                                      : Colors.green[700],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -798,21 +851,23 @@ class BidCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _scheduleMeeting(context),
-                    icon: const Icon(Icons.event, size: 18),
-                    label: const Text('Schedule Meeting'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
+                // SizedBox(
+                //   width: double.infinity,
+                //   child: ElevatedButton.icon(
+                //     onPressed: onProceedWithoutBid,
+                //     icon: const Icon(Icons.event, size: 18),
+                //     label: const Text('Schedule Meeting'),
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: AppTheme.primaryColor,
+                //       foregroundColor: Colors.white,
+                //       padding: const EdgeInsets.symmetric(vertical: 12),
+                //       shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(10),
+                //       ),
+                //       elevation: 0,
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -823,7 +878,11 @@ class BidCard extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.blue[700],
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

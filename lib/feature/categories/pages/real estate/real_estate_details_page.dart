@@ -14,15 +14,18 @@ import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RealEstateProductDetailsPage extends StatefulWidget {
   final MarketplacePost product;
   final bool isAuction;
+  final String? userId; // Add userId parameter
 
   const RealEstateProductDetailsPage({
     super.key,
     required this.product,
     this.isAuction = false,
+    this.userId,
   });
 
   @override
@@ -43,6 +46,7 @@ class _RealEstateProductDetailsPageState
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
@@ -53,13 +57,171 @@ class _RealEstateProductDetailsPageState
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
-
+  String? userId;
 
   @override
   void initState() {
     super.initState();
-    _fetchDetailsData();
-      _fetchSellerInfo();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadUserId();
+    await _fetchDetailsData();
+    await _fetchSellerInfo();
+    if (userId != null && userId != 'Unknown') {
+      await _checkShortlistStatus();
+    }
+  }
+
+  Future<void> _loadUserId() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+    });
+    debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
+  }
+
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') {
+      setState(() {
+        _isFavorited = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/list-shortlist.php?token=$token&user_id=$userId',
+        ),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
+          final isShortlisted = shortlistData.any(
+            (item) => item['post_id'].toString() == widget.product.id,
+          );
+          setState(() {
+            _isFavorited = isShortlisted;
+            _isLoadingFavorite = false;
+          });
+        } else {
+          setState(() {
+            _isFavorited = false;
+            _isLoadingFavorite = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to check shortlist status: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error checking shortlist status: $e');
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _toggleShortlist() async {
+    if (userId == null || userId == 'Unknown') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to manage your shortlist')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      // Assuming an API endpoint like `add-shortlist.php` or `remove-shortlist.php`
+      final action = _isFavorited ? 'remove' : 'add';
+      final response = await http.post(
+        Uri.parse('$baseUrl/$action-shortlist.php?token=$token'),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'user_id': userId,
+          'post_id': widget.product.id,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true') {
+          setState(() {
+            _isFavorited = !_isFavorited;
+            _isLoadingFavorite = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isFavorited
+                    ? 'Added to shortlist'
+                    : 'Removed from shortlist',
+              ),
+            ),
+          );
+
+          // Update cache in SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          final cachedShortlist = prefs.getString('shortlist_$userId');
+          if (cachedShortlist != null) {
+            try {
+              final responseData = jsonDecode(cachedShortlist);
+              if (responseData['status'] == 'true' && responseData['data'] is List) {
+                List<Map<String, dynamic>> shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
+                if (_isFavorited) {
+                  shortlistData.add({
+                    'post_id': widget.product.id,
+                    'user_id': userId,
+                    'created_on': DateTime.now().toIso8601String(),
+                  });
+                } else {
+                  shortlistData.removeWhere((item) => item['post_id'].toString() == widget.product.id);
+                }
+                await prefs.setString(
+                  'shortlist_$userId',
+                  jsonEncode({
+                    'status': 'true',
+                    'data': shortlistData,
+                  }),
+                );
+              }
+            } catch (e) {
+              debugPrint('Error updating shortlist cache: $e');
+            }
+          }
+        } else {
+          throw Exception('Failed to update shortlist: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to update shortlist: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error toggling shortlist: $e');
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
@@ -69,7 +231,7 @@ class _RealEstateProductDetailsPageState
     super.dispose();
   }
 
-Future<void> _fetchSellerInfo() async {
+  Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
         Uri.parse(
@@ -109,7 +271,6 @@ Future<void> _fetchSellerInfo() async {
       });
     }
   }
-
 
   Future<void> _fetchDetailsData() async {
     setState(() {
@@ -177,15 +338,14 @@ Future<void> _fetchSellerInfo() async {
         // Check if the filter value is an ID that needs mapping
         final variation = attributeVariations.firstWhere(
           (variation) => variation.id == filterValue,
-          orElse:
-              () => AttributeVariation(
-                id: '',
-                name: filterValue,
-                attributeId: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ), // Fallback to filter value if no mapping
+          orElse: () => AttributeVariation(
+            id: '',
+            name: filterValue,
+            attributeId: '',
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
         );
         final value = variation.name.isNotEmpty ? variation.name : filterValue;
         attributeValues[attribute.name] = value;
@@ -219,22 +379,21 @@ Future<void> _fetchSellerInfo() async {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -305,21 +464,19 @@ Future<void> _fetchSellerInfo() async {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -346,8 +503,7 @@ Future<void> _fetchSellerInfo() async {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -387,9 +543,7 @@ Future<void> _fetchSellerInfo() async {
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
+                                      duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -398,10 +552,9 @@ Future<void> _fetchSellerInfo() async {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -412,19 +565,18 @@ Future<void> _fetchSellerInfo() async {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
+                                        placeholder: (context, url) =>
+                                            const Center(
                                               child: SizedBox(
                                                 width: 20,
                                                 height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
                                               ),
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
                                               Icons.error,
                                               size: 20,
                                             ),
@@ -595,62 +747,61 @@ Future<void> _fetchSellerInfo() async {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        SellerInformationPage(userId: widget.product.createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SellerInformationPage(userId: widget.product.createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage:
+                          sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                              ? CachedNetworkImageProvider(sellerProfileImage!)
+                              : const AssetImage('assets/images/avatar.gif')
+                                  as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 
   Widget _buildQuestionsSection() {
@@ -720,13 +871,11 @@ Future<void> _fetchSellerInfo() async {
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -790,19 +939,24 @@ Future<void> _fetchSellerInfo() async {
                             ),
                           ),
                           const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
-                          ),
+                          _isLoadingFavorite
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: Icon(
+                                    _isFavorited
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: _isFavorited ? Colors.red : Colors.white,
+                                  ),
+                                  onPressed: _toggleShortlist,
+                                ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -837,16 +991,16 @@ Future<void> _fetchSellerInfo() async {
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -997,21 +1151,20 @@ Future<void> _fetchSellerInfo() async {
                         const Center(child: CircularProgressIndicator())
                       else
                         Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.key != 'Seller Type' &&
-                                        entry.key != 'Auction Starting Price' &&
-                                        entry.key != 'Auction Attempts',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.value,
-                                    ),
-                                  )
-                                  .toList(),
+                          children: orderedAttributeValues
+                              .where(
+                                (entry) =>
+                                    entry.key != 'Seller Type' &&
+                                    entry.key != 'Auction Starting Price' &&
+                                    entry.key != 'Auction Attempts',
+                              )
+                              .map(
+                                (entry) => _buildSellerCommentItem(
+                                  entry.key,
+                                  entry.value,
+                                ),
+                              )
+                              .toList(),
                         ),
                     ],
                   ),
@@ -1051,10 +1204,7 @@ Future<void> _fetchSellerInfo() async {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(
-                      
-                        context,
-                      ),
+                      _buildSellerInformationItem(context),
                     ],
                   ),
                 ),
@@ -1097,22 +1247,22 @@ Future<void> _fetchSellerInfo() async {
               ),
               child: Row(
                 children: [
-                          Expanded(
-  child: ElevatedButton(
-    onPressed: () {
-      showBidDialog(context); // Call the dialog function
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Palette.primarypink,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-    ),
-    child: const Text('Place Bid'),
-  ),
-),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        showBidDialog(context); // Call the dialog function
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primarypink,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
+                        ),
+                      ),
+                      child: const Text('Place Bid'),
+                    ),
+                  ),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showMeetingDialog(context),

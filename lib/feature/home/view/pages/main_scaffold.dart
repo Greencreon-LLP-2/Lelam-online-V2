@@ -37,7 +37,6 @@ class _MainScaffoldState extends State<MainScaffold> {
   Future<void> _loadUserId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      // Try to get userId from SharedPreferences, fallback to extra
       userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
     });
     if (kDebugMode) {
@@ -51,7 +50,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         ? BuyingStatusPage(userId: userId)
         : const Center(child: Text('Support')),
     isStatus
-        ? SellingStatusPage(userId: userId, adData: adData) // Pass adData here
+        ? SellingStatusPage(userId: userId, adData: adData)
         : SellPage(userId: userId),
     isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
     Center(
@@ -64,8 +63,6 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final double bottomPadding = MediaQuery.of(context).padding.bottom;
-
     return Scaffold(
       key: _scaffoldKey,
       drawer: AppDrawerWidget(userId: userId),
@@ -73,89 +70,93 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: SafeArea(bottom: false, child: _pages[currentIndex]),
       bottomNavigationBar: SafeArea(
         bottom: true,
-        top: false,
         left: false,
         right: false,
+        top: false,
+        maintainBottomViewPadding: true, // keeps consistent inset behavior
         child: SizedBox(
-          height: 60 + (bottomPadding > 0 ? bottomPadding : 0),
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            currentIndex: currentIndex,
-            onTap: (index) {
-              if (kDebugMode) print('Selected index: $index');
-              if (index == 4) {
-                _scaffoldKey.currentState?.openDrawer();
-                return;
-              }
-              setState(() {
-                currentIndex = index;
-              });
-              if (index == 0) {
+          height: 37, // 👈 fixed height you want
+          child: MediaQuery.removePadding(
+            context: context,
+            removeBottom:
+                true, // 👈 stop BottomNavigationBar from inflating on 3-button nav
+            child: BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: currentIndex,
+              onTap: (index) {
+                if (kDebugMode) print('Selected index: $index');
+                if (index == 4) {
+                  _scaffoldKey.currentState?.openDrawer();
+                  return;
+                }
+
                 setState(() {
-                  isStatus = false;
+                  currentIndex = index;
+
+                  if (index == 0) {
+                    isStatus = false; // Home resets to normal mode
+                  } else if (index == 3) {
+                    isStatus = true; // Switch to status mode
+                  }
                 });
-              }
-              if (index == 3) {
-                setState(() {
-                  currentIndex = isStatus ? 1 : 3;
-                  isStatus = true;
-                });
-              }
-            },
-            selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
-            unselectedItemColor: Colors.grey,
-            showUnselectedLabels: true,
-            showSelectedLabels: true,
-            selectedLabelStyle: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w600,
-            ),
-            unselectedLabelStyle: const TextStyle(fontSize: 8),
-            selectedFontSize: 8,
-            unselectedFontSize: 8,
-            iconSize: 18,
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+              },
+
+              selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
+              unselectedItemColor: Colors.grey,
+              showUnselectedLabels: true,
+              showSelectedLabels: true,
+              // keep these small to fit 30px height nicely
+              selectedLabelStyle: const TextStyle(
+                fontSize: 8,
+                fontWeight: FontWeight.w600,
               ),
-              BottomNavigationBarItem(
-                icon: Icon(
-                  isStatus ? Icons.shopping_cart : Icons.support_agent,
-                  size: 18,
+              unselectedLabelStyle: const TextStyle(fontSize: 8),
+              selectedFontSize: 8,
+              unselectedFontSize: 8,
+              iconSize: 14, // 👈 slightly smaller so 30px isn't cramped
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Home',
                 ),
-                label: isStatus ? 'Buying' : 'Support',
-              ),
-              BottomNavigationBarItem(
-                icon:
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    isStatus ? Icons.shopping_cart : Icons.support_agent,
+                  ),
+                  label: isStatus ? 'Buying' : 'Support',
+                ),
+                BottomNavigationBarItem(
+                  icon:
+                      isStatus
+                          ? const Icon(Icons.sell)
+                          : Container(
+                            padding: const EdgeInsets.all(1),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              size: 12,
+                              color: Color.fromARGB(255, 12, 9, 233),
+                            ),
+                          ),
+                  label: isStatus ? 'Selling' : 'Sell',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
                     isStatus
-                        ? const Icon(Icons.sell, size: 18)
-                        : Container(
-                          padding: const EdgeInsets.all(1),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.black, width: 3),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 12,
-                            color: Color.fromARGB(255, 12, 9, 233),
-                          ),
-                        ),
-                label: isStatus ? 'Selling' : 'Sell',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(
-                  isStatus ? Icons.star_border_outlined : Icons.stream_outlined,
-                  size: 18,
+                        ? Icons.star_border_outlined
+                        : Icons.stream_outlined,
+                  ),
+                  label: isStatus ? 'Shortlist' : 'Status',
                 ),
-                label: isStatus ? 'Shortlist' : 'Status',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.more_vert),
-                label: 'More',
-              ),
-            ],
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.more_vert),
+                  label: 'More',
+                ),
+              ],
+            ),
           ),
         ),
       ),

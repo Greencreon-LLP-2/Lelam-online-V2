@@ -91,17 +91,12 @@ class _LoginPageState extends State<LoginPage> {
             await userCheckResponse.stream.bytesToString();
 
         if (userCheckResponse.statusCode == 200) {
-          if (kDebugMode) {
-            print('index.php raw response: $userCheckResponseBody');
-          }
-
           dynamic userListResponse;
           try {
             userListResponse = jsonDecode(userCheckResponseBody);
           } catch (e) {
             if (kDebugMode) {
               print('Failed to parse index.php response: $e');
-              print('Raw response: $userCheckResponseBody');
             }
             throw Exception('Failed to parse response from index.php: $e');
           }
@@ -119,25 +114,23 @@ class _LoginPageState extends State<LoginPage> {
           }
 
           final userList = userListResponse['data'] as List<dynamic>;
-          if (kDebugMode) {
-            print('Parsed user list: $userList');
-          }
-
-          final user = userList.firstWhere((user) {
-            final apiMobile = _normalizeMobileNumber(
-              user['mobile']?.toString(),
-            );
-            final apiMobileCode = user['mobile_code']?.toString() ?? '';
+          Map<String, dynamic> user = {};
+          for (var u in userList) {
+            final apiMobile = _normalizeMobileNumber(u['mobile']?.toString());
+            final apiMobileCode = u['mobile_code']?.toString() ?? '';
             if (kDebugMode) {
               print(
                 'Comparing API mobile: "$apiMobile" (code: "$apiMobileCode") with input: "$normalizedMobile"',
               );
             }
-            return apiMobile == normalizedMobile &&
-                (apiMobileCode == '91' || apiMobileCode.isEmpty);
-          }, orElse: () => null);
+            if (apiMobile == normalizedMobile &&
+                (apiMobileCode == '91' || apiMobileCode.isEmpty)) {
+              user = u as Map<String, dynamic>;
+              break;
+            }
+          }
 
-          if (user == null) {
+          if (user.isEmpty) {
             if (mounted) {
               Fluttertoast.showToast(
                 msg: 'Phone number not registered. Please sign up.',
@@ -166,56 +159,27 @@ class _LoginPageState extends State<LoginPage> {
             print('Found user with user_id: $userId');
           }
 
-          // Step 2: Send OTP using login.php
-          final otpRequest = http.Request(
-            'GET',
-            Uri.parse(
-              '$baseUrl/login.php?token=$token&mobile_code=91&mobile=$mobile',
-            ),
-          );
-          otpRequest.headers.addAll({
-            'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
-          });
-          final otpResponse = await otpRequest.send();
-          final otpResponseBody = await otpResponse.stream.bytesToString();
-
-          if (otpResponse.statusCode == 200) {
-            if (mounted) {
-              final extra =
-                  (widget.extra ?? {})..addAll({
-                    'phone': '+91$mobile',
-                    'testOtp': isTestMode ? testOtp : null,
-                    'userId': userId,
-                  });
-              context.pushNamed(RouteNames.otpVerificationPage, extra: extra);
-              Fluttertoast.showToast(
-                msg:
-                    isTestMode
-                        ? 'Test OTP sent: $testOtp'
-                        : 'OTP sent to +91$mobile',
-                toastLength: Toast.LENGTH_LONG,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.green.withOpacity(0.8),
-                textColor: Colors.white,
-                fontSize: 16.0,
-              );
-            }
-          } else {
-            if (mounted) {
-              Fluttertoast.showToast(
-                msg: 'Failed to send OTP: ${otpResponse.reasonPhrase}',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.red.withOpacity(0.8),
-                textColor: Colors.white,
-                fontSize: 16.0,
-              );
-            }
-            if (kDebugMode) {
-              print(
-                'login.php failed: ${otpResponse.statusCode} ${otpResponse.reasonPhrase}',
-              );
-            }
+          // Step 2: Use test OTP and navigate to OtpVerificationPage
+          if (mounted) {
+            // Create a new map to avoid modifying widget.extra
+            final extra = <String, dynamic>{
+              ...?widget.extra, // Spread existing extra, if any
+              'phone': '+91$mobile',
+              'testOtp': isTestMode ? testOtp : null,
+              'userId': userId,
+            };
+            context.pushNamed(RouteNames.otpVerificationPage, extra: extra);
+            Fluttertoast.showToast(
+              msg:
+                  isTestMode
+                      ? 'Test OTP sent: $testOtp'
+                      : 'OTP sent to +91$mobile',
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.BOTTOM,
+              backgroundColor: Colors.green.withOpacity(0.8),
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
           }
         } else {
           if (mounted) {
