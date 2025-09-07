@@ -12,6 +12,7 @@ import 'package:lelamonline_flutter/feature/categories/services/details_service.
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -386,190 +387,183 @@ List<String> get _images {
     'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
   ];
 }
-  void _showFullScreenGallery(BuildContext context) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black.withOpacity(0.5),
-        pageBuilder: (BuildContext context, _, __) {
-          final PageController fullScreenController = PageController(
-            initialPage: _currentImageIndex,
-          );
-          return StatefulBuilder(
-            builder: (context, setState) {
-              return Scaffold(
-                backgroundColor: Colors.white,
-                body: Stack(
-                  children: [
-                    PageView.builder(
-                      controller: fullScreenController,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _currentImageIndex = index;
-                          _resetZoom();
-                        });
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      itemCount: _images.length,
-                      itemBuilder: (context, index) {
-                        return InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 5.0,
-                          boundaryMargin: const EdgeInsets.all(double.infinity),
-                          child: GestureDetector(
-                            onDoubleTap: _resetZoom,
-                            child: Hero(
-                              tag: 'image_$index',
-                              child: CachedNetworkImage(
-                                imageUrl: _images[index],
-                                fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+void _showFullScreenGallery(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black.withOpacity(0.5),
+      pageBuilder: (BuildContext context, _, __) {
+        final PageController fullScreenController = PageController(
+          initialPage: _currentImageIndex,
+        );
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Scaffold(
+              backgroundColor: Colors.white,
+              body: Stack(
+                children: [
+                  PageView.builder(
+                    controller: fullScreenController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentImageIndex = index;
+                        _resetZoom();
+                      });
+                      _pageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    itemCount: _images.length,
+                    itemBuilder: (context, index) {
+                      return InteractiveViewer(
+                        transformationController: _transformationController,
+                        minScale: 0.5,
+                        maxScale: 5.0,
+                        boundaryMargin: const EdgeInsets.all(double.infinity),
+                        child: GestureDetector(
+                          onDoubleTap: _resetZoom,
+                          child: Hero(
+                            tag: 'image_$index',
+                            child: CachedNetworkImage(
+                              imageUrl: _images[index],
+                              fit: BoxFit.contain,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.error_outline,
+                                    size: 50,
+                                    color: Colors.red,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      },
-                    ),
-                    SafeArea(
-                      child: Column(
-                        children: [
-                          Padding(
+                        ),
+                      );
+                    },
+                  ),
+                  CustomSafeArea(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                  ),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${_images.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          height: 70,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _images.length,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 8,
                             ),
-                            child: Row(
-                              children: [
-                                Container(
+                            itemBuilder: (context, index) {
+                              return GestureDetector(
+                                onTap: () {
+                                  fullScreenController.animateToPage(
+                                    index,
+                                    duration: const Duration(
+                                      milliseconds: 300,
+                                    ),
+                                    curve: Curves.easeInOut,
+                                  );
+                                },
+                                child: Container(
+                                  width: 70,
+                                  margin: const EdgeInsets.only(right: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.5),
+                                    border: Border.all(
+                                      color: _currentImageIndex == index
+                                          ? Colors.blue
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
                                     borderRadius: BorderRadius.circular(8),
+                                    color: Colors.black.withOpacity(0.3),
                                   ),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    '${_currentImageIndex + 1}/${_images.length}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: CachedNetworkImage(
+                                      imageUrl: _images[index],
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => const Center(
+                                        child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ),
+                                      errorWidget: (context, url, error) => const Icon(
+                                        Icons.error,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                          const Spacer(),
-                          Container(
-                            height: 70,
-                            margin: const EdgeInsets.only(bottom: 20),
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _images.length,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    fullScreenController.animateToPage(
-                                      index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
-                                      curve: Curves.easeInOut,
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 70,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
-                                        width: 2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                      color: Colors.black.withOpacity(0.3),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(6),
-                                      child: CachedNetworkImage(
-                                        imageUrl: _images[index],
-                                        fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
-                                            ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ),
+  );
+}
 
 void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
   final TextEditingController bidAmountController = TextEditingController();
@@ -1102,484 +1096,469 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final auctionEndTime =
-        DateTime.tryParse(auctionEndin) ??
-        DateTime.now().add(const Duration(days: 2, hours: 5));
-    final timeLeft = auctionEndTime.difference(DateTime.now());
+Widget build(BuildContext context) {
+  final auctionEndTime =
+      DateTime.tryParse(auctionEndin) ??
+      DateTime.now().add(const Duration(days: 2, hours: 5));
+  final timeLeft = auctionEndTime.difference(DateTime.now());
 
-    return Scaffold(
+  return CustomSafeArea(
+    child: Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 80),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Gallery
+            Stack(
               children: [
-                // Image Gallery
-                Stack(
-                  children: [
-                    SizedBox(
-                      height: 400,
-                      child: Stack(
-                        children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _images.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentImageIndex = index;
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => _showFullScreenGallery(context),
-                                child: CachedNetworkImage(
-                                  imageUrl: _images[index],
-                                  width: double.infinity,
-                                  height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
-                                ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
+                SizedBox(
+                  height: 400,
+                  child: Stack(
+                    children: [
+                      PageView.builder(
+                        controller: _pageController,
+                        itemCount: _images.length,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _currentImageIndex = index;
+                          });
+                        },
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () => _showFullScreenGallery(context),
+                            child: CachedNetworkImage(
+                              imageUrl: _images[index],
+                              width: double.infinity,
+                              height: 400,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_currentImageIndex + 1}/${_images.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              errorWidget: (context, url, error) =>
+                                  const Icon(Icons.error),
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
-                    ),
-                    SafeArea(
-                      child: Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => context.pop(),
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                            ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                          const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // TODO: Implement share functionality
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                // Current Highest Bid Banner
-                if (_isLoading)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    color: Colors.blue.shade50,
-                    child: Center(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'CURRENT HIGHEST BID',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '₹${NumberFormat('#,##0').format(_currentBid)}',
+                          child: Text(
+                            '${_currentImageIndex + 1}/${_images.length}',
                             style: const TextStyle(
-                              fontSize: 28,
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                // Auction Timer
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  color: Colors.red.shade50,
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.timer, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Product Details
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        modelVariation,
-                        style: TextStyle(fontSize: 18, color: Colors.grey[700]),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Starting Price',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Target Price',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '#AD ID $id',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // TODO: Implement call functionality
-                            },
-                            icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                const Divider(),
-                // Details Section
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                CustomSafeArea(
+                  child: Row(
                     children: [
-                      const Text(
-                        'Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.calendar_today,
-                                    attributeValues['Year'] ?? 'N/A',
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.person,
-                                    _getOwnerText(
-                                      attributeValues['No of owners'] ?? 'N/A',
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.speed,
-                                    _formatNumber(
-                                      attributeValues['KM Range'] ?? 'N/A',
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.local_gas_station,
-                                    attributeValues['Fuel Type'] ?? 'N/A',
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.settings,
-                                    attributeValues['Transmission'] ?? 'N/A',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(
+                          _isFavorited
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: _isFavorited ? Colors.red : Colors.white,
                         ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Seller Comments
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Comments',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isFavorited = !_isFavorited;
+                          });
+                        },
                       ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.value != 'N/A' &&
-                                        entry.key != 'Co driver side rear tyre',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.key == 'No of owners'
-                                          ? _getOwnerText(entry.value)
-                                          : entry.value,
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Seller Information
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Information',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.share, color: Colors.white),
+                        onPressed: () {
+                          // TODO: Implement share functionality
+                        },
                       ),
-                      const SizedBox(height: 12),
-                      _buildSellerInformationItem(context),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Bidding History
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Bidding History',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (_bidHistory.isEmpty)
-                        const Text(
-                          'No bids yet',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        )
-                      else
-                        Column(
-                          children:
-                              _bidHistory
-                                  .map(
-                                    (bid) => _buildBidHistoryItem(
-                                      bid['bidder'] ?? 'Unknown',
-                                      bid['amount'] ?? 'N/A',
-                                      bid['time'] ?? 'N/A',
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
                     ],
                   ),
                 ),
               ],
             ),
-          ),
-          // Bottom Bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(16),
+            // Current Highest Bid Banner
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                color: Colors.blue.shade50,
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Text(
+                        'CURRENT HIGHEST BID',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${NumberFormat('#,##0').format(_currentBid)}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // Auction Timer
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.red.shade50,
+              child: Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.timer, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Product Details
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    modelVariation,
+                    style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      _isLoadingLocations
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              landMark,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Starting Price',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            Text(
+                              '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Target Price',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            Text(
+                              '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '#AD ID $id',
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          // TODO: Implement call functionality
+                        },
+                        icon: const Icon(Icons.call),
+                        label: const Text('Call Support'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Details Section
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Details',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.calendar_today,
+                                attributeValues['Year'] ?? 'N/A',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.person,
+                                _getOwnerText(
+                                  attributeValues['No of owners'] ?? 'N/A',
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.speed,
+                                _formatNumber(
+                                  attributeValues['KM Range'] ?? 'N/A',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.local_gas_station,
+                                attributeValues['Fuel Type'] ?? 'N/A',
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildDetailItem(
+                                Icons.settings,
+                                attributeValues['Transmission'] ?? 'N/A',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Seller Comments
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seller Comments',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Column(
+                      children: orderedAttributeValues
+                          .where(
+                            (entry) =>
+                                entry.value != 'N/A' &&
+                                entry.key != 'Co driver side rear tyre',
+                          )
+                          .map(
+                            (entry) => _buildSellerCommentItem(
+                              entry.key,
+                              entry.key == 'No of owners'
+                                  ? _getOwnerText(entry.value)
+                                  : entry.value,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Seller Information
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Seller Information',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSellerInformationItem(context),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Bidding History
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Bidding History',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (_bidHistory.isEmpty)
+                    const Text(
+                      'No bids yet',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    )
+                  else
+                    Column(
+                      children: _bidHistory
+                          .map(
+                            (bid) => _buildBidHistoryItem(
+                              bid['bidder'] ?? 'Unknown',
+                              bid['amount'] ?? 'N/A',
+                              bid['time'] ?? 'N/A',
+                            ),
+                          )
+                          .toList(),
+                    ),
+                ],
+              ),
+            ),
+            // Bottom Buttons
+            Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
+             
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 5,
                     spreadRadius: 0,
-                    offset: const Offset(0, -5),
+                    offset: const Offset(0, -2),
                   ),
                 ],
               ),
               child: Row(
                 children: [
-                 
-                  const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _showBidDialog(context),
@@ -1588,23 +1567,22 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(0),
                         ),
                       ),
                       child: const Text('Enter Price'),
                     ),
                   ),
                   const SizedBox(width: 12),
-                 Expanded(
+                  Expanded(
                     child: ElevatedButton(
-                      onPressed:
-                          () => _showBidDialog(context, isIncrease: true),
+                      onPressed: () => _showBidDialog(context, isIncrease: true),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(0),
                         ),
                       ),
                       child: const Text('Increase minimum Bid'),
@@ -1613,11 +1591,12 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDetailItem(IconData icon, String text) {
     return Row(

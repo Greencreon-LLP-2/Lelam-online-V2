@@ -45,21 +45,21 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   List<Widget> get _pages => [
-    HomePage(userId: userId),
-    isStatus
-        ? BuyingStatusPage(userId: userId)
-        : const Center(child: Text('Support')),
-    isStatus
-        ? SellingStatusPage(userId: userId, adData: adData)
-        : SellPage(userId: userId),
-    isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
-    Center(
-      child: Text(
-        'Profile: User ID ${userId ?? 'Unknown'}',
-        style: const TextStyle(fontSize: 16),
-      ),
-    ),
-  ];
+        HomePage(userId: userId),
+        isStatus
+            ? BuyingStatusPage(userId: userId)
+            : const Center(child: Text('Support')),
+        isStatus
+            ? SellingStatusPage(userId: userId, adData: adData)
+            : SellPage(userId: userId),
+        isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
+        Center(
+          child: Text(
+            'Profile: User ID ${userId ?? 'Unknown'}',
+            style: const TextStyle(fontSize: 16),
+          ),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -67,19 +67,19 @@ class _MainScaffoldState extends State<MainScaffold> {
       key: _scaffoldKey,
       drawer: AppDrawerWidget(userId: userId),
       resizeToAvoidBottomInset: false,
-      body: SafeArea(bottom: false, child: _pages[currentIndex]),
+      body: SafeArea(
+        child: _pages[currentIndex], // Main page content inside SafeArea
+      ),
       bottomNavigationBar: SafeArea(
         bottom: true,
+        top: false,
         left: false,
         right: false,
-        top: false,
-        maintainBottomViewPadding: true, // keeps consistent inset behavior
         child: SizedBox(
-          height: 37, // 👈 fixed height you want
+          height: 37,
           child: MediaQuery.removePadding(
             context: context,
-            removeBottom:
-                true, // 👈 stop BottomNavigationBar from inflating on 3-button nav
+            removeBottom: true,
             child: BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
               currentIndex: currentIndex,
@@ -92,20 +92,18 @@ class _MainScaffoldState extends State<MainScaffold> {
 
                 setState(() {
                   currentIndex = index;
-
                   if (index == 0) {
-                    isStatus = false; // Home resets to normal mode
+                    isStatus = false;
                   } else if (index == 3) {
-                    isStatus = true; // Switch to status mode
+                    isStatus = true;
                   }
                 });
               },
-
-              selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
+              selectedItemColor:
+                  isStatus ? Colors.redAccent : Colors.black,
               unselectedItemColor: Colors.grey,
               showUnselectedLabels: true,
               showSelectedLabels: true,
-              // keep these small to fit 30px height nicely
               selectedLabelStyle: const TextStyle(
                 fontSize: 8,
                 fontWeight: FontWeight.w600,
@@ -113,7 +111,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               unselectedLabelStyle: const TextStyle(fontSize: 8),
               selectedFontSize: 8,
               unselectedFontSize: 8,
-              iconSize: 14, // 👈 slightly smaller so 30px isn't cramped
+              iconSize: 14,
               items: [
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.home),
@@ -126,21 +124,21 @@ class _MainScaffoldState extends State<MainScaffold> {
                   label: isStatus ? 'Buying' : 'Support',
                 ),
                 BottomNavigationBarItem(
-                  icon:
-                      isStatus
-                          ? const Icon(Icons.sell)
-                          : Container(
-                            padding: const EdgeInsets.all(1),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.black, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              size: 12,
-                              color: Color.fromARGB(255, 12, 9, 233),
-                            ),
+                  icon: isStatus
+                      ? const Icon(Icons.sell)
+                      : Container(
+                          padding: const EdgeInsets.all(1),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border:
+                                Border.all(color: Colors.black, width: 2),
                           ),
+                          child: const Icon(
+                            Icons.add,
+                            size: 12,
+                            color: Color.fromARGB(255, 12, 9, 233),
+                          ),
+                        ),
                   label: isStatus ? 'Selling' : 'Sell',
                 ),
                 BottomNavigationBarItem(

@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -38,9 +37,6 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         userId = storedUserId?.isNotEmpty == true ? storedUserId : widget.userId;
       });
-      // if (kDebugMode) {
-      //   print('HomePage - Loaded userId: "$userId" (SharedPreferences: "$storedUserId", widget.userId: "${widget.userId}")');
-      // }
     }
   }
 
@@ -52,95 +48,79 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // if (kDebugMode) {
-    //   print('HomePage - Building with userId: "$userId", _selectedDistrict: "$_selectedDistrict"');
-    // }
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Top section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on),
-                        const SizedBox(width: 8),
-                        DropdownButton<String>(
-                          value: _selectedDistrict,
-                          hint: Text('All Kerala'),
-                          items: districts.map((district) {
-                            return DropdownMenuItem<String>(
-                              value: district,
-                              child: Text(district),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            if (mounted) {
-                              setState(() {
-                                _selectedDistrict = newValue;
-                              });
-                              // if (kDebugMode) {
-                              //   print('HomePage - Selected district: "$_selectedDistrict"');
-                              // }
-                            }
-                          },
-                          underline: const SizedBox(),
-                          icon: const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () {
-                        // if (kDebugMode) {
-                        //   print('HomePage - Notification icon pressed, navigating to notification page with userId: "$userId"');
-                        // }
-                        context.pushNamed(RouteNames.notificationPage, extra: {'userId': userId});
-                      },
-                      icon: const Icon(Icons.notifications),
-                    ),
-                  ],
-                ),
-              ),
-              if (userId != null && userId != 'Unknown')
+        child: Padding(
+          padding: const EdgeInsets.only(top: 16), // Adds padding to avoid system UI
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top section
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  // child: Text(
-                  //   'Logged in as User ID: $userId',
-                  //   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  // ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: _selectedDistrict,
+                            hint: const Text('All Kerala'),
+                            items: districts.map((district) {
+                              return DropdownMenuItem<String>(
+                                value: district,
+                                child: Text(district),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (mounted) {
+                                setState(() {
+                                  _selectedDistrict = newValue;
+                                });
+                              }
+                            },
+                            underline: const SizedBox(),
+                            icon: const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () {
+                          context.pushNamed(RouteNames.notificationPage, extra: {'userId': userId});
+                        },
+                        icon: const Icon(Icons.notifications),
+                      ),
+                    ],
+                  ),
                 ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SearchButtonWidget(
-                  controller: _searchController,
-                  onSearch: (query) {
-                    if (mounted) {
-                      setState(() {
-                        _searchQuery = query;
-                      });
-                      // if (kDebugMode) {
-                      //   print('HomePage - Search query updated: "$_searchQuery"');
-                      // }
-                    }
-                  },
+                if (userId != null && userId != 'Unknown')
+                  const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SearchButtonWidget(
+                    controller: _searchController,
+                    onSearch: (query) {
+                      if (mounted) {
+                        setState(() {
+                          _searchQuery = query;
+                        });
+                      }
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5,),
-              const BannerWidget(),
-              // Pass userId to CategoryWidget
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: CategoryWidget(userId: userId),
-              ),
-              ProductSectionWidget(searchQuery: _searchQuery, userId: userId),
-            ],
+                const SizedBox(height: 5),
+                const BannerWidget(),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: CategoryWidget(userId: userId),
+                ),
+                ProductSectionWidget(searchQuery: _searchQuery, userId: userId),
+              ],
+            ),
           ),
         ),
       ),

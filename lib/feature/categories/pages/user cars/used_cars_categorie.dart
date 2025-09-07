@@ -1820,19 +1820,22 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            const Icon(Icons.gavel, size: 16, color: Colors.black),
-            const SizedBox(width: 6),
-            Text(
-              'Attempts: ${product.auctionAttempt}/3',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
+        Padding(
+          padding: const EdgeInsets.all(5.0),
+          child: Row(
+            children: [
+              const Icon(Icons.gavel, size: 16, color: Colors.black),
+              const SizedBox(width: 6),
+              Text(
+                'Attempts: ${product.auctionAttempt}/3',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
