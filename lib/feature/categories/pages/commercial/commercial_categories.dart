@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_details_page.dart';
+
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
@@ -205,7 +206,8 @@ class MarketplaceService {
 }
 
 class CommercialVehiclesPage extends StatefulWidget {
-  const CommercialVehiclesPage({super.key, String? userId});
+  final String? userId;
+  const CommercialVehiclesPage({super.key, this.userId});
 
   @override
   State<CommercialVehiclesPage> createState() => _CommercialVehiclesPageState();
@@ -214,7 +216,6 @@ class CommercialVehiclesPage extends StatefulWidget {
 class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  String _listingType = 'sale';
   List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
@@ -285,7 +286,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     });
     try {
       final posts = await _marketplaceService.fetchPosts(
-        categoryId: '3', // Assuming '3' is for commercial vehicles; adjust as needed
+        categoryId: '3',
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
       );
       setState(() {
@@ -346,12 +347,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       filtered = filtered.where((post) => post.userZoneId == _selectedLocation || post.parentZoneId == _selectedLocation).toList();
     }
 
-    if (_listingType == 'auction') {
-      filtered = filtered.where((post) => post.ifAuction == '1').toList();
-    } else if (_listingType == 'sale') {
-      filtered = filtered.where((post) => post.ifAuction == '0').toList();
-    }
-
     if (_selectedVehicleTypes.isNotEmpty) {
       filtered = filtered.where((post) {
         final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first : '';
@@ -361,8 +356,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
     if (_selectedPriceRange != 'all') {
       filtered = filtered.where((post) {
-        final priceStr = _listingType == 'auction' ? post.auctionStartingPrice : post.price;
-        int price = int.tryParse(priceStr) ?? 0;
+        int price = int.tryParse(post.price) ?? 0;
         switch (_selectedPriceRange) {
           case 'Under 5L':
             return price < 500000;
@@ -459,7 +453,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                         _priceRanges,
                         _selectedPriceRange,
                         (value) => setModalState(() => _selectedPriceRange = value),
-                        subtitle: _listingType == 'auction' ? 'Filter by starting bid price' : 'Filter by sale price',
+                        subtitle: 'Filter by sale price',
                       ),
                       _buildSingleSelectFilterSection('Condition', _conditions, _selectedCondition, (value) => setModalState(() => _selectedCondition = value)),
                       _buildMultiSelectFilterSection('Fuel Type', _fuelTypes, _selectedFuelTypes, setModalState),
@@ -800,81 +794,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           SliverToBoxAdapter(
             child: _isLoadingLocations
                 ? const Center(child: CircularProgressIndicator())
-                : Column(
-                    children: [
-                      if (!_showAppBarSearch)
-                        Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: _buildSearchField(),
-                        ),
-                      Container(
-                        color: Colors.grey.shade200,
-                        padding: const EdgeInsets.all(10),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _listingType = 'sale';
-                                      _fetchPosts();
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: _listingType == 'sale' ? Palette.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'Market Place',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontWeight: _listingType == 'sale' ? FontWeight.w600 : FontWeight.normal,
-                                        color: _listingType == 'sale' ? Colors.black : Colors.grey.shade600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _listingType = 'auction';
-                                      _fetchPosts();
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: _listingType == 'auction' ? Palette.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'Auction',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontWeight: _listingType == 'auction' ? FontWeight.w600 : FontWeight.normal,
-                                        color: _listingType == 'auction' ? Colors.black : Colors.grey.shade600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                : Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: _buildSearchField(),
                   ),
           ),
           if (!_isLoadingLocations)
@@ -946,10 +869,9 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   Widget _buildVehicleCard(MarketplacePost post) {
     final isFinanceAvailable = post.ifFinance == '1';
     final isFeatured = post.feature == '1';
-    final isAuction = post.ifAuction == '1';
     final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first : 'N/A';
     final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
-    final isVerified = post.adminApproval == '1'; // Assuming adminApproval indicates verification
+    final isVerified = post.adminApproval == '1';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -958,9 +880,9 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => CommercialVehicleDetailsPage(
+                builder: (context) => CommercialProductDetailsPage(
                   post: post,
-                  isAuction: isAuction,
+                  userId: widget.userId,
                 ),
               ),
             );
@@ -1002,48 +924,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             },
                           ),
                         ),
-                        // child: Stack(
-                        //   children: [
-                        //     if (isFeatured)
-                        //       Align(
-                        //         alignment: Alignment.topLeft,
-                        //         child: Container(
-                        //           margin: const EdgeInsets.only(top: 8, left: 8),
-                        //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        //           decoration: BoxDecoration(
-                        //             color: Colors.red,
-                        //             borderRadius: BorderRadius.circular(12),
-                        //             border: Border.all(color: Colors.white),
-                        //           ),
-                        //           child: const Text(
-                        //             'FEATURED',
-                        //             style: TextStyle(
-                        //               fontSize: 10,
-                        //               color: Colors.white,
-                        //               fontWeight: FontWeight.bold,
-                        //             ),
-                        //           ),
-                        //         ),
-                        //       ),
-                        //     if (isVerified)
-                        //       Align(
-                        //         alignment: Alignment.topRight,
-                        //         child: Container(
-                        //           margin: const EdgeInsets.only(top: 8, right: 8),
-                        //           padding: const EdgeInsets.all(4),
-                        //           decoration: BoxDecoration(
-                        //             color: Colors.green,
-                        //             borderRadius: BorderRadius.circular(8),
-                        //           ),
-                        //           child: const Icon(
-                        //             Icons.verified,
-                        //             color: Colors.white,
-                        //             size: 12,
-                        //           ),
-                        //         ),
-                        //       ),
-                        //   ],
-                        // ),
                       ),
                     ),
                     Expanded(
@@ -1068,9 +948,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              isAuction
-                                  ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
-                                  : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
+                              '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
@@ -1099,22 +977,12 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                     ),
                   ],
                 ),
-                if (isAuction || isFinanceAvailable)
+                if (isFinanceAvailable)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isAuction ? Palette.primarylightblue : Colors.white,
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
-                            ),
-                          ),
-                          child: isAuction ? _buildAuctionInfo(post) : _buildFinanceInfo(isFinanceAvailable),
-                        ),
+                        child: _buildFinanceInfo(isFinanceAvailable),
                       ),
                     ],
                   ),
@@ -1123,36 +991,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildAuctionInfo(MarketplacePost post) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.gavel, size: 16, color: Colors.black),
-            const SizedBox(width: 6),
-            Text(
-              'Attempts: ${post.auctionAttempt}/3',
-              style: TextStyle(fontSize: 13, color: Colors.black, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.red,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white),
-          ),
-          child: const Text(
-            'AUCTION',
-            style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
     );
   }
 

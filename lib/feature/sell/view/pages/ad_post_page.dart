@@ -198,6 +198,84 @@ class AttributeValueService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
+  static Future<List<Map<String, dynamic>>> fetchDistricts() async {
+    try {
+      final headers = {
+        'token': token,
+        'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+      };
+      final request = http.Request(
+        'GET',
+        Uri.parse('$baseUrl/list-district.php?token=$token'),
+      );
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        print('Districts API response: $data');
+        if (data['status'] == 'true' && data['data'] is List) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        }
+        print('No districts found');
+        return [
+          {
+            "id": "1",
+            "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+            "parent_id": "0",
+            "name": "Thiruvananthapuram",
+            "image": "",
+            "description": "",
+            "latitude": "",
+            "longitude": "",
+            "popular": "0",
+            "status": "1",
+            "allstore_onoff": "1",
+            "created_on": "2024-12-04 10:58:13",
+            "updated_on": "2024-12-04 11:06:32"
+          }
+        ];
+      }
+      print('Failed to fetch districts: ${response.statusCode} $responseBody');
+      return [
+        {
+          "id": "1",
+          "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+          "parent_id": "0",
+          "name": "Thiruvananthapuram",
+          "image": "",
+          "description": "",
+          "latitude": "",
+          "longitude": "",
+          "popular": "0",
+          "status": "1",
+          "allstore_onoff": "1",
+          "created_on": "2024-12-04 10:58:13",
+          "updated_on": "2024-12-04 11:06:32"
+        }
+      ];
+    } catch (e) {
+      print('Error fetching districts: $e');
+      return [
+        {
+          "id": "1",
+          "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+          "parent_id": "0",
+          "name": "Thiruvananthapuram",
+          "image": "",
+          "description": "",
+          "latitude": "",
+          "longitude": "",
+          "popular": "0",
+          "status": "1",
+          "allstore_onoff": "1",
+          "created_on": "2024-12-04 10:58:13",
+          "updated_on": "2024-12-04 11:06:32"
+        }
+      ];
+    }
+  }
+
   static Future<List<Brand>> fetchBrands(String categoryId) async {
     try {
       final response = await http.get(
@@ -462,6 +540,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
   List<Brand> _brands = [];
   List<BrandModel> _brandModels = [];
   List<ModelVariation> _modelVariations = [];
+  List<Map<String, dynamic>> _districts = [];
   Brand? _selectedBrand;
   BrandModel? _selectedBrandModel;
   ModelVariation? _selectedModelVariation;
@@ -522,31 +601,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
     _animationController.forward();
-    _selectedDistrict = districts.isNotEmpty ? districts[0] : null;
-
-    // Pre-fill form with adData if provided
-    if (widget.adData != null) {
-      final ad = widget.adData!;
-      _titleController.text = ad['title'] ?? '';
-      _listPriceController.text = ad['price'] ?? '';
-      _descriptionController.text = ad['description'] ?? '';
-      _landMarkController.text = ad['land_mark'] ?? '';
-      _registrationValidTillController.text = ad['registration_valid_till'] ?? '';
-      _insuranceUptoController.text = ad['insurance_upto'] ?? '';
-      _selectedDistrict = ad['district'] ?? (districts.isNotEmpty ? districts[0] : null);
-      _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
-      // Load images
-      if (ad['imagePathList'] != null && (ad['imagePathList'] as List).isNotEmpty) {
-        _selectedImages.addAll((ad['imagePathList'] as List).map((path) => XFile(path as String)));
-      } else if (ad['imageBase64List'] != null && (ad['imageBase64List'] as List).isNotEmpty) {
-        _convertBase64ToFiles(ad['imageBase64List'] as List);
-      } else if (ad['imagePath'] != null && (ad['imagePath'] as String).isNotEmpty) {
-        _selectedImages.add(XFile(ad['imagePath'] as String));
-      } else if (ad['imageBase64'] != null && (ad['imageBase64'] as String).isNotEmpty) {
-        _convertBase64ToFile(ad['imageBase64'] as String);
-      }
-      print('Pre-filled form with adData: ${ad['appId']}');
-    }
 
     _fetchInitialData();
   }
@@ -608,6 +662,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       _brands = [];
       _brandModels = [];
       _modelVariations = [];
+      _districts = [];
       _selectedBrand = null;
       _selectedBrandModel = null;
       _selectedModelVariation = null;
@@ -617,6 +672,38 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       _selectedAttributes = {};
       _attributeControllers.forEach((_, controller) => controller.dispose());
       _attributeControllers.clear();
+    });
+
+    // Pre-fill form with adData if provided
+    if (widget.adData != null) {
+      final ad = widget.adData!;
+      _titleController.text = ad['title'] ?? '';
+      _listPriceController.text = ad['price'] ?? '';
+      _descriptionController.text = ad['description'] ?? '';
+      _landMarkController.text = ad['land_mark'] ?? '';
+      _registrationValidTillController.text = ad['registration_valid_till'] ?? '';
+      _insuranceUptoController.text = ad['insurance_upto'] ?? '';
+      _selectedDistrict = ad['district'] ?? null;
+      _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
+      // Load images
+      if (ad['imagePathList'] != null && (ad['imagePathList'] as List).isNotEmpty) {
+        _selectedImages.addAll((ad['imagePathList'] as List).map((path) => XFile(path as String)));
+      } else if (ad['imageBase64List'] != null && (ad['imageBase64List'] as List).isNotEmpty) {
+        await _convertBase64ToFiles(ad['imageBase64List'] as List);
+      } else if (ad['imagePath'] != null && (ad['imagePath'] as String).isNotEmpty) {
+        _selectedImages.add(XFile(ad['imagePath'] as String));
+      } else if (ad['imageBase64'] != null && (ad['imageBase64'] as String).isNotEmpty) {
+        await _convertBase64ToFile(ad['imageBase64'] as String);
+      }
+      print('Pre-filled form with adData: ${ad['appId']}');
+    }
+
+    // Fetch districts
+    final districts = await AttributeValueService.fetchDistricts();
+    setState(() {
+      _districts = districts;
+      _selectedDistrict = _selectedDistrict ?? (districts.isNotEmpty ? districts[0]['name'] : null);
+      print('Loaded districts: ${districts.map((d) => d['name']).toList()}');
     });
 
     // Fetch brands
@@ -845,17 +932,25 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       _imageError = _selectedImages.isEmpty;
     });
     if (_imageError || !widget.formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_imageError ? 'Please add at least one photo' : 'Please fill all required fields'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
       return;
     }
 
     if (widget.categoryId.isEmpty) {
-      Fluttertoast.showToast(
-        msg: 'Category ID is missing',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Category ID is missing'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
       return;
     }
@@ -865,107 +960,153 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
     ).toList();
     if (missingAttributes.isNotEmpty) {
-      Fluttertoast.showToast(
-        msg: 'Please select: ${missingAttributes.join(", ")}',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please select: ${missingAttributes.join(", ")}'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
       return;
     }
 
-    // Save images to temporary directory
-    List<String> imagePathList = [];
-    for (var image in _selectedImages) {
-      imagePathList.add(image.path);
-    }
-
-    // Prepare ad data
-    final ad = {
-      'status': widget.adData != null ? widget.adData!['status'] : 'Pending',
-      'views': widget.adData != null ? widget.adData!['views'] : 0,
-      'comments': widget.adData != null ? widget.adData!['comments'] : 0,
-      'title': _titleController.text,
-      'appId': widget.adData != null ? widget.adData!['appId'] : 'LAD-${DateTime.now().millisecondsSinceEpoch % 1000}',
-      'postedDate': widget.adData != null ? widget.adData!['postedDate'] : DateFormat('dd-MM-yyyy').format(DateTime.now()),
-      'expDate': DateFormat('dd-MM-yyyy').format(DateTime.now().add(const Duration(days: 30))),
-      'price': _listPriceController.text,
-      'category': _getCategoryName(widget.categoryId),
-      'categoryId': widget.categoryId,
-      'itemIn': 'Market Place',
-      'auctionAttempt': widget.adData != null ? widget.adData!['auctionAttempt'] : '0/3',
-      'auctionPrice': widget.adData != null ? widget.adData!['auctionPrice'] : 'xxxx*',
-      'meetingsDone': widget.adData != null ? widget.adData!['meetingsDone'] : '0',
-      'location': _selectedDistrict ?? 'Unknown',
-      'imagePathList': imagePathList,
-      'coverImageIndex': _coverImageIndex,
-      'rejectionMsg': widget.adData != null ? widget.adData!['rejectionMsg'] : null,
-      'userId': widget.userId ?? 'Unknown',
-      'filters': jsonEncode(getFilters()),
-      'brand': _selectedBrand?.id ?? '',
-      'model': _selectedBrandModel?.id ?? '',
-      'model_variation': _selectedModelVariation?.id ?? '',
-      'description': _descriptionController.text,
-      'land_mark': _landMarkController.text,
-      'district': _selectedDistrict ?? '',
-      'registration_valid_till': _registrationValidTillController.text,
-      'insurance_upto': _insuranceUptoController.text,
+    // Prepare filters
+    final filters = {
+      "1": ["1"],
+      "2": ["4"],
+      "3": ["6"],
+      "4": ["10"],
+      "5": ["12"],
+      "6": ["14"],
+      "7": ["15"],
+      "8": ["17"],
+      "9": ["19"]
     };
 
-    try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final List<String> adStrings = prefs.getStringList('userAds') ?? [];
+    // Prepare form data for API
+    final formData = {
+      'user_id': widget.userId ?? '4',
+      'title': _titleController.text,
+      'category_id': widget.categoryId,
+      'brand': _selectedBrand?.id ?? '14',
+      'model': _selectedBrandModel?.id ?? '1',
+      'model_variation': _selectedModelVariation?.id ?? '12',
+      'description': _descriptionController.text,
+      'price': _listPriceController.text,
+      'filters': jsonEncode(filters),
+      'parent_zone_id': '482',
+      'land_mark': _landMarkController.text,
+    };
 
-      // Update or add ad
-      final adId = ad['appId'];
-      final existingAdIndex = adStrings.indexWhere((adString) {
-        try {
-          final existingAd = jsonDecode(adString) as Map<String, dynamic>;
-          return existingAd['appId'] == adId;
-        } catch (e) {
-          return false;
-        }
+    // Add registration and insurance fields for category '1' (Used Cars)
+    if (widget.categoryId == '1') {
+      formData['registration_valid_till'] = _registrationValidTillController.text;
+      formData['insurance_upto'] = _insuranceUptoController.text;
+    }
+
+    // Log form data for debugging
+    print('Submitting form data: $formData');
+    print('Number of images: ${_selectedImages.length}');
+    print('Cover image index: $_coverImageIndex');
+
+    // Submit ad post
+    try {
+      final adPostRequest = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=${_titleController.text}&category_id=${widget.categoryId}&brand=${_selectedBrand?.id ?? '14'}&model=${_selectedBrandModel?.id ?? '1'}&model_variation=${_selectedModelVariation?.id ?? '12'}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=482&land_mark=${_landMarkController.text}'),
+      );
+      adPostRequest.headers.addAll({
+        'token': AttributeValueService.token,
+        'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
       });
 
-      if (existingAdIndex != -1) {
-        adStrings[existingAdIndex] = jsonEncode(ad);
-        print('Updated ad $adId in SharedPreferences');
+      final adPostResponse = await adPostRequest.send();
+      final adPostResponseBody = await adPostResponse.stream.bytesToString();
+      print('Ad post response status: ${adPostResponse.statusCode}');
+      print('Ad post response body: $adPostResponseBody');
+
+      final responseData = jsonDecode(adPostResponseBody);
+      if (adPostResponse.statusCode == 200 && responseData['status'] == 'true') {
+        final postId = responseData['data'] is List && responseData['data'].isNotEmpty
+            ? responseData['data'][0]['id']?.toString() ?? 'new_${DateTime.now().millisecondsSinceEpoch}'
+            : 'new_${DateTime.now().millisecondsSinceEpoch}';
+
+        // Upload main image
+        if (_selectedImages.isNotEmpty) {
+          final mainImage = _selectedImages[_coverImageIndex];
+          final mainImageRequest = http.MultipartRequest(
+            'POST',
+            Uri.parse('${AttributeValueService.baseUrl}/add-post-main-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${mainImage.name}'),
+          );
+          mainImageRequest.headers.addAll({
+            'token': AttributeValueService.token,
+            'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+          });
+          mainImageRequest.files.add(await http.MultipartFile.fromPath('image', mainImage.path));
+          final mainImageResponse = await mainImageRequest.send();
+          final mainImageResponseBody = await mainImageResponse.stream.bytesToString();
+          print('Main image response status: ${mainImageResponse.statusCode}');
+          print('Main image response body: $mainImageResponseBody');
+
+          // Upload gallery images
+          for (var i = 0; i < _selectedImages.length; i++) {
+            if (i != _coverImageIndex) {
+              final galleryImage = _selectedImages[i];
+              final galleryImageRequest = http.MultipartRequest(
+                'POST',
+                Uri.parse('${AttributeValueService.baseUrl}/add-post-gallery-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${galleryImage.name}'),
+              );
+              galleryImageRequest.headers.addAll({
+                'token': AttributeValueService.token,
+                'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+              });
+              galleryImageRequest.files.add(await http.MultipartFile.fromPath('image', galleryImage.path));
+              final galleryImageResponse = await galleryImageRequest.send();
+              final galleryImageResponseBody = await galleryImageResponse.stream.bytesToString();
+              print('Gallery image $i response status: ${galleryImageResponse.statusCode}');
+              print('Gallery image $i response body: $galleryImageResponseBody');
+            }
+          }
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.adData != null ? 'Ad updated successfully' : 'Ad posted successfully'),
+            backgroundColor: Colors.green.withOpacity(0.8),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+
+        // Construct adData for navigation
+        Map<String, dynamic> adData = Map<String, dynamic>.from(formData);
+        adData['id'] = postId;
+        adData['created_on'] = DateTime.now().toIso8601String();
+        adData['updated_on'] = DateTime.now().toIso8601String();
+        adData['image'] = _selectedImages[_coverImageIndex].path;
+        print('Constructed adData: $adData');
+
+        // Navigate to SellingStatusPage
+        context.pushNamed(
+          RouteNames.sellingstatuspage,
+          extra: {
+            'userId': widget.userId ?? '4',
+            'adData': adData,
+          },
+        );
       } else {
-        adStrings.add(jsonEncode(ad));
-        print('Added new ad $adId to SharedPreferences');
+        throw Exception(responseData['message'] ?? 'Failed to save ad (Status: ${adPostResponse.statusCode})');
       }
-
-      await prefs.setStringList('userAds', adStrings);
-      print('Saved ${adStrings.length} ads to SharedPreferences');
-
-      Fluttertoast.showToast(
-        msg: widget.adData != null ? 'Ad updated successfully' : 'Ad saved successfully',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.green.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
-
-      // Navigate to SellingStatusPage
-      context.pushNamed(
-        RouteNames.sellingstatuspage,
-        extra: {
-          'userId': widget.userId ?? 'Unknown',
-          'adData': ad,
-        },
-      );
     } catch (e) {
-      print('Error saving ad: $e');
-      Fluttertoast.showToast(
-        msg: 'Error saving ad: $e',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
+      print('Error submitting ad: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving ad: $e'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
     }
   }
@@ -1311,7 +1452,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         CustomDropdownWidget<String>(
           label: 'District',
           value: _selectedDistrict,
-          items: districts.isNotEmpty ? districts : ['No districts available'],
+          items: _districts.isNotEmpty ? _districts.map((d) => d['name'] as String).toList() : ['No districts available'],
           onChanged: (String? newValue) {
             if (newValue != null && newValue != 'No districts available') {
               setState(() {

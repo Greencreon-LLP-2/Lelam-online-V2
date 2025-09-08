@@ -3,36 +3,91 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MyMeetingsWidget extends StatelessWidget {
-  final String baseUrl;
-  final String token;
-  final String? userId;
-  final String initialStatus;
-  final String? postId;
-  final String? bidId;
-  final Map<String, dynamic>? bid;
+import 'my_bids_widget.dart' as AttributeValueService;
 
-  const MyMeetingsWidget({
-    super.key,
-    required this.baseUrl,
-    required this.token,
-    this.userId,
-    required this.initialStatus,
-    this.postId,
-    this.bidId,
-    this.bid,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text('My Meetings Page - Bid ID: $bidId')),
-    );
+  Future<List<Map<String, dynamic>>> fetchDistricts() async {
+    try {
+      final headers = {
+        'token': token,
+        'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+      };
+      final request = http.Request(
+        'GET',
+        Uri.parse('$baseUrl/list-district.php?token=$token'),
+      );
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final data = jsonDecode(responseBody);
+        debugPrint('Districts API response: $data');
+        if (data['status'] == 'true' && data['data'] is List) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        }
+        debugPrint('No districts found');
+        return [
+          {
+            "id": "1",
+            "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+            "parent_id": "0",
+            "name": "Thiruvananthapuram",
+            "image": "",
+            "description": "",
+            "latitude": "",
+            "longitude": "",
+            "popular": "0",
+            "status": "1",
+            "allstore_onoff": "1",
+            "created_on": "2024-12-04 10:58:13",
+            "updated_on": "2024-12-04 11:06:32"
+          }
+        ];
+      }
+      debugPrint('Failed to fetch districts: ${response.statusCode} $responseBody');
+      return [
+        {
+          "id": "1",
+          "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+          "parent_id": "0",
+          "name": "Thiruvananthapuram",
+          "image": "",
+          "description": "",
+          "latitude": "",
+          "longitude": "",
+          "popular": "0",
+          "status": "1",
+          "allstore_onoff": "1",
+          "created_on": "2024-12-04 10:58:13",
+          "updated_on": "2024-12-04 11:06:32"
+        }
+      ];
+    } catch (e) {
+      debugPrint('Error fetching districts: $e');
+      return [
+        {
+          "id": "1",
+          "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+          "parent_id": "0",
+          "name": "Thiruvananthapuram",
+          "image": "",
+          "description": "",
+          "latitude": "",
+          "longitude": "",
+          "popular": "0",
+          "status": "1",
+          "allstore_onoff": "1",
+          "created_on": "2024-12-04 10:58:13",
+          "updated_on": "2024-12-04 11:06:32"
+        }
+      ];
+    }
   }
-}
+
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -53,6 +108,7 @@ class MyBidsWidget extends StatefulWidget {
 class _MyBidsWidgetState extends State<MyBidsWidget> {
   String? selectedBidType = 'Low Bids';
   List<Map<String, dynamic>> bids = [];
+  List<Map<String, dynamic>> districts = [];
   bool isLoading = true;
   String? error;
   String? _userId;
@@ -69,6 +125,9 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       _userId = widget.userId ?? prefs.getString('userId') ?? 'Unknown';
     });
     debugPrint('MyBidsWidget - Loaded userId: $_userId');
+    // Fetch districts
+    districts = await AttributeValueService.fetchDistricts();
+    debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
     await _loadBids();
   }
 
@@ -91,7 +150,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Check the response structure
         if (data['status'] == true || data['status'] == 'true') {
           Map<String, dynamic>? postData;
 
@@ -104,30 +162,43 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           if (postData != null) {
             debugPrint('Post details extracted: ${postData.toString()}');
 
-            // Fix image URL handling
             String imagePath = postData['image'] ?? '';
             String fullImageUrl = '';
 
             if (imagePath.isNotEmpty) {
               if (imagePath.startsWith('http')) {
-                fullImageUrl = imagePath; // Already a full URL
+                fullImageUrl = imagePath;
               } else if (imagePath.startsWith('/')) {
-                fullImageUrl =
-                    'https://lelamonline.com$imagePath'; // Absolute path
+                fullImageUrl = 'https://lelamonline.com$imagePath';
               } else {
-                fullImageUrl =
-                    'https://lelamonline.com/admin/$imagePath'; // Relative path
+                fullImageUrl = 'https://lelamonline.com/admin/$imagePath';
               }
+            }
+
+            // Map parent_zone_id to district name
+            String location = 'Unknown Location';
+            final parentZoneId = postData['parent_zone_id']?.toString();
+            if (parentZoneId != null) {
+              final district = districts.firstWhere(
+                (d) => d['id'] == parentZoneId,
+                orElse: () => {'name': 'Unknown District'},
+              );
+              location = district['name'] as String;
+              if (postData['land_mark'] != null && postData['land_mark'].isNotEmpty) {
+                location += ', ${postData['land_mark']}';
+              }
+            } else if (postData['land_mark'] != null && postData['land_mark'].isNotEmpty) {
+              location = postData['land_mark'];
             }
 
             return {
               'title': postData['title'] ?? 'Unknown Vehicle (ID: $postId)',
               'price': postData['price'] ?? '0',
-              'image': fullImageUrl, // Use the fixed URL
-              'parent_zone_id':
-                  postData['parent_zone_id'] ?? 'Unknown Location',
+              'image': fullImageUrl,
+              'parent_zone_id': parentZoneId ?? 'Unknown',
               'by_dealer': postData['by_dealer'] ?? '0',
-              'land_mark': postData['land_mark'] ?? 'Unknown Location',
+              'land_mark': postData['land_mark'] ?? '',
+              'location': location,
             };
           }
         }
@@ -164,7 +235,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     }
   }
 
-  // NEW: Fetch bid amount from a separate endpoint
   Future<String> _fetchBidAmount(String bidId) async {
     try {
       final response = await http.get(
@@ -180,7 +250,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true) {
-          // Try different possible field names for bid amount
           if (data['data'] is Map) {
             return data['data']['bid_amount'] ??
                 data['data']['amount'] ??
@@ -218,7 +287,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
       List<Map<String, dynamic>> allBids = [];
 
-      // Fetch low bids
       final lowBidsResponse = await http.get(
         Uri.parse(
           '${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId',
@@ -241,7 +309,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         }
       }
 
-      // Fetch high bids
       final highBidsResponse = await http.get(
         Uri.parse(
           '${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId',
@@ -256,9 +323,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       if (highBidsResponse.statusCode == 200) {
         final highBidsData = jsonDecode(highBidsBody);
         if (highBidsData['status'] == true && highBidsData['data'] is List) {
-          final highBids = List<Map<String, dynamic>>.from(
-            highBidsData['data'],
-          );
+          final highBids = List<Map<String, dynamic>>.from(highBidsData['data']);
           for (var bid in highBids) {
             bid['fromHighBids'] = true;
             allBids.add(bid);
@@ -268,41 +333,30 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
       debugPrint('Total bids fetched: ${allBids.length}');
 
-      // Fetch details for each bid
       for (var bid in allBids) {
         debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
 
-        // Fetch post details
         final postDetails = await _fetchPostDetails(bid['post_id']);
         if (postDetails != null) {
           bid['title'] = postDetails['title'];
-     bid['carImage'] = postDetails['image'];
+          bid['carImage'] = postDetails['image'];
           bid['targetPrice'] = postDetails['price'];
-          bid['location'] =
-              postDetails['land_mark'] ?? postDetails['parent_zone_id'];
-          bid['store'] =
-              postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
+          bid['location'] = postDetails['location'];
+          bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
           bid['appId'] = 'APP_${bid['post_id']}';
 
-          // Parse dates
           try {
             final createdDate = DateTime.parse(bid['created_on']);
             bid['bidDate'] = DateFormat('yyyy-MM-dd').format(createdDate);
-            bid['expirationDate'] = DateFormat(
-              'yyyy-MM-dd',
-            ).format(createdDate.add(Duration(days: 7)));
+            bid['expirationDate'] = DateFormat('yyyy-MM-dd').format(createdDate.add(Duration(days: 7)));
           } catch (e) {
             bid['bidDate'] = 'N/A';
             bid['expirationDate'] = 'N/A';
           }
 
-          // Fetch meeting attempts
           bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
-
-          // Fetch bid amount
           bid['bidPrice'] = await _fetchBidAmount(bid['id']);
         } else {
-          // Add fallback data if post details not found
           bid['title'] = 'Unknown Vehicle (ID: ${bid['post_id']})';
           bid['carImage'] = '';
           bid['targetPrice'] = '0';
@@ -318,7 +372,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         debugPrint('Bid processed: ${bid['title']}');
       }
 
-      // Update cache
       final prefs = await SharedPreferences.getInstance();
       await prefs.setStringList(
         'userBids',
@@ -343,8 +396,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   List<Map<String, dynamic>> _getFilteredBids() {
     return bids.where((bid) {
       final double bidPrice = double.tryParse(bid['bidPrice'] ?? '0') ?? 0;
-      final double targetPrice =
-          double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
+      final double targetPrice = double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
 
       if (selectedBidType == 'Low Bids') {
         return bidPrice < targetPrice ||
@@ -355,8 +407,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
     }).toList();
   }
-
-  // ... rest of your methods (proceedMeetingWithBid, proceedMeetingWithoutBid, increaseBid) ...
 
   @override
   Widget build(BuildContext context) {
@@ -408,87 +458,83 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           Expanded(
             child: Container(
               color: Colors.grey[50],
-              child:
-                  isLoading
-                      ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primaryColor,
-                        ),
-                      )
-                      : error != null
+              child: isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.primaryColor,
+                      ),
+                    )
+                  : error != null
                       ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 64,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              error!,
-                              style: const TextStyle(
-                                fontSize: 16,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
                                 color: Colors.red,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadUserIdAndBids,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      )
+                              const SizedBox(height: 16),
+                              Text(
+                                error!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadUserIdAndBids,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
                       : filteredBids.isEmpty
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.gavel_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No ${selectedBidType?.toLowerCase()} found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[600],
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.gavel_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No ${selectedBidType?.toLowerCase()} found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Your bids will appear here once you start bidding',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[500],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filteredBids.length,
+                              itemBuilder: (context, index) {
+                                final bid = filteredBids[index];
+                                return BidCard(
+                                  bid: bid,
+                                  baseUrl: widget.baseUrl,
+                                  token: widget.token,
+                                  userId: _userId ?? bid['user_id'] ?? '482',
+                                );
+                              },
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your bids will appear here once you start bidding',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
-                      : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredBids.length,
-                        itemBuilder: (context, index) {
-                          final bid = filteredBids[index];
-                          return BidCard(
-                            bid: bid,
-                            baseUrl: widget.baseUrl,
-                            token: widget.token,
-                            userId: _userId ?? bid['user_id'] ?? '482',
-                            // onProceedWithBid: () => _proceedMeetingWithBid(context, bid),
-                            // onProceedWithoutBid: () => _proceedMeetingWithoutBid(context, bid),
-                            // onIncreaseBid: () => _increaseBid(context, bid),
-                          );
-                        },
-                      ),
             ),
           ),
         ],
@@ -502,9 +548,6 @@ class BidCard extends StatelessWidget {
   final String baseUrl;
   final String token;
   final String userId;
-  // final VoidCallback onProceedWithBid;
-  // final VoidCallback onProceedWithoutBid;
-  // final VoidCallback onIncreaseBid;
 
   const BidCard({
     super.key,
@@ -512,9 +555,6 @@ class BidCard extends StatelessWidget {
     required this.baseUrl,
     required this.token,
     required this.userId,
-    // required this.onProceedWithBid,
-    // required this.onProceedWithoutBid,
-    // required this.onIncreaseBid,
   });
 
   @override
@@ -548,40 +588,39 @@ class BidCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-             // In your BidCard widget, update the CachedNetworkImage:
-ClipRRect(
-  borderRadius: BorderRadius.circular(12),
-  child: CachedNetworkImage(
-    imageUrl: bid['carImage'] ?? '',
-    width: 120,
-    height: 150,
-    fit: BoxFit.cover,
-    placeholder: (context, url) => Container(
-      width: 90,
-      height: 90,
-      color: Colors.grey[200],
-      child: const Center(
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppTheme.primaryColor,
-        ),
-      ),
-    ),
-    errorWidget: (context, url, error) {
-      debugPrint('Image load error: $error for URL: $url');
-      return Container(
-        width: 90,
-        height: 90,
-        color: Colors.grey[200],
-        child: const Icon(
-          Icons.directions_car,
-          size: 40,
-          color: Colors.grey,
-        ),
-      );
-    },
-  ),
-),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: CachedNetworkImage(
+                        imageUrl: bid['carImage'] ?? '',
+                        width: 100,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          width: 90,
+                          height: 90,
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) {
+                          debugPrint('Image load error: $error for URL: $url');
+                          return Container(
+                            width: 90,
+                            height: 90,
+                            color: Colors.grey[200],
+                            child: const Icon(
+                              Icons.directions_car,
+                              size: 40,
+                              color: Colors.grey,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -600,30 +639,6 @@ ClipRRect(
                                   ),
                                 ),
                               ),
-                              // Container(
-                              //   padding: const EdgeInsets.symmetric(
-                              //     horizontal: 8,
-                              //     vertical: 4,
-                              //   ),
-                              //   decoration: BoxDecoration(
-                              //     color:
-                              //         isLowBid
-                              //             ? Colors.orange[50]
-                              //             : Colors.green[50],
-                              //     borderRadius: BorderRadius.circular(12),
-                              //   ),
-                              //   child: Text(
-                              //     isLowBid ? 'Low Bid' : 'High Bid',
-                              //     style: TextStyle(
-                              //       fontSize: 10,
-                              //       fontWeight: FontWeight.w500,
-                              //       color:
-                              //           isLowBid
-                              //               ? Colors.orange[700]
-                              //               : Colors.green[700],
-                              //     ),
-                              //   ),
-                              // ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -636,7 +651,7 @@ ClipRRect(
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'APPid: ${bid['appId'] ?? 'APP_${bid['post_id']}'}',
+                                'App Id: ${bid['appId'] ?? 'LAD_${bid['post_id']}'}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[600],
@@ -666,23 +681,23 @@ ClipRRect(
                             ],
                           ),
                           const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.store,
-                                size: 14,
-                                color: Colors.grey[500],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Seller: ${bid['store'] ?? 'Unknown Seller'}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
+                          // Row(
+                          //   children: [
+                          //     Icon(
+                          //       Icons.store,
+                          //       size: 14,
+                          //       color: Colors.grey[500],
+                          //     ),
+                          //     const SizedBox(width: 4),
+                          //     Text(
+                          //       'Seller: ${bid['store'] ?? 'Unknown Seller'}',
+                          //       style: TextStyle(
+                          //         fontSize: 12,
+                          //         color: Colors.grey[600],
+                          //       ),
+                          //     ),
+                          //   ],
+                          // ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
@@ -716,60 +731,50 @@ ClipRRect(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      // onSelected: (value) {
-                      //   if (value == 'increase_bid') {
-                      //     onIncreaseBid();
-                      //   } else if (value == 'proceed_with_bid') {
-                      //     onProceedWithBid();
-                      //   } else if (value == 'proceed_without_bid') {
-                      //     onProceedWithoutBid();
-                      //   }
-                      // },
-                      itemBuilder:
-                          (BuildContext context) => [
-                            const PopupMenuItem<String>(
-                              value: 'increase_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.trending_up,
-                                    size: 16,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Increase Bid'),
-                                ],
+                      itemBuilder: (BuildContext context) => [
+                        const PopupMenuItem<String>(
+                          value: 'increase_bid',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.trending_up,
+                                size: 16,
+                                color: AppTheme.primaryColor,
                               ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'proceed_with_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.schedule,
-                                    size: 16,
-                                    color: Colors.blue,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Meeting with Bid'),
-                                ],
+                              SizedBox(width: 8),
+                              Text('Increase Bid'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'proceed_with_bid',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 16,
+                                color: Colors.blue,
                               ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'proceed_without_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.event,
-                                    size: 16,
-                                    color: Colors.orange,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Meeting without Bid'),
-                                ],
+                              SizedBox(width: 8),
+                              Text('Meeting with Bid'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'proceed_without_bid',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.event,
+                                size: 16,
+                                color: Colors.orange,
                               ),
-                            ),
-                          ],
+                              SizedBox(width: 8),
+                              Text('Meeting without Bid'),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -869,10 +874,7 @@ ClipRRect(
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color:
-                                  isLowBid
-                                      ? Colors.orange[700]
-                                      : Colors.green[700],
+                              color: isLowBid ? Colors.orange[700] : Colors.green[700],
                             ),
                           ),
                         ],
@@ -883,35 +885,30 @@ ClipRRect(
               ],
             ),
           ),
+          const Divider(),
           Container(
-            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.grey[50],
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
             ),
             child: Column(
               children: [
-                // SizedBox(
-                //   width: double.infinity,
-                //   child: ElevatedButton.icon(
-                //     onPressed: onProceedWithoutBid,
-                //     icon: const Icon(Icons.event, size: 18),
-                //     label: const Text('Schedule Meeting'),
-                //     style: ElevatedButton.styleFrom(
-                //       backgroundColor: AppTheme.primaryColor,
-                //       foregroundColor: Colors.white,
-                //       padding: const EdgeInsets.symmetric(vertical: 12),
-                //       shape: RoundedRectangleBorder(
-                //         borderRadius: BorderRadius.circular(10),
-                //       ),
-                //       elevation: 0,
-                //     ),
-                //   ),
-                // ),
-                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'Schedule meeting with bid',
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -929,7 +926,7 @@ ClipRRect(
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Meeting location can be requested 24 hrs before meeting time only.',
+                          'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.blue[700],

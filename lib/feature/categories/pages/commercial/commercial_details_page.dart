@@ -4,34 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
-import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
-    hide baseUrl, token;
-import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
-import 'package:lelamonline_flutter/utils/palette.dart';
-import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class CommercialVehicleDetailsPage extends StatefulWidget {
+class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
-  final bool isAuction;
+  final String? userId;
 
-  const CommercialVehicleDetailsPage({
+  const CommercialProductDetailsPage({
     super.key,
     required this.post,
-    this.isAuction = false,
+    this.userId,
   });
 
   @override
-  State<CommercialVehicleDetailsPage> createState() =>
-      _CommercialVehicleDetailsPageState();
+  State<CommercialProductDetailsPage> createState() =>
+      _CommercialProductDetailsPageState();
 }
 
-class _CommercialVehicleDetailsPageState
-    extends State<CommercialVehicleDetailsPage> {
+class _CommercialProductDetailsPageState
+    extends State<CommercialProductDetailsPage> {
   List<Attribute> attributes = [];
   List<AttributeVariation> attributeVariations = [];
   bool isLoadingDetails = false;
@@ -43,6 +44,7 @@ class _CommercialVehicleDetailsPageState
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
@@ -53,12 +55,212 @@ class _CommercialVehicleDetailsPageState
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
+  String? userId;
 
   @override
   void initState() {
     super.initState();
-    _fetchDetailsData();
-    _fetchSellerInfo();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadUserId();
+    await _fetchDetailsData();
+    await _fetchSellerInfo();
+    if (userId != null && userId != 'Unknown') {
+      await _checkShortlistStatus();
+    }
+  }
+
+  Future<void> _loadUserId() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+    });
+    debugPrint('CommercialProductDetailsPage - Loaded userId: $userId');
+  }
+
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') {
+      setState(() {
+        _isFavorited = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/list-shortlist.php?token=$token&user_id=$userId',
+        ),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
+          final isShortlisted = shortlistData.any(
+            (item) => item['post_id'].toString() == widget.post.id,
+          );
+          setState(() {
+            _isFavorited = isShortlisted;
+            _isLoadingFavorite = false;
+          });
+        } else {
+          setState(() {
+            _isFavorited = false;
+            _isLoadingFavorite = false;
+          });
+        }
+      } else {
+        throw Exception('Failed to check shortlist status: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error checking shortlist status: $e');
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _toggleShortlist() async {
+    if (userId == null || userId == 'Unknown') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to manage your shortlist')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final action = _isFavorited ? 'remove' : 'add';
+      final response = await http.post(
+        Uri.parse('$baseUrl/$action-shortlist.php?token=$token'),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'user_id': userId,
+          'post_id': widget.post.id,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true') {
+          setState(() {
+            _isFavorited = !_isFavorited;
+            _isLoadingFavorite = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isFavorited
+                    ? 'Added to shortlist'
+                    : 'Removed from shortlist',
+              ),
+            ),
+          );
+
+          final prefs = await SharedPreferences.getInstance();
+          final cachedShortlist = prefs.getString('shortlist_$userId');
+          if (cachedShortlist != null) {
+            try {
+              final responseData = jsonDecode(cachedShortlist);
+              if (responseData['status'] == 'true' && responseData['data'] is List) {
+                List<Map<String, dynamic>> shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
+                if (_isFavorited) {
+                  shortlistData.add({
+                    'post_id': widget.post.id,
+                    'user_id': userId,
+                    'created_on': DateTime.now().toIso8601String(),
+                  });
+                } else {
+                  shortlistData.removeWhere((item) => item['post_id'].toString() == widget.post.id);
+                }
+                await prefs.setString(
+                  'shortlist_$userId',
+                  jsonEncode({
+                    'status': 'true',
+                    'data': shortlistData,
+                  }),
+                );
+              }
+            } catch (e) {
+              debugPrint('Error updating shortlist cache: $e');
+            }
+          }
+        } else {
+          throw Exception('Failed to update shortlist: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to update shortlist: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error toggling shortlist: $e');
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  Future<void> _placeBid(double bidAmount) async {
+    if (userId == null || userId == 'Unknown') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to place a bid')),
+      );
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/add-bid.php?token=$token'),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'user_id': userId,
+          'post_id': widget.post.id,
+          'bid_amount': bidAmount,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bid placed successfully')),
+          );
+        } else {
+          throw Exception('Failed to place bid: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to place bid: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error placing bid: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
@@ -157,7 +359,6 @@ class _CommercialVehicleDetailsPageState
 
     final Set<String> processedAttributes = {};
 
-    // Map seller type from byDealer field
     attributeValues['Seller Type'] =
         widget.post.byDealer == '1' ? 'Dealer' : 'Owner';
     orderedAttributeValues.add(
@@ -165,7 +366,6 @@ class _CommercialVehicleDetailsPageState
     );
     processedAttributes.add('Seller Type');
 
-    // Map filters to attribute names and values
     for (var attribute in attributes) {
       final attributeId = attribute.id;
       if (filters.containsKey(attributeId) &&
@@ -174,15 +374,14 @@ class _CommercialVehicleDetailsPageState
         final filterValue = filters[attributeId]!.first;
         final variation = attributeVariations.firstWhere(
           (variation) => variation.id == filterValue,
-          orElse:
-              () => AttributeVariation(
-                id: '',
-                name: filterValue,
-                attributeId: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
+          orElse: () => AttributeVariation(
+            id: '',
+            name: filterValue,
+            attributeId: '',
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
         );
         final value = variation.name.isNotEmpty ? variation.name : filterValue;
         attributeValues[attribute.name] = value;
@@ -191,47 +390,27 @@ class _CommercialVehicleDetailsPageState
         print('Added from filters: ${attribute.name} = $value');
       }
     }
-
-    // Add auction-specific attributes if isAuction is true
-    if (widget.isAuction) {
-      attributeValues['Auction Starting Price'] = formatPriceInt(
-        double.tryParse(widget.post.auctionStartingPrice) ?? 0,
-      );
-      attributeValues['Auction Attempts'] = widget.post.auctionAttempt;
-      orderedAttributeValues.add(
-        MapEntry(
-          'Auction Starting Price',
-          attributeValues['Auction Starting Price']!,
-        ),
-      );
-      orderedAttributeValues.add(
-        MapEntry('Auction Attempts', attributeValues['Auction Attempts']!),
-      );
-      processedAttributes.add('Auction Starting Price');
-      processedAttributes.add('Auction Attempts');
-    }
   }
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -243,6 +422,7 @@ class _CommercialVehicleDetailsPageState
   String get landMark => _getLocationName(widget.post.parentZoneId);
   String get createdOn => widget.post.createdOn;
   String get createdBy => widget.post.createdBy;
+  String get byDealer => widget.post.byDealer;
   bool get isFinanceAvailable => widget.post.ifFinance == '1';
   bool get isFeatured => widget.post.feature == '1';
 
@@ -301,21 +481,19 @@ class _CommercialVehicleDetailsPageState
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -342,8 +520,7 @@ class _CommercialVehicleDetailsPageState
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -383,9 +560,7 @@ class _CommercialVehicleDetailsPageState
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
+                                      duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -394,10 +569,9 @@ class _CommercialVehicleDetailsPageState
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -408,19 +582,18 @@ class _CommercialVehicleDetailsPageState
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
+                                        placeholder: (context, url) =>
+                                            const Center(
                                               child: SizedBox(
                                                 width: 20,
                                                 height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
                                               ),
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
                                               Icons.error,
                                               size: 20,
                                             ),
@@ -476,12 +649,12 @@ class _CommercialVehicleDetailsPageState
                 ListTile(
                   leading: const Icon(
                     Icons.calendar_today,
-                    color: Palette.primaryblue,
+                    color: AppTheme.primaryColor,
                   ),
                   title: const Text('Select Date'),
                   subtitle: Text(
                     '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: Palette.primaryblue),
+                    style: const TextStyle(color: AppTheme.primaryColor),
                   ),
                   onTap: () async {
                     final DateTime? picked = await showDatePicker(
@@ -549,12 +722,6 @@ class _CommercialVehicleDetailsPageState
     );
   }
 
-  String getImageUrl(String imagePath) {
-    final cleanedPath =
-        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
-    return 'https://lelamonline.com/admin/$cleanedPath';
-  }
-
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
@@ -597,62 +764,61 @@ class _CommercialVehicleDetailsPageState
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        SellerInformationPage(userId: widget.post.createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SellerInformationPage(userId: widget.post.createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage:
+                          sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                              ? CachedNetworkImageProvider(sellerProfileImage!)
+                              : const AssetImage('assets/images/avatar.gif')
+                                  as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 
   Widget _buildQuestionsSection() {
@@ -721,14 +887,12 @@ class _CommercialVehicleDetailsPageState
                                   imageUrl: _images[index],
                                   width: double.infinity,
                                   height: 400,
-                                  fit: BoxFit.contain,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -792,19 +956,24 @@ class _CommercialVehicleDetailsPageState
                             ),
                           ),
                           const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
-                          ),
+                          _isLoadingFavorite
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: Icon(
+                                    _isFavorited
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: _isFavorited ? Colors.red : Colors.white,
+                                  ),
+                                  onPressed: _toggleShortlist,
+                                ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -839,16 +1008,16 @@ class _CommercialVehicleDetailsPageState
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -864,25 +1033,13 @@ class _CommercialVehicleDetailsPageState
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        widget.isAuction
-                            ? 'Starting Bid: ₹${formatPriceInt(double.tryParse(widget.post.auctionStartingPrice) ?? 0)}'
-                            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+                        '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.blueAccent,
                         ),
                       ),
-                      if (widget.isAuction) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Max Bid: ₹${formatPriceInt(double.tryParse(price) ?? 0)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -968,13 +1125,6 @@ class _CommercialVehicleDetailsPageState
                                 Icons.person,
                                 attributeValues['Seller Type'] ?? 'N/A',
                               ),
-                              if (widget.isAuction) ...[
-                                const SizedBox(height: 12),
-                                _buildDetailItem(
-                                  Icons.gavel,
-                                  'Attempts: ${attributeValues['Auction Attempts'] ?? '0'}/3',
-                                ),
-                              ],
                             ],
                           ),
                       ],
@@ -999,21 +1149,17 @@ class _CommercialVehicleDetailsPageState
                         const Center(child: CircularProgressIndicator())
                       else
                         Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.key != 'Seller Type' &&
-                                        entry.key != 'Auction Starting Price' &&
-                                        entry.key != 'Auction Attempts',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.value,
-                                    ),
-                                  )
-                                  .toList(),
+                          children: orderedAttributeValues
+                              .where(
+                                (entry) => entry.key != 'Seller Type',
+                              )
+                              .map(
+                                (entry) => _buildSellerCommentItem(
+                                  entry.key,
+                                  entry.value,
+                                ),
+                              )
+                              .toList(),
                         ),
                     ],
                   ),
@@ -1099,7 +1245,7 @@ class _CommercialVehicleDetailsPageState
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        showBidDialog(context); // Call the dialog function
+                        showBidDialog(context);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Palette.primarypink,
