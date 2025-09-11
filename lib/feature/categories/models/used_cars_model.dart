@@ -14,6 +14,8 @@ class MarketplacePost {
   final String modelVariation;
   final String description;
   final String price;
+  final String ifOfferPrice; 
+  final String offerPrice;   
   final String auctionPriceInterval;
   final String auctionStartingPrice;
   final List<String> attributeId;
@@ -37,6 +39,7 @@ class MarketplacePost {
   final String visiterCount;
   final String ifSold;
   final String ifExpired;
+  final String ifVerifyed; 
   final String byDealer;
   final String createdBy;
   final String createdOn;
@@ -53,6 +56,8 @@ class MarketplacePost {
     required this.modelVariation,
     required this.description,
     required this.price,
+    required this.ifOfferPrice,
+    required this.offerPrice,
     required this.auctionPriceInterval,
     required this.auctionStartingPrice,
     required this.attributeId,
@@ -76,6 +81,7 @@ class MarketplacePost {
     required this.visiterCount,
     required this.ifSold,
     required this.ifExpired,
+    required this.ifVerifyed,
     required this.byDealer,
     required this.createdBy,
     required this.createdOn,
@@ -135,6 +141,8 @@ class MarketplacePost {
       modelVariation: json['model_variation']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       price: json['price']?.toString() ?? '0',
+      ifOfferPrice: json['if_offer_price']?.toString() ?? '0', 
+      offerPrice: json['offer_price']?.toString() ?? '0',     
       auctionPriceInterval: json['auction_price_intervel']?.toString() ?? '0',
       auctionStartingPrice: json['auction_starting_price']?.toString() ?? '0',
       attributeId: parseStringList(json['attribute_id']),
@@ -158,6 +166,7 @@ class MarketplacePost {
       visiterCount: json['visiter_count']?.toString() ?? '0',
       ifSold: json['if_sold']?.toString() ?? '0',
       ifExpired: json['if_expired']?.toString() ?? '0',
+      ifVerifyed: json['if_verifyed']?.toString() ?? '0', 
       byDealer: json['by_dealer']?.toString() ?? '0',
       createdBy: json['created_by']?.toString() ?? '',
       createdOn: json['created_on']?.toString() ?? '',
@@ -181,6 +190,8 @@ class MarketplacePost {
       modelVariation: modelVariation,
       description: description,
       price: price,
+      ifOfferPrice: ifOfferPrice,
+      offerPrice: offerPrice,
       auctionPriceIntervel: auctionPriceInterval,
       auctionStartingPrice: auctionStartingPrice,
       attributeId: attributeId,
@@ -204,6 +215,7 @@ class MarketplacePost {
       visiterCount: visiterCount,
       ifSold: ifSold,
       ifExpired: ifExpired,
+      ifVerifyed: ifVerifyed,
       byDealer: byDealer,
       createdBy: createdBy,
       createdOn: createdOn,

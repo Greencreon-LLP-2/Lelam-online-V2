@@ -4,15 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart' show MarketplacePost;
+import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart'
+    show MarketplacePost;
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../categories/services/used_cars_service.dart' hide MarketplaceService;
+import '../../categories/services/used_cars_service.dart'
+    hide MarketplaceService;
 
 class ShortListPage extends StatefulWidget {
   final String? userId;
@@ -48,7 +52,8 @@ class _ShortListPageState extends State<ShortListPage> {
       await _fetchShortlistedItems();
     } else {
       setState(() {
-        errorMessage = 'Please log in to view your shortlist';
+        errorMessage =
+            'please_login'; // Use a specific error code for login issues
         isLoading = false;
       });
     }
@@ -87,7 +92,7 @@ class _ShortListPageState extends State<ShortListPage> {
   Future<void> _fetchShortlistedItems() async {
     if (userId == null || userId == 'Unknown') {
       setState(() {
-        errorMessage = 'User ID not available';
+        errorMessage = 'please_login';
         isLoading = false;
       });
       return;
@@ -116,8 +121,13 @@ class _ShortListPageState extends State<ShortListPage> {
         final responseData = jsonDecode(responseBody);
         if (responseData['status'] == 'true') {
           if (responseData['data'] is List) {
-            shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
-            final postIds = shortlistData.map<String>((item) => item['post_id'].toString()).toList();
+            shortlistData = List<Map<String, dynamic>>.from(
+              responseData['data'],
+            );
+            final postIds =
+                shortlistData
+                    .map<String>((item) => item['post_id'].toString())
+                    .toList();
             final products = await _fetchProductsForPostIds(postIds);
             setState(() {
               shortlistedProducts = products;
@@ -127,7 +137,9 @@ class _ShortListPageState extends State<ShortListPage> {
             // Cache in SharedPreferences
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('shortlist_$userId', responseBody);
-            debugPrint('Shortlisted items cached: ${shortlistedProducts.length} items');
+            debugPrint(
+              'Shortlisted items cached: ${shortlistedProducts.length} items',
+            );
           } else if (responseData['data'] == 'Data not found') {
             setState(() {
               shortlistedProducts = [];
@@ -157,9 +169,15 @@ class _ShortListPageState extends State<ShortListPage> {
       if (cachedShortlist != null) {
         try {
           final responseData = jsonDecode(cachedShortlist);
-          if (responseData['status'] == 'true' && responseData['data'] is List) {
-            shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
-            final postIds = shortlistData.map<String>((item) => item['post_id'].toString()).toList();
+          if (responseData['status'] == 'true' &&
+              responseData['data'] is List) {
+            shortlistData = List<Map<String, dynamic>>.from(
+              responseData['data'],
+            );
+            final postIds =
+                shortlistData
+                    .map<String>((item) => item['post_id'].toString())
+                    .toList();
             final products = await _fetchProductsForPostIds(postIds);
             setState(() {
               shortlistedProducts = products;
@@ -189,41 +207,73 @@ class _ShortListPageState extends State<ShortListPage> {
     for (String postId in postIds) {
       try {
         // Fetch marketplace and auction posts
-        final marketplacePosts = (await _marketplaceService.fetchPosts(
-          categoryId: '1',
-          userZoneId: '0',
-          listingType: 'sale',
-          userId: userId ?? '2',
-        )) ?? [];
-        final auctionPosts = (await _marketplaceService.fetchPosts(
-          categoryId: '1',
-          userZoneId: '0',
-          listingType: 'auction',
-          userId: userId ?? '2',
-        )) ?? [];
+        final marketplacePosts =
+            (await _marketplaceService.fetchPosts(
+              categoryId: '1',
+              userZoneId: '0',
+              listingType: 'sale',
+              userId: userId ?? '2',
+            )) ??
+            [];
+        final auctionPosts =
+            (await _marketplaceService.fetchPosts(
+              categoryId: '1',
+              userZoneId: '0',
+              listingType: 'auction',
+              userId: userId ?? '2',
+            )) ??
+            [];
 
         // Combine posts and filter out null values
-        final allPosts = [...marketplacePosts, ...auctionPosts].where((post) => post != null).cast<MarketplacePost>().toList();
+        final allPosts =
+            [
+              ...marketplacePosts,
+              ...auctionPosts,
+            ].where((post) => post != null).cast<MarketplacePost>().toList();
 
         // Find matching post
         final matchingPost = allPosts.firstWhere(
           (post) => post.id == postId,
-          orElse: () => MarketplacePost(
-            id: postId,
-            title: 'Product $postId',
-            image: '',
-            price: '0',
-            parentZoneId: 'Unknown',
-            createdOn: '',
-            createdBy: 'Unknown',
-            byDealer: '0',
-            filters: {},
-            ifAuction: '0',
-            auctionStartingPrice: '0',
-            auctionAttempt: '0',
-            ifFinance: '0',
-            ifExchange: '0', slug: '', categoryId: '', brand: '', model: '', modelVariation: '', description: '', auctionPriceInterval: '', attributeId: [], attributeVariationsId: [], latitude: '', longitude: '', userZoneId: '', landMark: '', auctionStatus: '', auctionStartin: '', auctionEndin: '', adminApproval: '', feature: '', status: '', visiterCount: '', ifSold: '', ifExpired: '', updatedOn: '',
-          ),
+          orElse:
+              () => MarketplacePost(
+                id: postId,
+                title: 'Product $postId',
+                image: '',
+                price: '0',
+                parentZoneId: 'Unknown',
+                createdOn: '',
+                createdBy: 'Unknown',
+                byDealer: '0',
+                filters: {},
+                ifAuction: '0',
+                auctionStartingPrice: '0',
+                auctionAttempt: '0',
+                ifFinance: '0',
+                ifExchange: '0',
+                slug: '',
+                categoryId: '',
+                brand: '',
+                model: '',
+                modelVariation: '',
+                description: '',
+                auctionPriceInterval: '',
+                attributeId: [],
+                attributeVariationsId: [],
+                latitude: '',
+                longitude: '',
+                userZoneId: '',
+                landMark: '',
+                auctionStatus: '',
+                auctionStartin: '',
+                auctionEndin: '',
+                adminApproval: '',
+                feature: '',
+                status: '',
+                visiterCount: '',
+                ifSold: '',
+                ifExpired: '',
+                updatedOn: '', ifOfferPrice: '', offerPrice: '', ifVerifyed: '',
+              ),
         );
         products.add(matchingPost.toProduct());
       } catch (e) {
@@ -237,21 +287,22 @@ class _ShortListPageState extends State<ShortListPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -271,18 +322,22 @@ class _ShortListPageState extends State<ShortListPage> {
     }
   }
 
-  Widget _buildProductCard(Product product, Map<String, dynamic> shortlistItem) {
+  Widget _buildProductCard(
+    Product product,
+    Map<String, dynamic> shortlistItem,
+  ) {
     final isAuction = product.ifAuction == '1';
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MarketPlaceProductDetailsPage(
-              product: product,
-              userId: userId,
-              isAuction: isAuction,
-            ),
+            builder:
+                (context) => MarketPlaceProductDetailsPage(
+                  product: product,
+                  userId: userId,
+                  isAuction: isAuction,
+                ),
           ),
         );
       },
@@ -300,21 +355,22 @@ class _ShortListPageState extends State<ShortListPage> {
                 height: 100,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade200,
-                 // borderRadius: BorderRadius.circular(8),
+                  // borderRadius: BorderRadius.circular(8),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
                     imageUrl: 'https://lelamonline.com/admin/${product.image}',
                     fit: BoxFit.cover,
-                    placeholder: (context, url) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                    errorWidget: (context, url, error) => Icon(
-                      Icons.directions_car,
-                      size: 40,
-                      color: Colors.grey.shade400,
-                    ),
+                    placeholder:
+                        (context, url) =>
+                            const Center(child: CircularProgressIndicator()),
+                    errorWidget:
+                        (context, url, error) => Icon(
+                          Icons.directions_car,
+                          size: 40,
+                          color: Colors.grey.shade400,
+                        ),
                   ),
                 ),
               ),
@@ -333,10 +389,6 @@ class _ShortListPageState extends State<ShortListPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    // Text(
-                    //   'Name: ${product.createdBy}',
-                    //   style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                    // ),
                     Text(
                       isAuction
                           ? 'Starting Bid: ₹${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)}'
@@ -349,11 +401,17 @@ class _ShortListPageState extends State<ShortListPage> {
                     ),
                     Text(
                       'Location: ${_getLocationName(product.parentZoneId)}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     Text(
                       'Shortlisted: ${_formatShortlistTime(shortlistItem['created_on'] ?? '')}',
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
@@ -371,69 +429,91 @@ class _ShortListPageState extends State<ShortListPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-       // centerTitle: true,
-       toolbarHeight: 50,
+        // centerTitle: true,
+        toolbarHeight: 50,
         title: const Text("Shortlist"),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: isLoading || _isLoadingLocations
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.primaryColor),
-            )
-          : errorMessage != null
+      body:
+          isLoading || _isLoadingLocations
+              ? const Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor),
+              )
+              : errorMessage != null
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red,
-                      ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      errorMessage == 'please_login'
+                          ? 'Please log in to view your shortlist'
+                          : errorMessage!,
+                      style: const TextStyle(fontSize: 16, color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (errorMessage == 'please_login') ...[
                       const SizedBox(height: 16),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(fontSize: 16, color: Colors.red),
-                        textAlign: TextAlign.center,
+                      ElevatedButton(
+                        onPressed: () {
+                          context.pushReplacementNamed(RouteNames.loginPage);
+                          debugPrint('Navigating to login page');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                        child: const Text('Log In'),
                       ),
                     ],
-                  ),
-                )
+                  ],
+                ),
+              )
               : shortlistedProducts.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.favorite_border,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No shortlisted items found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: shortlistedProducts.length,
-                      itemBuilder: (context, index) {
-                        final product = shortlistedProducts[index];
-                        final shortlistItem = shortlistData.firstWhere(
-                          (item) => item['post_id'].toString() == product.id,
-                          orElse: () => {'created_on': ''},
-                        );
-                        return _buildProductCard(product, shortlistItem);
-                      },
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.favorite_border,
+                      size: 64,
+                      color: Colors.grey[400],
                     ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No shortlisted items found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: shortlistedProducts.length,
+                itemBuilder: (context, index) {
+                  final product = shortlistedProducts[index];
+                  final shortlistItem = shortlistData.firstWhere(
+                    (item) => item['post_id'].toString() == product.id,
+                    orElse: () => {'created_on': ''},
+                  );
+                  return _buildProductCard(product, shortlistItem);
+                },
+              ),
     );
   }
 }

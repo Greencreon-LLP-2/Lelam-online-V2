@@ -545,7 +545,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
   BrandModel? _selectedBrandModel;
   ModelVariation? _selectedModelVariation;
   Map<String, String?> _selectedAttributes = {};
-  final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _listPriceController = TextEditingController();
   final _offerPriceController = TextEditingController();
@@ -590,6 +589,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       }
       print('Updated model variations: ${modelVariations.map((v) => v.name).toList()}');
     });
+  }
+
+  String _generateTitle() {
+    return '${_selectedBrand?.name ?? 'Unknown Brand'} ${_selectedBrandModel?.name ?? 'Unknown Model'}'.trim();
   }
 
   @override
@@ -677,7 +680,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     // Pre-fill form with adData if provided
     if (widget.adData != null) {
       final ad = widget.adData!;
-      _titleController.text = ad['title'] ?? '';
       _listPriceController.text = ad['price'] ?? '';
       _descriptionController.text = ad['description'] ?? '';
       _landMarkController.text = ad['land_mark'] ?? '';
@@ -955,6 +957,18 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       return;
     }
 
+    if (_selectedBrand == null || _selectedBrandModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select both brand and model'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
     final requiredAttributes = _getRequiredAttributes(widget.categoryId);
     final missingAttributes = requiredAttributes.where(
       (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
@@ -971,31 +985,26 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       return;
     }
 
+    // Generate title from brand and model
+    final generatedTitle = _generateTitle();
+
     // Prepare filters
-    final filters = {
-      "1": ["1"],
-      "2": ["4"],
-      "3": ["6"],
-      "4": ["10"],
-      "5": ["12"],
-      "6": ["14"],
-      "7": ["15"],
-      "8": ["17"],
-      "9": ["19"]
-    };
+    final filters = getFilters();
 
     // Prepare form data for API
     final formData = {
       'user_id': widget.userId ?? '4',
-      'title': _titleController.text,
+      'title': generatedTitle,
       'category_id': widget.categoryId,
-      'brand': _selectedBrand?.id ?? '14',
-      'model': _selectedBrandModel?.id ?? '1',
-      'model_variation': _selectedModelVariation?.id ?? '12',
+      'brand': _selectedBrand!.id,
+      'brand_name': _selectedBrand!.name,
+      'model': _selectedBrandModel!.id,
+      'model_name': _selectedBrandModel!.name,
+      'model_variation': _selectedModelVariation?.id ?? '',
       'description': _descriptionController.text,
       'price': _listPriceController.text,
       'filters': jsonEncode(filters),
-      'parent_zone_id': '482',
+      'parent_zone_id': _districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': '482'})['id']?.toString() ?? '482',
       'land_mark': _landMarkController.text,
     };
 
@@ -1014,7 +1023,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     try {
       final adPostRequest = http.MultipartRequest(
         'POST',
-        Uri.parse('${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=${_titleController.text}&category_id=${widget.categoryId}&brand=${_selectedBrand?.id ?? '14'}&model=${_selectedBrandModel?.id ?? '1'}&model_variation=${_selectedModelVariation?.id ?? '12'}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=482&land_mark=${_landMarkController.text}'),
+        Uri.parse('${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=$generatedTitle&category_id=${widget.categoryId}&brand=${_selectedBrand!.id}&model=${_selectedBrandModel!.id}&model_variation=${_selectedModelVariation?.id ?? ''}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=${_districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': '482'})['id']?.toString() ?? '482'}&land_mark=${_landMarkController.text}'),
       );
       adPostRequest.headers.addAll({
         'token': AttributeValueService.token,
@@ -1084,7 +1093,7 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         adData['id'] = postId;
         adData['created_on'] = DateTime.now().toIso8601String();
         adData['updated_on'] = DateTime.now().toIso8601String();
-        adData['image'] = _selectedImages[_coverImageIndex].path;
+        adData['image'] = _selectedImages.isNotEmpty ? _selectedImages[_coverImageIndex].path : '';
         print('Constructed adData: $adData');
 
         // Navigate to SellingStatusPage
@@ -1413,19 +1422,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           ),
         if (_modelVariations.isNotEmpty) const SizedBox(height: 12),
         CustomFormField(
-          controller: _titleController,
-          label: 'Title',
-          isRequired: true,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter a title';
-            }
-            return null;
-          },
-          onChanged: (value) {},
-        ),
-        const SizedBox(height: 12),
-        CustomFormField(
           controller: _listPriceController,
           label: 'List Price',
           isNumberInput: true,
@@ -1629,7 +1625,6 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
 
   @override
   void dispose() {
-    _titleController.dispose();
     _descriptionController.dispose();
     _listPriceController.dispose();
     _offerPriceController.dispose();

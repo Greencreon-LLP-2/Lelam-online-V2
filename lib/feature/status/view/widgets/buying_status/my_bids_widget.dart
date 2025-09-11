@@ -3,71 +3,33 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'my_bids_widget.dart' as AttributeValueService;
 
-
-  Future<List<Map<String, dynamic>>> fetchDistricts() async {
-    try {
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
-      };
-      final request = http.Request(
-        'GET',
-        Uri.parse('$baseUrl/list-district.php?token=$token'),
-      );
-      request.headers.addAll(headers);
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        debugPrint('Districts API response: $data');
-        if (data['status'] == 'true' && data['data'] is List) {
-          return List<Map<String, dynamic>>.from(data['data']);
-        }
-        debugPrint('No districts found');
-        return [
-          {
-            "id": "1",
-            "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
-            "parent_id": "0",
-            "name": "Thiruvananthapuram",
-            "image": "",
-            "description": "",
-            "latitude": "",
-            "longitude": "",
-            "popular": "0",
-            "status": "1",
-            "allstore_onoff": "1",
-            "created_on": "2024-12-04 10:58:13",
-            "updated_on": "2024-12-04 11:06:32"
-          }
-        ];
+Future<List<Map<String, dynamic>>> fetchDistricts() async {
+  const String token = '5cb2c9b569416b5db1604e0e12478ded';
+  const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+  try {
+    final headers = {
+      'token': token,
+      'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+    };
+    final request = http.Request(
+      'GET',
+      Uri.parse('$baseUrl/list-district.php?token=$token'),
+    );
+    request.headers.addAll(headers);
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final data = jsonDecode(responseBody);
+      debugPrint('Districts API response: $data');
+      if (data['status'] == 'true' && data['data'] is List) {
+        return List<Map<String, dynamic>>.from(data['data']);
       }
-      debugPrint('Failed to fetch districts: ${response.statusCode} $responseBody');
-      return [
-        {
-          "id": "1",
-          "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
-          "parent_id": "0",
-          "name": "Thiruvananthapuram",
-          "image": "",
-          "description": "",
-          "latitude": "",
-          "longitude": "",
-          "popular": "0",
-          "status": "1",
-          "allstore_onoff": "1",
-          "created_on": "2024-12-04 10:58:13",
-          "updated_on": "2024-12-04 11:06:32"
-        }
-      ];
-    } catch (e) {
-      debugPrint('Error fetching districts: $e');
+      debugPrint('No districts found');
       return [
         {
           "id": "1",
@@ -86,8 +48,45 @@ import 'my_bids_widget.dart' as AttributeValueService;
         }
       ];
     }
+    debugPrint('Failed to fetch districts: ${response.statusCode} $responseBody');
+    return [
+      {
+        "id": "1",
+        "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+        "parent_id": "0",
+        "name": "Thiruvananthapuram",
+        "image": "",
+        "description": "",
+        "latitude": "",
+        "longitude": "",
+        "popular": "0",
+        "status": "1",
+        "allstore_onoff": "1",
+        "created_on": "2024-12-04 10:58:13",
+        "updated_on": "2024-12-04 11:06:32"
+      }
+    ];
+  } catch (e) {
+    debugPrint('Error fetching districts: $e');
+    return [
+      {
+        "id": "1",
+        "slug": "thiruvananthapuram-bwmuosmfkfdc2g2",
+        "parent_id": "0",
+        "name": "Thiruvananthapuram",
+        "image": "",
+        "description": "",
+        "latitude": "",
+        "longitude": "",
+        "popular": "0",
+        "status": "1",
+        "allstore_onoff": "1",
+        "created_on": "2024-12-04 10:58:13",
+        "updated_on": "2024-12-04 11:06:32"
+      }
+    ];
   }
-
+}
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -122,10 +121,9 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   Future<void> _loadUserIdAndBids() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _userId = widget.userId ?? prefs.getString('userId') ?? 'Unknown';
+      _userId = widget.userId ?? prefs.getString('userId') ?? '482'; // Default to 482 for testing
     });
     debugPrint('MyBidsWidget - Loaded userId: $_userId');
-    // Fetch districts
     districts = await AttributeValueService.fetchDistricts();
     debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
     await _loadBids();
@@ -134,25 +132,19 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId',
-        ),
+        Uri.parse('${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId'),
         headers: {
           'token': widget.token,
           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
         },
       );
 
-      debugPrint(
-        'post-details.php full response for post_id $postId: ${response.body}',
-      );
+      debugPrint('post-details.php response for post_id $postId: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
         if (data['status'] == true || data['status'] == 'true') {
           Map<String, dynamic>? postData;
-
           if (data['data'] is List && data['data'].isNotEmpty) {
             postData = data['data'][0];
           } else if (data['data'] is Map) {
@@ -160,22 +152,15 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           }
 
           if (postData != null) {
-            debugPrint('Post details extracted: ${postData.toString()}');
+            String imagePath = postData['image']?.toString() ?? '';
+            String fullImageUrl = imagePath.isNotEmpty
+                ? (imagePath.startsWith('http')
+                    ? imagePath
+                    : imagePath.startsWith('/')
+                        ? 'https://lelamonline.com$imagePath'
+                        : 'https://lelamonline.com/admin/$imagePath')
+                : '';
 
-            String imagePath = postData['image'] ?? '';
-            String fullImageUrl = '';
-
-            if (imagePath.isNotEmpty) {
-              if (imagePath.startsWith('http')) {
-                fullImageUrl = imagePath;
-              } else if (imagePath.startsWith('/')) {
-                fullImageUrl = 'https://lelamonline.com$imagePath';
-              } else {
-                fullImageUrl = 'https://lelamonline.com/admin/$imagePath';
-              }
-            }
-
-            // Map parent_zone_id to district name
             String location = 'Unknown Location';
             final parentZoneId = postData['parent_zone_id']?.toString();
             if (parentZoneId != null) {
@@ -184,25 +169,26 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                 orElse: () => {'name': 'Unknown District'},
               );
               location = district['name'] as String;
-              if (postData['land_mark'] != null && postData['land_mark'].isNotEmpty) {
+              if (postData['land_mark']?.isNotEmpty ?? false) {
                 location += ', ${postData['land_mark']}';
               }
-            } else if (postData['land_mark'] != null && postData['land_mark'].isNotEmpty) {
+            } else if (postData['land_mark']?.isNotEmpty ?? false) {
               location = postData['land_mark'];
             }
 
             return {
               'title': postData['title'] ?? 'Unknown Vehicle (ID: $postId)',
-              'price': postData['price'] ?? '0',
+              'price': postData['price']?.toString() ?? '0',
               'image': fullImageUrl,
               'parent_zone_id': parentZoneId ?? 'Unknown',
-              'by_dealer': postData['by_dealer'] ?? '0',
-              'land_mark': postData['land_mark'] ?? '',
+              'by_dealer': postData['by_dealer']?.toString() ?? '0',
+              'land_mark': postData['land_mark']?.toString() ?? '',
               'location': location,
             };
           }
         }
       }
+      debugPrint('No valid post data for post_id $postId');
       return null;
     } catch (e) {
       debugPrint('Error fetching post details for post_id $postId: $e');
@@ -213,9 +199,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   Future<int> _fetchMeetingAttempts(String bidId) async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/meetings.php?token=${widget.token}&bid_id=$bidId',
-        ),
+        Uri.parse('${widget.baseUrl}/meetings.php?token=${widget.token}&bid_id=$bidId'),
         headers: {
           'token': widget.token,
           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
@@ -232,36 +216,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     } catch (e) {
       debugPrint('Error fetching meeting attempts for bid_id $bidId: $e');
       return 0;
-    }
-  }
-
-  Future<String> _fetchBidAmount(String bidId) async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/bid-details.php?token=${widget.token}&bid_id=$bidId',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true) {
-          if (data['data'] is Map) {
-            return data['data']['bid_amount'] ??
-                data['data']['amount'] ??
-                data['data']['price'] ??
-                '0';
-          }
-        }
-      }
-      return '0';
-    } catch (e) {
-      debugPrint('Error fetching bid amount for bid_id $bidId: $e');
-      return '0';
     }
   }
 
@@ -287,19 +241,17 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
       List<Map<String, dynamic>> allBids = [];
 
+      // Fetch low bids
       final lowBidsResponse = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId',
-        ),
+        Uri.parse('${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId'),
         headers: headers,
       );
 
       debugPrint('my-bids-low.php status: ${lowBidsResponse.statusCode}');
-      final lowBidsBody = lowBidsResponse.body;
-      debugPrint('my-bids-low.php response: $lowBidsBody');
+      debugPrint('my-bids-low.php response: ${lowBidsResponse.body}');
 
       if (lowBidsResponse.statusCode == 200) {
-        final lowBidsData = jsonDecode(lowBidsBody);
+        final lowBidsData = jsonDecode(lowBidsResponse.body);
         if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
           final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
           for (var bid in lowBids) {
@@ -309,19 +261,17 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         }
       }
 
+      // Fetch high bids
       final highBidsResponse = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId',
-        ),
+        Uri.parse('${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId'),
         headers: headers,
       );
 
       debugPrint('my-bids-high.php status: ${highBidsResponse.statusCode}');
-      final highBidsBody = highBidsResponse.body;
-      debugPrint('my-bids-high.php response: $highBidsBody');
+      debugPrint('my-bids-high.php response: ${highBidsResponse.body}');
 
       if (highBidsResponse.statusCode == 200) {
-        final highBidsData = jsonDecode(highBidsBody);
+        final highBidsData = jsonDecode(highBidsResponse.body);
         if (highBidsData['status'] == true && highBidsData['data'] is List) {
           final highBids = List<Map<String, dynamic>>.from(highBidsData['data']);
           for (var bid in highBids) {
@@ -337,37 +287,24 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
 
         final postDetails = await _fetchPostDetails(bid['post_id']);
-        if (postDetails != null) {
-          bid['title'] = postDetails['title'];
-          bid['carImage'] = postDetails['image'];
-          bid['targetPrice'] = postDetails['price'];
-          bid['location'] = postDetails['location'];
-          bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
-          bid['appId'] = 'APP_${bid['post_id']}';
-
-          try {
-            final createdDate = DateTime.parse(bid['created_on']);
-            bid['bidDate'] = DateFormat('yyyy-MM-dd').format(createdDate);
-            bid['expirationDate'] = DateFormat('yyyy-MM-dd').format(createdDate.add(Duration(days: 7)));
-          } catch (e) {
-            bid['bidDate'] = 'N/A';
-            bid['expirationDate'] = 'N/A';
-          }
-
-          bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
-          bid['bidPrice'] = await _fetchBidAmount(bid['id']);
-        } else {
-          bid['title'] = 'Unknown Vehicle (ID: ${bid['post_id']})';
-          bid['carImage'] = '';
-          bid['targetPrice'] = '0';
-          bid['location'] = 'Unknown Location';
-          bid['store'] = 'Individual';
-          bid['appId'] = 'APP_${bid['post_id']}';
-          bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
-          bid['expirationDate'] = 'N/A';
-          bid['meetingAttempts'] = 0;
-          bid['bidPrice'] = '0';
+        if (postDetails == null) {
+          debugPrint('Skipping bid ${bid['id']} due to missing post details');
+          continue; // Skip bids with missing post details
         }
+
+        bid['title'] = postDetails['title'];
+        bid['carImage'] = postDetails['image'];
+        bid['targetPrice'] = postDetails['price'];
+        bid['location'] = postDetails['location'];
+        bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
+        bid['appId'] = 'APP_${bid['post_id']}';
+        bid['bidPrice'] = bid['my_bid_amount']?.toString() ?? '0';
+
+        // Use exp_date from API response
+        bid['expirationDate'] = bid['exp_date']?.toString() ?? 'N/A';
+        bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
+
+        bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
 
         debugPrint('Bid processed: ${bid['title']}');
       }
@@ -395,15 +332,15 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
   List<Map<String, dynamic>> _getFilteredBids() {
     return bids.where((bid) {
-      final double bidPrice = double.tryParse(bid['bidPrice'] ?? '0') ?? 0;
-      final double targetPrice = double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
+      final double bidPrice = double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
+      final double targetPrice = double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
+
+      debugPrint('Filtering bid ${bid['id']}: bidPrice=$bidPrice, targetPrice=$targetPrice, fromLowBids=${bid['fromLowBids']}, fromHighBids=${bid['fromHighBids']}');
 
       if (selectedBidType == 'Low Bids') {
-        return bidPrice < targetPrice ||
-            (bid.containsKey('fromLowBids') && bid['fromLowBids'] == true);
+        return bid['fromLowBids'] == true || (bidPrice > 0 && bidPrice < targetPrice);
       } else {
-        return bidPrice >= targetPrice ||
-            (bid.containsKey('fromHighBids') && bid['fromHighBids'] == true);
+        return bid['fromHighBids'] == true || (bidPrice > 0 && bidPrice >= targetPrice);
       }
     }).toList();
   }
@@ -531,7 +468,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                   bid: bid,
                                   baseUrl: widget.baseUrl,
                                   token: widget.token,
-                                  userId: _userId ?? bid['user_id'] ?? '482',
+                                  userId: _userId ?? '482',
                                 );
                               },
                             ),
@@ -559,11 +496,9 @@ class BidCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double bidPrice = double.tryParse(bid['bidPrice'] ?? '0') ?? 0;
-    final double targetPrice = double.tryParse(bid['targetPrice'] ?? '0') ?? 0;
-    final bool isLowBid =
-        bidPrice < targetPrice ||
-        (bid.containsKey('fromLowBids') && bid['fromLowBids'] == true);
+    final double bidPrice = double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
+    final double targetPrice = double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
+    final bool isLowBid = bid['fromLowBids'] == true || (bidPrice > 0 && bidPrice < targetPrice);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -591,7 +526,7 @@ class BidCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: CachedNetworkImage(
-                        imageUrl: bid['carImage'] ?? '',
+                        imageUrl: bid['carImage']?.toString() ?? '',
                         width: 100,
                         height: 150,
                         fit: BoxFit.cover,
@@ -626,20 +561,13 @@ class BidCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  bid['title'] ??
-                                      'Unknown Vehicle (ID: ${bid['post_id']})',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          Text(
+                            bid['title'] ?? 'Unknown Vehicle (ID: ${bid['post_id']})',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -681,24 +609,6 @@ class BidCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          // Row(
-                          //   children: [
-                          //     Icon(
-                          //       Icons.store,
-                          //       size: 14,
-                          //       color: Colors.grey[500],
-                          //     ),
-                          //     const SizedBox(width: 4),
-                          //     Text(
-                          //       'Seller: ${bid['store'] ?? 'Unknown Seller'}',
-                          //       style: TextStyle(
-                          //         fontSize: 12,
-                          //         color: Colors.grey[600],
-                          //       ),
-                          //     ),
-                          //   ],
-                          // ),
-                          const SizedBox(height: 4),
                           Row(
                             children: [
                               Icon(
@@ -708,7 +618,7 @@ class BidCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Meeting Attempts: ${bid['meetingAttempts'] ?? 0}',
+                                'Meeting Attempts: ${bid['meetingAttempts']?.toString() ?? '0'}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[600],
@@ -793,9 +703,7 @@ class BidCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            bid['bidDate'] ??
-                                bid['created_on']?.split(' ')[0] ??
-                                'N/A',
+                            bid['bidDate']?.toString() ?? 'N/A',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -817,7 +725,7 @@ class BidCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            bid['expirationDate'] ?? 'N/A',
+                            bid['expirationDate']?.toString() ?? 'N/A',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,

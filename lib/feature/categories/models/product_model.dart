@@ -9,6 +9,8 @@ class Product {
   final String modelVariation;
   final String description;
   final String price;
+  final String ifOfferPrice; 
+  final String offerPrice;   
   final String auctionPriceIntervel;
   final String auctionStartingPrice;
   final List<String> attributeId;
@@ -32,6 +34,7 @@ class Product {
   final String visiterCount;
   final String ifSold;
   final String ifExpired;
+  final String ifVerifyed; // Added for verification status
   final String byDealer;
   final String createdBy;
   final String createdOn;
@@ -48,6 +51,8 @@ class Product {
     required this.modelVariation,
     required this.description,
     required this.price,
+    required this.ifOfferPrice,
+    required this.offerPrice,
     required this.auctionPriceIntervel,
     required this.auctionStartingPrice,
     required this.attributeId,
@@ -71,6 +76,7 @@ class Product {
     required this.visiterCount,
     required this.ifSold,
     required this.ifExpired,
+    required this.ifVerifyed,
     required this.byDealer,
     required this.createdBy,
     required this.createdOn,

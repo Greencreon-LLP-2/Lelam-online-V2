@@ -1510,293 +1510,349 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    final isAuction = product.ifAuction == '1';
-    final isFinanceAvailable = product.ifFinance == '1';
-    final isExchangeAvailable = product.ifExchange == '1';
-    final isFeatured = product.feature == '1';
-    final attributeValues = _productAttributeValues[product.id] ?? {};
+Widget _buildProductCard(Product product) {
+  final isAuction = product.ifAuction == '1';
+  final isFinanceAvailable = product.ifFinance == '1';
+  final isExchangeAvailable = product.ifExchange == '1';
+  final isFeatured = product.feature == '1';
+  final isVerified = product.ifVerifyed == '1'; 
+  final hasOffer = product.ifOfferPrice == '1';
+  final attributeValues = _productAttributeValues[product.id] ?? {};
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: () {
-            if (isAuction) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => AuctionProductDetailsPage(product: product),
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return GestureDetector(
+        onTap: () {
+          if (isAuction) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AuctionProductDetailsPage(product: product),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MarketPlaceProductDetailsPage(
+                  product: product,
+                  isAuction: product.ifAuction == '1',
                 ),
-              );
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => MarketPlaceProductDetailsPage(
-                        product: product,
-                        isAuction: product.ifAuction == '1',
-                      ),
-                ),
-              );
-            }
-          },
-          child: Container(
-            width: constraints.maxWidth,
-            margin: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.30),
-                  blurRadius: 5,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Container(
-                        width: 120,
-                        height: 155,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(0),
-                          ),
+              ),
+            );
+          }
+        },
+        child: Container(
+          width: constraints.maxWidth,
+          margin: EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.30),
+                blurRadius: 5,
+                spreadRadius: 1,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Container(
+                      width: 120,
+                      height: 155,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: const BorderRadius.all(
+                          Radius.circular(0),
                         ),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.all(
-                                Radius.circular(12),
-                              ),
-                              child: Image.network(
-                                'https://lelamonline.com/admin/${product.image}',
-                                fit: BoxFit.cover,
-                                height: 700,
-                                width: 200,
-                                errorBuilder: (context, error, stackTrace) {
-                                  print(
-                                    'Failed to load image: https://lelamonline.com/${product.image}',
-                                  );
-                                  print('Error: $error');
-                                  return Container(
-                                    color: Colors.grey.shade200,
-                                    child: Icon(
-                                      Icons.directions_car,
-                                      size: 40,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  );
-                                },
-                              ),
+                      ),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
                             ),
-                            if (isAuction)
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 4,
+                            child: Image.network(
+                              'https://lelamonline.com/admin/${product.image}',
+                              fit: BoxFit.cover,
+                              height: 700,
+                              width: 200,
+                              errorBuilder: (context, error, stackTrace) {
+                                print(
+                                  'Failed to load image: https://lelamonline.com/${product.image}',
+                                );
+                                print('Error: $error');
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(
+                                    Icons.directions_car,
+                                    size: 40,
+                                    color: Colors.grey.shade400,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'AUCTION',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                );
+                              },
+                            ),
+                          ),
+                          if (isAuction)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'AUCTION',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                          if (isVerified)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.verified,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                              if (isFeatured)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.verified,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                if (isFeatured)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Icon(
-                                      Icons.verified,
-                                      size: 16,
-                                      color: Colors.blue,
-                                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              // if (isFeatured)
+                              //   Padding(
+                              //     padding: const EdgeInsets.only(right: 4),
+                              //     child: Icon(
+                              //       Icons.verified,
+                              //       size: 16,
+                              //       color: Colors.blue,
+                              //     ),
+                              //   ),
+                              // if (isVerified)
+                              //   Padding(
+                              //     padding: const EdgeInsets.only(right: 4),
+                              //     child: Icon(
+                              //       Icons.verified,
+                              //       size: 16,
+                              //       color: Colors.blue,
+                              //     ),
+                              //   ),
+                              Expanded(
+                                child: Text(
+                                  product.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: Colors.black87,
                                   ),
-                                Expanded(
-                                  child: Text(
-                                    product.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
-                                      color: Colors.black87,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ],
-                            ),
-                            Text(
-                              product.modelVariation,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
                               ),
+                            ],
+                          ),
+                          Text(
+                            product.modelVariation,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
                             ),
-                            const SizedBox(height: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (isAuction)
                                 Text(
-                                  isAuction
-                                      ? '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}'
-                                      : '${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                  '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Palette.primaryblue,
+                                  ),
+                                )
+                              else if (hasOffer)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _formatPrice(double.tryParse(product.price) ?? 0),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade600,
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Palette.primaryblue,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Text(
+                                  _formatPrice(double.tryParse(product.price) ?? 0),
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                     color: Palette.primaryblue,
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.grey.shade500,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _getLocationName(product.parentZoneId),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            if (attributeValues.isNotEmpty)
-                              Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      if (attributeValues['Year'] != null &&
-                                          attributeValues['Year']!.isNotEmpty)
-                                        _buildDetailChipWithIcon(
-                                          Icons.calendar_today,
-                                          attributeValues['Year']!,
-                                        ),
-                                      const SizedBox(width: 4),
-                                      if (attributeValues['No of owners'] !=
-                                              null &&
-                                          attributeValues['No of owners']!
-                                              .isNotEmpty)
-                                        _buildDetailChipWithIcon(
-                                          Icons.person,
-                                          _getOwnerText(
-                                            attributeValues['No of owners']!,
-                                          ),
-                                        ),
-                                      const SizedBox(width: 4),
-                                      if (attributeValues['KM Range'] != null &&
-                                          attributeValues['KM Range']!
-                                              .isNotEmpty)
-                                        _buildDetailChipWithIcon(
-                                          Icons.speed,
-                                          _formatKmRange(
-                                            attributeValues['KM Range']!,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      if (attributeValues['Fuel Type'] !=
-                                              null &&
-                                          attributeValues['Fuel Type']!
-                                              .isNotEmpty)
-                                        _buildDetailChipWithIcon(
-                                          Icons.local_gas_station,
-                                          attributeValues['Fuel Type']!,
-                                        ),
-                                      const SizedBox(width: 4),
-                                      if (attributeValues['Transmission'] !=
-                                              null &&
-                                          attributeValues['Transmission']!
-                                              .isNotEmpty)
-                                        _buildDetailChipWithIcon(
-                                          Icons.settings,
-                                          attributeValues['Transmission']!,
-                                        ),
-                                    ],
-                                  ),
-                                ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: Colors.grey.shade500,
                               ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                _getLocationName(product.parentZoneId),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (attributeValues.isNotEmpty)
+                            Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    if (attributeValues['Year'] != null &&
+                                        attributeValues['Year']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.calendar_today,
+                                        attributeValues['Year']!,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['No of owners'] != null &&
+                                        attributeValues['No of owners']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.person,
+                                        _getOwnerText(
+                                          attributeValues['No of owners']!,
+                                        ),
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['KM Range'] != null &&
+                                        attributeValues['KM Range']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.speed,
+                                        _formatKmRange(
+                                          attributeValues['KM Range']!,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    if (attributeValues['Fuel Type'] != null &&
+                                        attributeValues['Fuel Type']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.local_gas_station,
+                                        attributeValues['Fuel Type']!,
+                                      ),
+                                    const SizedBox(width: 4),
+                                    if (attributeValues['Transmission'] != null &&
+                                        attributeValues['Transmission']!.isNotEmpty)
+                                      _buildDetailChipWithIcon(
+                                        Icons.settings,
+                                        attributeValues['Transmission']!,
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (isAuction || isFinanceAvailable || isExchangeAvailable)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                        decoration: BoxDecoration(
+                          color: isAuction ? Palette.primarylightblue : Colors.white,
                         ),
+                        child: isAuction
+                            ? _buildAuctionInfo(product)
+                            : _buildFinanceExchangeInfo(
+                                isFinanceAvailable,
+                                isExchangeAvailable,
+                              ),
                       ),
                     ),
                   ],
                 ),
-                if (isAuction || isFinanceAvailable || isExchangeAvailable)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 0,
-                            vertical: 0,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isAuction
-                                    ? Palette.primarylightblue
-                                    : Colors.white,
-                          ),
-                          child:
-                              isAuction
-                                  ? _buildAuctionInfo(product)
-                                  : _buildFinanceExchangeInfo(
-                                    isFinanceAvailable,
-                                    isExchangeAvailable,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildDetailChipWithIcon(IconData icon, String label) {
     return Container(

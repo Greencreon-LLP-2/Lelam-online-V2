@@ -1095,7 +1095,7 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
     super.dispose();
   }
 
-  @override
+@override
 Widget build(BuildContext context) {
   final auctionEndTime =
       DateTime.tryParse(auctionEndin) ??
@@ -1105,494 +1105,509 @@ Widget build(BuildContext context) {
   return CustomSafeArea(
     child: Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image Gallery
-            Stack(
+      body: Stack(
+        children: [
+          // Scrollable content
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  height: 400,
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        itemCount: _images.length,
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentImageIndex = index;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          return GestureDetector(
-                            onTap: () => _showFullScreenGallery(context),
-                            child: CachedNetworkImage(
-                              imageUrl: _images[index],
-                              width: double.infinity,
-                              height: 400,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
+                // Image Gallery
+                Stack(
+                  children: [
+                    SizedBox(
+                      height: 400,
+                      child: Stack(
+                        children: [
+                          PageView.builder(
+                            controller: _pageController,
+                            itemCount: _images.length,
+                            onPageChanged: (index) {
+                              setState(() {
+                                _currentImageIndex = index;
+                              });
+                            },
+                            itemBuilder: (context, index) {
+                              return GestureDetector(
+                                onTap: () => _showFullScreenGallery(context),
+                                child: CachedNetworkImage(
+                                  imageUrl: _images[index],
+                                  width: double.infinity,
+                                  height: 400,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
+                                ),
+                              );
+                            },
+                          ),
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
                               ),
-                              errorWidget: (context, url, error) =>
-                                  const Icon(Icons.error),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_currentImageIndex + 1}/${_images.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '${_currentImageIndex + 1}/${_images.length}',
-                            style: const TextStyle(
+                    ),
+                    CustomSafeArea(
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => context.pop(),
+                            icon: const Icon(
+                              Icons.arrow_back,
                               color: Colors.white,
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
+                          const Spacer(),
+                          IconButton(
+                            icon: Icon(
+                              _isFavorited
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: _isFavorited ? Colors.red : Colors.white,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isFavorited = !_isFavorited;
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.share, color: Colors.white),
+                            onPressed: () {
+                              // TODO: Implement share functionality
+                            },
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                // Current Highest Bid Banner
+                if (_isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    color: Colors.blue.shade50,
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Text(
+                            'CURRENT HIGHEST BID',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '₹${NumberFormat('#,##0').format(_currentBid)}',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                // Auction Timer
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  color: Colors.red.shade50,
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.timer, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                CustomSafeArea(
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: Icon(
-                          _isFavorited
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: _isFavorited ? Colors.red : Colors.white,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isFavorited = !_isFavorited;
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.share, color: Colors.white),
-                        onPressed: () {
-                          // TODO: Implement share functionality
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            // Current Highest Bid Banner
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                color: Colors.blue.shade50,
-                child: Center(
+                // Product Details
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'CURRENT HIGHEST BID',
-                        style: TextStyle(
-                          fontSize: 14,
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '₹${NumberFormat('#,##0').format(_currentBid)}',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+                        modelVariation,
+                        style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          _isLoadingLocations
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Starting Price',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Target Price',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '#AD ID $id',
+                            style: const TextStyle(color: Colors.grey),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              // TODO: Implement call functionality
+                            },
+                            icon: const Icon(Icons.call),
+                            label: const Text('Call Support'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              ),
-            // Auction Timer
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              color: Colors.red.shade50,
-              child: Center(
+                const Divider(),
+                // Details Section
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Details',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDetailItem(
+                                    Icons.calendar_today,
+                                    attributeValues['Year'] ?? 'N/A',
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildDetailItem(
+                                    Icons.person,
+                                    _getOwnerText(
+                                      attributeValues['No of owners'] ?? 'N/A',
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildDetailItem(
+                                    Icons.speed,
+                                    _formatNumber(
+                                      attributeValues['KM Range'] ?? 'N/A',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildDetailItem(
+                                    Icons.local_gas_station,
+                                    attributeValues['Fuel Type'] ?? 'N/A',
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildDetailItem(
+                                    Icons.settings,
+                                    attributeValues['Transmission'] ?? 'N/A',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Seller Comments
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seller Comments',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else
+                        Column(
+                          children: orderedAttributeValues
+                              .where(
+                                (entry) =>
+                                    entry.value != 'N/A' &&
+                                    entry.key != 'Co driver side rear tyre',
+                              )
+                              .map(
+                                (entry) => _buildSellerCommentItem(
+                                  entry.key,
+                                  entry.key == 'No of owners'
+                                      ? _getOwnerText(entry.value)
+                                      : entry.value,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Seller Information
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Seller Information',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSellerInformationItem(context),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                // Bidding History
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Bidding History',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_isLoading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_bidHistory.isEmpty)
+                        const Text(
+                          'No bids yet',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        )
+                      else
+                        Column(
+                          children: _bidHistory
+                              .map(
+                                (bid) => _buildBidHistoryItem(
+                                  bid['bidder'] ?? 'Unknown',
+                                  bid['amount'] ?? 'N/A',
+                                  bid['time'] ?? 'N/A',
+                                ),
+                              )
+                              .toList(),
+                        ),
+                    ],
+                  ),
+                ),
+                // Bottom padding to prevent content from being hidden under fixed buttons
+                const SizedBox(height: 80), // Adjust as needed
+              ],
+            ),
+          ),
+          // Fixed buttons at the bottom
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+               
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 5,
+                      spreadRadius: 0,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.timer, color: Colors.red),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red,
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                        ),
+                        child: const Text('Enter Price'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showBidDialog(context, isIncrease: true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(0),
+                          ),
+                        ),
+                        child: const Text('Increase minimum Bid'),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-            // Product Details
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    modelVariation,
-                    style: TextStyle(fontSize: 18, color: Colors.grey[700]),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 4),
-                      _isLoadingLocations
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              landMark,
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Starting Price',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Target Price',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '#AD ID $id',
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement call functionality
-                        },
-                        icon: const Icon(Icons.call),
-                        label: const Text('Call Support'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            // Details Section
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Details',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailItem(
-                                Icons.calendar_today,
-                                attributeValues['Year'] ?? 'N/A',
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailItem(
-                                Icons.person,
-                                _getOwnerText(
-                                  attributeValues['No of owners'] ?? 'N/A',
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailItem(
-                                Icons.speed,
-                                _formatNumber(
-                                  attributeValues['KM Range'] ?? 'N/A',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildDetailItem(
-                                Icons.local_gas_station,
-                                attributeValues['Fuel Type'] ?? 'N/A',
-                              ),
-                            ),
-                            Expanded(
-                              child: _buildDetailItem(
-                                Icons.settings,
-                                attributeValues['Transmission'] ?? 'N/A',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-            const Divider(),
-            // Seller Comments
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Seller Comments',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else
-                    Column(
-                      children: orderedAttributeValues
-                          .where(
-                            (entry) =>
-                                entry.value != 'N/A' &&
-                                entry.key != 'Co driver side rear tyre',
-                          )
-                          .map(
-                            (entry) => _buildSellerCommentItem(
-                              entry.key,
-                              entry.key == 'No of owners'
-                                  ? _getOwnerText(entry.value)
-                                  : entry.value,
-                            ),
-                          )
-                          .toList(),
-                    ),
-                ],
-              ),
-            ),
-            const Divider(),
-            // Seller Information
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Seller Information',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildSellerInformationItem(context),
-                ],
-              ),
-            ),
-            const Divider(),
-            // Bidding History
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Bidding History',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_bidHistory.isEmpty)
-                    const Text(
-                      'No bids yet',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    )
-                  else
-                    Column(
-                      children: _bidHistory
-                          .map(
-                            (bid) => _buildBidHistoryItem(
-                              bid['bidder'] ?? 'Unknown',
-                              bid['amount'] ?? 'N/A',
-                              bid['time'] ?? 'N/A',
-                            ),
-                          )
-                          .toList(),
-                    ),
-                ],
-              ),
-            ),
-            // Bottom Buttons
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-             
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 5,
-                    spreadRadius: 0,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.pink,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                      child: const Text('Enter Price'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context, isIncrease: true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0),
-                        ),
-                      ),
-                      child: const Text('Increase minimum Bid'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
