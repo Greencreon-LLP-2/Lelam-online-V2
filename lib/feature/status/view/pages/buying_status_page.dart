@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart' hide MyMeetingsWidget;
-import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart' hide MyBidsWidget;
 
 class BuyingStatusPage extends StatelessWidget {
-  const BuyingStatusPage({super.key, String? userId});
+  final String? userId; // Ensure userId is a class-level property
+
+  const BuyingStatusPage({super.key, this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +30,11 @@ class BuyingStatusPage extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
-            MyBidsWidget(),
-            MyMeetingsWidget(),
-            Center(child: Text('Expired')),
+            MyBidsWidget(userId: userId), 
+            MyMeetingsWidget(userId: userId), 
+            Center(child: Text('Expired (User ID: ${userId ?? 'Unknown'})')),
           ],
         ),
       ),

@@ -1547,7 +1547,7 @@ Widget build(BuildContext context) {
                   ),
                 ),
                 // Bottom padding to prevent content from being hidden under fixed buttons
-                const SizedBox(height: 80), // Adjust as needed
+                const SizedBox(height: 80), // Adjusted to match button height
               ],
             ),
           ),
@@ -1556,54 +1556,50 @@ Widget build(BuildContext context) {
             left: 0,
             right: 0,
             bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-               
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 5,
-                      spreadRadius: 0,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _showBidDialog(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.pink,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+             
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 15,
+                    spreadRadius: 0,
+                    offset: Offset(1, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _showBidDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primarypink,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
                         ),
-                        child: const Text('Enter Price'),
                       ),
+                      child: const Text('Enter Price'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _showBidDialog(context, isIncrease: true),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(0),
-                          ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _showBidDialog(context, isIncrease: true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primaryblue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero,
                         ),
-                        child: const Text('Increase minimum Bid'),
                       ),
+                      child: const Text('Increase minimum Bid'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

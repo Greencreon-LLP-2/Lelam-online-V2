@@ -48,7 +48,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/sell.php?token=$token&user_id=${widget.userId ?? '482'}',
+          '$baseUrl/sell.php?token=$token&user_id=${widget.userId }',
         ),
         headers: {'token': token, 'Cookie': 'PHPSESSID=$phpSessId'},
       );
@@ -114,7 +114,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 Future<void> _deleteAd(String adId) async {
   try {
     final response = await http.post(
-      Uri.parse('$baseUrl/sell.php?token=$token&user_id=${widget.userId ?? '482'}'),
+      Uri.parse('$baseUrl/sell.php?token=$token&user_id=${widget.userId }'),
       headers: {
         'token': token,
         'Cookie': 'PHPSESSID=$phpSessId',
@@ -126,7 +126,7 @@ Future<void> _deleteAd(String adId) async {
       },
     );
 
-    print('Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${widget.userId ?? '482'}');
+    print('Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${widget.userId }');
     print('Delete ad request body: id=$adId, action=delete');
     print('Delete ad response status: ${response.statusCode}');
     print('Delete ad response body: ${response.body}');
@@ -238,7 +238,7 @@ Future<void> _deleteAd(String adId) async {
                     context.pushNamed(
                       RouteNames.adPostPage,
                       extra: {
-                        'userId': widget.userId ?? '482',
+                        'userId': widget.userId ,
                         'categoryId': ad['category_id']?.toString() ?? '',
                         'adData': ad,
                       },

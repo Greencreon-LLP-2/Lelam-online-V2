@@ -232,8 +232,8 @@ class AttributeValueService {
             "status": "1",
             "allstore_onoff": "1",
             "created_on": "2024-12-04 10:58:13",
-            "updated_on": "2024-12-04 11:06:32"
-          }
+            "updated_on": "2024-12-04 11:06:32",
+          },
         ];
       }
       print('Failed to fetch districts: ${response.statusCode} $responseBody');
@@ -251,8 +251,8 @@ class AttributeValueService {
           "status": "1",
           "allstore_onoff": "1",
           "created_on": "2024-12-04 10:58:13",
-          "updated_on": "2024-12-04 11:06:32"
-        }
+          "updated_on": "2024-12-04 11:06:32",
+        },
       ];
     } catch (e) {
       print('Error fetching districts: $e');
@@ -270,8 +270,8 @@ class AttributeValueService {
           "status": "1",
           "allstore_onoff": "1",
           "created_on": "2024-12-04 10:58:13",
-          "updated_on": "2024-12-04 11:06:32"
-        }
+          "updated_on": "2024-12-04 11:06:32",
+        },
       ];
     }
   }
@@ -279,7 +279,9 @@ class AttributeValueService {
   static Future<List<Brand>> fetchBrands(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-brand.php?token=$token&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-brand.php?token=$token&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -289,11 +291,14 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Brands API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          final brands = (data['data'] as List)
-              .map((e) => Brand.fromJson(e))
-              .where((brand) => brand.categoryId == categoryId)
-              .toList();
-          print('Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}');
+          final brands =
+              (data['data'] as List)
+                  .map((e) => Brand.fromJson(e))
+                  .where((brand) => brand.categoryId == categoryId)
+                  .toList();
+          print(
+            'Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}',
+          );
           return brands;
         }
         print('No brands found for category_id: $categoryId');
@@ -307,10 +312,15 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<BrandModel>> fetchBrandModels(String brandId, String categoryId) async {
+  static Future<List<BrandModel>> fetchBrandModels(
+    String brandId,
+    String categoryId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-model.php?token=$token&brand_id=$brandId&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -318,16 +328,25 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Brand models API response for brand_id $brandId, category_id $categoryId: $data');
+        print(
+          'Brand models API response for brand_id $brandId, category_id $categoryId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          final models = (data['data'] as List).map((e) => BrandModel.fromJson(e)).toList();
+          final models =
+              (data['data'] as List)
+                  .map((e) => BrandModel.fromJson(e))
+                  .toList();
           print('Fetched brand models: ${models.map((m) => m.name).toList()}');
           return models;
         }
-        print('No brand models found for brand_id: $brandId, category_id: $categoryId');
+        print(
+          'No brand models found for brand_id: $brandId, category_id: $categoryId',
+        );
         return [];
       }
-      print('Failed to fetch brand models: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch brand models: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching brand models: $e');
@@ -335,10 +354,15 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<ModelVariation>> fetchModelVariations(String brandModelId, String categoryId) async {
+  static Future<List<ModelVariation>> fetchModelVariations(
+    String brandModelId,
+    String categoryId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/list-model-variations.php?token=$token&brands_model_id=$brandModelId&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -346,17 +370,28 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data');
+        print(
+          'Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          final variations = (data['data'] as List).map((e) => ModelVariation.fromJson(e)).toList();
+          final variations =
+              (data['data'] as List)
+                  .map((e) => ModelVariation.fromJson(e))
+                  .toList();
           print('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
-          print('Model variations names: ${variations.map((v) => v.name).toSet()}');
+          print(
+            'Model variations names: ${variations.map((v) => v.name).toSet()}',
+          );
           return variations;
         }
-        print('No model variations found for brands_model_id: $brandModelId, category_id: $categoryId');
+        print(
+          'No model variations found for brands_model_id: $brandModelId, category_id: $categoryId',
+        );
         return [];
       }
-      print('Failed to fetch model variations: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch model variations: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching model variations: $e');
@@ -367,7 +402,9 @@ class AttributeValueService {
   static Future<List<Attribute>> fetchAttributes(String categoryId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId'),
+        Uri.parse(
+          '$baseUrl/filter-attribute.php?token=$token&category_id=$categoryId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -377,12 +414,16 @@ class AttributeValueService {
         final data = jsonDecode(response.body);
         print('Attributes API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List).map((e) => Attribute.fromJson(e)).toList();
+          return (data['data'] as List)
+              .map((e) => Attribute.fromJson(e))
+              .toList();
         }
         print('No attributes found for category_id: $categoryId');
         return [];
       }
-      print('Failed to fetch attributes: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch attributes: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
       print('Error fetching attributes: $e');
@@ -390,10 +431,14 @@ class AttributeValueService {
     }
   }
 
-  static Future<List<AttributeVariation>> fetchAttributeVariations(String attributeId) async {
+  static Future<List<AttributeVariation>> fetchAttributeVariations(
+    String attributeId,
+  ) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId'),
+        Uri.parse(
+          '$baseUrl/filter-attribute-variations.php?token=$token&attribute_id=$attributeId',
+        ),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=fmnu7gp638cltiqjss9380hfln',
@@ -401,17 +446,25 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Attribute variations API response for attribute_id $attributeId: $data');
+        print(
+          'Attribute variations API response for attribute_id $attributeId: $data',
+        );
         if (data['status'] == 'true' && data['data'] is List) {
-          return (data['data'] as List).map((e) => AttributeVariation.fromJson(e)).toList();
+          return (data['data'] as List)
+              .map((e) => AttributeVariation.fromJson(e))
+              .toList();
         }
         print('No variations found for attribute_id: $attributeId');
         return [];
       }
-      print('Failed to fetch attribute variations: ${response.statusCode} ${response.body}');
+      print(
+        'Failed to fetch attribute variations: ${response.statusCode} ${response.body}',
+      );
       return [];
     } catch (e) {
-      print('Error fetching attribute variations for attribute_id $attributeId: $e');
+      print(
+        'Error fetching attribute variations for attribute_id $attributeId: $e',
+      );
       return [];
     }
   }
@@ -447,7 +500,9 @@ class _AdPostPageState extends State<AdPostPage> {
       _userId = widget.extra!['userId']?.toString() ?? 'Unknown';
       _adData = widget.extra!['adData'] as Map<String, dynamic>?;
       if (_categoryId == null) {
-        print('Error: categoryId is missing or invalid in extra: ${widget.extra}');
+        print(
+          'Error: categoryId is missing or invalid in extra: ${widget.extra}',
+        );
         Fluttertoast.showToast(
           msg: 'Invalid category ID',
           toastLength: Toast.LENGTH_LONG,
@@ -536,7 +591,8 @@ class AdPostForm extends StatefulWidget {
   State<AdPostForm> createState() => _AdPostFormState();
 }
 
-class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateMixin {
+class _AdPostFormState extends State<AdPostForm>
+    with SingleTickerProviderStateMixin {
   List<Brand> _brands = [];
   List<BrandModel> _brandModels = [];
   List<ModelVariation> _modelVariations = [];
@@ -568,7 +624,14 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
   List<String> _getRequiredAttributes(String categoryId) {
     switch (categoryId) {
       case '1':
-        return ['Year', 'No of owners', 'Fuel Type', 'Transmission', 'KM Range', 'Sold by'];
+        return [
+          'Year',
+          'No of owners',
+          'Fuel Type',
+          'Transmission',
+          'KM Range',
+          'Sold by',
+        ];
       case '2':
         return ['Property Type', 'Area', 'Location'];
       case '3':
@@ -584,15 +647,20 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     setState(() {
       _modelVariations = modelVariations;
       if (_selectedModelVariation != null &&
-          !modelVariations.any((item) => item.id == _selectedModelVariation!.id)) {
+          !modelVariations.any(
+            (item) => item.id == _selectedModelVariation!.id,
+          )) {
         _selectedModelVariation = null;
       }
-      print('Updated model variations: ${modelVariations.map((v) => v.name).toList()}');
+      print(
+        'Updated model variations: ${modelVariations.map((v) => v.name).toList()}',
+      );
     });
   }
 
   String _generateTitle() {
-    return '${_selectedBrand?.name ?? 'Unknown Brand'} ${_selectedBrandModel?.name ?? 'Unknown Model'}'.trim();
+    return '${_selectedBrand?.name ?? 'Unknown Brand'} ${_selectedBrandModel?.name ?? 'Unknown Model'}'
+        .trim();
   }
 
   @override
@@ -602,7 +670,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_animationController);
     _animationController.forward();
 
     _fetchInitialData();
@@ -683,18 +754,25 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       _listPriceController.text = ad['price'] ?? '';
       _descriptionController.text = ad['description'] ?? '';
       _landMarkController.text = ad['land_mark'] ?? '';
-      _registrationValidTillController.text = ad['registration_valid_till'] ?? '';
+      _registrationValidTillController.text =
+          ad['registration_valid_till'] ?? '';
       _insuranceUptoController.text = ad['insurance_upto'] ?? '';
       _selectedDistrict = ad['district'] ?? null;
       _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
       // Load images
-      if (ad['imagePathList'] != null && (ad['imagePathList'] as List).isNotEmpty) {
-        _selectedImages.addAll((ad['imagePathList'] as List).map((path) => XFile(path as String)));
-      } else if (ad['imageBase64List'] != null && (ad['imageBase64List'] as List).isNotEmpty) {
+      if (ad['imagePathList'] != null &&
+          (ad['imagePathList'] as List).isNotEmpty) {
+        _selectedImages.addAll(
+          (ad['imagePathList'] as List).map((path) => XFile(path as String)),
+        );
+      } else if (ad['imageBase64List'] != null &&
+          (ad['imageBase64List'] as List).isNotEmpty) {
         await _convertBase64ToFiles(ad['imageBase64List'] as List);
-      } else if (ad['imagePath'] != null && (ad['imagePath'] as String).isNotEmpty) {
+      } else if (ad['imagePath'] != null &&
+          (ad['imagePath'] as String).isNotEmpty) {
         _selectedImages.add(XFile(ad['imagePath'] as String));
-      } else if (ad['imageBase64'] != null && (ad['imageBase64'] as String).isNotEmpty) {
+      } else if (ad['imageBase64'] != null &&
+          (ad['imageBase64'] as String).isNotEmpty) {
         await _convertBase64ToFile(ad['imageBase64'] as String);
       }
       print('Pre-filled form with adData: ${ad['appId']}');
@@ -704,7 +782,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     final districts = await AttributeValueService.fetchDistricts();
     setState(() {
       _districts = districts;
-      _selectedDistrict = _selectedDistrict ?? (districts.isNotEmpty ? districts[0]['name'] : null);
+      _selectedDistrict =
+          _selectedDistrict ??
+          (districts.isNotEmpty ? districts[0]['name'] : null);
       print('Loaded districts: ${districts.map((d) => d['name']).toList()}');
     });
 
@@ -712,12 +792,24 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     final brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
       _brands = brands;
-      print('Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}');
+      print(
+        'Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}',
+      );
       // Set selected brand from adData
       if (widget.adData != null && widget.adData!['brand'] != null) {
         _selectedBrand = brands.firstWhere(
           (b) => b.id == widget.adData!['brand'],
-          orElse: () => Brand(id: '', slug: '', categoryId: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+          orElse:
+              () => Brand(
+                id: '',
+                slug: '',
+                categoryId: '',
+                name: '',
+                image: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
         );
         if (_selectedBrand!.id.isEmpty) _selectedBrand = null;
       }
@@ -725,15 +817,30 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
 
     // Fetch brand models if brand is selected
     if (_selectedBrand != null) {
-      final brandModels = await AttributeValueService.fetchBrandModels(_selectedBrand!.id, widget.categoryId);
+      final brandModels = await AttributeValueService.fetchBrandModels(
+        _selectedBrand!.id,
+        widget.categoryId,
+      );
       setState(() {
         _brandModels = brandModels;
-        print('Loaded brand models for brand ${_selectedBrand!.name}: ${brandModels.map((m) => m.name).toList()}');
+        print(
+          'Loaded brand models for brand ${_selectedBrand!.name}: ${brandModels.map((m) => m.name).toList()}',
+        );
         // Set selected brand model from adData
         if (widget.adData != null && widget.adData!['model'] != null) {
           _selectedBrandModel = brandModels.firstWhere(
             (m) => m.id == widget.adData!['model'],
-            orElse: () => BrandModel(id: '', brandId: '', slug: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+            orElse:
+                () => BrandModel(
+                  id: '',
+                  brandId: '',
+                  slug: '',
+                  name: '',
+                  image: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
           );
           if (_selectedBrandModel!.id.isEmpty) _selectedBrandModel = null;
         }
@@ -741,33 +848,54 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
 
       // Fetch model variations if brand model is selected
       if (_selectedBrandModel != null) {
-        final modelVariations = await AttributeValueService.fetchModelVariations(_selectedBrandModel!.id, widget.categoryId);
-        final uniqueModelVariations = modelVariations.asMap().entries.fold<List<ModelVariation>>(
-          [],
-          (uniqueList, entry) {
-            if (!uniqueList.any((item) => item.id == entry.value.id)) {
-              uniqueList.add(entry.value);
-            }
-            return uniqueList;
-          },
-        );
+        final modelVariations =
+            await AttributeValueService.fetchModelVariations(
+              _selectedBrandModel!.id,
+              widget.categoryId,
+            );
+        final uniqueModelVariations = modelVariations
+            .asMap()
+            .entries
+            .fold<List<ModelVariation>>([], (uniqueList, entry) {
+              if (!uniqueList.any((item) => item.id == entry.value.id)) {
+                uniqueList.add(entry.value);
+              }
+              return uniqueList;
+            });
         setState(() {
           _modelVariations = uniqueModelVariations;
-          print('Loaded model variations: ${uniqueModelVariations.map((v) => v.name).toList()}');
+          print(
+            'Loaded model variations: ${uniqueModelVariations.map((v) => v.name).toList()}',
+          );
           // Set selected model variation from adData
-          if (widget.adData != null && widget.adData!['model_variation'] != null) {
+          if (widget.adData != null &&
+              widget.adData!['model_variation'] != null) {
             _selectedModelVariation = uniqueModelVariations.firstWhere(
               (v) => v.id == widget.adData!['model_variation'],
-              orElse: () => ModelVariation(id: '', slug: '', brandId: '', brandModelId: '', name: '', image: '', status: '', createdOn: '', updatedOn: ''),
+              orElse:
+                  () => ModelVariation(
+                    id: '',
+                    slug: '',
+                    brandId: '',
+                    brandModelId: '',
+                    name: '',
+                    image: '',
+                    status: '',
+                    createdOn: '',
+                    updatedOn: '',
+                  ),
             );
-            if (_selectedModelVariation!.id.isEmpty) _selectedModelVariation = null;
+            if (_selectedModelVariation!.id.isEmpty)
+              _selectedModelVariation = null;
           }
         });
       }
     }
 
     // Fetch attributes
-    final attributes = await AttributeValueService.fetchAttributes(widget.categoryId);
+    final attributes = await AttributeValueService.fetchAttributes(
+      widget.categoryId,
+    );
     setState(() {
       _attributes = attributes;
       _attributeIdMap = {for (var attr in attributes) attr.name: attr.id};
@@ -775,16 +903,23 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       for (var attr in attributes) {
         _attributeControllers[attr.name] = TextEditingController();
       }
-      print('Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}');
+      print(
+        'Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}',
+      );
       // Set selected attributes from adData.filters
       if (widget.adData != null && widget.adData!['filters'] != null) {
         try {
-          final filters = jsonDecode(widget.adData!['filters'] as String) as Map<String, dynamic>;
+          final filters =
+              jsonDecode(widget.adData!['filters'] as String)
+                  as Map<String, dynamic>;
           for (var attr in attributes) {
             final attrId = attr.id;
-            if (filters.containsKey(attrId) && filters[attrId] is List && (filters[attrId] as List).isNotEmpty) {
+            if (filters.containsKey(attrId) &&
+                filters[attrId] is List &&
+                (filters[attrId] as List).isNotEmpty) {
               final variationId = filters[attrId][0].toString();
-              _selectedAttributes[attr.name] = variationId; // Will be updated to name after fetching variations
+              _selectedAttributes[attr.name] =
+                  variationId; // Will be updated to name after fetching variations
             }
           }
         } catch (e) {
@@ -795,20 +930,34 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
 
     // Fetch attribute variations and update selected attributes
     for (var attr in attributes) {
-      final variations = await AttributeValueService.fetchAttributeVariations(attr.id);
+      final variations = await AttributeValueService.fetchAttributeVariations(
+        attr.id,
+      );
       setState(() {
         _attributeVariations[attr.name] = variations;
-        print('Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}');
+        print(
+          'Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}',
+        );
         // Update selected attributes with variation names
         if (_selectedAttributes[attr.name] != null) {
           final variationId = _selectedAttributes[attr.name];
           final variation = variations.firstWhere(
             (v) => v.id == variationId,
-            orElse: () => AttributeVariation(id: '', attributeId: '', name: variationId ?? '', status: '', createdOn: '', updatedOn: ''),
+            orElse:
+                () => AttributeVariation(
+                  id: '',
+                  attributeId: '',
+                  name: variationId ?? '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
           );
-          _selectedAttributes[attr.name] = variation.name.isNotEmpty ? variation.name : variationId;
+          _selectedAttributes[attr.name] =
+              variation.name.isNotEmpty ? variation.name : variationId;
           if (_attributeControllers[attr.name] != null) {
-            _attributeControllers[attr.name]!.text = variation.name.isNotEmpty ? variation.name : variationId ?? '';
+            _attributeControllers[attr.name]!.text =
+                variation.name.isNotEmpty ? variation.name : variationId ?? '';
           }
         }
       });
@@ -816,16 +965,19 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
   }
 
   Future<void> _fetchModelVariations(String brandModelId) async {
-    final modelVariations = await AttributeValueService.fetchModelVariations(brandModelId, widget.categoryId);
-    final uniqueModelVariations = modelVariations.asMap().entries.fold<List<ModelVariation>>(
-      [],
-      (uniqueList, entry) {
-        if (!uniqueList.any((item) => item.id == entry.value.id)) {
-          uniqueList.add(entry.value);
-        }
-        return uniqueList;
-      },
+    final modelVariations = await AttributeValueService.fetchModelVariations(
+      brandModelId,
+      widget.categoryId,
     );
+    final uniqueModelVariations = modelVariations
+        .asMap()
+        .entries
+        .fold<List<ModelVariation>>([], (uniqueList, entry) {
+          if (!uniqueList.any((item) => item.id == entry.value.id)) {
+            uniqueList.add(entry.value);
+          }
+          return uniqueList;
+        });
     _updateModelVariations(uniqueModelVariations);
   }
 
@@ -836,14 +988,19 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: Text('Maximum $_maxImages images allowed'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
     }
     try {
       if (source == ImageSource.camera) {
-        final XFile? image = await _imagePicker.pickImage(source: source, imageQuality: 80);
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 80,
+        );
         if (image != null) {
           setState(() {
             _selectedImages.add(image);
@@ -855,16 +1012,21 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           });
         }
       } else {
-        final List<XFile>? images = await _imagePicker.pickMultiImage(imageQuality: 80);
+        final List<XFile>? images = await _imagePicker.pickMultiImage(
+          imageQuality: 80,
+        );
         if (images != null && images.isNotEmpty) {
           setState(() {
-            final newImages = images.take(_maxImages - _selectedImages.length).toList();
+            final newImages =
+                images.take(_maxImages - _selectedImages.length).toList();
             _selectedImages.addAll(newImages);
             _imageError = false;
             if (_selectedImages.length == newImages.length) {
               _coverImageIndex = 0;
             }
-            print('Added gallery images: ${newImages.map((img) => img.path).toList()}');
+            print(
+              'Added gallery images: ${newImages.map((img) => img.path).toList()}',
+            );
           });
         }
       }
@@ -874,7 +1036,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: Text('Error picking image: $e'),
           backgroundColor: Colors.red.withOpacity(0.9),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -884,16 +1048,17 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => ImageSourceBottomSheetWidget(
-        onCameraTap: () {
-          Navigator.pop(context);
-          _pickImage(ImageSource.camera);
-        },
-        onGalleryTap: () {
-          Navigator.pop(context);
-          _pickImage(ImageSource.gallery);
-        },
-      ),
+      builder:
+          (context) => ImageSourceBottomSheetWidget(
+            onCameraTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.camera);
+            },
+            onGalleryTap: () {
+              Navigator.pop(context);
+              _pickImage(ImageSource.gallery);
+            },
+          ),
     );
   }
 
@@ -905,7 +1070,15 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         if (variations != null && variations.isNotEmpty) {
           final variation = variations.firstWhere(
             (v) => v.name == selectedValue,
-            orElse: () => AttributeVariation(id: '', attributeId: _attributeIdMap[attrName] ?? '', name: '', status: '', createdOn: '', updatedOn: ''),
+            orElse:
+                () => AttributeVariation(
+                  id: '',
+                  attributeId: _attributeIdMap[attrName] ?? '',
+                  name: '',
+                  status: '',
+                  createdOn: '',
+                  updatedOn: '',
+                ),
           );
           if (variation.id.isNotEmpty) {
             filters[_attributeIdMap[attrName] ?? ''] = [variation.id];
@@ -917,7 +1090,8 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         }
       }
     });
-    if (widget.categoryId == '1' && _registrationValidTillController.text.isNotEmpty) {
+    if (widget.categoryId == '1' &&
+        _registrationValidTillController.text.isNotEmpty) {
       final regId = _attributeIdMap['Registration valid till'] ?? '27';
       filters[regId] = [_registrationValidTillController.text];
     }
@@ -936,10 +1110,16 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     if (_imageError || !widget.formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_imageError ? 'Please add at least one photo' : 'Please fill all required fields'),
+          content: Text(
+            _imageError
+                ? 'Please add at least one photo'
+                : 'Please fill all required fields',
+          ),
           backgroundColor: Colors.red.withOpacity(0.8),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -951,7 +1131,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: const Text('Category ID is missing'),
           backgroundColor: Colors.red.withOpacity(0.8),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -963,23 +1145,32 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: const Text('Please select both brand and model'),
           backgroundColor: Colors.red.withOpacity(0.8),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
     }
 
     final requiredAttributes = _getRequiredAttributes(widget.categoryId);
-    final missingAttributes = requiredAttributes.where(
-      (attr) => _selectedAttributes[attr] == null || _selectedAttributes[attr]!.isEmpty,
-    ).toList();
+    final missingAttributes =
+        requiredAttributes
+            .where(
+              (attr) =>
+                  _selectedAttributes[attr] == null ||
+                  _selectedAttributes[attr]!.isEmpty,
+            )
+            .toList();
     if (missingAttributes.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please select: ${missingAttributes.join(", ")}'),
           backgroundColor: Colors.red.withOpacity(0.8),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -1004,13 +1195,20 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       'description': _descriptionController.text,
       'price': _listPriceController.text,
       'filters': jsonEncode(filters),
-      'parent_zone_id': _districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': '482'})['id']?.toString() ?? '482',
+      'parent_zone_id':
+          _districts
+              .firstWhere(
+                (d) => d['name'] == _selectedDistrict,
+                orElse: () => {'id': ''},
+              )['id']
+              ?.toString(),
       'land_mark': _landMarkController.text,
     };
 
     // Add registration and insurance fields for category '1' (Used Cars)
     if (widget.categoryId == '1') {
-      formData['registration_valid_till'] = _registrationValidTillController.text;
+      formData['registration_valid_till'] =
+          _registrationValidTillController.text;
       formData['insurance_upto'] = _insuranceUptoController.text;
     }
 
@@ -1023,7 +1221,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
     try {
       final adPostRequest = http.MultipartRequest(
         'POST',
-        Uri.parse('${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=$generatedTitle&category_id=${widget.categoryId}&brand=${_selectedBrand!.id}&model=${_selectedBrandModel!.id}&model_variation=${_selectedModelVariation?.id ?? ''}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=${_districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': '482'})['id']?.toString() ?? '482'}&land_mark=${_landMarkController.text}'),
+        Uri.parse(
+          '${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=$generatedTitle&category_id=${widget.categoryId}&brand=${_selectedBrand!.id}&model=${_selectedBrandModel!.id}&model_variation=${_selectedModelVariation?.id ?? ''}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=${_districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': ''})['id']?.toString()}&land_mark=${_landMarkController.text}',
+        ),
       );
       adPostRequest.headers.addAll({
         'token': AttributeValueService.token,
@@ -1036,25 +1236,33 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
       print('Ad post response body: $adPostResponseBody');
 
       final responseData = jsonDecode(adPostResponseBody);
-      if (adPostResponse.statusCode == 200 && responseData['status'] == 'true') {
-        final postId = responseData['data'] is List && responseData['data'].isNotEmpty
-            ? responseData['data'][0]['id']?.toString() ?? 'new_${DateTime.now().millisecondsSinceEpoch}'
-            : 'new_${DateTime.now().millisecondsSinceEpoch}';
+      if (adPostResponse.statusCode == 200 &&
+          responseData['status'] == 'true') {
+        final postId =
+            responseData['data'] is List && responseData['data'].isNotEmpty
+                ? responseData['data'][0]['id']?.toString() ??
+                    'new_${DateTime.now().millisecondsSinceEpoch}'
+                : 'new_${DateTime.now().millisecondsSinceEpoch}';
 
         // Upload main image
         if (_selectedImages.isNotEmpty) {
           final mainImage = _selectedImages[_coverImageIndex];
           final mainImageRequest = http.MultipartRequest(
             'POST',
-            Uri.parse('${AttributeValueService.baseUrl}/add-post-main-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${mainImage.name}'),
+            Uri.parse(
+              '${AttributeValueService.baseUrl}/add-post-main-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${mainImage.name}',
+            ),
           );
           mainImageRequest.headers.addAll({
             'token': AttributeValueService.token,
             'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
           });
-          mainImageRequest.files.add(await http.MultipartFile.fromPath('image', mainImage.path));
+          mainImageRequest.files.add(
+            await http.MultipartFile.fromPath('image', mainImage.path),
+          );
           final mainImageResponse = await mainImageRequest.send();
-          final mainImageResponseBody = await mainImageResponse.stream.bytesToString();
+          final mainImageResponseBody =
+              await mainImageResponse.stream.bytesToString();
           print('Main image response status: ${mainImageResponse.statusCode}');
           print('Main image response body: $mainImageResponseBody');
 
@@ -1064,27 +1272,42 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
               final galleryImage = _selectedImages[i];
               final galleryImageRequest = http.MultipartRequest(
                 'POST',
-                Uri.parse('${AttributeValueService.baseUrl}/add-post-gallery-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${galleryImage.name}'),
+                Uri.parse(
+                  '${AttributeValueService.baseUrl}/add-post-gallery-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${galleryImage.name}',
+                ),
               );
               galleryImageRequest.headers.addAll({
                 'token': AttributeValueService.token,
                 'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
               });
-              galleryImageRequest.files.add(await http.MultipartFile.fromPath('image', galleryImage.path));
+              galleryImageRequest.files.add(
+                await http.MultipartFile.fromPath('image', galleryImage.path),
+              );
               final galleryImageResponse = await galleryImageRequest.send();
-              final galleryImageResponseBody = await galleryImageResponse.stream.bytesToString();
-              print('Gallery image $i response status: ${galleryImageResponse.statusCode}');
-              print('Gallery image $i response body: $galleryImageResponseBody');
+              final galleryImageResponseBody =
+                  await galleryImageResponse.stream.bytesToString();
+              print(
+                'Gallery image $i response status: ${galleryImageResponse.statusCode}',
+              );
+              print(
+                'Gallery image $i response body: $galleryImageResponseBody',
+              );
             }
           }
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.adData != null ? 'Ad updated successfully' : 'Ad posted successfully'),
+            content: Text(
+              widget.adData != null
+                  ? 'Ad updated successfully'
+                  : 'Ad posted successfully',
+            ),
             backgroundColor: Colors.green.withOpacity(0.8),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
 
@@ -1093,19 +1316,22 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         adData['id'] = postId;
         adData['created_on'] = DateTime.now().toIso8601String();
         adData['updated_on'] = DateTime.now().toIso8601String();
-        adData['image'] = _selectedImages.isNotEmpty ? _selectedImages[_coverImageIndex].path : '';
+        adData['image'] =
+            _selectedImages.isNotEmpty
+                ? _selectedImages[_coverImageIndex].path
+                : '';
         print('Constructed adData: $adData');
 
         // Navigate to SellingStatusPage
         context.pushNamed(
           RouteNames.sellingstatuspage,
-          extra: {
-            'userId': widget.userId ?? '4',
-            'adData': adData,
-          },
+          extra: {'userId': widget.userId ?? '4', 'adData': adData},
         );
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to save ad (Status: ${adPostResponse.statusCode})');
+        throw Exception(
+          responseData['message'] ??
+              'Failed to save ad (Status: ${adPostResponse.statusCode})',
+        );
       }
     } catch (e) {
       print('Error submitting ad: $e');
@@ -1114,7 +1340,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           content: Text('Error saving ad: $e'),
           backgroundColor: Colors.red.withOpacity(0.8),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -1216,9 +1444,15 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10.0,
+                                  sigmaY: 10.0,
+                                ),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.5),
                                     borderRadius: BorderRadius.circular(12),
@@ -1241,7 +1475,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                              filter: ImageFilter.blur(
+                                sigmaX: 10.0,
+                                sigmaY: 10.0,
+                              ),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -1251,7 +1488,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                                   icon: Icon(
                                     Icons.star,
                                     size: 20,
-                                    color: index == _coverImageIndex ? Colors.yellow : Colors.white,
+                                    color:
+                                        index == _coverImageIndex
+                                            ? Colors.yellow
+                                            : Colors.white,
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -1270,7 +1510,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                              filter: ImageFilter.blur(
+                                sigmaX: 10.0,
+                                sigmaY: 10.0,
+                              ),
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.3),
@@ -1294,7 +1537,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                                       } else {
                                         _coverImageIndex = 0;
                                       }
-                                      print('Removed image at index: $index, new cover index: $_coverImageIndex');
+                                      print(
+                                        'Removed image at index: $index, new cover index: $_coverImageIndex',
+                                      );
                                     });
                                   },
                                 ),
@@ -1335,7 +1580,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         ),
         const SizedBox(height: 16),
         _selectedImages.isEmpty
-            ? Row(mainAxisAlignment: MainAxisAlignment.center, children: [_buildImagePicker()])
+            ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [_buildImagePicker()],
+            )
             : _buildImagePicker(),
         const SizedBox(height: 24),
       ],
@@ -1369,16 +1617,25 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
               print('Selected brand: ${newValue?.name} (ID: ${newValue?.id})');
             });
             if (newValue != null) {
-              final brandModels = await AttributeValueService.fetchBrandModels(newValue.id, widget.categoryId);
+              final brandModels = await AttributeValueService.fetchBrandModels(
+                newValue.id,
+                widget.categoryId,
+              );
               setState(() {
                 _brandModels = brandModels;
-                print('Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}');
+                print(
+                  'Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}',
+                );
               });
             }
           },
           isRequired: true,
           itemToString: (Brand item) => item.name,
-          validator: (Brand? value) => value == null ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}' : null,
+          validator:
+              (Brand? value) =>
+                  value == null
+                      ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
+                      : null,
           hintText: '',
         ),
         const SizedBox(height: 12),
@@ -1392,7 +1649,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                 _selectedBrandModel = newValue;
                 _selectedModelVariation = null;
                 _modelVariations = [];
-                print('Selected brand model: ${newValue?.name} (ID: ${newValue?.id})');
+                print(
+                  'Selected brand model: ${newValue?.name} (ID: ${newValue?.id})',
+                );
               });
               if (newValue != null) {
                 await _fetchModelVariations(newValue.id);
@@ -1400,7 +1659,11 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
             },
             isRequired: true,
             itemToString: (BrandModel item) => item.name,
-            validator: (BrandModel? value) => value == null ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}' : null,
+            validator:
+                (BrandModel? value) =>
+                    value == null
+                        ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
+                        : null,
             hintText: '',
           ),
         if (_brandModels.isNotEmpty) const SizedBox(height: 12),
@@ -1412,7 +1675,9 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
             onChanged: (ModelVariation? newValue) {
               setState(() {
                 _selectedModelVariation = newValue;
-                print('Selected model variation: ${newValue?.name} (ID: ${newValue?.id})');
+                print(
+                  'Selected model variation: ${newValue?.name} (ID: ${newValue?.id})',
+                );
               });
             },
             isRequired: false,
@@ -1448,7 +1713,10 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         CustomDropdownWidget<String>(
           label: 'District',
           value: _selectedDistrict,
-          items: _districts.isNotEmpty ? _districts.map((d) => d['name'] as String).toList() : ['No districts available'],
+          items:
+              _districts.isNotEmpty
+                  ? _districts.map((d) => d['name'] as String).toList()
+                  : ['No districts available'],
           onChanged: (String? newValue) {
             if (newValue != null && newValue != 'No districts available') {
               setState(() {
@@ -1459,7 +1727,11 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
           },
           isRequired: true,
           itemToString: (String item) => item,
-          validator: (String? value) => value == null || value == 'No districts available' ? 'Please select a district' : null,
+          validator:
+              (String? value) =>
+                  value == null || value == 'No districts available'
+                      ? 'Please select a district'
+                      : null,
           hintText: '',
         ),
         const SizedBox(height: 12),
@@ -1512,8 +1784,11 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
         ),
         const SizedBox(height: 16),
         ..._attributes.map((attr) {
-          final isRequired = _getRequiredAttributes(widget.categoryId).contains(attr.name);
-          final hasVariations = _attributeVariations[attr.name]?.isNotEmpty ?? false;
+          final isRequired = _getRequiredAttributes(
+            widget.categoryId,
+          ).contains(attr.name);
+          final hasVariations =
+              _attributeVariations[attr.name]?.isNotEmpty ?? false;
 
           if (hasVariations) {
             return Padding(
@@ -1521,7 +1796,11 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
               child: CustomDropdownWidget<String>(
                 label: attr.name,
                 value: _selectedAttributes[attr.name],
-                items: _attributeVariations[attr.name]?.map((v) => v.name).toList() ?? ['No options available'],
+                items:
+                    _attributeVariations[attr.name]
+                        ?.map((v) => v.name)
+                        .toList() ??
+                    ['No options available'],
                 onChanged: (String? newValue) {
                   if (newValue != null && newValue != 'No options available') {
                     setState(() {
@@ -1532,14 +1811,17 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                 },
                 isRequired: isRequired,
                 itemToString: (String item) => item,
-                validator: isRequired
-                    ? (value) {
-                        if (value == null || value.isEmpty || value == 'No options available') {
-                          return 'Please select ${attr.name}';
+                validator:
+                    isRequired
+                        ? (value) {
+                          if (value == null ||
+                              value.isEmpty ||
+                              value == 'No options available') {
+                            return 'Please select ${attr.name}';
+                          }
+                          return null;
                         }
-                        return null;
-                      }
-                    : null,
+                        : null,
                 hintText: '',
               ),
             );
@@ -1550,14 +1832,15 @@ class _AdPostFormState extends State<AdPostForm> with SingleTickerProviderStateM
                 controller: _attributeControllers[attr.name]!,
                 label: attr.name,
                 isRequired: isRequired,
-                validator: isRequired
-                    ? (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter ${attr.name}';
+                validator:
+                    isRequired
+                        ? (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter ${attr.name}';
+                          }
+                          return null;
                         }
-                        return null;
-                      }
-                    : null,
+                        : null,
                 onChanged: (value) {
                   setState(() {
                     _selectedAttributes[attr.name] = value;
