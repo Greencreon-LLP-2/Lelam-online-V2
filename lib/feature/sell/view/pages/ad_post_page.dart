@@ -1245,6 +1245,7 @@ class _AdPostFormState extends State<AdPostForm>
                 : 'new_${DateTime.now().millisecondsSinceEpoch}';
 
         // Upload main image
+        String? mainImageUrl;
         if (_selectedImages.isNotEmpty) {
           final mainImage = _selectedImages[_coverImageIndex];
           final mainImageRequest = http.MultipartRequest(
@@ -1265,6 +1266,20 @@ class _AdPostFormState extends State<AdPostForm>
               await mainImageResponse.stream.bytesToString();
           print('Main image response status: ${mainImageResponse.statusCode}');
           print('Main image response body: $mainImageResponseBody');
+
+          // Parse the response to get the image URL
+          final mainImageData = jsonDecode(mainImageResponseBody);
+          if (mainImageResponse.statusCode == 200 &&
+              mainImageData['status'] == 'true') {
+            mainImageUrl = mainImageData['image_url'] ?? '';
+            if (mainImageUrl!.isEmpty) {
+              print('Warning: Main image URL not returned by the server');
+            }
+          } else {
+            throw Exception(
+              'Failed to upload main image: $mainImageResponseBody',
+            );
+          }
 
           // Upload gallery images
           for (var i = 0; i < _selectedImages.length; i++) {
@@ -1317,15 +1332,16 @@ class _AdPostFormState extends State<AdPostForm>
         adData['created_on'] = DateTime.now().toIso8601String();
         adData['updated_on'] = DateTime.now().toIso8601String();
         adData['image'] =
-            _selectedImages.isNotEmpty
-                ? _selectedImages[_coverImageIndex].path
-                : '';
+            mainImageUrl!.isNotEmpty
+                ? mainImageUrl
+                : (_selectedImages.isNotEmpty
+                    ? _selectedImages[_coverImageIndex].path
+                    : '');
         print('Constructed adData: $adData');
-
         // Navigate to SellingStatusPage
         context.pushNamed(
           RouteNames.sellingstatuspage,
-          extra: {'userId': widget.userId ?? '4', 'adData': adData},
+          extra: {'userId': widget.userId ?? '', 'adData': adData},
         );
       } else {
         throw Exception(

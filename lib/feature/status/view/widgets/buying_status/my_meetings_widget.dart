@@ -267,7 +267,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<void> _loadMeetings() async {
+ Future<void> _loadMeetings() async {
     if (!mounted || _userId == null || _userId == 'Unknown') {
       setState(() {
         isLoading = false;
@@ -290,139 +290,130 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       String url;
       switch (selectedIndex) {
         case 0:
-          url =
-              '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 1:
-          url =
-              '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 2:
-          url =
-              '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 3:
-          url =
-              '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         default:
-          url =
-              '${widget.baseUrl}/my-meeting-completed.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-completed.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
       debugPrint('Fetching meetings from: $url');
       final response = await http.get(Uri.parse(url), headers: headers);
-      debugPrint('Raw response body: ${response.body}');
+      debugPrint('Response status: ${response.statusCode}, body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData is Map<String, dynamic> &&
-            (responseData['status'] == true ||
-                responseData['status'] == 'true') &&
-            responseData['data'] is List) {
-          final List<dynamic> meetingData = responseData['data'];
-          debugPrint('Found ${meetingData.length} meetings in API response');
+            (responseData['status'] == true || responseData['status'] == 'true')) {
+          if (responseData['data'] is List && responseData['data'].isNotEmpty) {
+            final List<dynamic> meetingData = responseData['data'];
+            debugPrint('Found ${meetingData.length} meetings in API response');
 
-          for (var meeting in meetingData) {
-            debugPrint(
-              'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
-            );
-            final postDetails = await _fetchPostDetails(meeting['post_id']);
-            if (postDetails == null) {
+            for (var meeting in meetingData) {
               debugPrint(
-                'Skipping meeting ${meeting['id']} due to missing post details',
+                'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
               );
-              continue;
+              final postDetails = await _fetchPostDetails(meeting['post_id']);
+              if (postDetails == null) {
+                debugPrint('Skipping meeting ${meeting['id']} due to missing post details');
+                continue;
+              }
+              final statusData = await _fetchMeetingStatus(meeting['id']);
+              final middleStatus = statusData?['middleStatus_data']?.toString() ?? 'Schedule meeting';
+              final meetingData = <String, dynamic>{
+                'id': meeting['id']?.toString() ?? 'N/A',
+                'user_id': meeting['user_id']?.toString() ?? _userId,
+                'post_id': meeting['post_id']?.toString() ?? 'N/A',
+                'bid_id': meeting['bid_id']?.toString() ?? '0',
+                'with_bid': meeting['with_bid']?.toString() ?? '0',
+                'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
+                'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
+                'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
+                'if_location_request': meeting['if_location_request']?.toString() ?? '0',
+                'latitude': meeting['latitude']?.toString() ?? '',
+                'longitude': meeting['longitude']?.toString() ?? '',
+                'location_link': meeting['location_link']?.toString() ?? '',
+                'location_request_count': meeting['location_request_count']?.toString() ?? '0',
+                'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
+                'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
+                'status': meeting['status']?.toString() ?? '1',
+                'meeting_done': meeting['meeting_done']?.toString() ?? '0',
+                'if_junk': meeting['if_junk']?.toString() ?? '0',
+                'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
+                'if_skipped': meeting['if_skipped']?.toString() ?? '0',
+                'if_not_intersect': meeting['if_not_intersect']?.toString() ?? '0',
+                'if_revisit': meeting['if_revisit']?.toString() ?? '0',
+                'if_decisionpedding': meeting['if_decisionpedding']?.toString() ?? '0',
+                'if_expired': meeting['if_expired']?.toString() ?? '0',
+                'if_cancel': meeting['if_cancel']?.toString() ?? '0',
+                'if_sold': meeting['if_sold']?.toString() ?? '0',
+                'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
+                'price_offered': meeting['price_offered']?.toString() ?? '0.00',
+                'created_on': meeting['created_on']?.toString() ??
+                    DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+                'updated_on': meeting['updated_on']?.toString() ??
+                    DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+                'title': postDetails['title'] ?? 'Unknown Vehicle (ID: ${meeting['post_id']})',
+                'carImage': postDetails['image'] ?? '',
+                'appId': 'APP_${meeting['post_id']}',
+                'bidDate': meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
+                'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
+                'targetPrice': postDetails['price'] ?? '0',
+                'bidPrice': meeting['bid_amount']?.toString() ?? '0',
+                'location': postDetails['location'] ?? 'Unknown Location',
+                'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
+                'if_auction': meeting['if_auction']?.toString() ?? '0',
+                'middleStatus_data': middleStatus,
+              };
+              debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
+              meetings.add(meetingData);
             }
-            final statusData = await _fetchMeetingStatus(meeting['id']);
-            final middleStatus =
-                statusData?['middleStatus_data']?.toString() ??
-                'Schedule meeting';
-            final meetingData = <String, dynamic>{
-              'id': meeting['id']?.toString() ?? 'N/A',
-              'user_id': meeting['user_id']?.toString() ?? _userId,
-              'post_id': meeting['post_id']?.toString() ?? 'N/A',
-              'bid_id': meeting['bid_id']?.toString() ?? '0',
-              'with_bid': meeting['with_bid']?.toString() ?? '0',
-              'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
-              'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
-              'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
-              'if_location_request':
-                  meeting['if_location_request']?.toString() ?? '0',
-              'latitude': meeting['latitude']?.toString() ?? '',
-              'longitude': meeting['longitude']?.toString() ?? '',
-              'location_link': meeting['location_link']?.toString() ?? '',
-              'location_request_count':
-                  meeting['location_request_count']?.toString() ?? '0',
-              'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
-              'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
-              'status': meeting['status']?.toString() ?? '1',
-              'meeting_done': meeting['meeting_done']?.toString() ?? '0',
-              'if_junk': meeting['if_junk']?.toString() ?? '0',
-              'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
-              'if_skipped': meeting['if_skipped']?.toString() ?? '0',
-              'if_not_intersect':
-                  meeting['if_not_intersect']?.toString() ?? '0',
-              'if_revisit': meeting['if_revisit']?.toString() ?? '0',
-              'if_decisionpedding':
-                  meeting['if_decisionpedding']?.toString() ?? '0',
-              'if_expired': meeting['if_expired']?.toString() ?? '0',
-              'if_cancel': meeting['if_cancel']?.toString() ?? '0',
-              'if_sold': meeting['if_sold']?.toString() ?? '0',
-              'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
-              'price_offered': meeting['price_offered']?.toString() ?? '0.00',
-              'created_on':
-                  meeting['created_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'updated_on':
-                  meeting['updated_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'title':
-                  postDetails['title'] ??
-                  'Unknown Vehicle (ID: ${meeting['post_id']})',
-              'carImage': postDetails['image'] ?? '',
-              'appId': 'APP_${meeting['post_id']}',
-              'bidDate':
-                  meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
-              'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
-              'targetPrice': postDetails['price'] ?? '0',
-              'bidPrice': meeting['bid_amount']?.toString() ?? '0',
-              'location': postDetails['location'] ?? 'Unknown Location',
-              'store':
-                  postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
-              'if_auction': meeting['if_auction']?.toString() ?? '0',
-              'middleStatus_data': middleStatus,
-            };
-            debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
-            meetings.add(meetingData);
+          } else {
+            debugPrint('No meetings available in response: ${responseData.toString()}');
+            setState(() {
+              errorMessage = 'No meetings available for ${statuses[selectedIndex]}';
+            });
           }
         } else {
-          debugPrint('Unexpected response format: ${responseData.toString()}');
-          errorMessage = 'Unexpected response format from server';
+          debugPrint('Invalid server response: ${responseData.toString()}');
+          setState(() {
+            errorMessage = 'No meetings available for ${statuses[selectedIndex]}';
+          });
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setStringList(
-          'userMeetings',
-          meetings.map((m) => jsonEncode(m)).toList(),
-        );
-        debugPrint('Total meetings loaded: ${meetings.length}');
       } else {
-        debugPrint('Failed to fetch meetings: ${response.reasonPhrase}');
-        errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
+        debugPrint('Failed to fetch meetings: ${response.statusCode} - ${response.reasonPhrase}');
+        setState(() {
+          errorMessage = 'Failed to fetch meetings. Please try again.';
+        });
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        'userMeetings',
+        meetings.map((m) => jsonEncode(m)).toList(),
+      );
+      debugPrint('Total meetings saved: ${meetings.length}');
     } catch (e) {
       debugPrint('Error loading meetings: $e');
-      errorMessage = 'Error loading meetings: $e';
-    }
-
-    if (mounted) {
       setState(() {
-        isLoading = false;
+        errorMessage = 'Error loading meetings. Please check your connection and try again.';
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
-
   void _onLocationRequestSent(String meetingId) {
     if (mounted) {
       setState(() {

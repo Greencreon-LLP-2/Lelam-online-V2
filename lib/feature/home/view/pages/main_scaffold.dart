@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/app_drawer.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
@@ -45,21 +46,21 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   List<Widget> get _pages => [
-    HomePage(userId: userId),
-    isStatus
-        ? BuyingStatusPage(userId: userId)
-        : const Center(child: Text('Support')),
-    isStatus
-        ? SellingStatusPage(userId: userId, adData: adData)
-        : SellPage(userId: userId),
-    isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
-    Center(
-      child: Text(
-        'Profile: User ID ${userId ?? 'Unknown'}',
-        style: const TextStyle(fontSize: 16),
-      ),
-    ),
-  ];
+        HomePage(userId: userId),
+        isStatus
+            ? BuyingStatusPage(userId: userId)
+            : SupportTicketPage(userId: userId ?? 'Unknown'), 
+        isStatus
+            ? SellingStatusPage(userId: userId, adData: adData)
+            : SellPage(userId: userId),
+        isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
+        Center(
+          child: Text(
+            'Profile: User ID ${userId ?? 'Unknown'}',
+            style: const TextStyle(fontSize: 16),
+          ),
+        ),
+      ];
 
   Future<bool> _onWillPop() async {
     if (currentIndex != 0) {
@@ -67,29 +68,28 @@ class _MainScaffoldState extends State<MainScaffold> {
         currentIndex = 0;
         isStatus = false;
       });
-      return false; 
+      return false;
     }
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Exit App'),
-            content: const Text('Are you sure you want to exit the app?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Exit'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Exit App'),
+        content: const Text('Are you sure you want to exit the app?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
     );
 
-    return shouldExit ?? false; 
+    return shouldExit ?? false;
   }
 
   @override
@@ -156,24 +156,23 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: isStatus ? 'Buying' : 'Support',
                   ),
                   BottomNavigationBarItem(
-                    icon:
-                        isStatus
-                            ? const Icon(Icons.sell)
-                            : Container(
-                              padding: const EdgeInsets.all(1),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.black,
-                                  width: 2,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                size: 12,
-                                color: Color.fromARGB(255, 12, 9, 233),
+                    icon: isStatus
+                        ? const Icon(Icons.sell)
+                        : Container(
+                            padding: const EdgeInsets.all(1),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.black,
+                                width: 2,
                               ),
                             ),
+                            child: const Icon(
+                              Icons.add,
+                              size: 12,
+                              color: Color.fromARGB(255, 12, 9, 233),
+                            ),
+                          ),
                     label: isStatus ? 'Selling' : 'Sell',
                   ),
                   BottomNavigationBarItem(

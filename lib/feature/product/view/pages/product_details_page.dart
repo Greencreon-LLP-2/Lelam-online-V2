@@ -1116,8 +1116,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       const SizedBox(height: 16),
                       Text(
                         widget.isAuction
-                            ? '₹${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(widget.product.price) ?? 0)}'
-                            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+                            ? '${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)} - ${formatPriceInt(double.tryParse(widget.product.price) ?? 0)}'
+                            : '${formatPriceInt(double.tryParse(price) ?? 0)}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
