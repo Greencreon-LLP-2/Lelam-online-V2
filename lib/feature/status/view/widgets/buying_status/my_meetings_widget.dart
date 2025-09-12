@@ -680,7 +680,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bid_id=${meeting['bid_id']}&bidamt=${meeting['bid_amount']}',
+          '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=${meeting['bid_amount']}',
         ),
         headers: {
           'token': widget.token,
@@ -1390,8 +1390,42 @@ class MeetingCard extends StatelessWidget {
     required this.onViewLocation,
   });
 
+  String _getMeetingStatus(Map<String, dynamic> meeting) {
+    if (meeting['meeting_done'] == '1') return 'Meeting Completed';
+    if (meeting['seller_approvel'] == '1' &&
+        meeting['admin_approvel'] == '1' &&
+        meeting['meeting_done'] == '0' &&
+        meeting['if_location_request'] == '1' &&
+        meeting['location_link']?.isNotEmpty == true) {
+      return 'Ready For Meeting';
+    }
+    if (meeting['if_location_request'] == '1' &&
+        meeting['status'] == '1' &&
+        meeting['meeting_done'] == '0' &&
+        (meeting['location_link'] == null ||
+            meeting['location_link'] == '' ||
+            meeting['latitude'] == '' ||
+            meeting['longitude'] == '')) {
+      return 'Awaiting Location';
+    }
+    if (meeting['status'] == '1' &&
+        meeting['meeting_done'] == '0' &&
+        meeting['meeting_date'] != 'N/A' &&
+        meeting['meeting_date']?.isNotEmpty == true &&
+        meeting['if_location_request'] != '1') {
+      return 'Date Fixed';
+    }
+    if (meeting['status'] == '1' &&
+        meeting['meeting_done'] == '0' &&
+        meeting['if_location_request'] == '0') {
+      return 'Meeting Request';
+    }
+    return 'Unknown';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final status = _getMeetingStatus(meeting);
     final bool withBid = meeting['with_bid'] == '1';
     final double bidAmount =
         double.tryParse(meeting['bid_amount'] ?? meeting['bidPrice'] ?? '0') ??
@@ -1412,7 +1446,7 @@ class MeetingCard extends StatelessWidget {
         '${meeting['location_request_count'] ?? '0'}/2';
 
     debugPrint(
-      'Rendering MeetingCard: id=${meeting['id']}, bid_id=${meeting['bid_id']}, title=${meeting['title']}, date=${meeting['meeting_date']}, time=${meeting['meeting_time']}, middleStatus_data=${meeting['middleStatus_data']}',
+      'Rendering MeetingCard: id=${meeting['id']}, bid_id=${meeting['bid_id']}, title=${meeting['title']}, date=${meeting['meeting_date']}, time=${meeting['meeting_time']}, middleStatus_data=${meeting['middleStatus_data']}, status=$status',
     );
 
     return Container(
@@ -1578,6 +1612,7 @@ class MeetingCard extends StatelessWidget {
                         }
                       },
                       itemBuilder: (BuildContext context) {
+                        final currentStatus = _getMeetingStatus(meeting);
                         List<PopupMenuItem<String>> items = [
                           const PopupMenuItem<String>(
                             value: 'edit_date',
@@ -1608,48 +1643,6 @@ class MeetingCard extends StatelessWidget {
                             ),
                           ),
                           const PopupMenuItem<String>(
-                            value: 'proceed_with_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.schedule,
-                                  size: 16,
-                                  color: Colors.blue,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Meeting with Bid'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'proceed_without_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.schedule,
-                                  size: 16,
-                                  color: Colors.blue,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Meeting without Bid'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'increase_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.arrow_upward,
-                                  size: 16,
-                                  color: Colors.blue,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Increase Bid'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
                             value: 'cancel_meeting',
                             child: Row(
                               children: [
@@ -1660,8 +1653,24 @@ class MeetingCard extends StatelessWidget {
                             ),
                           ),
                         ];
-                        if (isMeetingRequest &&
-                            meeting['if_location_request'] != '1') {
+
+                        if (currentStatus == 'Meeting Request') {
+                          items.add(
+                            const PopupMenuItem<String>(
+                              value: 'proceed_with_bid',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.schedule,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Proceed with Bid'),
+                                ],
+                              ),
+                            ),
+                          );
                           items.add(
                             const PopupMenuItem<String>(
                               value: 'send_location',
@@ -1673,30 +1682,118 @@ class MeetingCard extends StatelessWidget {
                                     color: AppTheme.primaryColor,
                                   ),
                                   SizedBox(width: 8),
-                                  Text('Send Location'),
+                                  Text('Send Location Request'),
                                 ],
                               ),
                             ),
                           );
-                        }
-                        if (isReadyForMeeting &&
-                            meeting['location_link']?.isNotEmpty == true) {
+                        } else if (currentStatus == 'Date Fixed') {
                           items.add(
                             const PopupMenuItem<String>(
-                              value: 'view_location',
+                              value: 'proceed_without_bid',
                               child: Row(
                                 children: [
                                   Icon(
-                                    Icons.map,
+                                    Icons.schedule,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Proceed without Bid'),
+                                ],
+                              ),
+                            ),
+                          );
+                          if (withBid && isLowBid) {
+                            items.add(
+                              const PopupMenuItem<String>(
+                                value: 'increase_bid',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.arrow_upward,
+                                      size: 16,
+                                      color: Colors.blue,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Increase Bid'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          if (meeting['if_location_request'] != '1') {
+                            items.add(
+                              const PopupMenuItem<String>(
+                                value: 'send_location',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on,
+                                      size: 16,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Send Location Request'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        } else if (currentStatus == 'Awaiting Location') {
+                          items.add(
+                            const PopupMenuItem<String>(
+                              value: 'send_location',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
                                     size: 16,
                                     color: AppTheme.primaryColor,
                                   ),
                                   SizedBox(width: 8),
-                                  Text('View Location'),
+                                  Text('Resend Location Request'),
                                 ],
                               ),
                             ),
                           );
+                          if (withBid) {
+                            items.add(
+                              const PopupMenuItem<String>(
+                                value: 'proceed_with_bid',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule,
+                                      size: 16,
+                                      color: Colors.blue,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Proceed with Bid'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        } else if (currentStatus == 'Ready For Meeting') {
+                          if (meeting['location_link']?.isNotEmpty == true) {
+                            items.add(
+                              const PopupMenuItem<String>(
+                                value: 'view_location',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.map,
+                                      size: 16,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('View Location'),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
                         }
                         return items;
                       },

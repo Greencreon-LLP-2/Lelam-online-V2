@@ -45,115 +45,151 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   List<Widget> get _pages => [
-        HomePage(userId: userId),
-        isStatus
-            ? BuyingStatusPage(userId: userId)
-            : const Center(child: Text('Support')),
-        isStatus
-            ? SellingStatusPage(userId: userId, adData: adData)
-            : SellPage(userId: userId),
-        isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
-        Center(
-          child: Text(
-            'Profile: User ID ${userId ?? 'Unknown'}',
-            style: const TextStyle(fontSize: 16),
+    HomePage(userId: userId),
+    isStatus
+        ? BuyingStatusPage(userId: userId)
+        : const Center(child: Text('Support')),
+    isStatus
+        ? SellingStatusPage(userId: userId, adData: adData)
+        : SellPage(userId: userId),
+    isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
+    Center(
+      child: Text(
+        'Profile: User ID ${userId ?? 'Unknown'}',
+        style: const TextStyle(fontSize: 16),
+      ),
+    ),
+  ];
+
+  Future<bool> _onWillPop() async {
+    if (currentIndex != 0) {
+      setState(() {
+        currentIndex = 0;
+        isStatus = false;
+      });
+      return false; 
+    }
+
+    bool? shouldExit = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Exit App'),
+            content: const Text('Are you sure you want to exit the app?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Exit'),
+              ),
+            ],
           ),
-        ),
-      ];
+    );
+
+    return shouldExit ?? false; 
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: AppDrawerWidget(userId: userId),
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: _pages[currentIndex], // Main page content inside SafeArea
-      ),
-      bottomNavigationBar: SafeArea(
-        bottom: true,
-        top: false,
-        left: false,
-        right: false,
-        child: SizedBox(
-          height: 37,
-          child: MediaQuery.removePadding(
-            context: context,
-            removeBottom: true,
-            child: BottomNavigationBar(
-              type: BottomNavigationBarType.fixed,
-              currentIndex: currentIndex,
-              onTap: (index) {
-                if (kDebugMode) print('Selected index: $index');
-                if (index == 4) {
-                  _scaffoldKey.currentState?.openDrawer();
-                  return;
-                }
-
-                setState(() {
-                  currentIndex = index;
-                  if (index == 0) {
-                    isStatus = false;
-                  } else if (index == 3) {
-                    isStatus = true;
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: AppDrawerWidget(userId: userId),
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: _pages[currentIndex], // Main page content inside SafeArea
+        ),
+        bottomNavigationBar: SafeArea(
+          bottom: true,
+          top: false,
+          left: false,
+          right: false,
+          child: SizedBox(
+            height: 37,
+            child: MediaQuery.removePadding(
+              context: context,
+              removeBottom: true,
+              child: BottomNavigationBar(
+                type: BottomNavigationBarType.fixed,
+                currentIndex: currentIndex,
+                onTap: (index) {
+                  if (kDebugMode) print('Selected index: $index');
+                  if (index == 4) {
+                    _scaffoldKey.currentState?.openDrawer();
+                    return;
                   }
-                });
-              },
-              selectedItemColor:
-                  isStatus ? Colors.redAccent : Colors.black,
-              unselectedItemColor: Colors.grey,
-              showUnselectedLabels: true,
-              showSelectedLabels: true,
-              selectedLabelStyle: const TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
+
+                  setState(() {
+                    currentIndex = index;
+                    if (index == 0) {
+                      isStatus = false;
+                    } else if (index == 3) {
+                      isStatus = true;
+                    }
+                  });
+                },
+                selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
+                unselectedItemColor: Colors.grey,
+                showUnselectedLabels: true,
+                showSelectedLabels: true,
+                selectedLabelStyle: const TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(fontSize: 8),
+                selectedFontSize: 8,
+                unselectedFontSize: 8,
+                iconSize: 14,
+                items: [
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(
+                      isStatus ? Icons.shopping_cart : Icons.support_agent,
+                    ),
+                    label: isStatus ? 'Buying' : 'Support',
+                  ),
+                  BottomNavigationBarItem(
+                    icon:
+                        isStatus
+                            ? const Icon(Icons.sell)
+                            : Container(
+                              padding: const EdgeInsets.all(1),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                size: 12,
+                                color: Color.fromARGB(255, 12, 9, 233),
+                              ),
+                            ),
+                    label: isStatus ? 'Selling' : 'Sell',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(
+                      isStatus
+                          ? Icons.star_border_outlined
+                          : Icons.stream_outlined,
+                    ),
+                    label: isStatus ? 'Shortlist' : 'Status',
+                  ),
+                  const BottomNavigationBarItem(
+                    icon: Icon(Icons.more_vert),
+                    label: 'More',
+                  ),
+                ],
               ),
-              unselectedLabelStyle: const TextStyle(fontSize: 8),
-              selectedFontSize: 8,
-              unselectedFontSize: 8,
-              iconSize: 14,
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.home),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(
-                    isStatus ? Icons.shopping_cart : Icons.support_agent,
-                  ),
-                  label: isStatus ? 'Buying' : 'Support',
-                ),
-                BottomNavigationBarItem(
-                  icon: isStatus
-                      ? const Icon(Icons.sell)
-                      : Container(
-                          padding: const EdgeInsets.all(1),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border:
-                                Border.all(color: Colors.black, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 12,
-                            color: Color.fromARGB(255, 12, 9, 233),
-                          ),
-                        ),
-                  label: isStatus ? 'Selling' : 'Sell',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(
-                    isStatus
-                        ? Icons.star_border_outlined
-                        : Icons.stream_outlined,
-                  ),
-                  label: isStatus ? 'Shortlist' : 'Status',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.more_vert),
-                  label: 'More',
-                ),
-              ],
             ),
           ),
         ),

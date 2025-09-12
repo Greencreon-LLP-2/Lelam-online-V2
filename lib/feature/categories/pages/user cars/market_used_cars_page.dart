@@ -196,8 +196,8 @@ class _MarketPlaceProductDetailsPageState
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to add to shortlist'),
-              backgroundColor: Colors.red,
+              content: Text('Shortlist Added '),
+              backgroundColor: Colors.green,
             ),
           );
         }
@@ -244,7 +244,7 @@ class _MarketPlaceProductDetailsPageState
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         if (responseData['status'] == true) {
-          // Cache the bid locally
+    
           final prefs = await SharedPreferences.getInstance();
           final cachedBids = prefs.getStringList('userBids') ?? [];
           final newBid = {
@@ -294,6 +294,8 @@ class _MarketPlaceProductDetailsPageState
       });
     }
   }
+
+
 
   void showProductBidDialog(BuildContext context) {
     final TextEditingController _bidController = TextEditingController();
@@ -1014,110 +1016,172 @@ class _MarketPlaceProductDetailsPageState
     );
   }
 
-  void _showMeetingDialog(BuildContext context) {
-    DateTime selectedDate = DateTime.now();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+Future<void> _fixMeeting(DateTime selectedDate) async {
+  if (userId == null || userId == 'Unknown') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please log in to schedule a meeting'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  try {
+    final headers = {
+      'token': _token,
+      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+    };
+    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final url =
+        '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+    debugPrint('Scheduling meeting: $url');
+
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    debugPrint('post-fix-meeting.php response: $responseBody');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      if (responseData['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(responseData['data'] ?? 'Meeting scheduled successfully'),
+            backgroundColor: Colors.green,
           ),
-          title: Column(
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to schedule meeting: ${responseData['data']}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${response.reasonPhrase}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error scheduling meeting: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
+void _showMeetingDialog(BuildContext context) {
+  DateTime selectedDate = DateTime.now();
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: Column(
+          children: [
+            const SizedBox(height: 8),
+            const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
+            const SizedBox(height: 4),
+            Text(
+              'Select date',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
+              ListTile(
+                leading: const Icon(
+                  Icons.calendar_today,
+                  color: AppTheme.primaryColor,
+                ),
+                title: const Text('Select Date'),
+                subtitle: Text(
+                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  style: const TextStyle(color: AppTheme.primaryColor),
+                ),
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 30)),
+                  );
+                  if (picked != null && picked != selectedDate) {
+                    selectedDate = picked;
+                    Navigator.pop(context);
+                    _showMeetingDialog(context);
+                  }
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey[300]!),
                 ),
               ),
             ],
           ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: AppTheme.primaryColor,
-                  ),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
-                  ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      selectedDate = picked;
-                      Navigator.pop(context);
-                      _showMeetingDialog(context);
-                    }
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[300]!),
-                  ),
-                ),
-              ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+            ),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
+          ElevatedButton(
+            onPressed: () async {
+              await _fixMeeting(selectedDate);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
               ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
-            ElevatedButton(
-              onPressed: () {
-                debugPrint(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                );
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text(
-                'Schedule Meeting',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+            child: const Text(
+              'Schedule Meeting',
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
+          ),
+        ],
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      );
+    },
+  );
+}
 
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
