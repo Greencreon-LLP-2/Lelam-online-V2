@@ -634,8 +634,8 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                             onLocationRequestSent: _onLocationRequestSent,
                             onProceedWithBid:
                                 () => _proceedWithBid(context, meeting),
-                            onProceedWithoutBid:
-                                () => _proceedWithoutBid(context, meeting),
+                            // onProceedWithoutBid:
+                            //     () => _proceedWithoutBid(context, meeting),
                             onIncreaseBid: () => _increaseBid(context, meeting),
                             onEditDate:
                                 (meeting) => _editDate(context, meeting),
@@ -766,76 +766,76 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<void> _proceedWithoutBid(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-meeting-proceed-without-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-        },
-      );
-      debugPrint(
-        'my-meeting-proceed-without-bid.php response: ${response.body}',
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Proceeded without bid successfully')),
-          );
-          final prefs = await SharedPreferences.getInstance();
-          final meetings =
-              (prefs.getStringList('userMeetings') ?? [])
-                  .map((m) => jsonDecode(m) as Map<String, dynamic>)
-                  .toList();
-          meetings.removeWhere((m) => m['id'] == meeting['id']);
-          meetings.add({
-            ...meeting,
-            'seller_approvel': '1',
-            'admin_approvel': '1',
-          });
-          await prefs.setStringList(
-            'userMeetings',
-            meetings.map((m) => jsonEncode(m)).toList(),
-          );
-          await _loadMeetings();
-          widget.onRefreshMeetings?.call();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to proceed without bid: ${data['message'] ?? 'Unknown error'}',
-              ),
-            ),
-          );
-        }
-      } else {
-        debugPrint(
-          'my-meeting-proceed-without-bid.php failed with status ${response.statusCode}',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to proceed without bid')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error proceeding without bid: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error proceeding without bid')),
-      );
-    }
-  }
+  // Future<void> _proceedWithoutBid(
+  //   BuildContext context,
+  //   Map<String, dynamic> meeting,
+  // ) async {
+  //   if (_userId == null || _userId == 'Unknown') {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Invalid user ID. Please log in again.')),
+  //     );
+  //     return;
+  //   }
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse(
+  //         '${widget.baseUrl}/my-meeting-proceed-without-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}',
+  //       ),
+  //       headers: {
+  //         'token': widget.token,
+  //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+  //       },
+  //     );
+  //     debugPrint(
+  //       'my-meeting-proceed-without-bid.php response: ${response.body}',
+  //     );
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       if (data['status'] == true || data['status'] == 'true') {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Proceeded without bid successfully')),
+  //         );
+  //         final prefs = await SharedPreferences.getInstance();
+  //         final meetings =
+  //             (prefs.getStringList('userMeetings') ?? [])
+  //                 .map((m) => jsonDecode(m) as Map<String, dynamic>)
+  //                 .toList();
+  //         meetings.removeWhere((m) => m['id'] == meeting['id']);
+  //         meetings.add({
+  //           ...meeting,
+  //           'seller_approvel': '1',
+  //           'admin_approvel': '1',
+  //         });
+  //         await prefs.setStringList(
+  //           'userMeetings',
+  //           meetings.map((m) => jsonEncode(m)).toList(),
+  //         );
+  //         await _loadMeetings();
+  //         widget.onRefreshMeetings?.call();
+  //       } else {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text(
+  //               'Failed to proceed without bid: ${data['message'] ?? 'Unknown error'}',
+  //             ),
+  //           ),
+  //         );
+  //       }
+  //     } else {
+  //       debugPrint(
+  //         'my-meeting-proceed-without-bid.php failed with status ${response.statusCode}',
+  //       );
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Failed to proceed without bid')),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error proceeding without bid: $e');
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Error proceeding without bid')),
+  //     );
+  //   }
+  // }
 
   Future<void> _increaseBid(
     BuildContext context,
@@ -1394,7 +1394,7 @@ class MeetingCard extends StatelessWidget {
   final VoidCallback onCancel;
   final Function(String) onLocationRequestSent;
   final VoidCallback onProceedWithBid;
-  final VoidCallback onProceedWithoutBid;
+ // final VoidCallback onProceedWithoutBid;
   final VoidCallback onIncreaseBid;
   final Function(Map<String, dynamic>) onEditDate;
   final Function(Map<String, dynamic>) onEditTime;
@@ -1411,7 +1411,7 @@ class MeetingCard extends StatelessWidget {
     required this.onCancel,
     required this.onLocationRequestSent,
     required this.onProceedWithBid,
-    required this.onProceedWithoutBid,
+  //  required this.onProceedWithoutBid,
     required this.onIncreaseBid,
     required this.onEditDate,
     required this.onEditTime,
@@ -1629,8 +1629,8 @@ class MeetingCard extends StatelessWidget {
                           onEditTime(meeting);
                         } else if (value == 'proceed_with_bid') {
                           onProceedWithBid();
-                        } else if (value == 'proceed_without_bid') {
-                          onProceedWithoutBid();
+                        // } else if (value == 'proceed_without_bid') {
+                        //   onProceedWithoutBid();
                         } else if (value == 'increase_bid') {
                           onIncreaseBid();
                         } else if (value == 'cancel_meeting') {
@@ -1720,7 +1720,7 @@ class MeetingCard extends StatelessWidget {
                         } else if (currentStatus == 'Date Fixed') {
                           items.add(
                             const PopupMenuItem<String>(
-                              value: 'proceed_without_bid',
+                              value: 'proceed_with_bid',
                               child: Row(
                                 children: [
                                   Icon(
@@ -1729,7 +1729,7 @@ class MeetingCard extends StatelessWidget {
                                     color: Colors.blue,
                                   ),
                                   SizedBox(width: 8),
-                                  Text('Proceed without Bid'),
+                                  Text('Proceed with Bid'),
                                 ],
                               ),
                             ),
