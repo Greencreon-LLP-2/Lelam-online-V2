@@ -45,12 +45,13 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   List<MapEntry<String, String>> orderedAttributeValues = [];
   List<Map<String, dynamic>> _bidHistory = [];
   int _currentBid = 0;
-  double _minBidIncrement = 0.0; // Will be set to auction_price_intervel
+  double _minBidIncrement = 0.0;
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
   String sellerActiveFrom = 'N/A';
   String? userId;
+  String _currentHighestBid = '0';
 
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
@@ -66,35 +67,36 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String get auctionEndin => _getProperty('auctionEndin') ?? '';
   String get modelVariation => _getProperty('modelVariation') ?? '';
 
-dynamic _getProperty(String propertyName) {
-  if (widget.product == null) return null;
-  switch (propertyName) {
-    case 'id':
-      return widget.product.id;
-    case 'title':
-      return widget.product.title;
-    case 'image':
-      return widget.product.image;
-    case 'price':
-      return widget.product.price;
-    case 'auctionStartingPrice':
-      return widget.product.auctionStartingPrice;
-    case 'auctionPriceIntervel':
-      return widget.product.auctionPriceIntervel;
-    case 'landMark':
-      return _getLocationName(widget.product.parentZoneId);
-    case 'createdOn':
-      return widget.product.createdOn;
-    case 'createdBy':
-      return widget.product.createdBy;
-    case 'auctionEndin':
-      return widget.product.auctionEndin;
-    case 'modelVariation':
-      return widget.product.modelVariation;
-    default:
-      return null;
+  dynamic _getProperty(String propertyName) {
+    if (widget.product == null) return null;
+    switch (propertyName) {
+      case 'id':
+        return widget.product.id;
+      case 'title':
+        return widget.product.title;
+      case 'image':
+        return widget.product.image;
+      case 'price':
+        return widget.product.price;
+      case 'auctionStartingPrice':
+        return widget.product.auctionStartingPrice;
+      case 'auctionPriceIntervel':
+        return widget.product.auctionPriceIntervel;
+      case 'landMark':
+        return _getLocationName(widget.product.parentZoneId);
+      case 'createdOn':
+        return widget.product.createdOn;
+      case 'createdBy':
+        return widget.product.createdBy;
+      case 'auctionEndin':
+        return widget.product.auctionEndin;
+      case 'modelVariation':
+        return widget.product.modelVariation;
+      default:
+        return null;
+    }
   }
-}
+
   @override
   void initState() {
     super.initState();
@@ -102,64 +104,142 @@ dynamic _getProperty(String propertyName) {
     _fetchData();
     _fetchSellerInfo();
   }
-Future<void> _loadUserId() async {
+
+  Future<void> _loadUserId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       userId = prefs.getString('userId') ?? 'Unknown';
     });
-    // Print userId in debug console
+
     debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
   }
- Future<void> _fetchData() async {
-  setState(() {
-    _isLoading = true;
-    _isLoadingLocations = true;
-  });
 
-  try {
-    // Fetch locations
-    final locationResponse = await _locationService.fetchLocations();
-    if (locationResponse != null && locationResponse.status) {
-      _locations = locationResponse.data;
-    } else {
-      throw Exception('Failed to load locations');
+  Future<void> _fetchData() async {
+    setState(() {
+      _isLoading = true;
+      _isLoadingLocations = true;
+    });
+
+    try {
+      final locationResponse = await _locationService.fetchLocations();
+      if (locationResponse != null && locationResponse.status) {
+        _locations = locationResponse.data;
+      } else {
+        throw Exception('Failed to load locations');
+      }
+
+      attributes = await ApiService.fetchAttributes();
+      attributeVariations = await ApiService.fetchAttributeVariations(
+        widget.product.filters,
+      );
+      final attributeValuePairs =
+          await AttributeValueService.fetchAttributeValuePairs();
+      _mapFiltersToValues(attributeValuePairs);
+
+      _bidHistory = await _auctionService.fetchBidHistory(id);
+      _minBidIncrement = double.tryParse(auctionPriceIntervel) ?? 2500.0;
+
+      // New: Fetch highest bid from API
+      await _fetchCurrentHighestBid();
+
+      // Fallback to local calculation if API fails (e.g., _currentHighestBid starts with 'Error')
+      if (_currentHighestBid == '0' || _currentHighestBid.startsWith('Error')) {
+        _currentBid =
+            _bidHistory.isNotEmpty
+                ? int.tryParse(
+                      _bidHistory[0]['amount']
+                              ?.replaceAll('₹', '')
+                              .replaceAll(',', '') ??
+                          '0',
+                    ) ??
+                    0
+                : int.tryParse(auctionStartingPrice) ?? 0;
+      } else {
+        _currentBid = int.tryParse(_currentHighestBid) ?? 0;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      print('Error fetching auction data: $e');
+      setState(() {
+        _isLoading = false;
+        _isLoadingLocations = false;
+      });
     }
-
-    // Fetch attributes and variations
-    attributes = await ApiService.fetchAttributes();
-    attributeVariations = await ApiService.fetchAttributeVariations(
-      widget.product.filters,
-    );
-    final attributeValuePairs =
-        await AttributeValueService.fetchAttributeValuePairs();
-    _mapFiltersToValues(attributeValuePairs);
-
-    // Fetch auction-specific data
-    _bidHistory = await _auctionService.fetchBidHistory(id);
-    _minBidIncrement = double.tryParse(auctionPriceIntervel) ?? 2500.0; // Use auction_price_intervel
-    _currentBid =
-        _bidHistory.isNotEmpty
-            ? int.tryParse(
-                  _bidHistory[0]['amount']
-                          ?.replaceAll('₹', '')
-                          .replaceAll(',', '') ??
-                      '0',
-                ) ??
-                0
-            : int.tryParse(auctionStartingPrice) ?? 0;
-
-    setState(() {
-      _isLoading = false;
-      _isLoadingLocations = false;
-    });
-  } catch (e) {
-    print('Error fetching auction data: $e');
-    setState(() {
-      _isLoading = false;
-      _isLoadingLocations = false;
-    });
   }
-}
+
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      setState(() {
+        _isLoading = true; // Reuse for UI feedback
+      });
+
+      final headers = {
+        'token': token,
+        'Cookie':
+            'PHPSESSID=a99k454ctjeu4sp52ie9dgua76', // Reuse from marketplace
+      };
+      final url =
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
+      debugPrint('Fetching highest bid: $url'); // Logs full URL
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint(
+        'Full API response body: $responseBody',
+      ); // Shows PHP notice + JSON
+      debugPrint('Response status code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed response data: $responseData'); // Full JSON
+
+        if (responseData['status'] == true) {
+          final dataValue = responseData['data']?.toString() ?? '0';
+          // Check if data is numeric; otherwise, treat as error
+          if (int.tryParse(dataValue) != null) {
+            setState(() {
+              _currentHighestBid = dataValue;
+            });
+            debugPrint('Successfully fetched highest bid: $dataValue');
+          } else {
+            // Handle non-numeric (e.g., "Please provide valid data")
+            debugPrint('API returned non-numeric data (error): $dataValue');
+            setState(() {
+              _currentHighestBid = 'Error: $dataValue';
+            });
+          }
+        } else {
+          debugPrint('API status false: ${responseData['data']}');
+          setState(() {
+            _currentHighestBid = 'Error: Failed to fetch';
+          });
+        }
+      } else {
+        debugPrint(
+          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
+        );
+        setState(() {
+          _currentHighestBid = 'Error: Network issue';
+        });
+      }
+    } catch (e) {
+      debugPrint('Exception in fetch highest bid: $e');
+      setState(() {
+        _currentHighestBid = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
@@ -379,558 +459,370 @@ Future<void> _loadUserId() async {
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
   }
-List<String> get _images {
-  if (image.isNotEmpty) {
-    return ['https://lelamonline.com/admin/$image'];
+
+  List<String> get _images {
+    if (image.isNotEmpty) {
+      return ['https://lelamonline.com/admin/$image'];
+    }
+    return [
+      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    ];
   }
-  return [
-    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-  ];
-}
-void _showFullScreenGallery(BuildContext context) {
-  Navigator.of(context).push(
-    PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black.withOpacity(0.5),
-      pageBuilder: (BuildContext context, _, __) {
-        final PageController fullScreenController = PageController(
-          initialPage: _currentImageIndex,
-        );
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Scaffold(
-              backgroundColor: Colors.white,
-              body: Stack(
-                children: [
-                  PageView.builder(
-                    controller: fullScreenController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentImageIndex = index;
-                        _resetZoom();
-                      });
-                      _pageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
-                    },
-                    itemCount: _images.length,
-                    itemBuilder: (context, index) {
-                      return InteractiveViewer(
-                        transformationController: _transformationController,
-                        minScale: 0.5,
-                        maxScale: 5.0,
-                        boundaryMargin: const EdgeInsets.all(double.infinity),
-                        child: GestureDetector(
-                          onDoubleTap: _resetZoom,
-                          child: Hero(
-                            tag: 'image_$index',
-                            child: CachedNetworkImage(
-                              imageUrl: _images[index],
-                              fit: BoxFit.contain,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: Colors.grey[200],
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.error_outline,
-                                    size: 50,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  CustomSafeArea(
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: () => Navigator.of(context).pop(),
-                                ),
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  '${_currentImageIndex + 1}/${_images.length}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          height: 70,
-                          margin: const EdgeInsets.only(bottom: 20),
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _images.length,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                            ),
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () {
-                                  fullScreenController.animateToPage(
-                                    index,
-                                    duration: const Duration(
-                                      milliseconds: 300,
+
+  void _showFullScreenGallery(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withOpacity(0.5),
+        pageBuilder: (BuildContext context, _, __) {
+          final PageController fullScreenController = PageController(
+            initialPage: _currentImageIndex,
+          );
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return Scaffold(
+                backgroundColor: Colors.white,
+                body: Stack(
+                  children: [
+                    PageView.builder(
+                      controller: fullScreenController,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentImageIndex = index;
+                          _resetZoom();
+                        });
+                        _pageController.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                      itemCount: _images.length,
+                      itemBuilder: (context, index) {
+                        return InteractiveViewer(
+                          transformationController: _transformationController,
+                          minScale: 0.5,
+                          maxScale: 5.0,
+                          boundaryMargin: const EdgeInsets.all(double.infinity),
+                          child: GestureDetector(
+                            onDoubleTap: _resetZoom,
+                            child: Hero(
+                              tag: 'image_$index',
+                              child: CachedNetworkImage(
+                                imageUrl: _images[index],
+                                fit: BoxFit.contain,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                    curve: Curves.easeInOut,
-                                  );
-                                },
-                                child: Container(
-                                  width: 70,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: _currentImageIndex == index
-                                          ? Colors.blue
-                                          : Colors.transparent,
-                                      width: 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.black.withOpacity(0.3),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: CachedNetworkImage(
-                                      imageUrl: _images[index],
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
                                         ),
                                       ),
-                                      errorWidget: (context, url, error) => const Icon(
-                                        Icons.error,
-                                        size: 20,
-                                      ),
+                                    ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    CustomSafeArea(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '${_currentImageIndex + 1}/${_images.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                          const Spacer(),
+                          Container(
+                            height: 70,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _images.length,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    fullScreenController.animateToPage(
+                                      index,
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
+                                      curve: Curves.easeInOut,
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 70,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.black.withOpacity(0.3),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: CachedNetworkImage(
+                                        imageUrl: _images[index],
+                                        fit: BoxFit.cover,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
+                                            ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    ),
-  );
-}
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
 void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
   final TextEditingController bidAmountController = TextEditingController();
   if (isIncrease) {
-    bidAmountController.text = (_currentBid + _minBidIncrement).toInt().toString();
+    bidAmountController.text =
+        (_currentBid + _minBidIncrement).toInt().toString();
   }
 
   showDialog(
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
-      return Dialog(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.9,
-          constraints: const BoxConstraints(maxWidth: 400),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-                spreadRadius: 0,
+      return AlertDialog(
+        title: Text(isIncrease ? 'Increase Your Bid' : 'Place Your Bid'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Enter your bid amount in rupees'),
+            const SizedBox(height: 16),
+            
+            // Current Bid Info
+            Text(
+              'Current Highest Bid',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue[600]!, Colors.blue[700]!],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.gavel,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      isIncrease ? 'Increase Your Bid' : 'Place Your Bid',
-                      style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Enter your bid amount in rupees',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _currentHighestBid.startsWith('Error')
+                  ? _currentHighestBid
+                  : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
+              style: TextStyle(
+                color: _currentHighestBid.startsWith('Error') ? Colors.red : null,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
-              
-              // Content Section
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    // Current Bid Info Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.grey[50]!, Colors.grey[100]!],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[200]!, width: 1),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'Current Highest Bid',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '₹${NumberFormat('#,##,###').format(_currentBid)}',
-                            style: TextStyle(
-                              color: Colors.grey[800],
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (isIncrease) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.amber[100],
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.amber[300]!, width: 1),
-                              ),
-                              child: Text(
-                                'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
-                                style: TextStyle(
-                                  color: Colors.amber[800],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Bid Input Field
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withOpacity(0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: bidAmountController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          prefixIcon: Container(
-                            margin: const EdgeInsets.only(left: 20, right: 8),
-                            child: Text(
-                              '₹',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[600],
-                              ),
-                            ),
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 0,
-                            minHeight: 0,
-                          ),
-                          hintText: '0',
-                          hintStyle: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: Colors.grey[300]!,
-                              width: 2,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: Colors.blue[600]!,
-                              width: 3,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              
-              // Action Buttons
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.grey[300]!, width: 2),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final String amount = bidAmountController.text;
-                          if (amount.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a bid amount'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            return;
-                          }
-
-                          final int bidAmount = int.tryParse(amount) ?? 0;
-                          final double minimumPrice = _currentBid + _minBidIncrement;
-                          if (bidAmount <= _currentBid) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
-                                ),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            return;
-                          }
-                          if (bidAmount < minimumPrice) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
-                                ),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            return;
-                          }
-
-                          if (userId == null || userId == 'Unknown') {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please log in to place a bid'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            return;
-                          }
-
-                          try {
-                            final success = await _auctionService.placeBid(
-                              id,
-                              userId!, // Use actual userId from SharedPreferences
-                              bidAmount,
-                            );
-                            if (success) {
-                              setState(() {
-                                _currentBid = bidAmount;
-                                _bidHistory.insert(0, {
-                                  'bidder': 'You', // Replace with actual user name if available
-                                  'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
-                                  'time': 'Just now',
-                                });
-                              });
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Bid placed successfully!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to place bid'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error placing bid: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[600],
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.gavel, size: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              isIncrease ? 'Increase Bid' : 'Submit Bid',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+            ),
+            
+            if (isIncrease) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
-          ),
+            
+            const SizedBox(height: 16),
+
+            // Bid Input Field
+            TextField(
+              controller: bidAmountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: false,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              decoration: InputDecoration(
+                prefixText: '₹',
+                hintText: '0',
+                labelText: 'Enter bid amount',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final String amount = bidAmountController.text;
+              if (amount.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a bid amount'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              final int bidAmount = int.tryParse(amount) ?? 0;
+              final double minimumPrice =
+                  _currentBid + _minBidIncrement;
+              if (bidAmount <= _currentBid) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              if (bidAmount < minimumPrice) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              if (userId == null || userId == 'Unknown') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please log in to place a bid'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              try {
+                final success = await _auctionService.placeBid(
+                  id,
+                  userId!, // Use actual userId from SharedPreferences
+                  bidAmount,
+                );
+                if (success) {
+                  setState(() {
+                    _currentBid = bidAmount;
+                    _bidHistory.insert(0, {
+                      'bidder':
+                          'You', // Replace with actual user name if available
+                      'amount':
+                          '₹${NumberFormat('#,##').format(bidAmount)}',
+                      'time': 'Just now',
+                    });
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bid placed successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to place bid'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error placing bid: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text(isIncrease ? 'Increase Bid' : 'Submit Bid'),
+          ),
+        ],
       );
     },
   );
@@ -1095,519 +987,537 @@ void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
     super.dispose();
   }
 
-@override
-Widget build(BuildContext context) {
-  final auctionEndTime =
-      DateTime.tryParse(auctionEndin) ??
-      DateTime.now().add(const Duration(days: 2, hours: 5));
-  final timeLeft = auctionEndTime.difference(DateTime.now());
+  @override
+  Widget build(BuildContext context) {
+    final auctionEndTime =
+        DateTime.tryParse(auctionEndin) ??
+        DateTime.now().add(const Duration(days: 2, hours: 5));
+    final timeLeft = auctionEndTime.difference(DateTime.now());
 
-  return CustomSafeArea(
-    child: Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Scrollable content
-          SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Image Gallery
-                Stack(
-                  children: [
-                    SizedBox(
-                      height: 400,
-                      child: Stack(
-                        children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _images.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentImageIndex = index;
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => _showFullScreenGallery(context),
-                                child: CachedNetworkImage(
-                                  imageUrl: _images[index],
-                                  width: double.infinity,
-                                  height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
-                                ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_currentImageIndex + 1}/${_images.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    CustomSafeArea(
-                      child: Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => context.pop(),
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // TODO: Implement share functionality
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                // Current Highest Bid Banner
-                if (_isLoading)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    color: Colors.blue.shade50,
-                    child: Center(
-                      child: Column(
-                        children: [
-                          const Text(
-                            'CURRENT HIGHEST BID',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '₹${NumberFormat('#,##0').format(_currentBid)}',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                // Auction Timer
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  color: Colors.red.shade50,
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.timer, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Product Details
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return CustomSafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            // Scrollable content
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image Gallery
+                  Stack(
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                      SizedBox(
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            PageView.builder(
+                              controller: _pageController,
+                              itemCount: _images.length,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentImageIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _showFullScreenGallery(context),
+                                  child: CachedNetworkImage(
+                                    imageUrl: _images[index],
+                                    width: double.infinity,
+                                    height: 400,
+                                    fit: BoxFit.cover,
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) =>
+                                            const Icon(Icons.error),
+                                  ),
+                                );
+                              },
+                            ),
+                            Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${_images.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        modelVariation,
-                        style: TextStyle(fontSize: 18, color: Colors.grey[700]),
+                      CustomSafeArea(
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => context.pop(),
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(
+                                _isFavorited
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isFavorited ? Colors.red : Colors.white,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isFavorited = !_isFavorited;
+                                });
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.share,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                // TODO: Implement share functionality
+                              },
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Colors.grey,
+                    ],
+                  ),
+                  // Current Highest Bid Banner
+                  // Current Highest Bid Banner
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      color: Colors.blue.shade50,
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Text(
+                              'CURRENT HIGHEST BID',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentHighestBid.startsWith('Error')
+                                  ? _currentHighestBid // e.g., "Error: Please provide valid data"
+                                  : '₹${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    _currentHighestBid.startsWith('Error')
+                                        ? Colors.red
+                                        : Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Auction Timer
+                  // Container(
+                  //   padding: const EdgeInsets.symmetric(vertical: 8),
+                  //   color: Colors.red.shade50,
+                  //   child: Center(
+                  //     child: Row(
+                  //       mainAxisAlignment: MainAxisAlignment.center,
+                  //       children: [
+                  //         const Icon(Icons.timer, color: Colors.red),
+                  //         const SizedBox(width: 8),
+                  //         Text(
+                  //           'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
+                  //           style: const TextStyle(
+                  //             fontSize: 16,
+                  //             fontWeight: FontWeight.w600,
+                  //             color: Colors.red,
+                  //           ),
+                  //         ),
+                  //       ],
+                  //     ),
+                  //   ),
+                  // ),
+                  // Product Details
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          modelVariation,
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            _isLoadingLocations
+                                ? const SizedBox(
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Text(
+                                : Text(
                                   landMark,
                                   style: const TextStyle(color: Colors.grey),
                                 ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Starting Price',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
+                            const Spacer(),
+                            // const Icon(
+                            //   Icons.access_time,
+                            //   size: 16,
+                            //   color: Colors.grey,
+                            // ),
+                            // const SizedBox(width: 4),
+                            // Text(
+                            //   'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
+                            //   style: const TextStyle(color: Colors.grey),
+                            // ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Starting Price',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
+                                  Text(
+                                    '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Target Price',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '#AD ID $id',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // TODO: Implement call functionality
-                            },
-                            icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero,
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Details Section
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Details',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.calendar_today,
-                                    attributeValues['Year'] ?? 'N/A',
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.person,
-                                    _getOwnerText(
-                                      attributeValues['No of owners'] ?? 'N/A',
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Target Price',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey,
                                     ),
                                   ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.speed,
-                                    _formatNumber(
-                                      attributeValues['KM Range'] ?? 'N/A',
+                                  Text(
+                                    '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[700],
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.local_gas_station,
-                                    attributeValues['Fuel Type'] ?? 'N/A',
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildDetailItem(
-                                    Icons.settings,
-                                    attributeValues['Transmission'] ?? 'N/A',
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Seller Comments
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Comments',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children: orderedAttributeValues
-                              .where(
-                                (entry) =>
-                                    entry.value != 'N/A' &&
-                                    entry.key != 'Co driver side rear tyre',
-                              )
-                              .map(
-                                (entry) => _buildSellerCommentItem(
-                                  entry.key,
-                                  entry.key == 'No of owners'
-                                      ? _getOwnerText(entry.value)
-                                      : entry.value,
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '#AD ID $id',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                // TODO: Implement call functionality
+                              },
+                              icon: const Icon(Icons.call),
+                              label: const Text('Call Support'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
                                 ),
-                              )
-                              .toList(),
+                              ),
+                            ),
+                          ],
                         ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const Divider(),
-                // Seller Information
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Information',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSellerInformationItem(context),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                // Bidding History
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Bidding History',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (_bidHistory.isEmpty)
+                  const Divider(),
+                  // Details Section
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         const Text(
-                          'No bids yet',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        )
-                      else
-                        Column(
-                          children: _bidHistory
-                              .map(
-                                (bid) => _buildBidHistoryItem(
-                                  bid['bidder'] ?? 'Unknown',
-                                  bid['amount'] ?? 'N/A',
-                                  bid['time'] ?? 'N/A',
-                                ),
-                              )
-                              .toList(),
+                          'Details',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                    ],
+                        const SizedBox(height: 12),
+                        if (_isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.calendar_today,
+                                      attributeValues['Year'] ?? 'N/A',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.person,
+                                      _getOwnerText(
+                                        attributeValues['No of owners'] ??
+                                            'N/A',
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.speed,
+                                      _formatNumber(
+                                        attributeValues['KM Range'] ?? 'N/A',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.local_gas_station,
+                                      attributeValues['Fuel Type'] ?? 'N/A',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.settings,
+                                      attributeValues['Transmission'] ?? 'N/A',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
+                  const Divider(),
+                  // Seller Comments
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Seller Comments',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          Column(
+                            children:
+                                orderedAttributeValues
+                                    .where(
+                                      (entry) =>
+                                          entry.value != 'N/A' &&
+                                          entry.key !=
+                                              'Co driver side rear tyre',
+                                    )
+                                    .map(
+                                      (entry) => _buildSellerCommentItem(
+                                        entry.key,
+                                        entry.key == 'No of owners'
+                                            ? _getOwnerText(entry.value)
+                                            : entry.value,
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  // Seller Information
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Seller Information',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSellerInformationItem(context),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  // Bidding History
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Bidding History',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_isLoading)
+                          const Center(child: CircularProgressIndicator())
+                        else if (_bidHistory.isEmpty)
+                          const Text(
+                            'No bids yet',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          )
+                        else
+                          Column(
+                            children:
+                                _bidHistory
+                                    .map(
+                                      (bid) => _buildBidHistoryItem(
+                                        bid['bidder'] ?? 'Unknown',
+                                        bid['amount'] ?? 'N/A',
+                                        bid['time'] ?? 'N/A',
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Bottom padding to prevent content from being hidden under fixed buttons
+                  const SizedBox(height: 80), // Adjusted to match button height
+                ],
+              ),
+            ),
+            // Fixed buttons at the bottom
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 15,
+                      spreadRadius: 0,
+                      offset: Offset(1, 3),
+                    ),
+                  ],
                 ),
-                // Bottom padding to prevent content from being hidden under fixed buttons
-                const SizedBox(height: 80), // Adjusted to match button height
-              ],
-            ),
-          ),
-          // Fixed buttons at the bottom
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-             
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 15,
-                    spreadRadius: 0,
-                    offset: Offset(1, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primarypink,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
                         ),
+                        child: const Text('Enter Price'),
                       ),
-                      child: const Text('Enter Price'),
                     ),
-                  ),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showBidDialog(context, isIncrease: true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed:
+                            () => _showBidDialog(context, isIncrease: true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
                         ),
+                        child: const Text('Increase minimum Bid'),
                       ),
-                      child: const Text('Increase minimum Bid'),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildDetailItem(IconData icon, String text) {
     return Row(
