@@ -7,7 +7,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// StatusPill and PillConnector remain unchanged
+
 class StatusPill extends StatelessWidget {
   final String label;
   final bool isActive;
@@ -339,61 +339,51 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
             final middleStatus =
                 statusData?['middleStatus_data']?.toString() ??
                 'Schedule meeting';
-            final meetingData = {
-              'id': meeting['id']?.toString() ?? 'N/A',
-              'user_id': meeting['user_id']?.toString() ?? _userId,
-              'post_id': meeting['post_id']?.toString() ?? 'N/A',
-              'bid_id': meeting['bid_id']?.toString() ?? '0',
-              'with_bid': meeting['with_bid']?.toString() ?? '0',
-              'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
-              'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
-              'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
-              'if_location_request':
-                  meeting['if_location_request']?.toString() ?? '0',
-              'latitude': meeting['latitude']?.toString() ?? '',
-              'longitude': meeting['longitude']?.toString() ?? '',
-              'location_link': meeting['location_link']?.toString() ?? '',
-              'location_request_count':
-                  meeting['location_request_count']?.toString() ?? '0',
-              'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
-              'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
-              'status': meeting['status']?.toString() ?? '1',
-              'meeting_done': meeting['meeting_done']?.toString() ?? '0',
-              'if_junk': meeting['if_junk']?.toString() ?? '0',
-              'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
-              'if_skipped': meeting['if_skipped']?.toString() ?? '0',
-              'if_not_intersect':
-                  meeting['if_not_intersect']?.toString() ?? '0',
-              'if_revisit': meeting['if_revisit']?.toString() ?? '0',
-              'if_decisionpedding':
-                  meeting['if_decisionpedding']?.toString() ?? '0',
-              'if_expired': meeting['if_expired']?.toString() ?? '0',
-              'if_cancel': meeting['if_cancel']?.toString() ?? '0',
-              'if_sold': meeting['if_sold']?.toString() ?? '0',
-              'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
-              'price_offered': meeting['price_offered']?.toString() ?? '0.00',
-              'created_on':
-                  meeting['created_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'updated_on':
-                  meeting['updated_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'title':
-                  postDetails['title'] ??
-                  'Unknown Vehicle (ID: ${meeting['post_id']})',
-              'carImage': postDetails['image'] ?? '',
-              'appId': 'APP_${meeting['post_id']}',
-              'bidDate':
-                  meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
-              'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
-              'targetPrice': postDetails['price'] ?? '0',
-              'bidPrice': meeting['bid_amount']?.toString() ?? '0',
-              'location': postDetails['location'] ?? 'Unknown Location',
-              'store':
-                  postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
-              'if_auction': meeting['if_auction']?.toString() ?? '0',
-              'middleStatus_data': middleStatus,
-            };
+            final meetingData = <String, dynamic>{
+  'id': meeting['id']?.toString() ?? 'N/A',
+  'user_id': meeting['user_id']?.toString() ?? _userId,
+  'post_id': meeting['post_id']?.toString() ?? 'N/A',
+  'bid_id': meeting['bid_id']?.toString() ?? '0',
+  'with_bid': meeting['with_bid']?.toString() ?? '0',
+  'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
+  'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
+  'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
+  'if_location_request': meeting['if_location_request']?.toString() ?? '0',
+  'latitude': meeting['latitude']?.toString() ?? '',
+  'longitude': meeting['longitude']?.toString() ?? '',
+  'location_link': meeting['location_link']?.toString() ?? '',
+  'location_request_count': meeting['location_request_count']?.toString() ?? '0',
+  'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
+  'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
+  'status': meeting['status']?.toString() ?? '1',
+  'meeting_done': meeting['meeting_done']?.toString() ?? '0',
+  'if_junk': meeting['if_junk']?.toString() ?? '0',
+  'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
+  'if_skipped': meeting['if_skipped']?.toString() ?? '0',
+  'if_not_intersect': meeting['if_not_intersect']?.toString() ?? '0',
+  'if_revisit': meeting['if_revisit']?.toString() ?? '0',
+  'if_decisionpedding': meeting['if_decisionpedding']?.toString() ?? '0',
+  'if_expired': meeting['if_expired']?.toString() ?? '0',
+  'if_cancel': meeting['if_cancel']?.toString() ?? '0',
+  'if_sold': meeting['if_sold']?.toString() ?? '0',
+  'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
+  'price_offered': meeting['price_offered']?.toString() ?? '0.00',
+  'created_on': meeting['created_on']?.toString() ??
+      DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+  'updated_on': meeting['updated_on']?.toString() ??
+      DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+  'title': postDetails['title'] ?? 'Unknown Vehicle (ID: ${meeting['post_id']})',
+  'carImage': postDetails['image'] ?? '',
+  'appId': 'APP_${meeting['post_id']}',
+  'bidDate': meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
+  'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
+  'targetPrice': postDetails['price'] ?? '0',
+  'bidPrice': meeting['bid_amount']?.toString() ?? '0',
+  'location': postDetails['location'] ?? 'Unknown Location',
+  'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
+  'if_auction': meeting['if_auction']?.toString() ?? '0',
+  'middleStatus_data': middleStatus,
+};
             debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
             meetings.add(meetingData);
           }
@@ -672,11 +662,41 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     if (meeting['bid_amount'] == null ||
         meeting['bid_amount'] == '0.00' ||
         meeting['bid_id'] == '0') {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No valid bid found')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No valid bid found')),
+      );
       return;
     }
+
+    // Show confirmation dialog with bid amount
+    final double bidAmount =
+        double.tryParse(meeting['bid_amount']?.toString() ?? '0.00') ?? 0.00;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Bid'),
+        content: Text(
+          'Do you want to proceed with a bid of ₹${NumberFormat('#,##0').format(bidAmount)}?',
+          style: const TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      debugPrint('Bid confirmation cancelled by user');
+      return;
+    }
+
     try {
       final response = await http.get(
         Uri.parse(

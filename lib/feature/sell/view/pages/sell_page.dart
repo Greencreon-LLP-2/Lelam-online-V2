@@ -50,6 +50,7 @@ class _SellPageState extends State<SellPage> {
     }
 
     try {
+      // Reverted to original endpoint (exists on server and returns JSON)
       final response = await http.get(
         Uri.parse(
           'https://lelamonline.com/admin/api/v1/select-category.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=${widget.userId}&cat_id=$categoryId',
@@ -67,50 +68,68 @@ class _SellPageState extends State<SellPage> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'true' && data['code'] == 4) {
-          await showDialog(
-            context: context,
-            builder:
-                (context) => AlertDialog(
-                  title: const Text('Post Limit Exceeded'),
-                  content: Text(
-                    data['data'] ??
-                        'You have posted your permitted post limit in this category. Please upgrade your plan.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('OK'),
-                    ),
-                  ],
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Post Limit Exceeded'),
+                content: Text(
+                  data['data'] ??
+                      'You have posted your permitted post limit in this category. Please upgrade your plan.',
                 ),
-          );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
           return false; // Limit exceeded
         }
-        return true; // Limit not exceeded
+        return true; // Limit not exceeded (or no limit info)
       } else {
         print('Failed to check post limit: ${response.reasonPhrase}');
-        return false;
+        return false; // Fail closed on error
       }
     } catch (e) {
       print('Error checking post limit: $e');
-      return false;
+      return false; // Fail closed on exception
     }
   }
 
   void _navigateToAdPost(BuildContext context, String categoryId) async {
     if (_isUserNotLoggedIn) {
-      return; // UI handles login prompt
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to post an ad'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      context.pushNamed(RouteNames.loginPage);
+      return;
     }
 
     final canPost = await _checkPostLimit(categoryId);
     if (!canPost) {
-      return; // Dialog shown in _checkPostLimit
+      return; // Dialog shown in _checkPostLimit, or failed silently
     }
 
-    context.pushReplacement(
-      RouteNames.adPostPage,
-      extra: {'categoryId': categoryId, 'userId': widget.userId},
-    );
+    // Pass extra as Map<String, dynamic> for type safety
+    final extraData = <String, dynamic>{
+      'categoryId': categoryId,
+      'userId': widget.userId,
+    };
+
+    if (mounted) {
+      context.pushNamed(
+        RouteNames.adPostPage,
+        extra: extraData,
+      );
+    }
   }
 
   @override
@@ -236,22 +255,19 @@ class _CategoryCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: categoryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
-                    image:
-                        category.imageUrl != null
-                            ? DecorationImage(
-                              image: NetworkImage(category.imageUrl!),
-                              fit: BoxFit.cover,
-                              onError:
-                                  (exception, stackTrace) => const AssetImage(
-                                    'assets/placeholder.png',
-                                  ),
-                            )
-                            : null,
+                    image: category.imageUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(category.imageUrl!),
+                            fit: BoxFit.cover,
+                            onError: (exception, stackTrace) {
+                              print('Image load error: $exception');
+                            },
+                          )
+                        : null,
                   ),
-                  child:
-                      category.imageUrl == null
-                          ? Icon(category.icon, color: categoryColor, size: 28)
-                          : null,
+                  child: category.imageUrl == null
+                      ? Icon(category.icon, color: categoryColor, size: 28)
+                      : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(
