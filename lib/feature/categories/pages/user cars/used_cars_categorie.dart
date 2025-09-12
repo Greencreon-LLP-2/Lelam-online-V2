@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -33,11 +34,6 @@ class MarketplaceService {
   }) async {
     final cacheKey = '$categoryId-$userZoneId-$listingType-$userId';
 
-    if (_postsCache.containsKey(cacheKey)) {
-      print('Returning cached posts for $cacheKey');
-      return _postsCache[cacheKey]!;
-    }
-
     final endpoint =
         listingType == 'auction'
             ? '$baseUrl/list-category-post-auction.php'
@@ -49,8 +45,10 @@ class MarketplaceService {
             : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
 
     try {
+      print('Fetching posts from: $url');
       final response = await http.get(Uri.parse(url));
-
+      print('API Response Status: ${response.statusCode}');
+      print('API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
 
@@ -68,11 +66,22 @@ class MarketplaceService {
           _postsCache[cacheKey] = posts;
           return posts;
         } else if (decodedBody is Map && decodedBody.containsKey('data')) {
-          final data = decodedBody['data'] as List;
-          final posts =
-              data.map((json) => MarketplacePost.fromJson(json)).toList();
-          _postsCache[cacheKey] = posts;
-          return posts;
+          if (decodedBody['data'] is List) {
+            final data = decodedBody['data'] as List;
+            final posts =
+                data.map((json) => MarketplacePost.fromJson(json)).toList();
+            _postsCache[cacheKey] = posts;
+            return posts;
+          } else if (decodedBody['data'] ==
+              'Please accept live auction terms') {
+            throw Exception('Please accept live auction terms');
+          } else if (decodedBody['data'] == 'Data not found') {
+            print('No posts found for $listingType');
+            _postsCache[cacheKey] = [];
+            return [];
+          } else {
+            throw Exception('Unexpected data format: ${decodedBody['data']}');
+          }
         } else {
           throw Exception('Unexpected API response format');
         }
@@ -82,6 +91,47 @@ class MarketplaceService {
     } catch (e) {
       print('Error in fetchPosts ($listingType): $e');
       throw Exception('Error fetching posts: $e');
+    }
+  }
+
+  Future<String> fetchAuctionTerms() async {
+    final url = '$baseUrl/live-auction-terms.php?token=$token';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody is Map && decodedBody.containsKey('data')) {
+          return decodedBody['data']?.toString() ?? '';
+        } else {
+          throw Exception('Unexpected terms response format');
+        }
+      } else {
+        throw Exception('Failed to load terms: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching auction terms: $e');
+      throw Exception('Error fetching terms: $e');
+    }
+  }
+
+  Future<bool> acceptAuctionTerms(String userId) async {
+    final url =
+        '$baseUrl/live-auction-terms-accept.php?token=$token&user_id=$userId';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody['status'] == 'true') {
+          return true;
+        } else {
+          throw Exception('Failed to accept terms: ${decodedBody['data']}');
+        }
+      } else {
+        throw Exception('Failed to accept terms: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error accepting auction terms: $e');
+      return false;
     }
   }
 
@@ -148,11 +198,126 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<String> _selectedTransmissions = [];
   String _selectedKmRange = 'all';
   String _selectedSoldBy = 'all';
-  late ScrollController _scrollController;
+  ScrollController _scrollController = ScrollController();
   bool _showAppBarSearch = false;
 
+  Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
+    bool isAccepted = false;
+    String termsHtml = '';
+    bool isLoadingTerms = true;
+    String? termsError;
+
+    try {
+      termsHtml = await _marketplaceService.fetchAuctionTerms();
+      isLoadingTerms = false;
+    } catch (e) {
+      termsError = e.toString();
+      isLoadingTerms = false;
+    }
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool dialogIsAccepted = false;
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setDialogState) {
+            return AlertDialog(
+              title: const Text('Auction Terms & Conditions'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoadingTerms)
+                      const Center(child: CircularProgressIndicator())
+                    else if (termsError != null)
+                      Text(
+                        'Error loading terms: $termsError',
+                        style: const TextStyle(fontSize: 14, color: Colors.red),
+                      )
+                    else
+                      Html(
+                        data: termsHtml,
+                        style: {'body': Style(fontSize: FontSize(14))},
+                      ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      title: const Text('I accept the terms and conditions'),
+                      value: dialogIsAccepted,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          dialogIsAccepted = value ?? false;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      dialogIsAccepted && !isLoadingTerms && termsError == null
+                          ? () async {
+                            bool accepted = await _marketplaceService
+                                .acceptAuctionTerms(_userId ?? '');
+                            if (accepted) {
+                              await _storage.write(
+                                key: 'auction_terms_accepted',
+                                value: 'true',
+                              );
+                              Navigator.pop(dialogContext, true);
+                            } else {
+                              setState(() {
+                                _errorMessage =
+                                    'Failed to accept terms. Please try again.';
+                              });
+                              Navigator.pop(dialogContext, false);
+                            }
+                          }
+                          : null,
+                  child: const Text('Accept'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((value) {
+      isAccepted = value ?? false;
+    });
+
+    return isAccepted;
+  }
+
+  Future<bool> _checkAuctionTermsAcceptance() async {
+    final url =
+        '${MarketplaceService.baseUrl}/auction-start-checking.php?token=${MarketplaceService.token}&cat_id=14';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody['status'] == 'true' &&
+            decodedBody['data'] == 'Please accept live auction terms') {
+          return false;
+        }
+        return true;
+      } else {
+        throw Exception(
+          'Failed to check auction terms: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Error checking auction terms: $e');
+      return false;
+    }
+  }
+
   Future<void> _checkLoginStatus() async {
-    final userId = widget.userId ?? await _storage.read(key: 'userId');
+    final userId = widget.userId ?? await _storage.read(key: 'userId') ?? '';
     if (mounted) {
       setState(() {
         _userId = userId;
@@ -188,42 +353,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-    _scrollController.addListener(_handleScroll);
-    _listingType = widget.showAuctions ? 'auction' : 'sale';
-    _checkLoginStatus().then((_) {
-      if (_listingType == 'auction' && _userId == null) {
-        context.pushNamed(
-          RouteNames.pleaseLoginPage,
-          extra: {'redirectToAuctions': true},
-        );
-      } else {
-        _fetchProducts();
-      }
-    });
-    _fetchLocations();
-    _fetchAttributesAndVariations();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_handleScroll);
-    _scrollController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _handleScroll() {
-    if (_scrollController.offset > 100 && !_showAppBarSearch) {
-      setState(() => _showAppBarSearch = true);
-    } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
-      setState(() => _showAppBarSearch = false);
-    }
-  }
-
   Future<void> _fetchAttributesAndVariations() async {
     try {
       attributes = await _marketplaceService.fetchAttributes();
@@ -241,11 +370,18 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
-    if (_userId == null && _listingType == 'auction') {
-      context.pushNamed(
-        RouteNames.pleaseLoginPage,
-        extra: {'redirectToAuctions': true},
+    if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
+      debugPrint(
+        'Redirecting to login page: userId=$_userId, listingType=$_listingType',
       );
+      context.pushReplacementNamed(
+        RouteNames.loginPage,
+        extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
+      );
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+      });
       return;
     }
     if (forceRefresh) {
@@ -257,10 +393,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     });
     try {
       final posts = await _marketplaceService.fetchPosts(
-        categoryId: '1',
+        categoryId: _listingType == 'auction' ? '1' : '1',
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
         listingType: _listingType,
-        userId: _userId ?? '2',
+        userId: _userId ?? '',
       );
       final products = posts.map((post) => post.toProduct()).toList();
       final attributeValuePairs =
@@ -271,11 +407,68 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (e.toString().contains('Please accept live auction terms')) {
+        bool accepted = await _showTermsAndConditionsDialog(context);
+        if (accepted) {
+          await _fetchProducts();
+        } else {
+          setState(() {
+            _errorMessage =
+                'You must accept the auction terms to view auctions.';
+            _isLoading = false;
+          });
+        }
+      } else if (e.toString().contains(
+        'Unexpected data format: Data not found',
+      )) {
+        setState(() {
+          _products = [];
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to load cars. Please try again.';
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  void _handleScroll() {
+    if (_scrollController.offset > 100 && !_showAppBarSearch) {
+      setState(() => _showAppBarSearch = true);
+    } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+      setState(() => _showAppBarSearch = false);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_handleScroll);
+    _listingType = widget.showAuctions ? 'auction' : 'sale';
+    _checkLoginStatus().then((_) {
+      if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
+        context.pushReplacementNamed(
+          RouteNames.loginPage,
+          extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
+        );
+      } else {
+        _fetchProducts();
+      }
+    });
+    _fetchLocations();
+    _fetchAttributesAndVariations();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Map<String, Map<String, String>> _mapAttributeValuePairs(
@@ -1219,6 +1412,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+      'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
+    );
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1306,16 +1502,111 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () => _fetchProducts(forceRefresh: true),
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
-            SliverToBoxAdapter(
-              child:
-                  _isLoadingLocations
-                      ? const Center(child: CircularProgressIndicator())
-                      : Column(
+      body:
+          _isLoading || _isLoadingLocations
+              ? const Center(
+                child: CircularProgressIndicator(color: Palette.primaryblue),
+              )
+              : _listingType == 'auction' &&
+                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Please log in to view auction listings',
+                      style: TextStyle(fontSize: 16, color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        debugPrint(
+                          'Navigating to login page from auction prompt',
+                        );
+                        context.pushReplacementNamed(
+                          RouteNames.loginPage,
+                          extra: {
+                            'redirectTo': 'usedCars',
+                            'listingType': 'auction',
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primaryblue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        textStyle: const TextStyle(fontSize: 16),
+                      ),
+                      child: const Text('Log In'),
+                    ),
+                  ],
+                ),
+              )
+              : _errorMessage != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => _fetchProducts(forceRefresh: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+              : filteredProducts.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: () => _fetchProducts(forceRefresh: true),
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
                         children: [
                           if (!_showAppBarSearch)
                             Container(
@@ -1374,22 +1665,40 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   ),
                                   Expanded(
                                     child: GestureDetector(
-                                      onTap: () {
-                                        if (_userId == null) {
-                                          if (kDebugMode) {
-                                            print(
-                                              'Auction button clicked, but userId is null',
-                                            );
-                                          }
-                                          context.pushNamed(
-                                            RouteNames.pleaseLoginPage,
-                                            extra: {'redirectToAuctions': true},
+                                      onTap: () async {
+                                        if (_userId == null ||
+                                            _userId!.isEmpty ||
+                                            _userId == 'Unknown') {
+                                          debugPrint(
+                                            'Auction button clicked, userId: $_userId',
+                                          );
+                                          context.pushReplacementNamed(
+                                            RouteNames.loginPage,
+                                            extra: {
+                                              'redirectTo': 'usedCars',
+                                              'listingType': 'auction',
+                                            },
                                           );
                                         } else {
-                                          setState(() {
-                                            _listingType = 'auction';
-                                            _fetchProducts();
-                                          });
+                                          bool termsAccepted =
+                                              await _checkAuctionTermsAcceptance();
+                                          if (!termsAccepted) {
+                                            bool accepted =
+                                                await _showTermsAndConditionsDialog(
+                                                  context,
+                                                );
+                                            if (accepted) {
+                                              setState(() {
+                                                _listingType = 'auction';
+                                                _fetchProducts();
+                                              });
+                                            }
+                                          } else {
+                                            setState(() {
+                                              _listingType = 'auction';
+                                              _fetchProducts();
+                                            });
+                                          }
                                         }
                                       },
                                       child: Container(
@@ -1429,430 +1738,375 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           ),
                         ],
                       ),
-            ),
-            if (!_isLoadingLocations)
-              _isLoading
-                  ? const SliverToBoxAdapter(
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                  : _errorMessage != null
-                  ? SliverToBoxAdapter(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error: $_errorMessage',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _fetchProducts(forceRefresh: true),
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
                     ),
-                  )
-                  : filteredProducts.isEmpty
-                  ? SliverToBoxAdapter(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No cars found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Try adjusting your filters or search terms',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final product = filteredProducts[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _buildProductCard(product),
+                        );
+                      }, childCount: filteredProducts.length),
                     ),
-                  )
-                  : SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final product = filteredProducts[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildProductCard(product),
-                      );
-                    }, childCount: filteredProducts.length),
-                  ),
-          ],
-        ),
-      ),
+                  ],
+                ),
+              ),
     );
   }
 
-Widget _buildProductCard(Product product) {
-  final isAuction = product.ifAuction == '1';
-  final isFinanceAvailable = product.ifFinance == '1';
-  final isExchangeAvailable = product.ifExchange == '1';
-  final isFeatured = product.feature == '1';
-  final isVerified = product.ifVerifyed == '1'; 
-  final hasOffer = product.ifOfferPrice == '1';
-  final attributeValues = _productAttributeValues[product.id] ?? {};
+  Widget _buildProductCard(Product product) {
+    final isAuction = product.ifAuction == '1';
+    final isFinanceAvailable = product.ifFinance == '1';
+    final isExchangeAvailable = product.ifExchange == '1';
+    final isFeatured = product.feature == '1';
+    final isVerified = product.ifVerifyed == '1';
+    final hasOffer = product.ifOfferPrice == '1';
+    final attributeValues = _productAttributeValues[product.id] ?? {};
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return GestureDetector(
-        onTap: () {
-          if (isAuction) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AuctionProductDetailsPage(product: product),
-              ),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => MarketPlaceProductDetailsPage(
-                  product: product,
-                  isAuction: product.ifAuction == '1',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          onTap: () {
+            if (isAuction) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => AuctionProductDetailsPage(product: product),
                 ),
-              ),
-            );
-          }
-        },
-        child: Container(
-          width: constraints.maxWidth,
-          margin: EdgeInsets.zero,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.30),
-                blurRadius: 5,
-                spreadRadius: 1,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: Container(
-                      width: 120,
-                      height: 155,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(0),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => MarketPlaceProductDetailsPage(
+                        product: product,
+                        isAuction: product.ifAuction == '1',
+                      ),
+                ),
+              );
+            }
+          },
+          child: Container(
+            width: constraints.maxWidth,
+            margin: EdgeInsets.zero,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.30),
+                  blurRadius: 5,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Container(
+                        width: 120,
+                        height: 155,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(0),
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(12),
+                              ),
+                              child: Image.network(
+                                'https://lelamonline.com/admin/${product.image}',
+                                fit: BoxFit.cover,
+                                height: 700,
+                                width: 200,
+                                errorBuilder: (context, error, stackTrace) {
+                                  print(
+                                    'Failed to load image: https://lelamonline.com/${product.image}',
+                                  );
+                                  print('Error: $error');
+                                  return Container(
+                                    color: Colors.grey.shade200,
+                                    child: Icon(
+                                      Icons.directions_car,
+                                      size: 40,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            if (isAuction)
+                              Positioned(
+                                top: 8,
+                                left: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'AUCTION',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            if (isVerified)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.verified,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            if (isFeatured)
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.verified,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      child: Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            child: Image.network(
-                              'https://lelamonline.com/admin/${product.image}',
-                              fit: BoxFit.cover,
-                              height: 700,
-                              width: 200,
-                              errorBuilder: (context, error, stackTrace) {
-                                print(
-                                  'Failed to load image: https://lelamonline.com/${product.image}',
-                                );
-                                print('Error: $error');
-                                return Container(
-                                  color: Colors.grey.shade200,
-                                  child: Icon(
-                                    Icons.directions_car,
-                                    size: 40,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          if (isAuction)
-                            Positioned(
-                              top: 8,
-                              left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.red,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'AUCTION',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (isVerified)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.verified,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                              if (isFeatured)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.verified,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              // if (isFeatured)
-                              //   Padding(
-                              //     padding: const EdgeInsets.only(right: 4),
-                              //     child: Icon(
-                              //       Icons.verified,
-                              //       size: 16,
-                              //       color: Colors.blue,
-                              //     ),
-                              //   ),
-                              // if (isVerified)
-                              //   Padding(
-                              //     padding: const EdgeInsets.only(right: 4),
-                              //     child: Icon(
-                              //       Icons.verified,
-                              //       size: 16,
-                              //       color: Colors.blue,
-                              //     ),
-                              //   ),
-                              Expanded(
-                                child: Text(
-                                  product.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                    color: Colors.black87,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            product.modelVariation,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (isAuction)
-                                Text(
-                                  '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Palette.primaryblue,
-                                  ),
-                                )
-                              else if (hasOffer)
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _formatPrice(double.tryParse(product.price) ?? 0),
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade600,
-                                        decoration: TextDecoration.lineThrough,
-                                      ),
-                                    ),
-                                    Text(
-                                      _formatPrice(double.tryParse(product.offerPrice) ?? 0),
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: Palette.primaryblue,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else
-                                Text(
-                                  _formatPrice(double.tryParse(product.price) ?? 0),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Palette.primaryblue,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                size: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _getLocationName(product.parentZoneId),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (attributeValues.isNotEmpty)
-                            Column(
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    if (attributeValues['Year'] != null &&
-                                        attributeValues['Year']!.isNotEmpty)
-                                      _buildDetailChipWithIcon(
-                                        Icons.calendar_today,
-                                        attributeValues['Year']!,
-                                      ),
-                                    const SizedBox(width: 4),
-                                    if (attributeValues['No of owners'] != null &&
-                                        attributeValues['No of owners']!.isNotEmpty)
-                                      _buildDetailChipWithIcon(
-                                        Icons.person,
-                                        _getOwnerText(
-                                          attributeValues['No of owners']!,
-                                        ),
-                                      ),
-                                    const SizedBox(width: 4),
-                                    if (attributeValues['KM Range'] != null &&
-                                        attributeValues['KM Range']!.isNotEmpty)
-                                      _buildDetailChipWithIcon(
-                                        Icons.speed,
-                                        _formatKmRange(
-                                          attributeValues['KM Range']!,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    if (attributeValues['Fuel Type'] != null &&
-                                        attributeValues['Fuel Type']!.isNotEmpty)
-                                      _buildDetailChipWithIcon(
-                                        Icons.local_gas_station,
-                                        attributeValues['Fuel Type']!,
-                                      ),
-                                    const SizedBox(width: 4),
-                                    if (attributeValues['Transmission'] != null &&
-                                        attributeValues['Transmission']!.isNotEmpty)
-                                      _buildDetailChipWithIcon(
-                                        Icons.settings,
-                                        attributeValues['Transmission']!,
-                                      ),
-                                  ],
+                                Expanded(
+                                  child: Text(
+                                    product.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                      color: Colors.black87,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (isAuction || isFinanceAvailable || isExchangeAvailable)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                        decoration: BoxDecoration(
-                          color: isAuction ? Palette.primarylightblue : Colors.white,
-                        ),
-                        child: isAuction
-                            ? _buildAuctionInfo(product)
-                            : _buildFinanceExchangeInfo(
-                                isFinanceAvailable,
-                                isExchangeAvailable,
+                            Text(
+                              product.modelVariation,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (isAuction)
+                                  Text(
+                                    '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Palette.primaryblue,
+                                    ),
+                                  )
+                                else if (hasOffer)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _formatPrice(
+                                          double.tryParse(product.price) ?? 0,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatPrice(
+                                          double.tryParse(product.offerPrice) ??
+                                              0,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Palette.primaryblue,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else
+                                  Text(
+                                    _formatPrice(
+                                      double.tryParse(product.price) ?? 0,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Palette.primaryblue,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _getLocationName(product.parentZoneId),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (attributeValues.isNotEmpty)
+                              Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      if (attributeValues['Year'] != null &&
+                                          attributeValues['Year']!.isNotEmpty)
+                                        _buildDetailChipWithIcon(
+                                          Icons.calendar_today,
+                                          attributeValues['Year']!,
+                                        ),
+                                      const SizedBox(width: 4),
+                                      if (attributeValues['No of owners'] !=
+                                              null &&
+                                          attributeValues['No of owners']!
+                                              .isNotEmpty)
+                                        _buildDetailChipWithIcon(
+                                          Icons.person,
+                                          _getOwnerText(
+                                            attributeValues['No of owners']!,
+                                          ),
+                                        ),
+                                      const SizedBox(width: 4),
+                                      if (attributeValues['KM Range'] != null &&
+                                          attributeValues['KM Range']!
+                                              .isNotEmpty)
+                                        _buildDetailChipWithIcon(
+                                          Icons.speed,
+                                          _formatKmRange(
+                                            attributeValues['KM Range']!,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      if (attributeValues['Fuel Type'] !=
+                                              null &&
+                                          attributeValues['Fuel Type']!
+                                              .isNotEmpty)
+                                        _buildDetailChipWithIcon(
+                                          Icons.local_gas_station,
+                                          attributeValues['Fuel Type']!,
+                                        ),
+                                      const SizedBox(width: 4),
+                                      if (attributeValues['Transmission'] !=
+                                              null &&
+                                          attributeValues['Transmission']!
+                                              .isNotEmpty)
+                                        _buildDetailChipWithIcon(
+                                          Icons.settings,
+                                          attributeValues['Transmission']!,
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-            ],
+                if (isAuction || isFinanceAvailable || isExchangeAvailable)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 0,
+                            vertical: 0,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isAuction
+                                    ? Palette.primarylightblue
+                                    : Colors.white,
+                          ),
+                          child:
+                              isAuction
+                                  ? _buildAuctionInfo(product)
+                                  : _buildFinanceExchangeInfo(
+                                    isFinanceAvailable,
+                                    isExchangeAvailable,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   Widget _buildDetailChipWithIcon(IconData icon, String label) {
     return Container(
@@ -1877,10 +2131,10 @@ Widget _buildProductCard(Product product) {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Padding(
-          padding: const EdgeInsets.all(5.0),
+          padding: const EdgeInsets.all(3),
           child: Row(
             children: [
-              const Icon(Icons.gavel, size: 16, color: Colors.black),
+              const Icon(Icons.gavel, size: 13, color: Colors.black),
               const SizedBox(width: 6),
               Text(
                 'Attempts: ${product.auctionAttempt}/3',
@@ -1910,7 +2164,7 @@ Widget _buildProductCard(Product product) {
         children: [
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
               decoration: BoxDecoration(color: Palette.primarylightblue),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
@@ -1936,7 +2190,7 @@ Widget _buildProductCard(Product product) {
           Container(width: 1, height: 30, color: Colors.black),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
               decoration: BoxDecoration(
                 color: Palette.primarylightblue,
                 border: Border.all(color: Palette.primarylightblue),
@@ -1964,7 +2218,7 @@ Widget _buildProductCard(Product product) {
     if (isFinanceAvailable) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
         decoration: BoxDecoration(
           color: Palette.primarylightblue,
           border: Border.all(color: Palette.primarylightblue),
@@ -1989,7 +2243,7 @@ Widget _buildProductCard(Product product) {
     if (isExchangeAvailable) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
         decoration: BoxDecoration(
           color: Palette.primarylightblue,
           border: Border.all(color: Palette.primarylightblue),

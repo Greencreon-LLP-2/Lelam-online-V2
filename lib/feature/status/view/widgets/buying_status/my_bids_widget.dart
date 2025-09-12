@@ -38,17 +38,38 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     _loadUserIdAndBids();
   }
 
-  Future<void> _loadUserIdAndBids() async {
+ Future<void> _loadUserIdAndBids() async {
     final prefs = await SharedPreferences.getInstance();
+    final rawUserId = prefs.getString('userId');  // Log raw value
+    debugPrint('MyBidsWidget - Raw prefs.getString("userId"): $rawUserId');
     setState(() {
-      _userId = widget.userId ?? prefs.getString('userId');
+      _userId = widget.userId ?? rawUserId ?? 'Unknown';
     });
-    debugPrint('MyBidsWidget - Loaded userId: $_userId');
-    //districts = await AttributeValueService.fetchDistricts();
-    debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
+    debugPrint('MyBidsWidget - Loaded userId: $_userId (fallback from widget: ${widget.userId})');
+    
+    // Fetch districts with error handling
+    // try {
+    //   districts = await AttributeValueService.fetchDistricts();
+    // } catch (e) {
+    //   debugPrint('Error fetching districts: $e');
+    //   districts = [];
+    // }
+    // debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
+    
+    // If still unknown, try a fallback (e.g., check another key or prompt login)
+    if (_userId == 'Unknown') {
+      debugPrint('MyBidsWidget - User ID unknown; prompting login');
+      if (mounted) {
+        // Adjust navigation to your login route
+        // context.pushNamed(RouteNames.loginPage);  // Uncomment and customize
+        error = 'Please log in to view your bids';
+        setState(() => isLoading = false);
+      }
+      return;
+    }
+    
     await _loadBids();
   }
-
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     try {
       final response = await http.get(

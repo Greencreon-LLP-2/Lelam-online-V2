@@ -25,6 +25,7 @@ dependencies:
   country_code_picker: ^3.4.0
   flutter_secure_storage: ^9.2.4
   url_launcher: ^6.3.2
+  flutter_html: ^3.0.0
   
 dev_dependencies:
   flutter_test:

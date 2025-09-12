@@ -434,52 +434,53 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-List<Map<String, dynamic>> _getFilteredMeetings() {
-  final status = statuses[selectedIndex];
-  debugPrint('Filtering for status: $status');
+  List<Map<String, dynamic>> _getFilteredMeetings() {
+    final status = statuses[selectedIndex];
+    debugPrint('Filtering for status: $status');
 
-  return meetings.where((meeting) {
-    debugPrint(
-      'Meeting ${meeting['id']} - status: ${meeting['status']}, '
-      'seller_approvel: ${meeting['seller_approvel']}, '
-      'admin_approvel: ${meeting['admin_approvel']}, '
-      'meeting_done: ${meeting['meeting_done']}, '
-      'if_location_request: ${meeting['if_location_request']}, '
-      'meeting_date: ${meeting['meeting_date']}',
-    );
+    return meetings.where((meeting) {
+      debugPrint(
+        'Meeting ${meeting['id']} - status: ${meeting['status']}, '
+        'seller_approvel: ${meeting['seller_approvel']}, '
+        'admin_approvel: ${meeting['admin_approvel']}, '
+        'meeting_done: ${meeting['meeting_done']}, '
+        'if_location_request: ${meeting['if_location_request']}, '
+        'meeting_date: ${meeting['meeting_date']}',
+      );
 
-    if (status == 'Date Fixed') {
-      return meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['meeting_date'] != 'N/A' &&
-          meeting['meeting_date']?.isNotEmpty == true &&
-          meeting['if_location_request'] != '1';
-    } else if (status == 'Meeting Request') {
-      return meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['if_location_request'] == '0';
-    } else if (status == 'Awaiting Location') {
-      return meeting['if_location_request'] == '1' &&
-          meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          (meeting['location_link'] == null ||
-              meeting['location_link'] == '' ||
-              meeting['latitude'] == null ||
-              meeting['latitude'] == '' ||
-              meeting['longitude'] == null ||
-              meeting['longitude'] == '');
-    } else if (status == 'Ready For Meeting') {
-      return meeting['seller_approvel'] == '1' &&
-          meeting['admin_approvel'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['if_location_request'] == '1' &&
-          meeting['location_link']?.isNotEmpty == true;
-    } else if (status == 'Meeting Completed') {
-      return meeting['meeting_done'] == '1';
-    }
-    return false;
-  }).toList();
-}
+      if (status == 'Date Fixed') {
+        return meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['meeting_date'] != 'N/A' &&
+            meeting['meeting_date']?.isNotEmpty == true &&
+            meeting['if_location_request'] != '1';
+      } else if (status == 'Meeting Request') {
+        return meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['if_location_request'] == '0';
+      } else if (status == 'Awaiting Location') {
+        return meeting['if_location_request'] == '1' &&
+            meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            (meeting['location_link'] == null ||
+                meeting['location_link'] == '' ||
+                meeting['latitude'] == null ||
+                meeting['latitude'] == '' ||
+                meeting['longitude'] == null ||
+                meeting['longitude'] == '');
+      } else if (status == 'Ready For Meeting') {
+        return meeting['seller_approvel'] == '1' &&
+            meeting['admin_approvel'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['if_location_request'] == '1' &&
+            meeting['location_link']?.isNotEmpty == true;
+      } else if (status == 'Meeting Completed') {
+        return meeting['meeting_done'] == '1';
+      }
+      return false;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMeetings = _getFilteredMeetings();

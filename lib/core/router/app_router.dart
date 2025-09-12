@@ -143,11 +143,11 @@ final GoRouter appRouter = GoRouter(
               const MarketPlaceProductDetailsPage(product: null),
       name: RouteNames.marketPlaceProductDetailsPage,
     ),
-    GoRoute(
-      path: RouteNames.pleaseLoginPage,
-      builder: (context, state) => const PleaseLoginPage(),
-      name: RouteNames.pleaseLoginPage,
-    ),
+    // GoRoute(
+    //   path: RouteNames.pleaseLoginPage,
+    //   builder: (context, state) => const PleaseLoginPage(),
+    //   name: RouteNames.pleaseLoginPage,
+    // ),
   ],
   errorBuilder:
       (context, state) => Scaffold(
