@@ -32,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // Normalize mobile number by removing country code, spaces, or special characters
+
   String _normalizeMobileNumber(String? mobile) {
     if (mobile == null || mobile.isEmpty) return '';
     return mobile
@@ -41,8 +41,8 @@ class _LoginPageState extends State<LoginPage> {
         .replaceAll(
           RegExp(r'[\s\-\(\)]'),
           '',
-        ) // Remove spaces, dashes, parentheses
-        .replaceAll(RegExp(r'^\+?0*'), '') // Remove leading zeros or +
+        ) 
+        .replaceAll(RegExp(r'^\+?0*'), '') 
         .trim();
   }
 
@@ -78,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
           );
         }
 
-        // Step 1: Check if the phone number is registered using index.php
+       
         final userCheckRequest = http.Request(
           'GET',
           Uri.parse('$baseUrl/index.php?token=$token'),
@@ -101,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
             throw Exception('Failed to parse response from index.php: $e');
           }
 
-          // Check if response has the expected structure
+        
           if (userListResponse is! Map ||
               userListResponse['status'] != 'true' ||
               userListResponse['data'] is! List) {
@@ -159,15 +159,18 @@ class _LoginPageState extends State<LoginPage> {
             print('Found user with user_id: $userId');
           }
 
-          // Step 2: Use test OTP and navigate to OtpVerificationPage
+        
           if (mounted) {
-            // Create a new map to avoid modifying widget.extra
-            final extra = <String, dynamic>{
-              ...?widget.extra, // Spread existing extra, if any
-              'phone': '+91$mobile',
+            final extra = {
+              'phone': '+91$normalizedMobile',
               'testOtp': isTestMode ? testOtp : null,
               'userId': userId,
+              'redirectToAuctions':
+                  false, 
             };
+            if (kDebugMode) {
+              print('Navigating to OtpVerificationPage with extra: $extra');
+            }
             context.pushNamed(RouteNames.otpVerificationPage, extra: extra);
             Fluttertoast.showToast(
               msg:

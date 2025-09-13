@@ -42,7 +42,7 @@ Future<void> _handleSignUp() async {
   if (!_formKey.currentState!.validate()) {
     if (kDebugMode) print('Form validation failed');
     Fluttertoast.showToast(
-      msg: 'Please enter valid details',
+      msg: 'Please enter a valid phone number',
       toastLength: Toast.LENGTH_SHORT,
       gravity: ToastGravity.BOTTOM,
       backgroundColor: Colors.red.withOpacity(0.8),
@@ -57,14 +57,14 @@ Future<void> _handleSignUp() async {
     const String baseUrl = 'https://lelamonline.com/admin/api/v1';
     const String token = '5cb2c9b569416b5db1604e0e12478ded';
     final String mobile = _phoneController.text;
-
     final String normalizedMobile = _normalizeMobileNumber(mobile);
 
-    if (kDebugMode) print('SignUp - Entered mobile: "$mobile", normalized: "$normalizedMobile"');
+    if (kDebugMode) {
+      print('SignUp - Entered mobile: "$mobile", Normalized: "$normalizedMobile"');
+    }
 
     // Use the correct register endpoint with GET method
     final url = Uri.parse('$baseUrl/register.php?token=$token&mobile_code=91&mobile=$normalizedMobile');
-    
     final request = http.Request('GET', url);
     request.headers.addAll({
       'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
@@ -76,35 +76,52 @@ Future<void> _handleSignUp() async {
     if (response.statusCode == 200) {
       if (kDebugMode) print('register.php response: $responseBody');
       final responseData = jsonDecode(responseBody);
-      
-      // Check the response structure based on the actual response
-      if (responseData['status'] != true) { // Note: boolean true, not string 'true'
+
+      // Check the response structure
+      if (responseData['status'] != true && responseData['status'] != 'true') {
         throw Exception('Registration failed: ${responseData['message'] ?? 'Unknown error'}');
       }
 
-      // The user ID is in the 'data' field, not 'user_id'
-      final userId = responseData['data'].toString();
+      // Extract userId from responseData['data']
+      final userId = responseData['data']?.toString();
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found in response');
+      }
+
+      if (kDebugMode) {
+        print('Registered user with userId: $userId');
+      }
+
       if (mounted) {
+        // Store userId in SharedPreferences
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userId', userId);
+
+        // Construct extra map for navigation
+        final extra = {
+          'phone': '+91$normalizedMobile',
+          'testOtp': kDebugMode ? '9021' : null,
+          'userId': userId,
+          'redirectToAuctions': false,
+        };
+        if (kDebugMode) {
+          print('Navigating to OtpVerificationPage with extra: $extra');
+        }
+
+        context.pushNamed(
+          RouteNames.otpVerificationPage,
+          extra: extra,
+        );
+
         Fluttertoast.showToast(
-          msg: 'Registration successful, OTP sent to +91$normalizedMobile',
+          msg: kDebugMode
+              ? 'Registration successful, Test OTP sent: 9021'
+              : 'Registration successful, OTP sent to +91$normalizedMobile',
           toastLength: Toast.LENGTH_LONG,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.green.withOpacity(0.8),
           textColor: Colors.white,
           fontSize: 16.0,
-        );
-        
-        // Store userId in SharedPreferences immediately after signup
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userId', userId);
-        
-        context.pushNamed(
-          RouteNames.otpVerificationPage,
-          extra: {
-            'phone': '+91$normalizedMobile',
-            'testOtp': kDebugMode ? '9021' : null,
-            'userId': userId, // Ensure userId is passed correctly
-          },
         );
       }
     } else {
@@ -118,7 +135,9 @@ Future<void> _handleSignUp() async {
           fontSize: 16.0,
         );
       }
-      if (kDebugMode) print('register.php failed: ${response.statusCode} ${response.reasonPhrase}');
+      if (kDebugMode) {
+        print('register.php failed: ${response.statusCode} ${response.reasonPhrase}');
+      }
     }
   } catch (e) {
     if (mounted) {
@@ -136,6 +155,7 @@ Future<void> _handleSignUp() async {
     if (mounted) setState(() => _isLoading = false);
   }
 }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
