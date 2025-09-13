@@ -24,6 +24,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   bool isLoading = true;
   String? errorMessage;
   Map<String, bool> _expandedImages = {};
+  Map<String, String> _adStatuses = {};
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
   static const String phpSessId = 'g6nr0pkfdnp6o573mn9srq20b4';
@@ -108,6 +109,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               _checkApprovalStatus(ad['id']);
             }
           }
+
+          // Load status for all ads
+          for (var ad in ads) {
+            _loadAdStatus(ad['id']);
+          }
         } else {
           throw Exception(responseData['message'] ?? 'No ads found');
         }
@@ -120,6 +126,27 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         errorMessage = 'Error loading ads: $e';
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadAdStatus(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/sell-post-status.php?token=$token&post_id=$postId'),
+        headers: {'token': token, 'Cookie': 'PHPSESSID=$phpSessId'},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Status response for post $postId: $responseData');
+        if (responseData['status'] == 'true') {
+          setState(() {
+            _adStatuses[postId] = responseData['data'] ?? 'Unknown';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading status for post $postId: $e');
     }
   }
 
@@ -462,13 +489,13 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: ad['status'] == '0' ? Colors.red.shade100 : ad['status'] == '1' ? Colors.green.shade100 : Colors.blue.shade100,
+                    color: ad['status'] == '0' ? Colors.red.shade100 : ad['status'] == '1' ? Colors.blue : Colors.blue.shade100,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    ad['status'] == '0' ? 'Pending' : ad['status'] == '1' ? 'Approved' : 'Sold',
+                    ad['status'] == '0' ? 'Pending' : ad['status'] == '1' ? 'Live' : 'Sold',
                     style: TextStyle(
-                      color: ad['status'] == '0' ? Colors.red : ad['status'] == '1' ? Colors.green : Colors.blue,
+                      color: ad['status'] == '0' ? Colors.red : ad['status'] == '1' ? Colors.white : Colors.blue,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -607,6 +634,22 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 child: Text(
                   ad['rejectionMsg'] as String,
                   style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+            const Divider(color: Colors.grey, thickness: 1, height: 20),
+            if (_adStatuses[ad['id']] != null && _adStatuses[ad['id']]!.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Center(
+                  child: Text(
+                    _adStatuses[ad['id']]!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ),
             ],
