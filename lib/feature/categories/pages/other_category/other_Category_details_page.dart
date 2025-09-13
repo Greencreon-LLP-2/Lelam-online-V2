@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
@@ -943,6 +944,7 @@ String sellerName = 'Unknown';
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -950,51 +952,53 @@ String sellerName = 'Unknown';
             left: 0,
             right: 0,
             bottom: -5,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 15,
-                    spreadRadius: 0,
-                    offset: Offset(1, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                            Expanded(
-  child: ElevatedButton(
-    onPressed: () {
-      showBidDialog(context); // Call the dialog function
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: Palette.primarypink,
-      foregroundColor: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 0),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.zero,
-      ),
-    ),
-    child: const Text('Place Bid'),
-  ),
-),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showMeetingDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                      ),
-                      child: const Text('Fix Meeting'),
+            child: CustomSafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 15,
+                      spreadRadius: 0,
+                      offset: Offset(1, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    showBidDialog(context); // Call the dialog function
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Palette.primarypink,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 0),
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
                     ),
                   ),
-                ],
+                  child: const Text('Place Bid'),
+                ),
+              ),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showMeetingDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Fix Meeting'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

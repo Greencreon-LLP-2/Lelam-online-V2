@@ -1768,7 +1768,7 @@ Widget build(BuildContext context) {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: -5,
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: const BoxDecoration(
