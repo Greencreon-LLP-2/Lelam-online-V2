@@ -1,20 +1,23 @@
-
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
+import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:lelamonline_flutter/utils/review_dialog.dart';
 
 const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
@@ -52,6 +55,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
   final _storage = const FlutterSecureStorage();
+  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
+  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
 
   String sellerName = 'Unknown';
   String? sellerProfileImage;
@@ -192,13 +197,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           });
         } else {
           setState(() {
-            _shortlistErrorMessage = jsonResponse['message'] ?? 'Failed to update shortlist';
+            _shortlistErrorMessage =
+                jsonResponse['message'] ?? 'Failed to update shortlist';
             _isLoadingShortlist = false;
           });
         }
       } else {
         setState(() {
-          _shortlistErrorMessage = 'Failed to update shortlist: ${response.statusCode}';
+          _shortlistErrorMessage =
+              'Failed to update shortlist: ${response.statusCode}';
           _isLoadingShortlist = false;
         });
       }
@@ -221,9 +228,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _isShortlisted
-                ? 'Added to shortlist'
-                : 'Removed from shortlist',
+            _isShortlisted ? 'Added to shortlist' : 'Removed from shortlist',
           ),
           backgroundColor: Colors.green,
         ),
@@ -805,7 +810,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   String formatPriceInt(double price) {
-    final formatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 0,
+    );
     return formatter.format(price.round());
   }
 
@@ -941,7 +950,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                // Ask a question functionality
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => ReviewDialog(userId: '', postId: ''),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -1040,9 +1053,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               _isShortlisted
                                   ? Icons.bookmark
                                   : Icons.bookmark_border,
-                              color: _isShortlisted ? Colors.yellow : Colors.white,
+                              color:
+                                  _isShortlisted ? Colors.yellow : Colors.white,
                             ),
-                            onPressed: _isLoadingShortlist ? null : _toggleShortlist,
+                            onPressed:
+                                _isLoadingShortlist ? null : _toggleShortlist,
                           ),
                           IconButton(
                             icon: Icon(
@@ -1134,8 +1149,56 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             style: const TextStyle(color: Colors.grey),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () {
-                              // Call functionality
+                            onPressed: () async {
+                              final userId = await _storage.read(key: 'userId');
+                              if (userId == null || userId == 'Unknown') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please log in to chat with the seller',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return ChatOptionsDialog(
+                                    onChatWithSupport: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => SupportTicketPage(
+                                                userId: userId,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    onChatWithSeller: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => ChatPage(
+                                                userId: userId,
+                                                listenerId:
+                                                    widget.product.createdBy,
+                                                listenerName: sellerName,
+                                                listenerImage:
+                                                    sellerProfileImage ??
+                                                    'seller.jpg',
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    baseUrl: _baseUrl,
+                                    token: _token,
+                                  );
+                                },
+                              );
                             },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
@@ -1315,7 +1378,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     ],
                   ),
                 ),
-               SizedBox(height: 25)
+                SizedBox(height: 25),
               ],
             ),
           ),

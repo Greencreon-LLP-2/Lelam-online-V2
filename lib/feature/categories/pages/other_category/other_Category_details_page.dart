@@ -3,13 +3,18 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart'
+    show ChatPage;
+import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+import 'package:lelamonline_flutter/utils/review_dialog.dart';
 
 class BikeDetailsPage extends StatefulWidget {
   final Bike bike;
@@ -29,19 +34,21 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
+  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
 
-String sellerName = 'Unknown';
+  String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
-
+  String? userId;
   @override
   void initState() {
     super.initState();
     _fetchLocations();
-      _fetchSellerInfo();
+    _fetchSellerInfo();
   }
 
   @override
@@ -55,7 +62,7 @@ String sellerName = 'Unknown';
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.bike.createdBy}',
+          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.bike.createdBy}',
         ),
       );
 
@@ -92,7 +99,6 @@ String sellerName = 'Unknown';
     }
   }
 
-
   Future<void> _fetchLocations() async {
     setState(() {
       _isLoadingLocations = true;
@@ -121,21 +127,22 @@ String sellerName = 'Unknown';
     if (zoneId == '0') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -160,7 +167,8 @@ String sellerName = 'Unknown';
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
@@ -210,19 +218,21 @@ String sellerName = 'Unknown';
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -249,7 +259,8 @@ String sellerName = 'Unknown';
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -300,9 +311,10 @@ String sellerName = 'Unknown';
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -313,21 +325,22 @@ String sellerName = 'Unknown';
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -491,7 +504,7 @@ String sellerName = 'Unknown';
     );
   }
 
-   Widget _buildSellerInformationItem(BuildContext context) {
+  Widget _buildSellerInformationItem(BuildContext context) {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
@@ -553,7 +566,6 @@ String sellerName = 'Unknown';
         );
   }
 
-
   Widget _buildQuestionsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,7 +581,12 @@ String sellerName = 'Unknown';
             ),
             ElevatedButton(
               onPressed: () {
-                // Ask a question functionality
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => const ReviewDialog(userId: '', postId: ''),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -599,7 +616,7 @@ String sellerName = 'Unknown';
 
   @override
   Widget build(BuildContext context) {
-   // final filters = _parseFilters(widget.bike.filters);
+    // final filters = _parseFilters(widget.bike.filters);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -632,11 +649,13 @@ String sellerName = 'Unknown';
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.contain,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  placeholder:
+                                      (context, url) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                  errorWidget:
+                                      (context, url, error) =>
+                                          const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -747,16 +766,16 @@ String sellerName = 'Unknown';
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -789,7 +808,54 @@ String sellerName = 'Unknown';
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // Call functionality
+                              if (userId == null || userId == 'Unknown') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please log in to chat with the seller',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return ChatOptionsDialog(
+                                    onChatWithSupport: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => SupportTicketPage(
+                                                userId: userId ?? '',
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    onChatWithSeller: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => ChatPage(
+                                                userId: userId!,
+                                                listenerId:
+                                                    widget.bike.createdBy,
+                                                listenerName: sellerName,
+                                                listenerImage:
+                                                    sellerProfileImage ??
+                                                    'seller.jpg',
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    baseUrl: _baseUrl,
+                                    token: _token,
+                                  );
+                                },
+                              );
                             },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
@@ -919,10 +985,7 @@ String sellerName = 'Unknown';
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildSellerInformationItem(
-                       
-                        context,
-                      ),
+                      _buildSellerInformationItem(context),
                     ],
                   ),
                 ),
@@ -967,22 +1030,22 @@ String sellerName = 'Unknown';
                 ),
                 child: Row(
                   children: [
-                              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    showBidDialog(context); // Call the dialog function
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Palette.primarypink,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 0),
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.zero,
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          showBidDialog(context); // Call the dialog function
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
                     ),
-                  ),
-                  child: const Text('Place Bid'),
-                ),
-              ),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _showMeetingDialog(context),

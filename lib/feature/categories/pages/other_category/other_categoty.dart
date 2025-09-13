@@ -1129,7 +1129,10 @@ class _OthersPageState extends State<OthersPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => BikeDetailsPage(bike: bike),
+                builder: (context) => BikeDetailsPage(
+                bike: bike,
+              
+                ),
               ),
             );
           },
