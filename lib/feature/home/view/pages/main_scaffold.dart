@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/app_drawer.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
@@ -25,6 +26,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
   bool isStatus = false;
   String? userId;
+  String? sessionId;  
   Map<String, dynamic>? adData;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -39,9 +41,11 @@ class _MainScaffoldState extends State<MainScaffold> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+      sessionId = prefs.getString('sessionId');  // Load sessionId from SharedPreferences (adjust key if needed)
     });
     if (kDebugMode) {
       print('Loaded userId: $userId');
+      print('Loaded sessionId: $sessionId');
     }
   }
 
@@ -53,7 +57,9 @@ class _MainScaffoldState extends State<MainScaffold> {
         isStatus
             ? SellingStatusPage(userId: userId, adData: adData)
             : SellPage(userId: userId),
-        isStatus ? ShortListPage(userId: userId) : StatusPage(userId: userId),
+        isStatus 
+            ? ChatListPage(userId: userId ?? 'Unknown', sessionId: sessionId ?? '')  // Fixed: Pass userId and sessionId correctly, no extra comma
+            : StatusPage(userId: userId),
         Center(
           child: Text(
             'Profile: User ID ${userId ?? 'Unknown'}',
@@ -178,10 +184,10 @@ class _MainScaffoldState extends State<MainScaffold> {
                   BottomNavigationBarItem(
                     icon: Icon(
                       isStatus
-                          ? Icons.star_border_outlined
+                          ? Icons.chat
                           : Icons.stream_outlined,
                     ),
-                    label: isStatus ? 'Shortlist' : 'Status',
+                    label: isStatus ? 'Chats' : 'Status',
                   ),
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.more_vert),
