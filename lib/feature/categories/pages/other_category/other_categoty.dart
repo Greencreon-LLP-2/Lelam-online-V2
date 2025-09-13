@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_Category_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
@@ -174,8 +175,6 @@ class MarketplacePost {
 
 // MarketplaceService
 class MarketplaceService {
-  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
   Future<List<MarketplacePost>> fetchPosts({
     required String categoryId,

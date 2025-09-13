@@ -85,7 +85,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                 : const Center(child: Text('Please log in to access Sell'))),
         isStatus
             ? (_isUserIdValid
-                ? ChatListPage(userId: userId!, sessionId: sessionId ?? '')
+                ? ShortListPage(userId: userId!, )
                 : const Center(child: Text('Please log in to access Chats')))
             : (_isUserIdValid
                 ? StatusPage(userId: userId!)
@@ -254,8 +254,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: isStatus ? 'Selling' : 'Sell',
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(isStatus ? Icons.chat : Icons.stream_outlined),
-                    label: isStatus ? 'Chats' : 'Status',
+                    icon: Icon(isStatus ? Icons.star : Icons.stream_outlined),
+                    label: isStatus ? 'Short List' : 'Status',
                   ),
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.more_vert),

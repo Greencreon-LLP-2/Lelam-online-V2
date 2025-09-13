@@ -60,8 +60,7 @@ class _MarketPlaceProductDetailsPageState
   String sellerErrorMessage = '';
   String? userId;
   double _minBidIncrement = 1000;
-  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
-  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
+
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
   bool _isLoadingGallery = true;
@@ -86,10 +85,10 @@ class _MarketPlaceProductDetailsPageState
       });
 
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
-      final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+      final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
       debugPrint('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -150,11 +149,11 @@ class _MarketPlaceProductDetailsPageState
       });
 
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
       debugPrint(
         'Fetching highest bid: $url',
       ); 
@@ -229,10 +228,10 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
-      final url = '$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId';
+      final url = '$baseUrl/list-shortlist.php?token=$token&user_id=$userId';
       debugPrint('Checking shortlist status: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -289,11 +288,11 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=$id';
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=$userId&post_id=$id';
       debugPrint('Adding to shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -375,11 +374,11 @@ class _MarketPlaceProductDetailsPageState
       });
 
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/place-bid.php?token=$_token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+          '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
       debugPrint('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -473,8 +472,8 @@ class _MarketPlaceProductDetailsPageState
                       MaterialPageRoute(
                         builder:
                             (context) => MyBidsWidget(
-                              baseUrl: _baseUrl,
-                              token: _token,
+                              baseUrl: baseUrl,
+                              token: token,
                               userId: userId,
                             ),
                       ),
@@ -497,8 +496,8 @@ class _MarketPlaceProductDetailsPageState
                       MaterialPageRoute(
                         builder:
                             (context) => MyBidsWidget(
-                              baseUrl: _baseUrl,
-                              token: _token,
+                              baseUrl: baseUrl,
+                              token: token,
                               userId: userId,
                             ),
                       ),
@@ -674,7 +673,7 @@ class _MarketPlaceProductDetailsPageState
     try {
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
         ),
       );
 
@@ -1214,12 +1213,12 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
-          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
       debugPrint('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -1538,13 +1537,13 @@ class _MarketPlaceProductDetailsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    // child: Text(
-                    //   'User ID: ${userId ?? 'Unknown'}',
-                    //   style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    // ),
-                  ),
+                  // Padding(
+                  //   padding: const EdgeInsets.all(16.0),
+                  //   // child: Text(
+                  //   //   'User ID: ${userId ?? 'Unknown'}',
+                  //   //   style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  //   // ),
+                  // ),
                   Stack(
                     children: [
                       SizedBox(
@@ -1771,8 +1770,8 @@ class _MarketPlaceProductDetailsPageState
                                           ),
                                         );
                                       },
-                                      baseUrl: _baseUrl,
-                                      token: _token,
+                                      baseUrl: baseUrl,
+                                      token: token,
                                     );
                                   },
                                 );

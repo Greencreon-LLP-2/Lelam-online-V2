@@ -1,0 +1,8 @@
+flutter_native_splash:
+  android: true
+  ios: true
+  color: "#276FF5"
+
+  android_12:
+  
+  image: assets/images/lelam_logo.png
