@@ -78,60 +78,75 @@ class _MarketPlaceProductDetailsPageState
     _fetchGalleryImages();
   }
 
-Future<void> _fetchGalleryImages() async {
-  try {
-    setState(() {
-      _isLoadingGallery = true;
-      _galleryError = '';
-    });
+  Future<void> _fetchGalleryImages() async {
+    try {
+      setState(() {
+        _isLoadingGallery = true;
+        _galleryError = '';
+      });
 
-    final headers = {
-      'token': _token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
-    final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
-    debugPrint('Fetching gallery: $url');
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+      debugPrint('Fetching gallery: $url');
 
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('Gallery API response: $responseBody');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Gallery API response: $responseBody');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('Parsed responseData type: ${responseData.runtimeType}');  // New: Log type for debug
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint(
+          'Parsed responseData type: ${responseData.runtimeType}',
+        ); 
 
-      if (responseData['status'] == 'true' && responseData['data'] is List && (responseData['data'] as List).isNotEmpty) {
-        // Parse from the 'data' array inside the wrapper
-        _galleryImages = (responseData['data'] as List)
-            .map((item) => 'https://lelamonline.com/admin/${item['image'] ?? ''}')
-            .where((img) => img.isNotEmpty && img.contains('uploads/'))  // Filter valid image paths
-            .toList();
-        debugPrint('Fetched ${_galleryImages.length} gallery images: $_galleryImages');  // Updated: Log the list
+        if (responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            (responseData['data'] as List).isNotEmpty) {
+          _galleryImages =
+              (responseData['data'] as List)
+                  .map(
+                    (item) =>
+                        'https://lelamonline.com/admin/${item['image'] ?? ''}',
+                  )
+                  .where(
+                    (img) => img.isNotEmpty && img.contains('uploads/'),
+                  ) 
+                  .toList();
+          debugPrint(
+            'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
+          ); 
+        } else {
+          throw Exception(
+            'Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}',
+          );
+        }
       } else {
-        throw Exception('Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}');
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    } catch (e) {
+      debugPrint('Error fetching gallery: $e');
+      setState(() {
+        _galleryError = 'Failed to load gallery: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingGallery = false;
+      });
     }
-  } catch (e) {
-    debugPrint('Error fetching gallery: $e');
-    setState(() {
-      _galleryError = 'Failed to load gallery: $e';
-    });
-  } finally {
-    setState(() {
-      _isLoadingGallery = false;
-    });
   }
-}
 
   Future<void> _fetchCurrentHighestBid() async {
     try {
       setState(() {
-        _isLoadingBid = true; // Reuse existing loading state for UI feedback
+        _isLoadingBid = true;
       });
 
       final headers = {
@@ -142,7 +157,7 @@ Future<void> _fetchGalleryImages() async {
           '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
       debugPrint(
         'Fetching highest bid: $url',
-      ); // This should log the full URL with post_id
+      ); 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -150,37 +165,35 @@ Future<void> _fetchGalleryImages() async {
       final responseBody = await response.stream.bytesToString();
       debugPrint(
         'Full API response body: $responseBody',
-      ); // This will show the PHP notice + JSON
+      ); 
       debugPrint('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         debugPrint(
           'Parsed response data: $responseData',
-        ); // Log the full parsed JSON
+        ); 
 
         if (responseData['status'] == true) {
           final dataValue = responseData['data']?.toString() ?? '0';
-          // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
           if (int.tryParse(dataValue) != null) {
             setState(() {
               _currentHighestBid = dataValue;
             });
             debugPrint('Successfully fetched highest bid: $dataValue');
           } else {
-            // New: Handle non-numeric data as error
             debugPrint(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
               _currentHighestBid =
-                  'Error: $dataValue'; // Store error for display
+                  'Error: $dataValue'; 
             });
           }
         } else {
           debugPrint('API status false: ${responseData['data']}');
           setState(() {
-            _currentHighestBid = '0'; // Fallback
+            _currentHighestBid = '0'; 
           });
         }
       } else {
@@ -188,13 +201,13 @@ Future<void> _fetchGalleryImages() async {
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
-          _currentHighestBid = '0'; // Fallback
+          _currentHighestBid = '0'; 
         });
       }
     } catch (e) {
       debugPrint('Exception in fetch highest bid: $e');
       setState(() {
-        _currentHighestBid = ' $e'; // Store error for display
+        _currentHighestBid = ' $e'; 
       });
     } finally {
       setState(() {
@@ -429,7 +442,6 @@ Future<void> _fetchGalleryImages() async {
   }
 
   void showProductBidDialog(BuildContext context) async {
-    // Fetch highest bid first
     await _fetchCurrentHighestBid();
 
     final TextEditingController _bidController = TextEditingController();
@@ -988,17 +1000,17 @@ Future<void> _fetchGalleryImages() async {
     }
   }
 
-List<String> get _images {
-  if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
-    return _galleryImages;
+  List<String> get _images {
+    if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
+      return _galleryImages;
+    }
+    if (image.isNotEmpty) {
+      return ['https://lelamonline.com/admin/$image'];
+    }
+    return [
+      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    ];
   }
-  if (image.isNotEmpty) {
-    return ['https://lelamonline.com/admin/$image'];
-  }
-  return [
-    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-  ];
-}
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -1528,78 +1540,97 @@ List<String> get _images {
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'User ID: ${userId ?? 'Unknown'}',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
+                    // child: Text(
+                    //   'User ID: ${userId ?? 'Unknown'}',
+                    //   style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    // ),
                   ),
                   Stack(
                     children: [
-                    SizedBox(
-  height: 400,
-  child: Stack(
-    children: [
-      if (_isLoadingGallery)
-        const Center(child: CircularProgressIndicator())  
-      else if (_galleryError.isNotEmpty)
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 50, color: Colors.red),
-              const SizedBox(height: 8),
-              Text(_galleryError, style: const TextStyle(color: Colors.red)),
-              TextButton(
-                onPressed: _fetchGalleryImages,  
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        )
-      else
-        PageView.builder(
-          controller: _pageController,
-          itemCount: _images.length,
-          onPageChanged: (index) {
-            setState(() {
-              _currentImageIndex = index;
-            });
-          },
-          itemBuilder: (context, index) {
-            return GestureDetector(
-              onTap: () => _showFullScreenGallery(context),
-              child: CachedNetworkImage(
-                imageUrl: _images[index],
-                width: double.infinity,
-                height: 400,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                errorWidget: (context, url, error) => const Icon(Icons.error),
-              ),
-            );
-          },
-        ),
-      if (!_isLoadingGallery && _galleryError.isEmpty)  // Only show counter if not loading/error
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '${_currentImageIndex + 1}/${_images.length}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-    ],
-  ),
-),
+                      SizedBox(
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            if (_isLoadingGallery)
+                              const Center(child: CircularProgressIndicator())
+                            else if (_galleryError.isNotEmpty)
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _galleryError,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                    TextButton(
+                                      onPressed: _fetchGalleryImages,
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              PageView.builder(
+                                controller: _pageController,
+                                itemCount: _images.length,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _currentImageIndex = index;
+                                  });
+                                },
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap:
+                                        () => _showFullScreenGallery(context),
+                                    child: CachedNetworkImage(
+                                      imageUrl: _images[index],
+                                      width: double.infinity,
+                                      height: 400,
+                                      fit: BoxFit.cover,
+                                      placeholder:
+                                          (context, url) => const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                      errorWidget:
+                                          (context, url, error) =>
+                                              const Icon(Icons.error),
+                                    ),
+                                  );
+                                },
+                              ),
+                            if (!_isLoadingGallery &&
+                                _galleryError
+                                    .isEmpty) // Only show counter if not loading/error
+                              Positioned(
+                                right: 16,
+                                bottom: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '${_currentImageIndex + 1}/${_images.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                       CustomSafeArea(
                         child: Row(
                           children: [

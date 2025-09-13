@@ -2139,7 +2139,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               Text(
                 'Attempts: ${product.auctionAttempt}/3',
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 11,
                   color: Colors.black,
                   fontWeight: FontWeight.w600,
                 ),

@@ -52,6 +52,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String sellerActiveFrom = 'N/A';
   String? userId;
   String _currentHighestBid = '0';
+  
 
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
