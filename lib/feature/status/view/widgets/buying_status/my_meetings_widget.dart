@@ -267,7 +267,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
- Future<void> _loadMeetings() async {
+  Future<void> _loadMeetings() async {
     if (!mounted || _userId == null || _userId == 'Unknown') {
       setState(() {
         isLoading = false;
@@ -290,130 +290,139 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       String url;
       switch (selectedIndex) {
         case 0:
-          url = '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url =
+              '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 1:
-          url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url =
+              '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 2:
-          url = '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url =
+              '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 3:
-          url = '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url =
+              '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         default:
-          url = '${widget.baseUrl}/my-meeting-completed.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url =
+              '${widget.baseUrl}/my-meeting-completed.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
       debugPrint('Fetching meetings from: $url');
       final response = await http.get(Uri.parse(url), headers: headers);
-      debugPrint('Response status: ${response.statusCode}, body: ${response.body}');
+      debugPrint('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData is Map<String, dynamic> &&
-            (responseData['status'] == true || responseData['status'] == 'true')) {
-          if (responseData['data'] is List && responseData['data'].isNotEmpty) {
-            final List<dynamic> meetingData = responseData['data'];
-            debugPrint('Found ${meetingData.length} meetings in API response');
+            (responseData['status'] == true ||
+                responseData['status'] == 'true') &&
+            responseData['data'] is List) {
+          final List<dynamic> meetingData = responseData['data'];
+          debugPrint('Found ${meetingData.length} meetings in API response');
 
-            for (var meeting in meetingData) {
+          for (var meeting in meetingData) {
+            debugPrint(
+              'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
+            );
+            final postDetails = await _fetchPostDetails(meeting['post_id']);
+            if (postDetails == null) {
               debugPrint(
-                'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
+                'Skipping meeting ${meeting['id']} due to missing post details',
               );
-              final postDetails = await _fetchPostDetails(meeting['post_id']);
-              if (postDetails == null) {
-                debugPrint('Skipping meeting ${meeting['id']} due to missing post details');
-                continue;
-              }
-              final statusData = await _fetchMeetingStatus(meeting['id']);
-              final middleStatus = statusData?['middleStatus_data']?.toString() ?? 'Schedule meeting';
-              final meetingData = <String, dynamic>{
-                'id': meeting['id']?.toString() ?? 'N/A',
-                'user_id': meeting['user_id']?.toString() ?? _userId,
-                'post_id': meeting['post_id']?.toString() ?? 'N/A',
-                'bid_id': meeting['bid_id']?.toString() ?? '0',
-                'with_bid': meeting['with_bid']?.toString() ?? '0',
-                'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
-                'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
-                'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
-                'if_location_request': meeting['if_location_request']?.toString() ?? '0',
-                'latitude': meeting['latitude']?.toString() ?? '',
-                'longitude': meeting['longitude']?.toString() ?? '',
-                'location_link': meeting['location_link']?.toString() ?? '',
-                'location_request_count': meeting['location_request_count']?.toString() ?? '0',
-                'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
-                'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
-                'status': meeting['status']?.toString() ?? '1',
-                'meeting_done': meeting['meeting_done']?.toString() ?? '0',
-                'if_junk': meeting['if_junk']?.toString() ?? '0',
-                'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
-                'if_skipped': meeting['if_skipped']?.toString() ?? '0',
-                'if_not_intersect': meeting['if_not_intersect']?.toString() ?? '0',
-                'if_revisit': meeting['if_revisit']?.toString() ?? '0',
-                'if_decisionpedding': meeting['if_decisionpedding']?.toString() ?? '0',
-                'if_expired': meeting['if_expired']?.toString() ?? '0',
-                'if_cancel': meeting['if_cancel']?.toString() ?? '0',
-                'if_sold': meeting['if_sold']?.toString() ?? '0',
-                'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
-                'price_offered': meeting['price_offered']?.toString() ?? '0.00',
-                'created_on': meeting['created_on']?.toString() ??
-                    DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-                'updated_on': meeting['updated_on']?.toString() ??
-                    DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-                'title': postDetails['title'] ?? 'Unknown Vehicle (ID: ${meeting['post_id']})',
-                'carImage': postDetails['image'] ?? '',
-                'appId': 'APP_${meeting['post_id']}',
-                'bidDate': meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
-                'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
-                'targetPrice': postDetails['price'] ?? '0',
-                'bidPrice': meeting['bid_amount']?.toString() ?? '0',
-                'location': postDetails['location'] ?? 'Unknown Location',
-                'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
-                'if_auction': meeting['if_auction']?.toString() ?? '0',
-                'middleStatus_data': middleStatus,
-              };
-              debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
-              meetings.add(meetingData);
+              continue;
             }
-          } else {
-            debugPrint('No meetings available in response: ${responseData.toString()}');
-            setState(() {
-              errorMessage = 'No meetings available for ${statuses[selectedIndex]}';
-            });
+            final statusData = await _fetchMeetingStatus(meeting['id']);
+            final middleStatus =
+                statusData?['middleStatus_data']?.toString() ??
+                'Schedule meeting';
+            final meetingData = <String, dynamic>{
+              'id': meeting['id']?.toString() ?? 'N/A',
+              'user_id': meeting['user_id']?.toString() ?? _userId,
+              'post_id': meeting['post_id']?.toString() ?? 'N/A',
+              'bid_id': meeting['bid_id']?.toString() ?? '0',
+              'with_bid': meeting['with_bid']?.toString() ?? '0',
+              'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
+              'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
+              'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
+              'if_location_request':
+                  meeting['if_location_request']?.toString() ?? '0',
+              'latitude': meeting['latitude']?.toString() ?? '',
+              'longitude': meeting['longitude']?.toString() ?? '',
+              'location_link': meeting['location_link']?.toString() ?? '',
+              'location_request_count':
+                  meeting['location_request_count']?.toString() ?? '0',
+              'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
+              'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
+              'status': meeting['status']?.toString() ?? '1',
+              'meeting_done': meeting['meeting_done']?.toString() ?? '0',
+              'if_junk': meeting['if_junk']?.toString() ?? '0',
+              'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
+              'if_skipped': meeting['if_skipped']?.toString() ?? '0',
+              'if_not_intersect':
+                  meeting['if_not_intersect']?.toString() ?? '0',
+              'if_revisit': meeting['if_revisit']?.toString() ?? '0',
+              'if_decisionpedding':
+                  meeting['if_decisionpedding']?.toString() ?? '0',
+              'if_expired': meeting['if_expired']?.toString() ?? '0',
+              'if_cancel': meeting['if_cancel']?.toString() ?? '0',
+              'if_sold': meeting['if_sold']?.toString() ?? '0',
+              'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
+              'price_offered': meeting['price_offered']?.toString() ?? '0.00',
+              'created_on':
+                  meeting['created_on']?.toString() ??
+                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'updated_on':
+                  meeting['updated_on']?.toString() ??
+                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'title':
+                  postDetails['title'] ??
+                  'Unknown Vehicle (ID: ${meeting['post_id']})',
+              'carImage': postDetails['image'] ?? '',
+              'appId': 'APP_${meeting['post_id']}',
+              'bidDate':
+                  meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
+              'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
+              'targetPrice': postDetails['price'] ?? '0',
+              'bidPrice': meeting['bid_amount']?.toString() ?? '0',
+              'location': postDetails['location'] ?? 'Unknown Location',
+              'store':
+                  postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
+              'if_auction': meeting['if_auction']?.toString() ?? '0',
+              'middleStatus_data': middleStatus,
+            };
+            debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
+            meetings.add(meetingData);
           }
         } else {
-          debugPrint('Invalid server response: ${responseData.toString()}');
-          setState(() {
-            errorMessage = 'No meetings available for ${statuses[selectedIndex]}';
-          });
+          debugPrint('Unexpected response format: ${responseData.toString()}');
+          errorMessage = 'Unexpected response format from server';
         }
-      } else {
-        debugPrint('Failed to fetch meetings: ${response.statusCode} - ${response.reasonPhrase}');
-        setState(() {
-          errorMessage = 'Failed to fetch meetings. Please try again.';
-        });
-      }
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(
-        'userMeetings',
-        meetings.map((m) => jsonEncode(m)).toList(),
-      );
-      debugPrint('Total meetings saved: ${meetings.length}');
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(
+          'userMeetings',
+          meetings.map((m) => jsonEncode(m)).toList(),
+        );
+        debugPrint('Total meetings loaded: ${meetings.length}');
+      } else {
+        debugPrint('Failed to fetch meetings: ${response.reasonPhrase}');
+        errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
+      }
     } catch (e) {
       debugPrint('Error loading meetings: $e');
+      errorMessage = 'Error loading meetings: $e';
+    }
+
+    if (mounted) {
       setState(() {
-        errorMessage = 'Error loading meetings. Please check your connection and try again.';
+        isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
     }
   }
+
   void _onLocationRequestSent(String meetingId) {
     if (mounted) {
       setState(() {
@@ -827,6 +836,265 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //     );
   //   }
   // }
+
+Future<void> _completeMeeting(
+  BuildContext context,
+  Map<String, dynamic> meeting,
+) async {
+  if (_userId == null || _userId == 'Unknown') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid user ID. Please log in again.')),
+    );
+    return;
+  }
+
+  try {
+    // First call the meeting done API
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+    
+    debugPrint('my-meeting-done.php response: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == true || data['status'] == 'true') {
+        // Show feedback dialog
+        await _showMeetingFeedbackDialog(context, meeting);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Meeting marked as completed')),
+        );
+        
+        // Update local meeting data
+        final prefs = await SharedPreferences.getInstance();
+        final meetings = (prefs.getStringList('userMeetings') ?? [])
+            .map((m) => jsonDecode(m) as Map<String, dynamic>)
+            .toList();
+        
+        meetings.removeWhere((m) => m['id'] == meeting['id']);
+        meetings.add({
+          ...meeting,
+          'meeting_done': '1',
+        });
+        
+        await prefs.setStringList(
+          'userMeetings',
+          meetings.map((m) => jsonEncode(m)).toList(),
+        );
+        
+        await _loadMeetings();
+        widget.onRefreshMeetings?.call();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to complete meeting: ${data['message'] ?? 'Unknown error'}',
+            ),
+          ),
+        );
+      }
+    } else {
+      debugPrint('my-meeting-done.php failed with status ${response.statusCode}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to complete meeting')),
+      );
+    }
+  } catch (e) {
+    debugPrint('Error completing meeting: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Error completing meeting')),
+    );
+  }
+}
+
+Future<void> _showMeetingFeedbackDialog(
+  BuildContext context,
+  Map<String, dynamic> meeting,
+) async {
+  final TextEditingController feedbackController = TextEditingController();
+  
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Meeting Feedback'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Enter your feedback about the meeting:'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: feedbackController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Enter your feedback here...',
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            final feedback = feedbackController.text.trim();
+            if (feedback.isNotEmpty) {
+              await _submitMeetingFeedback(meeting['id'], feedback);
+            }
+            Navigator.pop(context);
+          },
+          child: const Text('Submit'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _submitMeetingFeedback(String meetingId, String feedback) async {
+  try {
+    final response = await http.post(
+      Uri.parse(
+        '${widget.baseUrl}/my-meeting-done-post-status.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: {'feedback': feedback},
+    );
+    
+    debugPrint('Feedback submission response: ${response.body}');
+  } catch (e) {
+    debugPrint('Error submitting feedback: $e');
+  }
+}
+
+Future<void> _showOfferPrice(
+  BuildContext context,
+  Map<String, dynamic> meeting,
+) async {
+  final TextEditingController priceController = TextEditingController();
+  
+  await showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Offer Price'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: priceController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Price Offered',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () async {
+            final price = priceController.text.trim();
+            if (price.isNotEmpty) {
+              await _submitOfferPrice(meeting, price);
+            }
+            Navigator.pop(context);
+          },
+          child: const Text('Submit'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _submitOfferPrice(Map<String, dynamic> meeting, String price) async {
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/my-meetings-offer-price.php?token=${widget.token}&user_id=${_userId}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}&price_offered=$price',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+    
+    debugPrint('Offer price response: ${response.body}');
+  } catch (e) {
+    debugPrint('Error submitting offer price: $e');
+  }
+}
+
+Future<void> _markNotInterested(Map<String, dynamic> meeting) async {
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/my-meetings-not-intersted.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+    
+    debugPrint('Not interested response: ${response.body}');
+  } catch (e) {
+    debugPrint('Error marking as not interested: $e');
+  }
+}
+
+Future<void> _markRevisit(Map<String, dynamic> meeting) async {
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/my-meetings-revisit.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+    
+    debugPrint('Revisit response: ${response.body}');
+  } catch (e) {
+    debugPrint('Error marking as revisit: $e');
+  }
+}
+
+Future<void> _markDecisionPending(Map<String, dynamic> meeting) async {
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/my-meetings-decision-pendding.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+    
+    debugPrint('Decision pending response: ${response.body}');
+  } catch (e) {
+    debugPrint('Error marking as decision pending: $e');
+  }
+}
+
+
 
   Future<void> _increaseBid(
     BuildContext context,
@@ -1663,16 +1931,16 @@ class MeetingCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const PopupMenuItem<String>(
-                            value: 'cancel_meeting',
-                            child: Row(
-                              children: [
-                                Icon(Icons.cancel, size: 16, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text('Cancel Meeting'),
-                              ],
-                            ),
-                          ),
+                          // const PopupMenuItem<String>(
+                          //   value: 'cancel_meeting',
+                          //   child: Row(
+                          //     children: [
+                          //       Icon(Icons.cancel, size: 16, color: Colors.red),
+                          //       SizedBox(width: 8),
+                          //       Text('Cancel Meeting'),
+                          //     ],
+                          //   ),
+                          // ),
                         ];
 
                         if (currentStatus == 'Meeting Request') {
@@ -1813,6 +2081,7 @@ class MeetingCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
+                              
                             );
                           }
                         }

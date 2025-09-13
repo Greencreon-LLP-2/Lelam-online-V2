@@ -9,11 +9,14 @@ import 'package:lelamonline_flutter/feature/categories/models/details_model.dart
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
+import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
@@ -70,68 +73,80 @@ class _MarketPlaceProductDetailsPageState
     _checkShortlistStatus();
   }
 
-Future<void> _fetchCurrentHighestBid() async {
-  try {
-    setState(() {
-      _isLoadingBid = true;  // Reuse existing loading state for UI feedback
-    });
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      setState(() {
+        _isLoadingBid = true; // Reuse existing loading state for UI feedback
+      });
 
-    final headers = {
-      'token': _token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
-    final url = '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
-    debugPrint('Fetching highest bid: $url');  // This should log the full URL with post_id
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
+      debugPrint(
+        'Fetching highest bid: $url',
+      ); // This should log the full URL with post_id
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('Full API response body: $responseBody');  // This will show the PHP notice + JSON
-    debugPrint('Response status code: ${response.statusCode}');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint(
+        'Full API response body: $responseBody',
+      ); // This will show the PHP notice + JSON
+      debugPrint('Response status code: ${response.statusCode}');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('Parsed response data: $responseData');  // Log the full parsed JSON
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint(
+          'Parsed response data: $responseData',
+        ); // Log the full parsed JSON
 
-      if (responseData['status'] == true) {
-        final dataValue = responseData['data']?.toString() ?? '0';
-        // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
-        if (int.tryParse(dataValue) != null) {
-          setState(() {
-            _currentHighestBid = dataValue;
-          });
-          debugPrint('Successfully fetched highest bid: $dataValue');
+        if (responseData['status'] == true) {
+          final dataValue = responseData['data']?.toString() ?? '0';
+          // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
+          if (int.tryParse(dataValue) != null) {
+            setState(() {
+              _currentHighestBid = dataValue;
+            });
+            debugPrint('Successfully fetched highest bid: $dataValue');
+          } else {
+            // New: Handle non-numeric data as error
+            debugPrint(
+              'API returned non-numeric data (possible error): $dataValue',
+            );
+            setState(() {
+              _currentHighestBid =
+                  'Error: $dataValue'; // Store error for display
+            });
+          }
         } else {
-          // New: Handle non-numeric data as error
-          debugPrint('API returned non-numeric data (possible error): $dataValue');
+          debugPrint('API status false: ${responseData['data']}');
           setState(() {
-            _currentHighestBid = 'Error: $dataValue';  // Store error for display
+            _currentHighestBid = '0'; // Fallback
           });
         }
       } else {
-        debugPrint('API status false: ${responseData['data']}');
+        debugPrint(
+          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
+        );
         setState(() {
-          _currentHighestBid = '0';  // Fallback
+          _currentHighestBid = '0'; // Fallback
         });
       }
-    } else {
-      debugPrint('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
+    } catch (e) {
+      debugPrint('Exception in fetch highest bid: $e');
       setState(() {
-        _currentHighestBid = '0';  // Fallback
+        _currentHighestBid = ' $e'; // Store error for display
+      });
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
       });
     }
-  } catch (e) {
-    debugPrint('Exception in fetch highest bid: $e');
-    setState(() {
-      _currentHighestBid = ' $e';  // Store error for display
-    });
-  } finally {
-    setState(() {
-      _isLoadingBid = false;
-    });
   }
-}
 
   Future<void> _loadUserId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -308,7 +323,6 @@ Future<void> _fetchCurrentHighestBid() async {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         if (responseData['status'] == true) {
-    
           final prefs = await SharedPreferences.getInstance();
           final cachedBids = prefs.getStringList('userBids') ?? [];
           final newBid = {
@@ -359,52 +373,26 @@ Future<void> _fetchCurrentHighestBid() async {
     }
   }
 
+  void showProductBidDialog(BuildContext context) async {
+    // Fetch highest bid first
+    await _fetchCurrentHighestBid();
 
+    final TextEditingController _bidController = TextEditingController();
+    bool isDialogOpen = true;
 
-void showProductBidDialog(BuildContext context) async {
-  // Fetch highest bid first
-  await _fetchCurrentHighestBid();
-
-  final TextEditingController _bidController = TextEditingController();
-  bool isDialogOpen = true;
-
-  void showResponseDialog(String message, bool isSuccess) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            isSuccess ? 'Thank You' : 'Error',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(message, style: const TextStyle(fontSize: 16)),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (isDialogOpen) {
-                  Navigator.of(context).pop();
-                  isDialogOpen = false;
-                  _bidController.dispose();
-                }
-                if (isSuccess) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MyBidsWidget(
-                        baseUrl: _baseUrl,
-                        token: _token,
-                        userId: userId,
-                      ),
-                    ),
-                  );
-                }
-              },
-              child: const Text('OK', style: TextStyle(color: Colors.grey)),
+    void showResponseDialog(String message, bool isSuccess) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text(
+              isSuccess ? 'Thank You' : 'Error',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            if (isSuccess)
-              ElevatedButton(
+            content: Text(message, style: const TextStyle(fontSize: 16)),
+            actions: [
+              TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   if (isDialogOpen) {
@@ -412,153 +400,201 @@ void showProductBidDialog(BuildContext context) async {
                     isDialogOpen = false;
                     _bidController.dispose();
                   }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MyBidsWidget(
-                        baseUrl: _baseUrl,
-                        token: _token,
-                        userId: userId,
+                  if (isSuccess) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyBidsWidget(
+                              baseUrl: _baseUrl,
+                              token: _token,
+                              userId: userId,
+                            ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Call Support'),
+                child: const Text('OK', style: TextStyle(color: Colors.grey)),
               ),
+              if (isSuccess)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    if (isDialogOpen) {
+                      Navigator.of(context).pop();
+                      isDialogOpen = false;
+                      _bidController.dispose();
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyBidsWidget(
+                              baseUrl: _baseUrl,
+                              token: _token,
+                              userId: userId,
+                            ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Call Support'),
+                ),
+            ],
+          );
+        },
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Place Your Bid Amount',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // New: Display current highest bid
+              const Text(
+                'Current Highest Bid:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color:
+                        _currentHighestBid.startsWith('Bid amount')
+                            ? Colors.black
+                            : Colors.grey,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _currentHighestBid.startsWith('')
+                      ? _currentHighestBid // Show error message, e.g., "Error: Please provide valid data"
+                      : '₹ ${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color:
+                        _currentHighestBid.startsWith('')
+                            ? Colors.red
+                            : Colors.green,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Your Bid Amount *',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _bidController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: false,
+                ),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  hintText: 'Enter amount',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+              ),
+              if (_isLoadingBid)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8.0),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                isDialogOpen = false;
+                _bidController.dispose();
+              },
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed:
+                  _isLoadingBid
+                      ? null
+                      : () async {
+                        final String amount = _bidController.text;
+                        if (amount.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a bid amount'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        final int bidAmount = int.tryParse(amount) ?? 0;
+                        if (bidAmount < _minBidIncrement) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
+
+                        if (userId == null || userId == 'Unknown') {
+                          showResponseDialog(
+                            'Please log in to place a bid',
+                            false,
+                          );
+                          return;
+                        }
+
+                        try {
+                          final String responseMessage = await _saveBidData(
+                            bidAmount,
+                          );
+                          showResponseDialog(responseMessage, true);
+                        } catch (e) {
+                          showResponseDialog('Error placing bid: $e', false);
+                        }
+                      },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Submit'),
+            ),
           ],
         );
       },
-    );
+    ).then((_) {
+      if (isDialogOpen) {
+        isDialogOpen = false;
+        _bidController.dispose();
+      }
+    });
   }
-
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text(
-          'Place Your Bid Amount',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // New: Display current highest bid
-           const Text(
-  'Current Highest Bid:',
-  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-),
-const SizedBox(height: 4),
-Container(
-  width: double.infinity,
-  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-  decoration: BoxDecoration(
-    border: Border.all(
-      color: _currentHighestBid.startsWith('Bid amount') ? Colors.black : Colors.grey,
-    ),
-    borderRadius: BorderRadius.circular(4),
-  ),
-  child: Text(
-    _currentHighestBid.startsWith('')
-        ? _currentHighestBid  // Show error message, e.g., "Error: Please provide valid data"
-        : '₹ ${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
-    style: TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.bold,
-      color: _currentHighestBid.startsWith('') ? Colors.red : Colors.green,
-    ),
-  ),
-),
-            const SizedBox(height: 12),
-            const Text(
-              'Your Bid Amount *',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _bidController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: false),
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                hintText: 'Enter amount',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-            if (_isLoadingBid)
-              const Padding(
-                padding: EdgeInsets.only(top: 8.0),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              isDialogOpen = false;
-              _bidController.dispose();
-            },
-            child: const Text('Close', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: _isLoadingBid ? null : () async {
-              final String amount = _bidController.text;
-              if (amount.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a bid amount'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final int bidAmount = int.tryParse(amount) ?? 0;
-              if (bidAmount < _minBidIncrement) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              if (userId == null || userId == 'Unknown') {
-                showResponseDialog('Please log in to place a bid', false);
-                return;
-              }
-
-              try {
-                final String responseMessage = await _saveBidData(bidAmount);
-                showResponseDialog(responseMessage, true);
-              } catch (e) {
-                showResponseDialog('Error placing bid: $e', false);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Submit'),
-          ),
-        ],
-      );
-    },
-  ).then((_) {
-    if (isDialogOpen) {
-      isDialogOpen = false;
-      _bidController.dispose();
-    }
-  });
-}
 
   @override
   void dispose() {
@@ -1095,172 +1131,173 @@ Container(
     );
   }
 
-Future<void> _fixMeeting(DateTime selectedDate) async {
-  if (userId == null || userId == 'Unknown') {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please log in to schedule a meeting'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    if (userId == null || userId == 'Unknown') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to schedule a meeting'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-  try {
-    final headers = {
-      'token': _token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
-    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-    final url =
-        '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
-    debugPrint('Scheduling meeting: $url');
+    try {
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+      debugPrint('Scheduling meeting: $url');
 
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('post-fix-meeting.php response: $responseBody');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('post-fix-meeting.php response: $responseBody');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      if (responseData['status'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(responseData['data'] ?? 'Meeting scheduled successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                responseData['data'] ?? 'Meeting scheduled successfully',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to schedule meeting: ${responseData['data']}',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to schedule meeting: ${responseData['data']}'),
+            content: Text('Error: ${response.reasonPhrase}'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } else {
+    } catch (e) {
+      debugPrint('Error scheduling meeting: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${response.reasonPhrase}'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
-  } catch (e) {
-    debugPrint('Error scheduling meeting: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: $e'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
-}
 
-void _showMeetingDialog(BuildContext context) {
-  DateTime selectedDate = DateTime.now();
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: Column(
-          children: [
-            const SizedBox(height: 8),
-            const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-            const SizedBox(height: 4),
-            Text(
-              'Select date',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
-        content: Container(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+  void _showMeetingDialog(BuildContext context) {
+    DateTime selectedDate = DateTime.now();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Column(
             children: [
-              ListTile(
-                leading: const Icon(
-                  Icons.calendar_today,
-                  color: AppTheme.primaryColor,
-                ),
-                title: const Text('Select Date'),
-                subtitle: Text(
-                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                  style: const TextStyle(color: AppTheme.primaryColor),
-                ),
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 30)),
-                  );
-                  if (picked != null && picked != selectedDate) {
-                    selectedDate = picked;
-                    Navigator.pop(context);
-                    _showMeetingDialog(context);
-                  }
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey[300]!),
+              const SizedBox(height: 8),
+              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
+              const SizedBox(height: 4),
+              Text(
+                'Select date',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.normal,
                 ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
-            ),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
+          content: Container(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.calendar_today,
+                    color: AppTheme.primaryColor,
+                  ),
+                  title: const Text('Select Date'),
+                  subtitle: Text(
+                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                    style: const TextStyle(color: AppTheme.primaryColor),
+                  ),
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    if (picked != null && picked != selectedDate) {
+                      selectedDate = picked;
+                      Navigator.pop(context);
+                      _showMeetingDialog(context);
+                    }
+                  },
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+              ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              await _fixMeeting(selectedDate);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-            child: const Text(
-              'Schedule Meeting',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            ElevatedButton(
+              onPressed: () async {
+                await _fixMeeting(selectedDate);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Text(
+                'Schedule Meeting',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-        ],
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      );
-    },
-  );
-}
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
 
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
@@ -1399,7 +1436,12 @@ void _showMeetingDialog(BuildContext context) {
             ),
             ElevatedButton(
               onPressed: () {
-                // Ask a question functionality
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => const ReviewDialog(userId: '', postId: ''),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -1413,214 +1455,334 @@ void _showMeetingDialog(BuildContext context) {
       ],
     );
   }
-@override
-Widget build(BuildContext context) {
-  final isUserLoggedIn = userId != null && userId != 'Unknown';
-  return CustomSafeArea(
-    child: Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'User ID: ${userId ?? 'Unknown'}',
-                    style: const TextStyle(fontSize: 16, color: Colors.grey),
+
+  @override
+  Widget build(BuildContext context) {
+    final isUserLoggedIn = userId != null && userId != 'Unknown';
+    return CustomSafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      'User ID: ${userId ?? 'Unknown'}',
+                      style: const TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
                   ),
-                ),
-                Stack(
-                  children: [
-                    SizedBox(
-                      height: 400,
-                      child: Stack(
-                        children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _images.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentImageIndex = index;
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => _showFullScreenGallery(context),
-                                child: CachedNetworkImage(
-                                  imageUrl: _images[index],
-                                  width: double.infinity,
-                                  height: 400,
-                                  fit: BoxFit.fitWidth,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
-                                ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_currentImageIndex + 1}/${_images.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    CustomSafeArea(
-                      child: Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: _toggleFavorite,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // Share functionality
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Stack(
                     children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                      SizedBox(
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            PageView.builder(
+                              controller: _pageController,
+                              itemCount: _images.length,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentImageIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _showFullScreenGallery(context),
+                                  child: CachedNetworkImage(
+                                    imageUrl: _images[index],
+                                    width: double.infinity,
+                                    height: 400,
+                                    fit: BoxFit.fitWidth,
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) =>
+                                            const Icon(Icons.error),
+                                  ),
+                                );
+                              },
+                            ),
+                            Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${_images.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Colors.grey,
+                      CustomSafeArea(
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(
+                                _isFavorited
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isFavorited ? Colors.red : Colors.white,
+                              ),
+                              onPressed: _toggleFavorite,
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.share,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                // Share functionality
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            _isLoadingLocations
+                                ? const SizedBox(
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Text(
+                                : Text(
                                   landMark,
                                   style: const TextStyle(color: Colors.grey),
                                 ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            createdOn,
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent,
+                            const Spacer(),
+                            const Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              createdOn,
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '#AD ID $id',
-                            style: const TextStyle(color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueAccent,
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              // Call functionality
-                            },
-                            icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '#AD ID $id',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                if (userId == null || userId == 'Unknown') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please log in to chat with the seller',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return ChatOptionsDialog(
+                                      onChatWithSupport: () {},
+                                      onChatWithSeller: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChatPage(
+                                                  userId: userId!,
+                                                  listenerId:
+                                                      widget.product.createdBy,
+                                                  listenerName: sellerName,
+                                                  listenerImage:
+                                                      sellerProfileImage ??
+                                                      'seller.jpg',
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      baseUrl: _baseUrl,
+                                      token: _token,
+                                    );
+                                  },
+                                );
+                              },
+                              icon: const Icon(Icons.call),
+                              label: const Text('Call Support'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.30),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                          offset: const Offset(1, 1),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Details',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                          const SizedBox(height: 12),
+                          if (isLoadingDetails)
+                            const Center(child: CircularProgressIndicator())
+                          else
+                            Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.calendar_today,
+                                        attributeValues['Year'] ?? 'N/A',
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.person,
+                                        _getOwnerText(
+                                          attributeValues['No of owners'] ??
+                                              'N/A',
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.speed,
+                                        _formatNumber(
+                                          attributeValues['KM Range'] ?? 'N/A',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.local_gas_station,
+                                        attributeValues['Fuel Type'] ?? 'N/A',
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.settings,
+                                        attributeValues['Transmission'] ??
+                                            'N/A',
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildDetailItem(
+                                        Icons.build,
+                                        attributeValues['Engine Condition'] ??
+                                            'N/A',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                const Divider(),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.30),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                        offset: const Offset(1, 1),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
+                  const Divider(),
+                  Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Details',
+                          'Seller Comments',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -1631,194 +1793,121 @@ Widget build(BuildContext context) {
                           const Center(child: CircularProgressIndicator())
                         else
                           Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.person,
-                                      _getOwnerText(
-                                        attributeValues['No of owners'] ?? 'N/A',
+                            children:
+                                orderedAttributeValues
+                                    .where(
+                                      (entry) =>
+                                          entry.value != 'N/A' &&
+                                          entry.key !=
+                                              'Co driver side rear tyre',
+                                    )
+                                    .map(
+                                      (entry) => _buildSellerCommentItem(
+                                        entry.key,
+                                        entry.key == 'No of owners'
+                                            ? _getOwnerText(entry.value)
+                                            : entry.value,
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        attributeValues['KM Range'] ?? 'N/A',
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.settings,
-                                      attributeValues['Transmission'] ?? 'N/A',
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.build,
-                                      attributeValues['Engine Condition'] ?? 'N/A',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    )
+                                    .toList(),
                           ),
                       ],
                     ),
                   ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Comments',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Seller Information',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (isLoadingDetails)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children: orderedAttributeValues
-                              .where(
-                                (entry) =>
-                                    entry.value != 'N/A' &&
-                                    entry.key != 'Co driver side rear tyre',
-                              )
-                              .map(
-                                (entry) => _buildSellerCommentItem(
-                                  entry.key,
-                                  entry.key == 'No of owners'
-                                      ? _getOwnerText(entry.value)
-                                      : entry.value,
-                                ),
-                              )
-                              .toList(),
-                        ),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Information',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSellerInformationItem(context),
-                    ],
-                  ),
-                ),
-                const Divider(),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Questions',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildQuestionsSection(),
-                    ],
-                  ),
-                ),
-                // Add padding to prevent content from being hidden under fixed buttons
-                const SizedBox(height: 80),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-    
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 15,
-                    spreadRadius: 0,
-                    offset: Offset(1, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => showProductBidDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primarypink,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                      ),
-                      child: const Text('Place Bid'),
+                        const SizedBox(height: 12),
+                        _buildSellerInformationItem(context),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _showMeetingDialog(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
+                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Questions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      child: const Text('Fix Meeting'),
+                        const SizedBox(height: 12),
+                        _buildQuestionsSection(),
+                      ],
                     ),
                   ),
+                  // Add padding to prevent content from being hidden under fixed buttons
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
-          ),
-        ],
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 15,
+                      spreadRadius: 0,
+                      offset: Offset(1, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => showProductBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
+                    ),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showMeetingDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Fix Meeting'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

@@ -14,8 +14,10 @@ const String usedCarsProducts =
 const String locations = '$baseUrl/list-location.php?token=$token';
 
 //====================== Post details =======================//
-const String attribute_name =
+const String attributeName =
     '$baseUrl//post-attribute-values.php?token=$token';
+    const String addPostReview =
+    '$baseUrl/add-post-review.php?token=$token';
 
 //====================== Feature Posts ===============================//
 const String brand = '$baseUrl/list-brand.php?token=$token';
