@@ -16,64 +16,129 @@ class SupportTicketPage extends StatefulWidget {
 }
 
 class _SupportTicketPageState extends State<SupportTicketPage> {
-  final String baseUrl = "https://your-domain.com/api"; // Replace with your actual base URL
-  String token = "";
+  final String baseUrl = "https://lelamonline.com/admin/api/v1";
+  String token = "5cb2c9b569416b5db1604e0e12478ded";
   List<dynamic> tickets = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    if (kDebugMode) print('User ID: ${widget.userId}');
     _loadConfigAndFetchTickets();
   }
 
   Future<void> _loadConfigAndFetchTickets() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      token = prefs.getString('auth_token') ?? '';
+      token = prefs.getString('auth_token') ?? token;
+      isLoading = true;
     });
 
     if (token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Authentication token missing. Please log in again.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication token missing. Please log in again.')),
+        );
+      }
+      setState(() => isLoading = false);
       return;
     }
 
     await _fetchTickets();
   }
 
+  List<dynamic> _parseJsonSafely(String body) {
+    String cleanBody = body
+        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
+        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+        .trim();
+    if (kDebugMode) print('Cleaned Body (List): $cleanBody');
+    try {
+      final parsed = jsonDecode(cleanBody);
+      final typedParsed = Map<String, dynamic>.from(parsed);
+      if (typedParsed['data'] is String) {
+        return [];
+      }
+      return typedParsed['data'] ?? typedParsed;
+    } catch (e) {
+      if (kDebugMode) print('JSON Parse Error (List): $e\nRaw: $body');
+      return [];
+    }
+  }
+
+  Map<String, dynamic> _parseJsonMapSafely(String body) {
+    String cleanBody = body
+        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
+        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+        .trim();
+    if (kDebugMode) print('Cleaned Body (Map): $cleanBody');
+    try {
+      final parsed = jsonDecode(cleanBody);
+      final typedParsed = Map<String, dynamic>.from(parsed);
+      if (kDebugMode) print('Parsed Add Response: $typedParsed');
+      return typedParsed;
+    } catch (e) {
+      if (kDebugMode) print('JSON Parse Error (Map): $e\nRaw: $body');
+      return {'success': false, 'ticket_id': 'N/A'};
+    }
+  }
+
   Future<void> _fetchTickets() async {
     if (widget.userId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User ID is required')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User ID is required')),
+        );
+      }
+      setState(() => isLoading = false);
       return;
     }
     final url = Uri.parse('$baseUrl/support-ticket-list.php?token=$token&user_id=${widget.userId}');
     if (kDebugMode) print('Fetching tickets from: $url');
     try {
-      final response = await http.get(url);
+      final response = await http.get(url, headers: {
+        'token': token,
+        'Cookie': 'PHPSESSID=1nciicncgu05jlv98kv32ihdor',
+      });
+      if (kDebugMode) {
+        print('Tickets Response Status: ${response.statusCode}');
+        print('Tickets Response Headers: ${response.headers}');
+        print('Tickets Response Body: ${response.body}');
+      }
       if (response.statusCode == 200) {
         setState(() {
-          tickets = jsonDecode(response.body);
+          tickets = _parseJsonSafely(response.body);
+          isLoading = false;
         });
+        if (kDebugMode) print('Parsed Tickets: ${tickets.length} items');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load tickets: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load tickets: ${response.statusCode}')),
+          );
+        }
+        setState(() => isLoading = false);
       }
     } catch (e) {
       if (kDebugMode) print('Error fetching tickets: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching tickets: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching tickets: $e')),
+        );
+      }
+      setState(() => isLoading = false);
     }
   }
 
   void _showAddTicketDialog() {
-    final subjectController = TextEditingController(text: 'Test subjectasdasd');
-    final mobileController = TextEditingController(text: '9020583271');
-    final messageController = TextEditingController(text: 'test messageasdad');
+    final subjectController = TextEditingController();
+    final mobileController = TextEditingController();
+    final messageController = TextEditingController();
 
     showDialog(
       context: context,
@@ -86,27 +151,34 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
               TextField(
                 controller: subjectController,
                 decoration: const InputDecoration(
-                  labelText: 'Subject',
+                  labelText: 'Subject *',
                   border: OutlineInputBorder(),
+                  hintText: 'Enter ticket subject',
                 ),
+                maxLength: 100,
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: mobileController,
                 decoration: const InputDecoration(
-                  labelText: 'Mobile Number',
+                  labelText: 'Mobile Number *',
                   border: OutlineInputBorder(),
+                  hintText: 'e.g., 9626040738',
                 ),
                 keyboardType: TextInputType.phone,
+                maxLength: 15,
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: messageController,
                 decoration: const InputDecoration(
-                  labelText: 'Message',
+                  labelText: 'Message *',
                   border: OutlineInputBorder(),
+                  hintText: 'Describe your issue',
+                  alignLabelWithHint: true,
                 ),
                 maxLines: 3,
+                maxLength: 500,
               ),
             ],
           ),
@@ -118,6 +190,16 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final subject = subjectController.text.trim();
+              final mobile = mobileController.text.trim();
+              final msg = messageController.text.trim();
+
+              if (subject.isEmpty || mobile.isEmpty || msg.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please fill all fields')),
+                );
+                return;
+              }
               if (widget.userId.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('User ID is required')),
@@ -130,24 +212,30 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
                 );
                 return;
               }
+
               final url = Uri.parse(
-                '$baseUrl/add-ticket.php?token=$token&user_id=${widget.userId}&mobile=${mobileController.text}&subject=${Uri.encodeComponent(subjectController.text)}&msg=${Uri.encodeComponent(messageController.text)}',
+                '$baseUrl/add-ticket.php?token=$token&user_id=${widget.userId}&mobile=$mobile&subject=${Uri.encodeComponent(subject)}&msg=${Uri.encodeComponent(msg)}',
               );
               if (kDebugMode) print('Creating ticket at: $url');
               try {
-                final response = await http.post(url);
+                final response = await http.get(url, headers: {
+                  'token': token,
+                  'Cookie': 'PHPSESSID=1nciicncgu05jlv98kv32ihdor',
+                });
+                if (kDebugMode) {
+                  print('Add Ticket Response Status: ${response.statusCode}');
+                  print('Add Ticket Response Headers: ${response.headers}');
+                  print('Add Ticket Response Body: ${response.body}');
+                }
                 if (response.statusCode == 200) {
-                  final responseData = jsonDecode(response.body);
+                  final responseData = _parseJsonMapSafely(response.body);
+                  final newTicketId = responseData['ticket_id']?.toString() ?? responseData['id']?.toString() ?? 'N/A';
                   Navigator.pop(context);
-                  _showTicketCreatedCard(
-                    responseData['ticket_id']?.toString() ?? 'N/A',
-                    subjectController.text,
-                    DateTime.now().toString().split(' ')[0],
-                  );
+                  _showTicketCreatedCard(newTicketId, subject, DateTime.now().toString().split(' ')[0]);
                   await _fetchTickets();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to create ticket: ${response.statusCode}')),
+                    SnackBar(content: Text('Failed to create ticket: ${response.statusCode} - ${response.reasonPhrase}')),
                   );
                 }
               } catch (e) {
@@ -161,7 +249,11 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      subjectController.dispose();
+      mobileController.dispose();
+      messageController.dispose();
+    });
   }
 
   void _showTicketCreatedCard(String ticketId, String subject, String date) {
@@ -170,19 +262,18 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
       builder: (context) => AlertDialog(
         content: Card(
           elevation: 4,
+          color: Colors.green[50],
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                const SizedBox(height: 12),
                 const Text(
                   'Ticket Created Successfully!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 Text('Ticket ID: $ticketId'),
@@ -190,15 +281,16 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
                 Text('Subject: $subject'),
                 const SizedBox(height: 4),
                 Text('Date: $date'),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       _showChatDialog(ticketId, subject, widget.userId);
                     },
-                    child: const Text('Open Chat'),
+                    icon: const Icon(Icons.chat),
+                    label: const Text('Open Chat'),
                   ),
                 ),
               ],
@@ -216,6 +308,10 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   }
 
   void _showChatDialog(String ticketId, String ticketName, String userId) {
+    final ticket = tickets.firstWhere(
+      (t) => t['id'].toString() == ticketId,
+      orElse: () => {'msg': 'No Message'},
+    );
     showDialog(
       context: context,
       builder: (context) => ChatDialog(
@@ -224,6 +320,7 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
         ticketId: ticketId,
         ticketName: ticketName,
         userId: userId,
+        initialMessage: ticket['msg'] ?? 'No Message',
       ),
     );
   }
@@ -234,9 +331,11 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch WhatsApp')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch WhatsApp')),
+        );
+      }
     }
   }
 
@@ -244,7 +343,8 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Support'),
+        title: const Text('Support Tickets'),
+        backgroundColor: Theme.of(context).primaryColor,
       ),
       body: Column(
         children: [
@@ -253,13 +353,15 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: _showAddTicketDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('New Ticket'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text('New Ticket'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -271,6 +373,7 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
@@ -279,33 +382,88 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
           ),
           const Divider(height: 1),
           Expanded(
-            child: tickets.isEmpty
-                ? const Center(child: Text('No tickets'))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    itemCount: tickets.length,
-                    itemBuilder: (context, index) {
-                      final ticket = tickets[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8.0),
-                        elevation: 2,
-                        child: ListTile(
-                          title: Text(
-                            ticket['subject'] ?? 'No Subject',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            'ID: ${ticket['id'] ?? 'N/A'} | ${ticket['status'] ?? 'Unknown'}',
-                          ),
-                          onTap: () => _showChatDialog(
-                            ticket['id']?.toString() ?? 'N/A',
-                            ticket['subject'] ?? 'No Subject',
-                            widget.userId,
-                          ),
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : tickets.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.support_agent, size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text('No tickets yet. Create one above!'),
+                          ],
                         ),
-                      );
-                    },
-                  ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16.0),
+                        itemCount: tickets.length,
+                        itemBuilder: (context, index) {
+                          final ticket = tickets[index];
+                          final status = ticket['status'] == '0' ? 'Open' : 'Closed';
+                          Color statusColor = status == 'Open' ? Colors.blue : Colors.green;
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12.0),
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => _showChatDialog(
+                                ticket['id']?.toString() ?? 'N/A',
+                                ticket['uniq_id'] ?? 'No ID',
+                                widget.userId,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            ticket['uniq_id'] ?? 'No ID',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            status,
+                                            style: TextStyle(
+                                              color: statusColor,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Subject: ${ticket['subject'] ?? 'No Subject'}',
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Created: ${ticket['created_on']?.split(' ')[0] ?? 'N/A'}',
+                                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -319,6 +477,7 @@ class ChatDialog extends StatefulWidget {
   final String ticketId;
   final String ticketName;
   final String userId;
+  final String initialMessage;
 
   const ChatDialog({
     super.key,
@@ -327,6 +486,7 @@ class ChatDialog extends StatefulWidget {
     required this.ticketId,
     required this.ticketName,
     required this.userId,
+    required this.initialMessage,
   });
 
   @override
@@ -335,33 +495,76 @@ class ChatDialog extends StatefulWidget {
 
 class _ChatDialogState extends State<ChatDialog> {
   List<dynamic> comments = [];
-  final commentController = TextEditingController(text: 'Any updates');
+  final commentController = TextEditingController();
+  bool isSending = false;
 
   @override
   void initState() {
     super.initState();
+    // Add initial ticket message to comments
+    comments.add({
+      'comment': widget.initialMessage,
+      'timestamp': 'Initial Message',
+    });
     _fetchComments();
+  }
+
+  List<dynamic> _parseJsonSafely(String body) {
+    String cleanBody = body
+        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
+        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+        .trim();
+    if (kDebugMode) print('Cleaned Body (Comments): $cleanBody');
+    try {
+      final parsed = jsonDecode(cleanBody);
+      final typedParsed = Map<String, dynamic>.from(parsed);
+      if (typedParsed['data'] is String) {
+        return [];
+      }
+      return typedParsed['data'] ?? typedParsed;
+    } catch (e) {
+      if (kDebugMode) print('JSON Parse Error (Comments): $e\nRaw: $body');
+      return [];
+    }
   }
 
   Future<void> _fetchComments() async {
     final url = Uri.parse('${widget.baseUrl}/ticket-comments.php?token=${widget.token}&ticket_id=${widget.ticketId}');
     if (kDebugMode) print('Fetching comments from: $url');
     try {
-      final response = await http.get(url);
+      final response = await http.get(url, headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=1nciicncgu05jlv98kv32ihdor',
+      });
+      if (kDebugMode) {
+        print('Comments Response Status: ${response.statusCode}');
+        print('Comments Response Headers: ${response.headers}');
+        print('Comments Response Body: ${response.body}');
+      }
       if (response.statusCode == 200) {
         setState(() {
-          comments = jsonDecode(response.body);
+          final fetchedComments = _parseJsonSafely(response.body);
+          comments = [
+            {'comment': widget.initialMessage, 'timestamp': 'Initial Message'},
+            ...fetchedComments,
+          ];
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load comments: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load comments: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
       if (kDebugMode) print('Error fetching comments: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching comments: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching comments: $e')),
+        );
+      }
     }
   }
 
@@ -373,25 +576,47 @@ class _ChatDialogState extends State<ChatDialog> {
       );
       return;
     }
+
+    setState(() => isSending = true);
+
     final url = Uri.parse(
       '${widget.baseUrl}/ticket-reply.php?token=${widget.token}&user_id=${widget.userId}&ticket_id=${widget.ticketId}&comment=${Uri.encodeComponent(comment)}&image=',
     );
     if (kDebugMode) print('Sending reply to: $url');
     try {
-      final response = await http.post(url);
+      final response = await http.post(url, headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=1nciicncgu05jlv98kv32ihdor',
+      });
+      if (kDebugMode) {
+        print('Reply Response Status: ${response.statusCode}');
+        print('Reply Response Headers: ${response.headers}');
+        print('Reply Response Body: ${response.body}');
+      }
       if (response.statusCode == 200) {
         commentController.clear();
         await _fetchComments();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Reply sent successfully!')),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send reply: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to send reply: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
       if (kDebugMode) print('Error sending reply: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sending reply: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending reply: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isSending = false);
     }
   }
 
@@ -401,25 +626,38 @@ class _ChatDialogState extends State<ChatDialog> {
       title: Text('Ticket ${widget.ticketId} - ${widget.ticketName}'),
       content: SizedBox(
         width: double.maxFinite,
-        height: 300,
+        height: 400,
         child: Column(
           children: [
             Expanded(
               child: comments.isEmpty
-                  ? const Center(child: Text('No comments'))
+                  ? const Center(child: Text('No messages yet. Start the conversation!'))
                   : ListView.builder(
+                      padding: const EdgeInsets.all(8.0),
                       itemCount: comments.length,
                       itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Card(
-                            elevation: 1,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                comments[index]['comment'] ?? 'No Comment',
-                                style: const TextStyle(fontSize: 14),
-                              ),
+                        final comment = comments[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 4.0),
+                          elevation: 1,
+                          color: Colors.blue[50],
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  comment['comment'] ?? 'No Comment',
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                if (comment['timestamp'] != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    comment['timestamp'],
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         );
@@ -427,13 +665,31 @@ class _ChatDialogState extends State<ChatDialog> {
                     ),
             ),
             const Divider(),
-            TextField(
-              controller: commentController,
-              decoration: const InputDecoration(
-                hintText: 'Type reply...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: commentController,
+                    decoration: const InputDecoration(
+                      hintText: 'Type your reply...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    maxLines: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: isSending ? null : _sendReply,
+                  child: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('Send'),
+                ),
+              ],
             ),
           ],
         ),
@@ -443,11 +699,13 @@ class _ChatDialogState extends State<ChatDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Close'),
         ),
-        ElevatedButton(
-          onPressed: _sendReply,
-          child: const Text('Send'),
-        ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    commentController.dispose();
+    super.dispose();
   }
 }

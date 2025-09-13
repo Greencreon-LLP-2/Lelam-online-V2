@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
@@ -63,6 +64,9 @@ class _MarketPlaceProductDetailsPageState
   final String _token = '5cb2c9b569416b5db1604e0e12478ded';
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
+  bool _isLoadingGallery = true;
+  List<String> _galleryImages = [];
+  String _galleryError = '';
 
   @override
   void initState() {
@@ -71,7 +75,58 @@ class _MarketPlaceProductDetailsPageState
     _fetchDetailsData();
     _fetchSellerInfo();
     _checkShortlistStatus();
+    _fetchGalleryImages();
   }
+
+Future<void> _fetchGalleryImages() async {
+  try {
+    setState(() {
+      _isLoadingGallery = true;
+      _galleryError = '';
+    });
+
+    final headers = {
+      'token': _token,
+      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+    };
+    final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+    debugPrint('Fetching gallery: $url');
+
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    debugPrint('Gallery API response: $responseBody');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      debugPrint('Parsed responseData type: ${responseData.runtimeType}');  // New: Log type for debug
+
+      if (responseData['status'] == 'true' && responseData['data'] is List && (responseData['data'] as List).isNotEmpty) {
+        // Parse from the 'data' array inside the wrapper
+        _galleryImages = (responseData['data'] as List)
+            .map((item) => 'https://lelamonline.com/admin/${item['image'] ?? ''}')
+            .where((img) => img.isNotEmpty && img.contains('uploads/'))  // Filter valid image paths
+            .toList();
+        debugPrint('Fetched ${_galleryImages.length} gallery images: $_galleryImages');  // Updated: Log the list
+      } else {
+        throw Exception('Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}');
+      }
+    } else {
+      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    }
+  } catch (e) {
+    debugPrint('Error fetching gallery: $e');
+    setState(() {
+      _galleryError = 'Failed to load gallery: $e';
+    });
+  } finally {
+    setState(() {
+      _isLoadingGallery = false;
+    });
+  }
+}
 
   Future<void> _fetchCurrentHighestBid() async {
     try {
@@ -933,14 +988,17 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-  List<String> get _images {
-    if (image.isNotEmpty) {
-      return ['https://lelamonline.com/admin/$image'];
-    }
-    return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-    ];
+List<String> get _images {
+  if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
+    return _galleryImages;
   }
+  if (image.isNotEmpty) {
+    return ['https://lelamonline.com/admin/$image'];
+  }
+  return [
+    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+  ];
+}
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -987,7 +1045,7 @@ class _MarketPlaceProductDetailsPageState
                               tag: 'image_$index',
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
-                                fit: BoxFit.fill,
+                                fit: BoxFit.cover,
                                 placeholder:
                                     (context, url) => const Center(
                                       child: CircularProgressIndicator(),
@@ -1094,7 +1152,7 @@ class _MarketPlaceProductDetailsPageState
                                       borderRadius: BorderRadius.circular(6),
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
-                                        fit: BoxFit.fill,
+                                        fit: BoxFit.cover,
                                         placeholder:
                                             (context, url) => const Center(
                                               child: SizedBox(
@@ -1477,61 +1535,71 @@ class _MarketPlaceProductDetailsPageState
                   ),
                   Stack(
                     children: [
-                      SizedBox(
-                        height: 400,
-                        child: Stack(
-                          children: [
-                            PageView.builder(
-                              controller: _pageController,
-                              itemCount: _images.length,
-                              onPageChanged: (index) {
-                                setState(() {
-                                  _currentImageIndex = index;
-                                });
-                              },
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () => _showFullScreenGallery(context),
-                                  child: CachedNetworkImage(
-                                    imageUrl: _images[index],
-                                    width: double.infinity,
-                                    height: 400,
-                                    fit: BoxFit.fitWidth,
-                                    placeholder:
-                                        (context, url) => const Center(
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                    errorWidget:
-                                        (context, url, error) =>
-                                            const Icon(Icons.error),
-                                  ),
-                                );
-                              },
-                            ),
-                            Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  '${_currentImageIndex + 1}/${_images.length}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    SizedBox(
+  height: 400,
+  child: Stack(
+    children: [
+      if (_isLoadingGallery)
+        const Center(child: CircularProgressIndicator())  
+      else if (_galleryError.isNotEmpty)
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 50, color: Colors.red),
+              const SizedBox(height: 8),
+              Text(_galleryError, style: const TextStyle(color: Colors.red)),
+              TextButton(
+                onPressed: _fetchGalleryImages,  
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        )
+      else
+        PageView.builder(
+          controller: _pageController,
+          itemCount: _images.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentImageIndex = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            return GestureDetector(
+              onTap: () => _showFullScreenGallery(context),
+              child: CachedNetworkImage(
+                imageUrl: _images[index],
+                width: double.infinity,
+                height: 400,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
+              ),
+            );
+          },
+        ),
+      if (!_isLoadingGallery && _galleryError.isEmpty)  // Only show counter if not loading/error
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '${_currentImageIndex + 1}/${_images.length}',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+    ],
+  ),
+),
                       CustomSafeArea(
                         child: Row(
                           children: [
@@ -1646,7 +1714,15 @@ class _MarketPlaceProductDetailsPageState
                                   context: context,
                                   builder: (context) {
                                     return ChatOptionsDialog(
-                                      onChatWithSupport: () {},
+                                      onChatWithSupport: () {
+                                        Navigator.push(
+                                          context,
+                                          SupportTicketPage(
+                                                userId: userId ?? '',
+                                              )
+                                              as Route<Object?>,
+                                        );
+                                      },
                                       onChatWithSeller: () {
                                         Navigator.push(
                                           context,
