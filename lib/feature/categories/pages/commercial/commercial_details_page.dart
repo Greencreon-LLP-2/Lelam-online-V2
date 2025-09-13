@@ -5,16 +5,20 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
+import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CommercialProductDetailsPage extends StatefulWidget {
@@ -49,7 +53,9 @@ class _CommercialProductDetailsPageState
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
-
+ final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
+  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
+  
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
@@ -836,8 +842,13 @@ class _CommercialProductDetailsPageState
               ),
             ),
             ElevatedButton(
-              onPressed: () {
-                // Ask a question functionality
+               onPressed: () {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) => const ReviewDialog(userId: '', postId: ''),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -1051,8 +1062,53 @@ class _CommercialProductDetailsPageState
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // Call functionality
-                            },
+                                if (userId == null || userId == 'Unknown') {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please log in to chat with the seller',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return ChatOptionsDialog(
+                                      onChatWithSupport: () {
+                                        Navigator.push(
+                                          context,
+                                          SupportTicketPage(
+                                                userId: userId ?? '',
+                                              )
+                                              as Route<Object?>,
+                                        );
+                                      },
+                                      onChatWithSeller: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChatPage(
+                                                  userId: userId!,
+                                                  listenerId:
+                                                      widget.post.createdBy,
+                                                  listenerName: sellerName,
+                                                  listenerImage:
+                                                      sellerProfileImage ??
+                                                      'seller.jpg',
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      baseUrl: _baseUrl,
+                                      token: _token,
+                                    );
+                                  },
+                                );
+                              },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
                             style: ElevatedButton.styleFrom(
