@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
@@ -26,22 +28,36 @@ class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
   bool isStatus = false;
   String? userId;
-  String? sessionId;  
+  String? sessionId;
   Map<String, dynamic>? adData;
+  bool isLoading = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
-    _loadUserId();
     adData = widget.adData;
+    _loadUserId();
+  }
+
+  @override
+  void didUpdateWidget(MainScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.userId != oldWidget.userId) {
+      setState(() {
+        userId = widget.userId;
+        isLoading = false;
+      });
+      _loadUserId(); // Reload from SharedPreferences to ensure consistency
+    }
   }
 
   Future<void> _loadUserId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
-      sessionId = prefs.getString('sessionId');  // Load sessionId from SharedPreferences (adjust key if needed)
+      userId = prefs.getString('userId') ?? widget.userId;
+      sessionId = prefs.getString('sessionId');
+      isLoading = false;
     });
     if (kDebugMode) {
       print('Loaded userId: $userId');
@@ -49,17 +65,31 @@ class _MainScaffoldState extends State<MainScaffold> {
     }
   }
 
+  bool get _isUserIdValid => userId != null;
+
   List<Widget> get _pages => [
         HomePage(userId: userId),
         isStatus
-            ? BuyingStatusPage(userId: userId)
-            : SupportTicketPage(userId: userId ?? 'Unknown'), 
+            ? (_isUserIdValid
+                ? BuyingStatusPage(userId: userId!)
+                : const Center(child: Text('Please log in to view Buying Status')))
+            : (_isUserIdValid
+                ? SupportTicketPage(userId: userId!)
+                : const Center(child: Text('Please log in to access Support'))),
         isStatus
-            ? SellingStatusPage(userId: userId, adData: adData)
-            : SellPage(userId: userId),
-        isStatus 
-            ? ChatListPage(userId: userId ?? 'Unknown', sessionId: sessionId ?? '')  // Fixed: Pass userId and sessionId correctly, no extra comma
-            : StatusPage(userId: userId),
+            ? (_isUserIdValid
+                ? SellingStatusPage(userId: userId!, adData: adData)
+                : const Center(child: Text('Please log in to view Selling Status')))
+            : (_isUserIdValid
+                ? SellPage(userId: userId!)
+                : const Center(child: Text('Please log in to access Sell'))),
+        isStatus
+            ? (_isUserIdValid
+                ? ShortListPage(userId: userId!, )
+                : const Center(child: Text('Please log in to access Chats')))
+            : (_isUserIdValid
+                ? StatusPage(userId: userId!)
+                : const Center(child: Text('Please log in to view Status'))),
         Center(
           child: Text(
             'Profile: User ID ${userId ?? 'Unknown'}',
@@ -98,6 +128,41 @@ class _MainScaffoldState extends State<MainScaffold> {
     return shouldExit ?? false;
   }
 
+  void _navigateToLogin() {
+    GoRouter.of(context).pushNamed(RouteNames.loginPage).then((value) {
+      if (value != null && value is String) {
+        setState(() {
+          userId = value; // Update userId with the returned value
+          isLoading = false;
+        });
+      }
+      _loadUserId(); // Reload from SharedPreferences to ensure consistency
+    });
+  }
+
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Login Required'),
+        content: const Text('Please login to access this feature'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _navigateToLogin();
+            },
+            child: const Text('Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -107,7 +172,9 @@ class _MainScaffoldState extends State<MainScaffold> {
         drawer: AppDrawerWidget(userId: userId),
         resizeToAvoidBottomInset: false,
         body: SafeArea(
-          child: _pages[currentIndex], // Main page content inside SafeArea
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _pages[currentIndex],
         ),
         bottomNavigationBar: SafeArea(
           bottom: true,
@@ -126,6 +193,11 @@ class _MainScaffoldState extends State<MainScaffold> {
                   if (kDebugMode) print('Selected index: $index');
                   if (index == 4) {
                     _scaffoldKey.currentState?.openDrawer();
+                    return;
+                  }
+
+                  if (index != 0 && userId == null) {
+                    _showLoginDialog();
                     return;
                   }
 
@@ -182,12 +254,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: isStatus ? 'Selling' : 'Sell',
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(
-                      isStatus
-                          ? Icons.chat
-                          : Icons.stream_outlined,
-                    ),
-                    label: isStatus ? 'Chats' : 'Status',
+                    icon: Icon(isStatus ? Icons.star : Icons.stream_outlined),
+                    label: isStatus ? 'Short List' : 'Status',
                   ),
                   const BottomNavigationBarItem(
                     icon: Icon(Icons.more_vert),

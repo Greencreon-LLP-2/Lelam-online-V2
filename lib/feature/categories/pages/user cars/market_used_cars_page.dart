@@ -61,8 +61,7 @@ class _MarketPlaceProductDetailsPageState
   String sellerErrorMessage = '';
   String? userId;
   double _minBidIncrement = 1000;
-  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
-  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
+
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
   bool _isLoadingGallery = true;
@@ -104,12 +103,10 @@ class _MarketPlaceProductDetailsPageState
         final responseData = jsonDecode(responseBody);
         debugPrint(
           'Parsed responseData type: ${responseData.runtimeType}',
-        ); // New: Log type for debug
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
             (responseData['data'] as List).isNotEmpty) {
-          // Parse from the 'data' array inside the wrapper
           _galleryImages =
               (responseData['data'] as List)
                   .map(
@@ -123,6 +120,7 @@ class _MarketPlaceProductDetailsPageState
           debugPrint(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
           ); // Updated: Log the list
+
         } else {
           throw Exception(
             'Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}',
@@ -148,18 +146,18 @@ class _MarketPlaceProductDetailsPageState
   Future<void> _fetchCurrentHighestBid() async {
     try {
       setState(() {
-        _isLoadingBid = true; // Reuse existing loading state for UI feedback
+        _isLoadingBid = true;
       });
 
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
       debugPrint(
         'Fetching highest bid: $url',
-      ); // This should log the full URL with post_id
+      ); 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -167,39 +165,40 @@ class _MarketPlaceProductDetailsPageState
       final responseBody = await response.stream.bytesToString();
       debugPrint(
         'Full API response body: $responseBody',
-      ); // This will show the PHP notice + JSON
+      ); 
       debugPrint('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         debugPrint(
           'Parsed response data: $responseData',
-        ); // Log the full parsed JSON
+        ); 
 
         if (responseData['status'] == true) {
+
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
           final parsed = double.tryParse(dataValue);
           // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
           if (parsed != null) {
+
             setState(() {
               // store numeric string without "Error:" prefix
               _currentHighestBid = parsed.toString();
             });
             debugPrint('Successfully fetched highest bid: $dataValue');
           } else {
-            // New: Handle non-numeric data as error
             debugPrint(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
               _currentHighestBid =
-                  'Error: $dataValue'; // Store error for display
+                  'Error: $dataValue'; 
             });
           }
         } else {
           debugPrint('API status false: ${responseData['data']}');
           setState(() {
-            _currentHighestBid = '0'; // Fallback
+            _currentHighestBid = '0'; 
           });
         }
       } else {
@@ -207,13 +206,14 @@ class _MarketPlaceProductDetailsPageState
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
-          _currentHighestBid = '0'; // Fallback
+          _currentHighestBid = '0'; 
         });
       }
     } catch (e) {
       debugPrint('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e'; // Store error for display
+
       });
     } finally {
       setState(() {
@@ -235,10 +235,10 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
-      final url = '$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId';
+      final url = '$baseUrl/list-shortlist.php?token=$token&user_id=$userId';
       debugPrint('Checking shortlist status: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -295,11 +295,11 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=$id';
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=$userId&post_id=$id';
       debugPrint('Adding to shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -377,11 +377,11 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/place-bid.php?token=$_token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+          '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
       debugPrint('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -455,6 +455,7 @@ class _MarketPlaceProductDetailsPageState
   void showProductBidDialog(BuildContext context) async {
     // Fetch highest bid first
     setState(() => _isBidDialogOpen = true);
+
     await _fetchCurrentHighestBid();
 
     final TextEditingController _bidController = TextEditingController();
@@ -473,7 +474,27 @@ class _MarketPlaceProductDetailsPageState
             content: Text(message, style: const TextStyle(fontSize: 16)),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  if (isDialogOpen) {
+                    Navigator.of(context).pop();
+                    isDialogOpen = false;
+                    _bidController.dispose();
+                  }
+                  if (isSuccess) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => MyBidsWidget(
+                              baseUrl: baseUrl,
+                              token: token,
+                              userId: userId,
+                            ),
+                      ),
+                    );
+                  }
+                },
                 child: const Text('OK', style: TextStyle(color: Colors.grey)),
               ),
               if (isSuccess)
@@ -485,8 +506,8 @@ class _MarketPlaceProductDetailsPageState
                       MaterialPageRoute(
                         builder:
                             (context) => MyBidsWidget(
-                              baseUrl: _baseUrl,
-                              token: _token,
+                              baseUrl: baseUrl,
+                              token: token,
                               userId: userId,
                             ),
                       ),
@@ -731,7 +752,7 @@ class _MarketPlaceProductDetailsPageState
     try {
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
         ),
       );
 
@@ -1270,12 +1291,12 @@ class _MarketPlaceProductDetailsPageState
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
-          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
       debugPrint('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -1593,13 +1614,13 @@ class _MarketPlaceProductDetailsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'User ID: ${userId ?? 'Unknown'}',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
+                  // Padding(
+                  //   padding: const EdgeInsets.all(16.0),
+                  //   // child: Text(
+                  //   //   'User ID: ${userId ?? 'Unknown'}',
+                  //   //   style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  //   // ),
+                  // ),
                   Stack(
                     children: [
                       SizedBox(
@@ -1837,8 +1858,8 @@ class _MarketPlaceProductDetailsPageState
                                           ),
                                         );
                                       },
-                                      baseUrl: _baseUrl,
-                                      token: _token,
+                                      baseUrl: baseUrl,
+                                      token: token,
                                     );
                                   },
                                 );
