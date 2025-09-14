@@ -10,8 +10,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 class EditProfilePage extends StatefulWidget {
-  final String userId; // Add userId to pass logged-in user ID
-  const EditProfilePage({super.key, required this.userId});
+  const EditProfilePage({super.key});
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -66,9 +65,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final response = await ApiService().get(
         url: userDetails,
-        queryParams: {
-          "user_id": _userProvider.userData?.userId ?? widget.userId,
-        },
+        queryParams: {"user_id": _userProvider.userData?.userId ?? ''},
       );
 
       if (response['status'] == true && response['code'] == 200) {
@@ -179,7 +176,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // Only make API call if there are changes or a new image is selected
       if (changedFields.isNotEmpty || isImageUpdated) {
         changedFields['user_id'] =
-            _userProvider.userData?.userId ?? widget.userId;
+            _userProvider.userData?.userId ?? '';
 
         final response = await ApiService().postMultipart(
           url: userProfileUpdate,

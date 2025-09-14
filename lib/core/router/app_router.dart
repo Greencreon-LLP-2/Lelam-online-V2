@@ -75,9 +75,11 @@ final GoRouter appRouter = GoRouter(
       path: RouteNames.editProfilePage,
       name: RouteNames.editProfilePage,
       builder: (context, state) {
-        final params = state.extra as Map<String, dynamic>?;
-        final userId = params?['userId'] as String? ?? '0';
-        return EditProfilePage(userId: userId);
+        final loggedUser = context.watch<LoggedUserProvider>();
+        if (loggedUser.isLoggedIn) {
+          return EditProfilePage();
+        }
+        return LoginPage();
       },
     ),
     GoRoute(
