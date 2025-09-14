@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
@@ -28,13 +27,26 @@ class _MainScaffoldState extends State<MainScaffold> {
   String? userId;
   String? sessionId;
   Map<String, dynamic>? adData;
+  bool isLoading = true;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
-    _loadUserId();
     adData = widget.adData;
+    _loadUserId();
+  }
+
+  @override
+  void didUpdateWidget(MainScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.userId != oldWidget.userId) {
+      setState(() {
+        userId = widget.userId;
+        isLoading = false;
+      });
+      _loadUserId(); // Reload from SharedPreferences to ensure consistency
+    }
   }
 
   Future<void> _loadUserId() async {
@@ -49,27 +61,26 @@ class _MainScaffoldState extends State<MainScaffold> {
     }
   }
 
+  bool get _isUserIdValid => userId != null;
+
   List<Widget> get _pages => [
-        HomePage(userId: userId),
-        isStatus
-            ? BuyingStatusPage(userId: userId)
-            : SupportTicketPage(userId: userId ?? 'Unknown'),
-        isStatus
-            ? SellingStatusPage(userId: userId, adData: adData)
-            : SellPage(userId: userId),
-        isStatus
-            ? ChatListPage(
-                userId: userId ?? 'Unknown',
-                sessionId: sessionId ?? '',
-              )
-            : StatusPage(userId: userId),
-        Center(
-          child: Text(
-            'Profile: User ID ${userId ?? 'Unknown'}',
-            style: const TextStyle(fontSize: 16),
-          ),
-        ),
-      ];
+    HomePage(userId: userId),
+    isStatus
+        ? BuyingStatusPage(userId: userId)
+        : SupportTicketPage(userId: userId ?? 'Unknown'),
+    isStatus
+        ? SellingStatusPage(userId: userId, adData: adData)
+        : SellPage(userId: userId),
+    isStatus
+        ? ChatListPage(userId: userId ?? 'Unknown', sessionId: sessionId ?? '')
+        : StatusPage(userId: userId),
+    Center(
+      child: Text(
+        'Profile: User ID ${userId ?? 'Unknown'}',
+        style: const TextStyle(fontSize: 16),
+      ),
+    ),
+  ];
 
   Future<bool> _onWillPop() async {
     if (currentIndex != 0) {
@@ -82,20 +93,21 @@ class _MainScaffoldState extends State<MainScaffold> {
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Exit App'),
-        content: const Text('Are you sure you want to exit the app?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Exit App'),
+            content: const Text('Are you sure you want to exit the app?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Exit'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Exit'),
-          ),
-        ],
-      ),
     );
 
     return shouldExit ?? false;
@@ -109,9 +121,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         key: _scaffoldKey,
         drawer: AppDrawerWidget(),
         resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          child: _pages[currentIndex],
-        ),
+        body: SafeArea(child: _pages[currentIndex]),
         bottomNavigationBar: SafeArea(
           bottom: true,
           child: BottomNavigationBar(
@@ -156,26 +166,24 @@ class _MainScaffoldState extends State<MainScaffold> {
                 label: isStatus ? 'Buying' : 'Support',
               ),
               BottomNavigationBarItem(
-                icon: isStatus
-                    ? const Icon(Icons.sell)
-                    : FittedBox(
-                        fit: BoxFit.contain,
-                        child: Container(
-                          padding: const EdgeInsets.all(1),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.black,
-                              width: 2,
+                icon:
+                    isStatus
+                        ? const Icon(Icons.sell)
+                        : FittedBox(
+                          fit: BoxFit.contain,
+                          child: Container(
+                            padding: const EdgeInsets.all(1),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              size: 12,
+                              color: Color.fromARGB(255, 12, 9, 233),
                             ),
                           ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 12,
-                            color: Color.fromARGB(255, 12, 9, 233),
-                          ),
                         ),
-                      ),
                 label: isStatus ? 'Selling' : 'Sell',
               ),
               BottomNavigationBarItem(

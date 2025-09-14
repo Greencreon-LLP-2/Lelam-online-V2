@@ -49,6 +49,7 @@ class _MarketPlaceProductDetailsPageState
   final TransformationController _transformationController =
       TransformationController();
   bool _isFavorited = false;
+  bool _isBidDialogOpen = false;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
   final LocationService _locationService = LocationService();
@@ -60,8 +61,7 @@ class _MarketPlaceProductDetailsPageState
   String sellerErrorMessage = '';
   String? userId;
   double _minBidIncrement = 1000;
-  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
-  final String _token = '5cb2c9b569416b5db1604e0e12478ded';
+
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
   bool _isLoadingGallery = true;
@@ -78,71 +78,86 @@ class _MarketPlaceProductDetailsPageState
     _fetchGalleryImages();
   }
 
-Future<void> _fetchGalleryImages() async {
-  try {
-    setState(() {
-      _isLoadingGallery = true;
-      _galleryError = '';
-    });
-
-    final headers = {
-      'token': _token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
-    final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
-    debugPrint('Fetching gallery: $url');
-
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('Gallery API response: $responseBody');
-
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('Parsed responseData type: ${responseData.runtimeType}');  // New: Log type for debug
-
-      if (responseData['status'] == 'true' && responseData['data'] is List && (responseData['data'] as List).isNotEmpty) {
-        // Parse from the 'data' array inside the wrapper
-        _galleryImages = (responseData['data'] as List)
-            .map((item) => 'https://lelamonline.com/admin/${item['image'] ?? ''}')
-            .where((img) => img.isNotEmpty && img.contains('uploads/'))  // Filter valid image paths
-            .toList();
-        debugPrint('Fetched ${_galleryImages.length} gallery images: $_galleryImages');  // Updated: Log the list
-      } else {
-        throw Exception('Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}');
-      }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
-    }
-  } catch (e) {
-    debugPrint('Error fetching gallery: $e');
-    setState(() {
-      _galleryError = 'Failed to load gallery: $e';
-    });
-  } finally {
-    setState(() {
-      _isLoadingGallery = false;
-    });
-  }
-}
-
-  Future<void> _fetchCurrentHighestBid() async {
+  Future<void> _fetchGalleryImages() async {
     try {
       setState(() {
-        _isLoadingBid = true; // Reuse existing loading state for UI feedback
+        _isLoadingGallery = true;
+        _galleryError = '';
       });
 
       final headers = {
         'token': _token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
+      final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+      debugPrint('Fetching gallery: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Gallery API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint(
+          'Parsed responseData type: ${responseData.runtimeType}',
+
+        if (responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            (responseData['data'] as List).isNotEmpty) {
+          _galleryImages =
+              (responseData['data'] as List)
+                  .map(
+                    (item) =>
+                        'https://lelamonline.com/admin/${item['image'] ?? ''}',
+                  )
+                  .where(
+                    (img) => img.isNotEmpty && img.contains('uploads/'),
+                  ) // Filter valid image paths
+                  .toList();
+          debugPrint(
+            'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
+          ); // Updated: Log the list
+
+        } else {
+          throw Exception(
+            'Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}',
+          );
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching gallery: $e');
+      setState(() {
+        _galleryError = 'Failed to load gallery: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingGallery = false;
+      });
+    }
+  }
+
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      setState(() {
+        _isLoadingBid = true;
+      });
+
+      final headers = {
+        'token': token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
       final url =
-          '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
       debugPrint(
         'Fetching highest bid: $url',
-      ); // This should log the full URL with post_id
+      ); 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -150,37 +165,40 @@ Future<void> _fetchGalleryImages() async {
       final responseBody = await response.stream.bytesToString();
       debugPrint(
         'Full API response body: $responseBody',
-      ); // This will show the PHP notice + JSON
+      ); 
       debugPrint('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         debugPrint(
           'Parsed response data: $responseData',
-        ); // Log the full parsed JSON
+        ); 
 
         if (responseData['status'] == true) {
-          final dataValue = responseData['data']?.toString() ?? '0';
+
+          final dataValue = (responseData['data']?.toString() ?? '0').trim();
+          final parsed = double.tryParse(dataValue);
           // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
-          if (int.tryParse(dataValue) != null) {
+          if (parsed != null) {
+
             setState(() {
-              _currentHighestBid = dataValue;
+              // store numeric string without "Error:" prefix
+              _currentHighestBid = parsed.toString();
             });
             debugPrint('Successfully fetched highest bid: $dataValue');
           } else {
-            // New: Handle non-numeric data as error
             debugPrint(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
               _currentHighestBid =
-                  'Error: $dataValue'; // Store error for display
+                  'Error: $dataValue'; 
             });
           }
         } else {
           debugPrint('API status false: ${responseData['data']}');
           setState(() {
-            _currentHighestBid = '0'; // Fallback
+            _currentHighestBid = '0'; 
           });
         }
       } else {
@@ -188,13 +206,14 @@ Future<void> _fetchGalleryImages() async {
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
-          _currentHighestBid = '0'; // Fallback
+          _currentHighestBid = '0'; 
         });
       }
     } catch (e) {
       debugPrint('Exception in fetch highest bid: $e');
       setState(() {
-        _currentHighestBid = ' $e'; // Store error for display
+        _currentHighestBid = 'Error: $e'; // Store error for display
+
       });
     } finally {
       setState(() {
@@ -216,10 +235,10 @@ Future<void> _fetchGalleryImages() async {
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
-      final url = '$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId';
+      final url = '$baseUrl/list-shortlist.php?token=$token&user_id=$userId';
       debugPrint('Checking shortlist status: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -276,11 +295,11 @@ Future<void> _fetchGalleryImages() async {
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=$id';
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=$userId&post_id=$id';
       debugPrint('Adding to shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -357,16 +376,12 @@ Future<void> _fetchGalleryImages() async {
     }
 
     try {
-      setState(() {
-        _isLoadingBid = true;
-      });
-
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$_baseUrl/place-bid.php?token=$_token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+          '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
       debugPrint('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -377,7 +392,16 @@ Future<void> _fetchGalleryImages() async {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        if (responseData['status'] == true) {
+        debugPrint('Parsed place-bid response: $responseData');
+        final statusRaw = responseData['status'];
+        final bool statusIsTrue =
+            statusRaw == true || statusRaw == 'true' || statusRaw == '1';
+
+        final dataMessage = responseData['data']?.toString() ?? '';
+        final bool dataLooksLikeSuccess =
+            dataMessage.toLowerCase().contains('success') ||
+            dataMessage.toLowerCase().contains('placed successfully');
+        if (statusIsTrue || dataLooksLikeSuccess) {
           final prefs = await SharedPreferences.getInstance();
           final cachedBids = prefs.getStringList('userBids') ?? [];
           final newBid = {
@@ -430,16 +454,18 @@ Future<void> _fetchGalleryImages() async {
 
   void showProductBidDialog(BuildContext context) async {
     // Fetch highest bid first
+    setState(() => _isBidDialogOpen = true);
+
     await _fetchCurrentHighestBid();
 
     final TextEditingController _bidController = TextEditingController();
-    bool isDialogOpen = true;
 
-    void showResponseDialog(String message, bool isSuccess) {
-      showDialog(
+    // Helper to show a simple response dialog
+    Future<void> _showResponseDialog(String message, bool isSuccess) {
+      return showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext context) {
+        builder: (ctx) {
           return AlertDialog(
             title: Text(
               isSuccess ? 'Thank You' : 'Error',
@@ -461,8 +487,8 @@ Future<void> _fetchGalleryImages() async {
                       MaterialPageRoute(
                         builder:
                             (context) => MyBidsWidget(
-                              baseUrl: _baseUrl,
-                              token: _token,
+                              baseUrl: baseUrl,
+                              token: token,
                               userId: userId,
                             ),
                       ),
@@ -474,19 +500,14 @@ Future<void> _fetchGalleryImages() async {
               if (isSuccess)
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    if (isDialogOpen) {
-                      Navigator.of(context).pop();
-                      isDialogOpen = false;
-                      _bidController.dispose();
-                    }
+                    Navigator.of(ctx).pop();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder:
                             (context) => MyBidsWidget(
-                              baseUrl: _baseUrl,
-                              token: _token,
+                              baseUrl: baseUrl,
+                              token: token,
                               userId: userId,
                             ),
                       ),
@@ -504,151 +525,220 @@ Future<void> _fetchGalleryImages() async {
       );
     }
 
-    showDialog(
+    // Show the bid input dialog and return a result map when it closes
+    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Place Your Bid Amount',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // New: Display current highest bid
-              const Text(
-                'Current Highest Bid:',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return WillPopScope(
+          onWillPop: () async {
+            return true;
+          },
+          child: StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                title: const Text(
+                  'Place Your Bid Amount',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color:
-                        _currentHighestBid.startsWith('Bid amount')
-                            ? Colors.black
-                            : Colors.grey,
-                  ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _currentHighestBid.startsWith('')
-                      ? _currentHighestBid // Show error message, e.g., "Error: Please provide valid data"
-                      : '₹ ${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        _currentHighestBid.startsWith('')
-                            ? Colors.red
-                            : Colors.green,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Your Bid Amount *',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _bidController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: false,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  hintText: 'Enter amount',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-              ),
-              if (_isLoadingBid)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8.0),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                isDialogOpen = false;
-                _bidController.dispose();
-              },
-              child: const Text('Close', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed:
-                  _isLoadingBid
-                      ? null
-                      : () async {
-                        final String amount = _bidController.text;
-                        if (amount.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter a bid amount'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-
-                        final int bidAmount = int.tryParse(amount) ?? 0;
-                        if (bidAmount < _minBidIncrement) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Current Highest Bid:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color:
+                              _currentHighestBid.startsWith('Error')
+                                  ? Colors.red
+                                  : Colors.grey,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Builder(
+                        builder: (_) {
+                          if (_currentHighestBid.startsWith('Error')) {
+                            return Text(
+                              _currentHighestBid,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red,
                               ),
-                              backgroundColor: Colors.red,
+                            );
+                          }
+                          final double val =
+                              double.tryParse(
+                                _currentHighestBid.replaceAll(',', ''),
+                              ) ??
+                              0;
+                          final String formatted =
+                              '₹ ${NumberFormat('#,##0').format(val.round())}';
+                          return Text(
+                            formatted,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
                             ),
                           );
-                          return;
-                        }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Your Bid Amount *',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _bidController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: false,
+                      ),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        hintText: 'Enter amount',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                    if (_isLoadingBid)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(
+                        dialogContext,
+                      ).pop(null); // user closed dialog
+                    },
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                  ElevatedButton(
+                    onPressed:
+                        _isLoadingBid
+                            ? null
+                            : () async {
+                              final String amount = _bidController.text;
+                              if (amount.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please enter a bid amount'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
 
-                        if (userId == null || userId == 'Unknown') {
-                          showResponseDialog(
-                            'Please log in to place a bid',
-                            false,
-                          );
-                          return;
-                        }
+                              final int bidAmount = int.tryParse(amount) ?? 0;
+                              if (bidAmount < _minBidIncrement) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
 
-                        try {
-                          final String responseMessage = await _saveBidData(
-                            bidAmount,
-                          );
-                          showResponseDialog(responseMessage, true);
-                        } catch (e) {
-                          showResponseDialog('Error placing bid: $e', false);
-                        }
-                      },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Submit'),
-            ),
-          ],
+                              if (userId == null || userId == 'Unknown') {
+                                Navigator.of(dialogContext).pop({
+                                  'success': false,
+                                  'message': 'Please log in to place a bid',
+                                });
+                                return;
+                              }
+                               try{
+                              setDialogState(() {
+                                _isLoadingBid = true;
+                              });
+                               }catch (_){}
+                               try {
+                              FocusScope.of(dialogContext).unfocus();
+                            } catch (_) {}
+                              try {
+                                final String responseMessage =
+                                    await _saveBidData(bidAmount);
+                                // return success result with message
+                                Navigator.of(dialogContext).pop({
+                                  'success': true,
+                                  'message': responseMessage,
+                                });
+                              } catch (e) {
+                                Navigator.of(dialogContext).pop({
+                                  'success': false,
+                                  'message': 'Error placing bid: $e',
+                                });
+                              }finally {
+                              try {
+                                setDialogState(() {
+                                  _isLoadingBid = false;
+                                });
+                              } catch (_) {}
+                            }
+                              
+                            },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Submit'),
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
-    ).then((_) {
-      if (isDialogOpen) {
-        isDialogOpen = false;
-        _bidController.dispose();
-      }
-    });
+    );
+    await Future.delayed(const Duration(milliseconds: 200));
+    try{
+      FocusScope.of(context).unfocus();
+    }catch(_){}
+    try{
+      _bidController.dispose();
+    } catch(_){}
+    
+    
+
+    
+    if (result != null) {
+      final bool ok = result['success'] == true;
+      final String msg =
+          result['message']?.toString() ??
+          (ok ? 'Bid placed successfully' : 'Failed to place bid');
+      await _showResponseDialog(msg, ok);
+    }
+    if (mounted) setState(() => _isBidDialogOpen = false);
   }
 
   @override
@@ -662,7 +752,7 @@ Future<void> _fetchGalleryImages() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
+          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
         ),
       );
 
@@ -988,17 +1078,17 @@ Future<void> _fetchGalleryImages() async {
     }
   }
 
-List<String> get _images {
-  if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
-    return _galleryImages;
+  List<String> get _images {
+    if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
+      return _galleryImages;
+    }
+    if (image.isNotEmpty) {
+      return ['https://lelamonline.com/admin/$image'];
+    }
+    return [
+      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    ];
   }
-  if (image.isNotEmpty) {
-    return ['https://lelamonline.com/admin/$image'];
-  }
-  return [
-    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-  ];
-}
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
@@ -1087,8 +1177,7 @@ List<String> get _images {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.pop(context),
                                   ),
                                 ),
                                 const Spacer(),
@@ -1202,12 +1291,12 @@ List<String> get _images {
 
     try {
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
-          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
       debugPrint('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -1516,7 +1605,6 @@ List<String> get _images {
 
   @override
   Widget build(BuildContext context) {
-    final isUserLoggedIn = userId != null && userId != 'Unknown';
     return CustomSafeArea(
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -1526,90 +1614,120 @@ List<String> get _images {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      'User ID: ${userId ?? 'Unknown'}',
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
+                  // Padding(
+                  //   padding: const EdgeInsets.all(16.0),
+                  //   // child: Text(
+                  //   //   'User ID: ${userId ?? 'Unknown'}',
+                  //   //   style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  //   // ),
+                  // ),
                   Stack(
                     children: [
-                    SizedBox(
-  height: 400,
-  child: Stack(
-    children: [
-      if (_isLoadingGallery)
-        const Center(child: CircularProgressIndicator())  
-      else if (_galleryError.isNotEmpty)
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 50, color: Colors.red),
-              const SizedBox(height: 8),
-              Text(_galleryError, style: const TextStyle(color: Colors.red)),
-              TextButton(
-                onPressed: _fetchGalleryImages,  
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        )
-      else
-        PageView.builder(
-          controller: _pageController,
-          itemCount: _images.length,
-          onPageChanged: (index) {
-            setState(() {
-              _currentImageIndex = index;
-            });
-          },
-          itemBuilder: (context, index) {
-            return GestureDetector(
-              onTap: () => _showFullScreenGallery(context),
-              child: CachedNetworkImage(
-                imageUrl: _images[index],
-                width: double.infinity,
-                height: 400,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                errorWidget: (context, url, error) => const Icon(Icons.error),
-              ),
-            );
-          },
-        ),
-      if (!_isLoadingGallery && _galleryError.isEmpty)  // Only show counter if not loading/error
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '${_currentImageIndex + 1}/${_images.length}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-    ],
-  ),
-),
+                      SizedBox(
+                        height: 400,
+                        child: Stack(
+                          children: [
+                            if (_isLoadingGallery)
+                              const Center(child: CircularProgressIndicator())
+                            else if (_galleryError.isNotEmpty)
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      _galleryError,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                    TextButton(
+                                      onPressed: _fetchGalleryImages,
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              PageView.builder(
+                                controller: _pageController,
+                                itemCount: _images.length,
+                                onPageChanged: (index) {
+                                  setState(() {
+                                    _currentImageIndex = index;
+                                  });
+                                },
+                                itemBuilder: (context, index) {
+                                  return GestureDetector(
+                                    onTap:
+                                        () => _showFullScreenGallery(context),
+                                    child: CachedNetworkImage(
+                                      imageUrl: _images[index],
+                                      width: double.infinity,
+                                      height: 400,
+                                      fit: BoxFit.cover,
+                                      placeholder:
+                                          (context, url) => const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                      errorWidget:
+                                          (context, url, error) =>
+                                              const Icon(Icons.error),
+                                    ),
+                                  );
+                                },
+                              ),
+                            if (!_isLoadingGallery &&
+                                _galleryError
+                                    .isEmpty) // Only show counter if not loading/error
+                              Positioned(
+                                right: 16,
+                                bottom: 16,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.7),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '${_currentImageIndex + 1}/${_images.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                       CustomSafeArea(
                         child: Row(
                           children: [
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                              ),
-                            ),
+                             IconButton(
+  onPressed: () {
+    if (_isBidDialogOpen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please close the bid dialog first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    Navigator.pop(context);
+  },
+  icon: const Icon(
+    Icons.arrow_back,
+    color: Colors.white,
+  ),
+), 
                             const Spacer(),
                             IconButton(
                               icon: Icon(
@@ -1740,8 +1858,8 @@ List<String> get _images {
                                           ),
                                         );
                                       },
-                                      baseUrl: _baseUrl,
-                                      token: _token,
+                                      baseUrl: baseUrl,
+                                      token: token,
                                     );
                                   },
                                 );

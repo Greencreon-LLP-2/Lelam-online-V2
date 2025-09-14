@@ -222,25 +222,7 @@ class ProductSectionWidget extends StatelessWidget {
                 ),
               ],
             ),
-            if (product.feature == "1")
-              Positioned(
-                top: 0,
-                right: 0,
-                child: CustomPaint(
-                  painter: VerifiedBannerPainter(),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.topRight,
-                    padding: const EdgeInsets.only(top: 8, right: 8),
-                    child: const Icon(
-                      Icons.verified,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
+           
           ],
         ),
       ),
