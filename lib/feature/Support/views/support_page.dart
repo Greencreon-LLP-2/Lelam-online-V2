@@ -1,30 +1,32 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:intl/intl.dart';
 
 class SupportTicketPage extends StatefulWidget {
-  final String userId;
-
-  const SupportTicketPage({super.key, required this.userId});
+  const SupportTicketPage({super.key});
+  
 
   @override
   _SupportTicketPageState createState() => _SupportTicketPageState();
 }
 
 class _SupportTicketPageState extends State<SupportTicketPage> {
-  final String baseUrl = "https://lelamonline.com/admin/api/v1";
-  String token = "5cb2c9b569416b5db1604e0e12478ded";
+  late LoggedUserProvider _userProvider;
   List<dynamic> tickets = [];
-  // bool isLoading = true;
+
 
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     // if (kDebugMode) print('User ID: ${widget.userId}');
     // _loadConfigAndFetchTickets();
   }
@@ -398,7 +400,11 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.pop(context);
-                          _showChatDialog(ticketId, subject, widget.userId);
+                          _showChatDialog(
+                            ticketId,
+                            subject,
+                            _userProvider.userId ?? '',
+                          );
                         },
                         icon: const Icon(Icons.chat),
                         label: const Text('Open Chat'),
@@ -432,26 +438,28 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
             token: token,
             ticketId: ticketId,
             ticketName: ticketName,
-            userId: userId,
+
             initialMessage: ticket['msg'] ?? 'No Message',
           ),
     );
   }
 
   // Launches WhatsApp for support
-  Future<void> _launchWhatsApp() async {
-    const whatsappNumber = '+1234567890';
-    final url = Uri.parse('https://wa.me/$whatsappNumber?text=Hello%20Support');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not launch WhatsApp')),
-        );
-      }
+Future<void> _launchWhatsApp() async {
+  final phoneNumber ='8089308048'; 
+
+  final cleanedPhoneNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+  final url = Uri.parse('https://wa.me/$cleanedPhoneNumber?text=Hello%20Seller');
+  if (await canLaunchUrl(url)) {
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  } else {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch WhatsApp')),
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -499,10 +507,7 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
                   onPressed: () async {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => ChatListPage(userId: widget.userId),
-                      ),
+                      MaterialPageRoute(builder: (context) => ChatListPage()),
                     );
                   },
                   icon: const Icon(Icons.chat),
@@ -628,7 +633,6 @@ class ChatDialog extends StatefulWidget {
   final String token;
   final String ticketId;
   final String ticketName;
-  final String userId;
   final String initialMessage;
 
   const ChatDialog({
@@ -637,7 +641,7 @@ class ChatDialog extends StatefulWidget {
     required this.token,
     required this.ticketId,
     required this.ticketName,
-    required this.userId,
+
     required this.initialMessage,
   });
 
@@ -650,10 +654,12 @@ class _ChatDialogState extends State<ChatDialog> {
   late final TextEditingController commentController;
   final ScrollController _scrollController = ScrollController();
   bool isSending = false;
+  late final LoggedUserProvider _userProvider;
 
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     commentController = TextEditingController();
     comments.add({
       'comment': widget.initialMessage,
@@ -686,7 +692,7 @@ class _ChatDialogState extends State<ChatDialog> {
           .map(
             (comment) => {
               ...comment,
-              'isUser': comment['user_id'] == widget.userId,
+              'isUser': comment['user_id'] == _userProvider.userId,
             },
           )
           .toList();
@@ -782,7 +788,7 @@ class _ChatDialogState extends State<ChatDialog> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'user_id': widget.userId,
+          'user_id': _userProvider.userId,
           'ticket_id': widget.ticketId,
           'comment': comment,
           'image': '',

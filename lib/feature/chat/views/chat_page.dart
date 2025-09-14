@@ -7,6 +7,8 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/feature/chat/model/chat_message_model.dart';
 import 'package:lelamonline_flutter/feature/chat/model/chat_room_model.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:provider/provider.dart';
 
 class ChatRoomService {
   Future<ChatRoom?> createChatRoom({
@@ -14,12 +16,11 @@ class ChatRoomService {
     required String userIdTo,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-room-create.php?token=${token}&user_id_from=$userIdFrom&user_id_to=$userIdTo',
+      '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userIdFrom&user_id_to=$userIdTo',
     );
     try {
       final response = await http.get(
         url,
-        headers: {'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
       );
       debugPrint('ChatRoomService: Creating chat room: $url');
       debugPrint('ChatRoomService: Response status: ${response.statusCode}');
@@ -54,7 +55,7 @@ class ChatRoomService {
     required String listenerId,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-room-list.php?token=${token}&user_id=$userId',
+      '$baseUrl/chat-room-list.php?token=$token&user_id=$userId',
     );
     try {
       final response = await http.get(
@@ -101,7 +102,7 @@ class ChatRoomService {
 class MessageService {
   Future<List<ChatMessage>> fetchMessages(String chatRoomId) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-list.php?token=${token}&chat_room_id=$chatRoomId',
+      '$baseUrl/chat-message-list.php?token=$token&chat_room_id=$chatRoomId',
     );
     try {
       final response = await http.get(
@@ -142,7 +143,8 @@ class MessageService {
     required String chatRoomId,
     required String message,
   }) async {
-    final url = Uri.parse('${baseUrl}/chat-message-send.php?token=${token}&user_id=$userId&chat_room_id=$chatRoomId&message=$message');
+    final url = Uri.parse(
+        '$baseUrl/chat-message-send.php?token=$token&user_id=$userId&chat_room_id=$chatRoomId&message=$message');
     try {
       final response = await http.get(
         url,
@@ -168,7 +170,7 @@ class MessageService {
     required String userId,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-delete.php?token=${token}&message_id=$messageId&user_id=$userId',
+      '$baseUrl/chat-message-delete.php?token=$token&message_id=$messageId&user_id=$userId',
     );
     try {
       final response = await http.get(
@@ -200,7 +202,7 @@ class MessageService {
     required String userId,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-delete.php?token=${token}&chat_room_id=$chatRoomId&user_id=$userId',
+      '$baseUrl/chat-message-delete.php?token=$token&chat_room_id=$chatRoomId&user_id=$userId',
     );
     try {
       final response = await http.get(
@@ -227,14 +229,12 @@ class ChatPage extends HookWidget {
   final String listenerId;
   final String listenerName;
   final String listenerImage;
-  final String userId;
 
   const ChatPage({
     super.key,
     required this.listenerId,
     required this.listenerName,
     required this.listenerImage,
-    required this.userId,
   });
 
   String _formatTime(String dateStr) {
@@ -243,7 +243,7 @@ class ChatPage extends HookWidget {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final messageDate = DateTime(date.year, date.month, date.day);
-      
+
       if (messageDate == today) {
         return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
       } else {
@@ -256,6 +256,10 @@ class ChatPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Retrieve userId from LoggedUserProvider
+    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userId = userProvider.userId ?? '';
+
     final messageController = useTextEditingController();
     final messages = useState<List<ChatMessage>>([]);
     final chatRoom = useState<ChatRoom?>(null);
@@ -275,6 +279,27 @@ class ChatPage extends HookWidget {
     }
 
     Future<void> deleteMessage(String messageId) async {
+      if (userId.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('User ID is missing. Please log in again.'),
+                ],
+              ),
+              backgroundColor: Colors.red[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       try {
         final messageService = MessageService();
         final success = await messageService.deleteMessage(
@@ -326,7 +351,29 @@ class ChatPage extends HookWidget {
     }
 
     Future<void> deleteChat() async {
-      if (chatRoom.value == null) return;
+      if (chatRoom.value == null || userId.isEmpty) {
+        if (userId.isEmpty) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('User ID is missing. Please log in again.'),
+                  ],
+                ),
+                backgroundColor: Colors.red[600],
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+        return;
+      }
+
       try {
         final messageService = MessageService();
         final success = await messageService.deleteChat(
@@ -453,6 +500,28 @@ class ChatPage extends HookWidget {
     }
 
     useEffect(() {
+      if (userId.isEmpty) {
+        isLoading.value = false;
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('User ID is missing. Please log in again.'),
+                ],
+              ),
+              backgroundColor: Colors.red[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return null;
+      }
+
       final chatRoomService = ChatRoomService();
       final messageService = MessageService();
       Timer? timer;
@@ -538,9 +607,30 @@ class ChatPage extends HookWidget {
 
       initializeChat();
       return () => timer?.cancel();
-    }, []);
+    }, [userId]);
 
     Future<void> sendMessage() async {
+      if (userId.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('User ID is missing. Please log in again.'),
+                ],
+              ),
+              backgroundColor: Colors.red[600],
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       final messageText = messageController.text.trim();
       if (messageText.isEmpty || chatRoom.value == null) {
         if (messageText.isEmpty) {
@@ -706,276 +796,317 @@ class ChatPage extends HookWidget {
             ),
           ),
         ),
-        body: isLoading.value
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text(
-                      'Loading chat...',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : chatRoom.value == null
-                ? Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(24),
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Chat Unavailable',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Please contact the seller to start a chat.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : Column(
+        body: userId.isEmpty
+            ? Center(
+                child: Container(
+                  margin: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red[100]!, width: 1),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: messages.value.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.forum_outlined,
-                                      size: 64,
-                                      color: Colors.grey[400],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No messages yet',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Start the conversation with a message',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                controller: scrollController,
-                                padding: const EdgeInsets.all(16),
-                                itemCount: messages.value.length,
-                                itemBuilder: (context, index) {
-                                  final message = messages.value[index];
-                                  final isMe = message.userIdFrom == userId;
-                                  final showTime = _formatTime(message.createdOn);
-                                  
-                                  return GestureDetector(
-                                    onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
-                                    child: Align(
-                                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                      child: Container(
-                                        margin: EdgeInsets.only(
-                                          top: 4,
-                                          bottom: 4,
-                                          left: isMe ? 48 : 0,
-                                          right: isMe ? 0 : 48,
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: isMe 
-                                              ? CrossAxisAlignment.end 
-                                              : CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 12,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: isMe 
-                                                    ? Theme.of(context).primaryColor
-                                                    : Colors.white,
-                                                borderRadius: BorderRadius.only(
-                                                  topLeft: const Radius.circular(16),
-                                                  topRight: const Radius.circular(16),
-                                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                                  bottomRight: Radius.circular(isMe ? 4 : 16),
-                                                ),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(0.05),
-                                                    blurRadius: 4,
-                                                    offset: const Offset(0, 1),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Text(
-                                                message.message,
-                                                style: TextStyle(
-                                                  color: isMe ? Colors.white : Colors.black87,
-                                                  fontSize: 16,
-                                                ),
-                                              ),
-                                            ),
-                                            if (showTime.isNotEmpty)
-                                              Padding(
-                                                padding: const EdgeInsets.only(top: 4),
-                                                child: Text(
-                                                  showTime,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.grey[500],
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 48,
+                        color: Colors.red[400],
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, -2),
-                            ),
-                          ],
+                      const SizedBox(height: 16),
+                      Text(
+                        'User Not Logged In',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red[700],
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: chatRoom.value == null 
-                                        ? Colors.grey[300]! 
-                                        : Colors.grey[200]!,
-                                  ),
-                                ),
-                                child: TextField(
-                                  controller: messageController,
-                                  decoration: InputDecoration(
-                                    hintText: chatRoom.value == null
-                                        ? 'Chat unavailable'
-                                        : 'Type a message...',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey[500],
-                                      fontSize: 15,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  enabled: chatRoom.value != null,
-                                  maxLines: 4,
-                                  minLines: 1,
-                                  style: const TextStyle(fontSize: 15),
-                                  onSubmitted: (value) {
-                                    if (chatRoom.value != null && !isSending.value) {
-                                      sendMessage();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              height: 48,
-                              width: 48,
-                              decoration: BoxDecoration(
-                                color: (chatRoom.value == null || isSending.value)
-                                    ? Colors.grey[300]
-                                    : Theme.of(context).primaryColor,
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(24),
-                                  onTap: (chatRoom.value == null || isSending.value) 
-                                      ? null 
-                                      : sendMessage,
-                                  child: Center(
-                                    child: isSending.value
-                                        ? SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                Colors.grey[600]!,
-                                              ),
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.send_rounded,
-                                            color: (chatRoom.value == null || isSending.value)
-                                                ? Colors.grey[600]
-                                                : Colors.white,
-                                            size: 20,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please log in to view your chats.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.red[600],
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
+                ),
+              )
+            : isLoading.value
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading chat...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : chatRoom.value == null
+                    ? Center(
+                        child: Container(
+                          margin: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Chat Unavailable',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Please contact the seller to start a chat.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: messages.value.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.forum_outlined,
+                                          size: 64,
+                                          color: Colors.grey[400],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'No messages yet',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Start the conversation with a message',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[500],
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    controller: scrollController,
+                                    padding: const EdgeInsets.all(16),
+                                    itemCount: messages.value.length,
+                                    itemBuilder: (context, index) {
+                                      final message = messages.value[index];
+                                      final isMe = message.userIdFrom == userId;
+                                      final showTime = _formatTime(message.createdOn);
+
+                                      return GestureDetector(
+                                        onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
+                                        child: Align(
+                                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                          child: Container(
+                                            margin: EdgeInsets.only(
+                                              top: 4,
+                                              bottom: 4,
+                                              left: isMe ? 48 : 0,
+                                              right: isMe ? 0 : 48,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 12,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: isMe
+                                                        ? Theme.of(context).primaryColor
+                                                        : Colors.white,
+                                                    borderRadius: BorderRadius.only(
+                                                      topLeft: const Radius.circular(16),
+                                                      topRight: const Radius.circular(16),
+                                                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black.withOpacity(0.05),
+                                                        blurRadius: 4,
+                                                        offset: const Offset(0, 1),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Text(
+                                                    message.message,
+                                                    style: TextStyle(
+                                                      color: isMe ? Colors.white : Colors.black87,
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (showTime.isNotEmpty)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 4),
+                                                    child: Text(
+                                                      showTime,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey[500],
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, -2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: chatRoom.value == null
+                                            ? Colors.grey[300]!
+                                            : Colors.grey[200]!,
+                                      ),
+                                    ),
+                                    child: TextField(
+                                      controller: messageController,
+                                      decoration: InputDecoration(
+                                        hintText: chatRoom.value == null
+                                            ? 'Chat unavailable'
+                                            : 'Type a message...',
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[500],
+                                          fontSize: 15,
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                      enabled: chatRoom.value != null && userId.isNotEmpty,
+                                      maxLines: 4,
+                                      minLines: 1,
+                                      style: const TextStyle(fontSize: 15),
+                                      onSubmitted: (value) {
+                                        if (chatRoom.value != null && !isSending.value && userId.isNotEmpty) {
+                                          sendMessage();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  height: 48,
+                                  width: 48,
+                                  decoration: BoxDecoration(
+                                    color: (chatRoom.value == null || isSending.value || userId.isEmpty)
+                                        ? Colors.grey[300]
+                                        : Theme.of(context).primaryColor,
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(24),
+                                      onTap: (chatRoom.value == null || isSending.value || userId.isEmpty)
+                                          ? null
+                                          : sendMessage,
+                                      child: Center(
+                                        child: isSending.value
+                                            ? SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                                    Colors.grey[600]!,
+                                                  ),
+                                                ),
+                                              )
+                                            : Icon(
+                                                Icons.send_rounded,
+                                                color: (chatRoom.value == null ||
+                                                        isSending.value ||
+                                                        userId.isEmpty)
+                                                    ? Colors.grey[600]
+                                                    : Colors.white,
+                                                size: 20,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
       ),
     );
   }

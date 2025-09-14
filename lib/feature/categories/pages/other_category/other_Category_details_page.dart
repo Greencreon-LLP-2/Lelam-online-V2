@@ -594,7 +594,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                   context: context,
                   barrierDismissible: false,
                   builder:
-                      (context) => const ReviewDialog(userId: '', postId: ''),
+                      (context) => const ReviewDialog( postId: ''),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -838,7 +838,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => SupportTicketPage(
-                                                userId: userId ?? '',
+                                               
                                               ),
                                         ),
                                       );
@@ -849,7 +849,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => ChatPage(
-                                                userId: userId!,
+                                               
                                                 listenerId:
                                                     widget.bike.createdBy,
                                                 listenerName: sellerName,

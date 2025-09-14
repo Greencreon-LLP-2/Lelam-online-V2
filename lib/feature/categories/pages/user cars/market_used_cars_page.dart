@@ -11,7 +11,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
-import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide token, baseUrl;
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 
@@ -62,7 +62,7 @@ class _MarketPlaceProductDetailsPageState
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
-  String? userId;
+
   double _minBidIncrement = 1000;
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
@@ -71,14 +71,13 @@ class _MarketPlaceProductDetailsPageState
   String _galleryError = '';
   late LoggedUserProvider _userProvider;
 
-  String get baseUrl => 'https://lelamonline.com/admin/api/v1';
-  String get token => '5cb2c9b569416b5db1604e0e12478ded';
+
 
   @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    _loadUserId();
+  //  _loadUserId();
     _fetchLocations();
     _fetchDetailsData();
     _fetchSellerInfo();
@@ -86,18 +85,20 @@ class _MarketPlaceProductDetailsPageState
     _fetchGalleryImages();
   }
 
-  Future<void> _loadUserId() async {
-    setState(() {
-      if (_userProvider.isLoggedIn) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('User ID not found. Please log in again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    });
-  }
+  // Future<void> _loadUserId() async {
+  //   setState(() {
+  //     if (!_userProvider.isLoggedIn) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Please log in to post an ad'),
+  //           backgroundColor: Colors.orange,
+  //         ),
+  //       );
+  //     }
+  //   }
+  //   });
+  // }
 
   Future<void> _fetchGalleryImages() async {
     try {
@@ -168,10 +169,10 @@ class _MarketPlaceProductDetailsPageState
 
       final headers = {
         'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+       
       };
       final url =
-          '$baseUrl/current-highest-bid-for-post.php?token=$token&post_id=$id';
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
       debugPrint('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -268,7 +269,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<void> _toggleFavorite() async {
-    if (userId == null || userId == 'Unknown') {
+    if (_userProvider.userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please log in to add to shortlist'),
@@ -281,7 +282,7 @@ class _MarketPlaceProductDetailsPageState
     try {
       final headers = {'token': token};
       final url =
-          '$baseUrl/add-to-shortlist.php?token=$token&user_id=$userId&post_id=$id';
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
       debugPrint('Adding to shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -328,7 +329,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<String> _saveBidData(int bidAmount) async {
-    if (userId == null || userId == 'Unknown') {
+    if (_userProvider.userId == null) {
       throw Exception('Please log in to place a bid');
     }
 
@@ -338,7 +339,7 @@ class _MarketPlaceProductDetailsPageState
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+          '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
       debugPrint('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -376,271 +377,253 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-  void showProductBidDialog(BuildContext context) async {
-    setState(() => _isBidDialogOpen = true);
-    await _fetchCurrentHighestBid();
-    final TextEditingController _bidController = TextEditingController();
+void showProductBidDialog(BuildContext context) async {
+  setState(() => _isBidDialogOpen = true);
+  await _fetchCurrentHighestBid(); // Fetch the current highest bid
+  final TextEditingController _bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(String message, bool isSuccess) {
-      return showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) {
-          return AlertDialog(
-            title: Text(
-              isSuccess ? 'Thank You' : 'Error',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            content: Text(message, style: const TextStyle(fontSize: 16)),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  if (isSuccess) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => MyBidsWidget(
-                              baseUrl: baseUrl,
-                              token: token,
-                              userId: userId ?? 'Unknown',
-                            ),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('OK', style: TextStyle(color: Colors.grey)),
+  Future<void> _showResponseDialog(String message, bool isSuccess) {
+    // Format the current highest bid
+    final String formattedBid = _currentHighestBid.startsWith('Error')
+        ? _currentHighestBid
+        : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(
+            isSuccess ? 'Thank You' : 'Error',
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: const TextStyle(fontSize: 16),
               ),
-              if (isSuccess)
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) => MyBidsWidget(
-                              baseUrl: baseUrl,
-                              token: token,
-                              userId: userId ?? 'Unknown',
-                            ),
+              const SizedBox(height: 12),
+              const Text(
+                'Current Highest Bid:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _currentHighestBid.startsWith('Error')
+                        ? Colors.red
+                        : Colors.grey,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  formattedBid,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _currentHighestBid.startsWith('Error')
+                        ? Colors.red
+                        : Colors.green,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (isSuccess) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MyBidsWidget(),
+                    ),
+                  );
+                }
+              },
+              child: const Text('OK', style: TextStyle(color: Colors.grey)),
+            ),
+            if (isSuccess)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SupportTicketPage(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Support'),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return WillPopScope(
+        onWillPop: () async {
+          return true;
+        },
+        child: StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                'Place Your Bid Amount',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your Bid Amount *',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _bidController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: false,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      hintText: 'Enter amount',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                    );
+                    ),
+                  ),
+                  if (_isLoadingBid)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(null);
                   },
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: _isLoadingBid
+                      ? null
+                      : () async {
+                          final String amount = _bidController.text;
+                          if (amount.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter a bid amount'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final int bidAmount = int.tryParse(amount) ?? 0;
+                          if (bidAmount < _minBidIncrement) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
+
+                          // if (_userProvider.userId == null) {
+                          //   Navigator.of(dialogContext).pop({
+                          //     'success': false,
+                          //     'message': 'Please log in to place a bid',
+                          //   });
+                          //   return;
+                          // }
+
+                          setDialogState(() {
+                            _isLoadingBid = true;
+                          });
+
+                          try {
+                            FocusScope.of(dialogContext).unfocus();
+                            final String responseMessage =
+                                await _saveBidData(bidAmount);
+                            Navigator.of(dialogContext).pop({
+                              'success': true,
+                              'message': responseMessage,
+                            });
+                          } catch (e) {
+                            Navigator.of(dialogContext).pop({
+                              'success': false,
+                              'message': 'Error placing bid: $e',
+                            });
+                          } finally {
+                            setDialogState(() {
+                              _isLoadingBid = false;
+                            });
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Call Support'),
+                  child: const Text('Submit'),
                 ),
-            ],
-          );
-        },
-      );
-    }
-
-    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return WillPopScope(
-          onWillPop: () async {
-            return true;
+              ],
+            );
           },
-          child: StatefulBuilder(
-            builder: (dialogContext, setDialogState) {
-              return AlertDialog(
-                title: const Text(
-                  'Place Your Bid Amount',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Current Highest Bid:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color:
-                              _currentHighestBid.startsWith('Error')
-                                  ? Colors.red
-                                  : Colors.grey,
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Builder(
-                        builder: (_) {
-                          if (_currentHighestBid.startsWith('Error')) {
-                            return Text(
-                              _currentHighestBid,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            );
-                          }
-                          final double val =
-                              double.tryParse(
-                                _currentHighestBid.replaceAll(',', ''),
-                              ) ??
-                              0;
-                          final String formatted =
-                              '₹ ${NumberFormat('#,##0').format(val.round())}';
-                          return Text(
-                            formatted,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Your Bid Amount *',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _bidController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: false,
-                      ),
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        hintText: 'Enter amount',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                    if (_isLoadingBid)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop(null);
-                    },
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed:
-                        _isLoadingBid
-                            ? null
-                            : () async {
-                              final String amount = _bidController.text;
-                              if (amount.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter a bid amount'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
+        ),
+      );
+    },
+  );
 
-                              final int bidAmount = int.tryParse(amount) ?? 0;
-                              if (bidAmount < _minBidIncrement) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
+  await Future.delayed(const Duration(milliseconds: 200));
+  FocusScope.of(context).unfocus();
+  _bidController.dispose();
 
-                              if (userId == null || userId == 'Unknown') {
-                                Navigator.of(dialogContext).pop({
-                                  'success': false,
-                                  'message': 'Please log in to place a bid',
-                                });
-                                return;
-                              }
-
-                              setDialogState(() {
-                                _isLoadingBid = true;
-                              });
-
-                              try {
-                                FocusScope.of(dialogContext).unfocus();
-                                final String responseMessage =
-                                    await _saveBidData(bidAmount);
-                                Navigator.of(dialogContext).pop({
-                                  'success': true,
-                                  'message': responseMessage,
-                                });
-                              } catch (e) {
-                                Navigator.of(dialogContext).pop({
-                                  'success': false,
-                                  'message': 'Error placing bid: $e',
-                                });
-                              } finally {
-                                setDialogState(() {
-                                  _isLoadingBid = false;
-                                });
-                              }
-                            },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Submit'),
-                  ),
-                ],
-              );
-            },
-          ),
-        );
-      },
-    );
-
-    await Future.delayed(const Duration(milliseconds: 200));
-    FocusScope.of(context).unfocus();
-    _bidController.dispose();
-
-    if (result != null) {
-      final bool ok = result['success'] == true;
-      final String msg =
-          result['message']?.toString() ??
-          (ok ? 'Bid placed successfully' : 'Failed to place bid');
-      await _showResponseDialog(msg, ok);
-    }
-    if (mounted) setState(() => _isBidDialogOpen = false);
+  if (result != null) {
+    final bool ok = result['success'] == true;
+    final String msg =
+        result['message']?.toString() ??
+        (ok ? 'Bid placed successfully' : 'Failed to place bid');
+    await _showResponseDialog(msg, ok);
   }
-
+  if (mounted) setState(() => _isBidDialogOpen = false);
+}
   @override
   void dispose() {
     _pageController.dispose();
@@ -1202,7 +1185,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<void> _fixMeeting(DateTime selectedDate) async {
-    if (userId == null || userId == 'Unknown') {
+    if (_userProvider.userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please log in to schedule a meeting'),
@@ -1215,11 +1198,10 @@ class _MarketPlaceProductDetailsPageState
     try {
       final headers = {
         'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
-          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
       debugPrint('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -1511,7 +1493,7 @@ class _MarketPlaceProductDetailsPageState
                   barrierDismissible: false,
                   builder:
                       (context) =>
-                          ReviewDialog(userId: userId ?? '', postId: id),
+                          ReviewDialog( postId: id),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1734,17 +1716,17 @@ class _MarketPlaceProductDetailsPageState
                             ),
                             ElevatedButton.icon(
                               onPressed: () {
-                                if (userId == null || userId == 'Unknown') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please log in to chat with the seller',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  return;
-                                }
+                                // if (_userProvider.userId != null) {
+                                //   ScaffoldMessenger.of(context).showSnackBar(
+                                //     const SnackBar(
+                                //       content: Text(
+                                //         'Please log in to chat with the seller',
+                                //       ),
+                                //       backgroundColor: Colors.red,
+                                //     ),
+                                //   );
+                                //   return;
+                                // }
                                 showDialog(
                                   context: context,
                                   builder: (context) {
@@ -1755,7 +1737,7 @@ class _MarketPlaceProductDetailsPageState
                                           MaterialPageRoute(
                                             builder:
                                                 (context) => SupportTicketPage(
-                                                  userId: userId ?? '',
+                                                  
                                                 ),
                                           ),
                                         );
@@ -1766,7 +1748,7 @@ class _MarketPlaceProductDetailsPageState
                                           MaterialPageRoute(
                                             builder:
                                                 (context) => ChatPage(
-                                                  userId: userId!,
+                                                
                                                   listenerId:
                                                       widget.product.createdBy,
                                                   listenerName: sellerName,

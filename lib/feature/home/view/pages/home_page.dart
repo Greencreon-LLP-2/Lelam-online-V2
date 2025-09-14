@@ -42,7 +42,7 @@ class _HomePageState extends State<HomePage> {
         child: Padding(
           padding: const EdgeInsets.only(
             top: 16,
-          ), // Adds padding to avoid system UI
+          ), 
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,

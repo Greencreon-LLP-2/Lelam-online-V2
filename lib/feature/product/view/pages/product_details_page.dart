@@ -978,7 +978,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) => ReviewDialog(userId: '', postId: ''),
+                  builder: (context) => ReviewDialog( postId: ''),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1197,7 +1197,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => SupportTicketPage(
-                                                userId: userId,
+                                               
                                               ),
                                         ),
                                       );
@@ -1208,7 +1208,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => ChatPage(
-                                                userId: userId,
+                                              
                                                 listenerId:
                                                     widget.product.createdBy,
                                                 listenerName: sellerName,

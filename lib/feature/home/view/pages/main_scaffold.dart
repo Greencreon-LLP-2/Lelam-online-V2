@@ -6,6 +6,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/app_drawer.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
+import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
 
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
@@ -44,12 +45,12 @@ class _MainScaffoldState extends State<MainScaffold> {
   List<Widget> get _pages => [
     HomePage(),
     isStatus
-        ? BuyingStatusPage(userId: userId)
-        : SupportTicketPage(userId: userId ?? 'Unknown'),
-    isStatus ? SellingStatusPage(userId: userId, adData: adData) : SellPage(),
+        ? BuyingStatusPage()
+        : SupportTicketPage(),
+    isStatus ? SellingStatusPage (adData: adData) : SellPage(),
     isStatus
-        ? ChatListPage(userId: userId ?? 'Unknown')
-        : StatusPage(userId: userId),
+        ? ShortListPage( )
+        : StatusPage(),
     Center(
       child: Text(
         'Profile: User ID ${userId ?? 'Unknown'}',
@@ -163,8 +164,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                 label: isStatus ? 'Selling' : 'Sell',
               ),
               BottomNavigationBarItem(
-                icon: Icon(isStatus ? Icons.chat : Icons.stream_outlined),
-                label: isStatus ? 'Chats' : 'Status',
+                icon: Icon(isStatus ? Icons.star : Icons.stream_outlined),
+                label: isStatus ? 'Short List' : 'Status',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.more_vert),

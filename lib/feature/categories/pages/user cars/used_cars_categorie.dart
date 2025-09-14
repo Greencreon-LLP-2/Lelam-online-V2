@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
@@ -9,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
@@ -19,6 +21,7 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:provider/provider.dart';
 
 class MarketplaceService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
@@ -168,8 +171,8 @@ class MarketplaceService {
 
 class UsedCarsPage extends StatefulWidget {
   final bool showAuctions;
-  final String? userId;
-  const UsedCarsPage({super.key, this.showAuctions = false, this.userId});
+
+  const UsedCarsPage({super.key, this.showAuctions = false});
 
   @override
   State<UsedCarsPage> createState() => _UsedCarsPageState();
@@ -202,6 +205,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedSoldBy = 'all';
   ScrollController _scrollController = ScrollController();
   bool _showAppBarSearch = false;
+  late final LoggedUserProvider _userProvider;
 
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
@@ -319,7 +323,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _checkLoginStatus() async {
-    final userId = widget.userId ?? await _storage.read(key: 'userId') ?? '';
+    final userId =
+        _userProvider.userId ?? await _storage.read(key: 'userId') ?? '';
     if (mounted) {
       setState(() {
         _userId = userId;
@@ -453,6 +458,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _scrollController = ScrollController();
     _scrollController.addListener(_handleScroll);
     _listingType = widget.showAuctions ? 'auction' : 'sale';
@@ -1831,14 +1837,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                               borderRadius: const BorderRadius.all(
                                 Radius.circular(12),
                               ),
-                              child: Image.network(
-                                'https://lelamonline.com/admin/${product.image}',
+                              child: CachedNetworkImage(
+                                imageUrl:
+                                    'https://lelamonline.com/admin/${product.image}',
                                 fit: BoxFit.cover,
                                 height: 700,
                                 width: 200,
-                                errorBuilder: (context, error, stackTrace) {
+                                placeholder:
+                                    (context, url) => Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                errorWidget: (context, url, error) {
                                   print(
-                                    'Failed to load image: https://lelamonline.com/${product.image}',
+                                    'Failed to load image: https://lelamonline.com/admin/${product.image}',
                                   );
                                   print('Error: $error');
                                   return Container(

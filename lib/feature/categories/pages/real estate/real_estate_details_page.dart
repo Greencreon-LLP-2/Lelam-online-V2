@@ -839,7 +839,7 @@ class _RealEstateProductDetailsPageState
                   context: context,
                   barrierDismissible: false,
                   builder:
-                      (context) => const ReviewDialog(userId: '', postId: ''),
+                      (context) => const ReviewDialog( postId: ''),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1089,7 +1089,7 @@ class _RealEstateProductDetailsPageState
                                     onChatWithSupport: () {
                                       Navigator.push(
                                         context,
-                                        SupportTicketPage(userId: userId ?? '')
+                                        SupportTicketPage()
                                             as Route<Object?>,
                                       );
                                     },
@@ -1099,7 +1099,7 @@ class _RealEstateProductDetailsPageState
                                         MaterialPageRoute(
                                           builder:
                                               (context) => ChatPage(
-                                                userId: userId!,
+                                              
                                                 listenerId:
                                                     widget.product.createdBy,
                                                 listenerName: sellerName,

@@ -6,8 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
-import 'my_bids_widget.dart'
-    as AttributeValueService; // Adjust import as needed
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -1020,22 +1018,25 @@ class BidCard extends StatelessWidget {
                           onProceedWithoutBid();
                         }
                       },
-                      itemBuilder:
-                          (BuildContext context) => [
-                            const PopupMenuItem<String>(
-                              value: 'increase_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.trending_up,
-                                    size: 16,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Increase Bid'),
-                                ],
-                              ),
+                      itemBuilder: (BuildContext context) {
+                        final items = <PopupMenuItem<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'increase_bid',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.trending_up,
+                                  size: 16,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Increase Bid'),
+                              ],
                             ),
+                          ),
+                        ];
+                        if (!isLowBid) {
+                          items.add(
                             const PopupMenuItem<String>(
                               value: 'proceed_with_bid',
                               child: Row(
@@ -1050,21 +1051,26 @@ class BidCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const PopupMenuItem<String>(
-                              value: 'proceed_without_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.event,
-                                    size: 16,
-                                    color: Colors.orange,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Meeting without Bid'),
-                                ],
-                              ),
+                          );
+                        }
+                        items.add(
+                          const PopupMenuItem<String>(
+                            value: 'proceed_without_bid',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Meeting without Bid'),
+                              ],
                             ),
-                          ],
+                          ),
+                        );
+                        return items;
+                      },
                     ),
                   ],
                 ),
@@ -1177,53 +1183,51 @@ class BidCard extends StatelessWidget {
             ),
           ),
           const Divider(),
-          Container(
-            decoration: BoxDecoration(color: Colors.grey[50]),
-            child: Column(
+          SizedBox(
+         
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'Schedule meeting with bid',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.red,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      isLowBid ? 'Book a meeting' : 'Schedule meeting',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                ),
-                const Divider(),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[100]!),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Colors.blue[700],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.blue[700],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue[100]!),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: Colors.blue[700],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    isLowBid
+                        ? 'For low bids, schedule a meeting to discuss further with the seller.'
+                        : 'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],

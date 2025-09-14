@@ -57,7 +57,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                   onTap: () {
                     print(category.id);
                     switch (category.id) {
-                      case "14":
+                      case "1":
                         Navigator.push(
                           context,
                           MaterialPageRoute(

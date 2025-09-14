@@ -3,29 +3,55 @@ import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'dart:convert';
 
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:provider/provider.dart';
+
 class ReviewDialog extends StatefulWidget {
-  final String userId;
   final String postId;
 
-  const ReviewDialog({super.key, required this.userId, required this.postId});
+  const ReviewDialog({super.key, required this.postId});
 
   @override
   ReviewDialogState createState() => ReviewDialogState();
 }
 
 class ReviewDialogState extends State<ReviewDialog> {
-  int _rating = 0;
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitting = false;
+  late final LoggedUserProvider _userProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
+  }
 
   Future<bool> _submitReview() async {
+    if (token.isEmpty || token.contains('?')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid authentication token. Please log in again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+
     final url = Uri.parse(
-      '$addPostReview&user_id=${widget.userId}&post_id=${widget.postId}&rateing=$_rating&comment=${Uri.encodeComponent(_reviewController.text)}',
+      '$addPostReview?token=$token&user_id=${_userProvider.userId}&post_id=${widget.postId}&rating=0&comment=${Uri.encodeComponent(_reviewController.text)}',
     );
 
     try {
       print('Submitting review to: $url');
-      final response = await http.get(url); // Using GET as per the provided example
+
+      final response = await http.get(url);
+
       print('API Response Status: ${response.statusCode}');
       print('API Response Body: ${response.body}');
 
@@ -43,6 +69,15 @@ class ReviewDialogState extends State<ReviewDialog> {
           );
           return false;
         }
+      } else if (response.statusCode == 401) {
+        print('HTTP Error: Unauthorized (401)');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unauthorized: Invalid or expired token. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
       } else {
         print('HTTP Error: ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
@@ -66,12 +101,6 @@ class ReviewDialogState extends State<ReviewDialog> {
   }
 
   @override
-  void dispose() {
-    _reviewController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: Colors.white,
@@ -80,36 +109,15 @@ class ReviewDialogState extends State<ReviewDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Rate Your Experience',
+              'Ask Your Question',
               style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10.0),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _rating = index + 1;
-                    });
-                  },
-                  child: Icon(
-                    index < _rating ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 25.0,
-                  ),
-                );
-              }).map((widget) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: widget,
-                  )).toList(),
             ),
             const SizedBox(height: 10.0),
             TextField(
               controller: _reviewController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Write your review here...',
+                hintText: 'Write your question here...',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(2.0),
                 ),
@@ -120,39 +128,42 @@ class ReviewDialogState extends State<ReviewDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(), 
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSubmitting
               ? null
               : () async {
-                  if (_rating > 0 && _reviewController.text.isNotEmpty) {
+                  if (_reviewController.text.isNotEmpty) {
                     setState(() {
                       _isSubmitting = true;
                     });
-                    final success = await _submitReview();
+
+                    await _submitReview(); 
+
                     setState(() {
                       _isSubmitting = false;
                     });
-                    if (success) {
+
+                    Navigator.of(context).pop();
+
+                    if (await _submitReview()) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Review submitted successfully: $_rating stars, ${_reviewController.text}',
-                          ),
+                        const SnackBar(
+                          content: Text('Question submitted successfully.'),
                           backgroundColor: Colors.green,
                         ),
                       );
-                      Navigator.of(context).pop();
                     }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Please select a rating and write a review.'),
+                        content: Text('Please write a question before submitting.'),
                         backgroundColor: Colors.red,
                       ),
                     );
+                    Navigator.of(context).pop();
                   }
                 },
           child: _isSubmitting

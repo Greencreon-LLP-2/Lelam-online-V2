@@ -307,7 +307,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           endpoint = 'my-meeting-readyformeeting-post-status.php';
           break;
         case 'Meeting Completed':
-          endpoint = 'my-meeting-done-post-status.php';
+          endpoint = 'my-meeting-done.php';
           break;
         case 'Date Fixed':
         default:
@@ -416,7 +416,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           break;
         default:
           url =
-              '${widget.baseUrl}/my-meeting-completed.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+              '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
       debugPrint('Fetching meetings from: $url');
