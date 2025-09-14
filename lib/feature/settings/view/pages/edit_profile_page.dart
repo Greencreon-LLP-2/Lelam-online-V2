@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/core/api/api_service.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 class EditProfilePage extends StatefulWidget {

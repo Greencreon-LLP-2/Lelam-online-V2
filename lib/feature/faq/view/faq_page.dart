@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/core/api/api_service.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 
 class FAQPage extends StatefulWidget {
   const FAQPage({super.key});
@@ -28,19 +27,14 @@ class _FAQPageState extends State<FAQPage> {
     });
 
     try {
-      final data = await apiService.get(url: faqUrl);
-      print(data);
-      // Convert Map values to List if needed
-      final List<Map<String, dynamic>> faqList = [];
-      for (var item in data) {
-        if (item is Map<String, dynamic>) {
-          faqList.add(item);
-        }
-      }
+      final Map<String, dynamic> data = await apiService.get(url: faqUrl);
 
-      setState(() {
-        faqs = faqList;
-      });
+      if (data['status'] == 'true') {
+        setState(() {
+          // Clear previous data and add new FAQs
+          faqs = List<Map<String, dynamic>>.from(data['data']);
+        });
+      }
     } catch (e) {
       debugPrint('Error fetching FAQs: $e');
       setState(() {

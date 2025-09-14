@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/core/api/api_service.dart';
-import 'package:lelamonline_flutter/core/api/hive_helper.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/hive_helper.dart';
 import 'package:lelamonline_flutter/core/model/user_model.dart';
 
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
   final Map<String, dynamic>? extra;
@@ -121,34 +123,25 @@ class _LoginPageState extends State<LoginPage> {
           );
 
           if (response['status'] == true && response['code'] == 200) {
-            final UserData userData = UserData.fromJson(
+            final userData = UserData.fromJson(
               response['data'][0] as Map<String, dynamic>,
             );
 
-            final success = await _hiveHelper.saveUserData(userData);
+            // Save & notify provider
+            await Provider.of<LoggedUserProvider>(
+              context,
+              listen: false,
+            ).setUser(userData);
 
-            if (!mounted) return; // Check if widget is still in the tree
-
-            if (success) {
-              context.goNamed(RouteNames.mainscaffold);
-              Fluttertoast.showToast(
-                msg: 'Login Sucess taking you to home page',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.green.withOpacity(0.8),
-                textColor: Colors.white,
-                fontSize: 16.0,
-              );
-            } else {
-              Fluttertoast.showToast(
-                msg: 'Failed to save user data',
-                toastLength: Toast.LENGTH_SHORT,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.red.withOpacity(0.8),
-                textColor: Colors.white,
-                fontSize: 16.0,
-              );
-            }
+            context.goNamed(RouteNames.mainscaffold);
+            Fluttertoast.showToast(
+              msg: 'Login Sucess taking you to home page',
+              toastLength: Toast.LENGTH_SHORT,
+              gravity: ToastGravity.BOTTOM,
+              backgroundColor: Colors.green.withOpacity(0.8),
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
           } else {
             Fluttertoast.showToast(
               msg: 'Failed to fetch user data after OTP verification',

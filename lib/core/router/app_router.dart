@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:lelamonline_flutter/core/model/user_model.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/main_scaffold.dart';
@@ -27,20 +27,17 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.loginPage,
       name: RouteNames.loginPage,
-      builder:
-          (context, state) => LoginPage(
-            extra:
-                state.extra is Map<String, dynamic>
-                    ? state.extra as Map<String, dynamic>
-                    : null,
-          ),
+      builder: (context, state) => LoginPage(
+        extra: state.extra is Map<String, dynamic>
+            ? state.extra as Map<String, dynamic>
+            : null,
+      ),
     ),
     GoRoute(
       path: RouteNames.categoriespage,
       name: RouteNames.categoriespage,
       builder: (context, state) => const CategoriesPage(),
     ),
-
     GoRoute(
       path: RouteNames.buyingStatusPage,
       name: RouteNames.buyingStatusPage,
@@ -54,7 +51,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.productDetailsPage,
       name: RouteNames.productDetailsPage,
-      builder: (context, state) => ProductDetailsPage(product: state.extra),
+      builder: (context, state) =>
+          ProductDetailsPage(product: state.extra),
     ),
     GoRoute(
       path: RouteNames.faqPage,
@@ -88,9 +86,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ad-post',
       name: RouteNames.adPostPage,
-      builder:
-          (context, state) =>
-              AdPostPage(extra: state.extra as Map<String, dynamic>?),
+      builder: (context, state) =>
+          AdPostPage(extra: state.extra as Map<String, dynamic>?),
     ),
     GoRoute(
       path: RouteNames.usedCarsPage,
@@ -100,54 +97,48 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.marketPlaceProductDetailsPage,
       name: RouteNames.marketPlaceProductDetailsPage,
-      builder:
-          (context, state) =>
-              const MarketPlaceProductDetailsPage(product: null),
+      builder: (context, state) =>
+          const MarketPlaceProductDetailsPage(product: null),
     ),
 
-    /// PROTECTED ROUTES
+    /// MAIN SCAFFOLD (always load)
     GoRoute(
       path: RouteNames.mainscaffold,
       name: RouteNames.mainscaffold,
       builder: (context, state) {
-        final userData = Provider.of<UserData?>(context, listen: false);
-        if (userData == null || userData.userId.isEmpty) {
-          return const LoginPage();
-        }
-        return MainScaffold(userId: userData.userId);
+        final loggedUser = context.watch<LoggedUserProvider>();
+        return MainScaffold(userId: loggedUser.userData?.userId ?? '');
       },
     ),
+
+    /// SHORTLIST PAGE (optional login)
     GoRoute(
       path: RouteNames.shortlistpage,
       name: RouteNames.shortlistpage,
       builder: (context, state) {
-        final userData = Provider.of<UserData?>(context, listen: false);
-        if (userData == null || userData.userId.isEmpty) {
-          return const ShortListPage();
-        }
-        return MainScaffold(userId: userData.userId);
+        final loggedUser = context.watch<LoggedUserProvider>();
+        return ShortListPage(userId: loggedUser.userData?.userId ?? '');
       },
     ),
+
+    /// SELLING STATUS PAGE (optional login)
     GoRoute(
       path: RouteNames.sellingstatuspage,
       name: RouteNames.sellingstatuspage,
       builder: (context, state) {
-        final userData = Provider.of<UserData?>(context, listen: false);
-        if (userData == null || userData.userId.isEmpty) {
-          return const LoginPage();
-        }
-
-        final extra = state.extra as Map<String, dynamic>?; // cast safely
-        final adData = extra?['adData']; // null-safe access
-
-        return SellingStatusPage(userId: userData.userId, adData: adData);
+        final loggedUser = context.watch<LoggedUserProvider>();
+        final extra = state.extra as Map<String, dynamic>?;
+        final adData = extra?['adData'];
+        return SellingStatusPage(
+          userId: loggedUser.userData?.userId ?? '',
+          adData: adData,
+        );
       },
     ),
   ],
 
-  /// Fallback error page
-  errorBuilder:
-      (context, state) => Scaffold(
-        body: Center(child: Text('Something went wrong in navigation')),
-      ),
+  /// Error fallback
+  errorBuilder: (context, state) => Scaffold(
+    body: Center(child: Text('Something went wrong in navigation')),
+  ),
 );
