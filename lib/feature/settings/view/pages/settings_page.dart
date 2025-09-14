@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -11,7 +14,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), centerTitle: true),
-      body: CustomSafeArea( 
+      body: CustomSafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -27,6 +30,15 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildProfileSection(BuildContext context) {
+    final userProvider = Provider.of<LoggedUserProvider>(context);
+    final userData = userProvider.userData;
+
+    // Build the image URL if user has image
+    final originalImageUrl =
+        (userData?.image?.isNotEmpty ?? false)
+            ? "$getImageFromServer${userData!.image}"
+            : null;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -35,23 +47,51 @@ class SettingsPage extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 40,
-              child: Image.asset(
-                'assets/images/avatar.gif',
-                width: 160,
-                height: 160,
-                fit: BoxFit.cover,
+              backgroundColor: Colors.grey.shade200,
+              child: ClipOval(
+                child:
+                    originalImageUrl != null
+                        ? Image.network(
+                          originalImageUrl,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (context, error, stackTrace) => Image.asset(
+                                'assets/images/avatar.gif',
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                              ),
+                        )
+                        : Image.asset(
+                          'assets/images/avatar.gif',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'John Doe',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'john.doe@example.com',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
+
+            // Show name only if not empty
+            if ((userData?.name?.isNotEmpty ?? false))
+              Text(
+                userData!.name!,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+            if ((userData?.username?.isNotEmpty ?? false)) ...[
+              const SizedBox(height: 4),
+              Text(
+                userData!.username!,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+            ],
+
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
@@ -101,6 +141,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   Widget _buildDangerSection(BuildContext context) {
+    final userProvider = context.watch<LoggedUserProvider>();
     return Card(
       elevation: 2,
       child: Column(
@@ -124,26 +165,30 @@ class SettingsPage extends StatelessWidget {
             onTap: () {
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Are you sure you want to logout?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                builder:
+                    (context) => AlertDialog(
+                      title: const Text('Logout'),
+                      content: const Text('Are you sure you want to logout?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+
+                            if (userProvider.isLoggedIn) {
+                              await userProvider.clearUser();
+                            }
+                          },
+                          child: const Text(
+                            'Logout',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
                     ),
-                    TextButton(
-                      onPressed: () {
-                        // Handle logout
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Logout',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
               );
             },
           ),
@@ -154,28 +199,29 @@ class SettingsPage extends StatelessWidget {
             onTap: () {
               showDialog(
                 context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete Account'),
-                  content: const Text(
-                    'Are you sure you want to delete your account? This action cannot be undone.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        // Handle account deletion
-                        Navigator.pop(context);
-                      },
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
+                builder:
+                    (context) => AlertDialog(
+                      title: const Text('Delete Account'),
+                      content: const Text(
+                        'Are you sure you want to delete your account? This action cannot be undone.',
                       ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Handle account deletion
+                            Navigator.pop(context);
+                          },
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
               );
             },
           ),

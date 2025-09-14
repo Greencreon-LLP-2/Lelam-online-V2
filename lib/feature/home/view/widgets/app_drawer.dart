@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -33,21 +34,28 @@ class AppDrawerWidget extends StatelessWidget {
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
               child: ClipOval(
-                child: userProvider.isLoggedIn && userData?.profile?.isNotEmpty == true
-                    ? Image.network(
-                        userData!.profile!,
-                        fit: BoxFit.cover,
-                        width: 60,
-                        height: 60,
-                        errorBuilder: (_, __, ___) => Image.asset(
+                child:
+                    (userProvider.isLoggedIn &&
+                            userData?.image?.isNotEmpty == true)
+                        ? Image.network(
+                          "$getImageFromServer${userData!.image}",
+                          fit: BoxFit.cover,
+                          width: 60,
+                          height: 60,
+                          errorBuilder:
+                              (_, __, ___) => Image.asset(
+                                'assets/images/avatar.gif',
+                                fit: BoxFit.cover,
+                                width: 60,
+                                height: 60,
+                              ),
+                        )
+                        : Image.asset(
                           'assets/images/avatar.gif',
                           fit: BoxFit.cover,
+                          width: 60,
+                          height: 60,
                         ),
-                      )
-                    : Image.asset(
-                        'assets/images/avatar.gif',
-                        fit: BoxFit.cover,
-                      ),
               ),
             ),
           ),
@@ -102,7 +110,13 @@ class AppDrawerWidget extends StatelessWidget {
                   leading: const Icon(Icons.info_outline),
                   title: const Text('Info'),
                   children: [
-                    ...['EULA', 'Privacy Policy', 'Terms of Service', 'About Us', 'Shipping Policy']
+                    ...[
+                          'EULA',
+                          'Privacy Policy',
+                          'Terms of Service',
+                          'About Us',
+                          'Shipping Policy',
+                        ]
                         .map(
                           (title) => ListTile(
                             contentPadding: const EdgeInsets.only(left: 72),
@@ -162,7 +176,10 @@ class AppDrawerWidget extends StatelessWidget {
   }) {
     return ListTile(
       leading: Icon(icon, color: isLogOut ? Colors.red : Colors.black),
-      title: Text(title, style: TextStyle(color: isLogOut ? Colors.red : Colors.black)),
+      title: Text(
+        title,
+        style: TextStyle(color: isLogOut ? Colors.red : Colors.black),
+      ),
       onTap: onTap,
     );
   }
