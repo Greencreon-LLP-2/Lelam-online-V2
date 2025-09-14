@@ -5,7 +5,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 //import 'package:lelamonline_flutter/feature/home/view/models/attribute_model.dart' hide ModelVariation, BrandModel, Brand;
 
-class ApiService {
+class TempApiService {
   static Future<List<Brand>> fetchBrands() async {
     final response = await http.get(Uri.parse(brand));
     if (response.statusCode == 200) {
@@ -86,9 +86,4 @@ class ApiService {
     }
     return allVariations;
   }
-
-  
 }
-
-
-

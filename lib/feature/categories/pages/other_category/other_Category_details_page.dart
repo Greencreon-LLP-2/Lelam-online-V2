@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
@@ -13,7 +15,7 @@ import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 
 class BikeDetailsPage extends StatefulWidget {
@@ -28,7 +30,7 @@ class BikeDetailsPage extends StatefulWidget {
 class _BikeDetailsPageState extends State<BikeDetailsPage> {
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
+
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
@@ -105,17 +107,24 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     });
 
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
         });
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Invalid API response format');
       }
     } catch (e) {
-      print('Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });

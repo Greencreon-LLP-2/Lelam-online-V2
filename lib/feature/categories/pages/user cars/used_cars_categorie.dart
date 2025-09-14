@@ -6,14 +6,16 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
@@ -140,7 +142,7 @@ class MarketplaceService {
       print('Returning cached attributes');
       return _attributesCache!;
     }
-    _attributesCache = await ApiService.fetchAttributes();
+    _attributesCache = await TempApiService.fetchAttributes();
     return _attributesCache!;
   }
 
@@ -151,7 +153,7 @@ class MarketplaceService {
       print('Returning cached attribute variations');
       return _attributeVariationsCache!;
     }
-    _attributeVariationsCache = await ApiService.fetchAttributeVariations(
+    _attributeVariationsCache = await TempApiService.fetchAttributeVariations(
       params,
     );
     return _attributeVariationsCache!;
@@ -184,7 +186,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<Product> _products = [];
   bool _isLoading = true;
   String? _errorMessage;
-  final LocationService _locationService = LocationService();
+
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;
   List<Attribute> attributes = [];
@@ -332,9 +334,15 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     setState(() {
       _isLoadingLocations = true;
     });
+
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
@@ -343,11 +351,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           );
         });
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Invalid API response format');
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error loading locations: $e';
         _isLoadingLocations = false;
       });
     }

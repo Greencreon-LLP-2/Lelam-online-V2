@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+import 'package:provider/provider.dart';
 
 class CategoryItem {
   final String name;
@@ -22,9 +25,7 @@ class CategoryItem {
 }
 
 class SellPage extends StatefulWidget {
-  final String? userId;
-
-  const SellPage({super.key, this.userId});
+  const SellPage({super.key});
 
   @override
   State<SellPage> createState() => _SellPageState();
@@ -32,37 +33,22 @@ class SellPage extends StatefulWidget {
 
 class _SellPageState extends State<SellPage> {
   late Future<List<CategoryModel>> _categoriesFuture;
-
+  late final LoggedUserProvider _userProvider;
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _categoriesFuture = CategoryService().fetchCategories();
   }
 
-  bool get _isUserNotLoggedIn =>
-      widget.userId == null ||
-      widget.userId!.isEmpty ||
-      widget.userId == 'Unknown';
-
   Future<bool> _checkPostLimit(String categoryId) async {
-    if (_isUserNotLoggedIn) {
-      return false;
-    }
-
     try {
       // Reverted to original endpoint (exists on server and returns JSON)
       final response = await http.get(
         Uri.parse(
-          'https://lelamonline.com/admin/api/v1/select-category.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=${widget.userId}&cat_id=$categoryId',
+          'https://lelamonline.com/admin/api/v1/select-category.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=${_userProvider.userId}&cat_id=$categoryId',
         ),
-        headers: {
-          'token': '5cb2c9b569416b5db1604e0e12478ded',
-          'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
-        },
-      );
-
-      print(
-        'Post limit check response: ${response.statusCode} ${response.body}',
+        headers: {'token': '5cb2c9b569416b5db1604e0e12478ded'},
       );
 
       if (response.statusCode == 200) {
@@ -71,19 +57,20 @@ class _SellPageState extends State<SellPage> {
           if (mounted) {
             await showDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Post Limit Exceeded'),
-                content: Text(
-                  data['data'] ??
-                      'You have posted your permitted post limit in this category. Please upgrade your plan.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Post Limit Exceeded'),
+                    content: Text(
+                      data['data'] ??
+                          'You have posted your permitted post limit in this category. Please upgrade your plan.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
                   ),
-                ],
-              ),
             );
           }
           return false; // Limit exceeded
@@ -100,7 +87,7 @@ class _SellPageState extends State<SellPage> {
   }
 
   void _navigateToAdPost(BuildContext context, String categoryId) async {
-    if (_isUserNotLoggedIn) {
+    if (!_userProvider.isLoggedIn) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -119,22 +106,16 @@ class _SellPageState extends State<SellPage> {
     }
 
     // Pass extra as Map<String, dynamic> for type safety
-    final extraData = <String, dynamic>{
-      'categoryId': categoryId,
-      'userId': widget.userId,
-    };
+    final extraData = <String, dynamic>{'categoryId': categoryId};
 
     if (mounted) {
-      context.pushNamed(
-        RouteNames.adPostPage,
-        extra: extraData,
-      );
+      context.pushNamed(RouteNames.adPostPage, extra: extraData);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isUserNotLoggedIn) {
+    if (!_userProvider.isLoggedIn) {
       return Scaffold(
         body: Center(
           child: ElevatedButton(
@@ -255,19 +236,21 @@ class _CategoryCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: categoryColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
-                    image: category.imageUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(category.imageUrl!),
-                            fit: BoxFit.cover,
-                            onError: (exception, stackTrace) {
-                              print('Image load error: $exception');
-                            },
-                          )
-                        : null,
+                    image:
+                        category.imageUrl != null
+                            ? DecorationImage(
+                              image: NetworkImage(category.imageUrl!),
+                              fit: BoxFit.cover,
+                              onError: (exception, stackTrace) {
+                                print('Image load error: $exception');
+                              },
+                            )
+                            : null,
                   ),
-                  child: category.imageUrl == null
-                      ? Icon(category.icon, color: categoryColor, size: 28)
-                      : null,
+                  child:
+                      category.imageUrl == null
+                          ? Icon(category.icon, color: categoryColor, size: 28)
+                          : null,
                 ),
                 const SizedBox(width: 20),
                 Expanded(

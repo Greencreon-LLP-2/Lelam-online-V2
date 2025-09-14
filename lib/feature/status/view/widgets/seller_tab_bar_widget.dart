@@ -82,7 +82,7 @@ class _SellerTabBarWidget extends State<SellerTabBarWidget>
                        
                       ),
                      MyMeetingsSellerWidget(
-                        userId: widget.userId,
+                     
                         postId: widget.postId
                        
                       ),

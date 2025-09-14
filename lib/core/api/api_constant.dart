@@ -1,4 +1,4 @@
-// const String baseUrl = 'http://localhost:8000/admin/api/v1';
+//const String baseUrl = 'http://localhost:8000/admin/api/v1';
 const String baseUrl = 'http://192.168.0.115:8000/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
@@ -35,3 +35,4 @@ const String allusers = '$baseUrl/index.php';
 const String userDetails = '$baseUrl/user-details.php';
 const String userRegister = '$baseUrl/register.php';
 const String userProfileUpdate = '$baseUrl/user-profile-update.php';
+const String shortlist = '$baseUrl/list-shortlist.php';

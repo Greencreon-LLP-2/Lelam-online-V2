@@ -1,18 +1,16 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
-  final String? userId;
-
-  const HomePage({super.key, this.userId});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -23,21 +21,11 @@ class _HomePageState extends State<HomePage> {
   String _searchQuery = '';
   String? _selectedDistrict;
   String? userId;
-
+  late final LoggedUserProvider _userProvider;
   @override
   void initState() {
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     super.initState();
-    _loadUserId();
-  }
-
-  Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final storedUserId = prefs.getString('userId');
-    if (mounted) {
-      setState(() {
-        userId = storedUserId?.isNotEmpty == true ? storedUserId : widget.userId;
-      });
-    }
   }
 
   @override
@@ -52,7 +40,9 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.only(top: 16), // Adds padding to avoid system UI
+          padding: const EdgeInsets.only(
+            top: 16,
+          ), // Adds padding to avoid system UI
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -69,12 +59,13 @@ class _HomePageState extends State<HomePage> {
                           DropdownButton<String>(
                             value: _selectedDistrict,
                             hint: const Text('All Kerala'),
-                            items: districts.map((district) {
-                              return DropdownMenuItem<String>(
-                                value: district,
-                                child: Text(district),
-                              );
-                            }).toList(),
+                            items:
+                                districts.map((district) {
+                                  return DropdownMenuItem<String>(
+                                    value: district,
+                                    child: Text(district),
+                                  );
+                                }).toList(),
                             onChanged: (String? newValue) {
                               if (mounted) {
                                 setState(() {
@@ -90,15 +81,14 @@ class _HomePageState extends State<HomePage> {
                       const Spacer(),
                       IconButton(
                         onPressed: () {
-                          context.pushNamed(RouteNames.notificationPage, extra: {'userId': userId});
+                          context.pushNamed(RouteNames.notificationPage);
                         },
                         icon: const Icon(Icons.notifications),
                       ),
                     ],
                   ),
                 ),
-                if (userId != null && userId != 'Unknown')
-                  const SizedBox(height: 8),
+                if (_userProvider.isLoggedIn) const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SearchButtonWidget(
@@ -116,9 +106,9 @@ class _HomePageState extends State<HomePage> {
                 const BannerWidget(),
                 Padding(
                   padding: const EdgeInsets.only(left: 16),
-                  child: CategoryWidget(userId: userId),
+                  child: CategoryWidget(),
                 ),
-                ProductSectionWidget(searchQuery: _searchQuery, userId: userId),
+                ProductSectionWidget(searchQuery: _searchQuery),
               ],
             ),
           ),

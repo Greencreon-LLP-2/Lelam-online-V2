@@ -21,17 +21,15 @@ dependencies:
   intl: ^0.20.2
   flutter_riverpod: ^2.6.1
   provider: ^6.1.5+1
-  shared_preferences: ^2.5.3
+
   country_code_picker: ^3.4.0
   flutter_secure_storage: ^9.2.4
   url_launcher: ^6.3.2
   flutter_html: ^3.0.0
   hive: ^2.2.3
   flutter_hooks: ^0.21.3+1
-
   dio: ^5.9.0
   hive_flutter: ^1.1.0
-
   retry: ^3.1.2
   flutter_native_splash: ^2.4.6
 

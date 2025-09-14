@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class MeetingsProvider extends ChangeNotifier {
   final List<String> statuses = [
@@ -42,28 +41,17 @@ class MeetingsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final List<String> meetingStrings = prefs.getStringList('userMeetings') ?? [];
-      meetings = meetingStrings
-          .map((meeting) => jsonDecode(meeting) as Map<String, dynamic>)
-          .toList();
-
-      // filter
-      if (postId != null) {
-        meetings = meetings.where((m) => m['post_id'] == postId).toList();
-      }
-      if (bidId != null) {
-        meetings = meetings.where((m) => m['bid_id'] == bidId).toList();
-      }
-
       // add bid if needed
       if (bid != null && statuses[selectedIndex] == 'Meeting Request') {
         final exists = meetings.any(
-          (m) => m['post_id'] == postId && (bidId == null || m['bid_id'] == bidId),
+          (m) =>
+              m['post_id'] == postId && (bidId == null || m['bid_id'] == bidId),
         );
         if (!exists) {
           meetings.add({
-            'id': bidId ?? 'TEMP_${postId}_${DateTime.now().millisecondsSinceEpoch}',
+            'id':
+                bidId ??
+                'TEMP_${postId}_${DateTime.now().millisecondsSinceEpoch}',
             'post_id': postId,
             'bid_id': bidId,
             'user_id': userId,
@@ -72,7 +60,8 @@ class MeetingsProvider extends ChangeNotifier {
             'if_location_request': '0',
             'seller_approvel': '0',
             'admin_approvel': '0',
-            'meeting_date': bid!['meeting_date'] ??
+            'meeting_date':
+                bid!['meeting_date'] ??
                 DateFormat('yyyy-MM-dd').format(DateTime.now()),
             'meeting_time': bid!['meeting_time'] ?? 'N/A',
             'bid_amount': bid!['bidPrice'] ?? '0',
@@ -87,8 +76,6 @@ class MeetingsProvider extends ChangeNotifier {
             'location': bid!['location'] ?? 'N/A',
             'store': bid!['store'] ?? 'N/A',
           });
-          final meetingStrings = meetings.map((m) => jsonEncode(m)).toList();
-          await prefs.setStringList('userMeetings', meetingStrings);
         }
       }
 
@@ -122,7 +109,8 @@ class MeetingsProvider extends ChangeNotifier {
             meeting['seller_approvel'] == '0' &&
             meeting['admin_approvel'] == '0';
       } else if (status == 'Awaiting Location') {
-        return meeting['status'] == '1' && meeting['if_location_request'] == '1';
+        return meeting['status'] == '1' &&
+            meeting['if_location_request'] == '1';
       } else if (status == 'Ready For Meeting') {
         return meeting['status'] == '1' &&
             meeting['seller_approvel'] == '1' &&
@@ -140,46 +128,52 @@ class MeetingsProvider extends ChangeNotifier {
     if (!RegExp(r'^\d{2}:\d{2}:\d{2}$').hasMatch(meetingTime)) {
       throw Exception('Invalid time format. Use HH:mm:ss');
     }
-    final prefs = await SharedPreferences.getInstance();
+
     meetings.removeWhere((m) => m['id'] == id);
-    meetings.add({...meetings.firstWhere((m) => m['id'] == id), 'meeting_time': meetingTime});
-    await prefs.setStringList('userMeetings', meetings.map((m) => jsonEncode(m)).toList());
+    meetings.add({
+      ...meetings.firstWhere((m) => m['id'] == id),
+      'meeting_time': meetingTime,
+    });
+
     notifyListeners();
   }
 
   Future<void> editDate(String id, DateTime picked) async {
     final meetingDate = DateFormat('yyyy-MM-dd').format(picked);
-    final prefs = await SharedPreferences.getInstance();
+
     meetings.removeWhere((m) => m['id'] == id);
-    meetings.add({...meetings.firstWhere((m) => m['id'] == id), 'meeting_date': meetingDate});
-    await prefs.setStringList('userMeetings', meetings.map((m) => jsonEncode(m)).toList());
+    meetings.add({
+      ...meetings.firstWhere((m) => m['id'] == id),
+      'meeting_date': meetingDate,
+    });
+
     notifyListeners();
   }
 
   Future<void> sendLocationRequest(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     meetings.removeWhere((m) => m['id'] == id);
-    meetings.add({...meetings.firstWhere((m) => m['id'] == id), 'if_location_request': '1'});
-    await prefs.setStringList('userMeetings', meetings.map((m) => jsonEncode(m)).toList());
+    meetings.add({
+      ...meetings.firstWhere((m) => m['id'] == id),
+      'if_location_request': '1',
+    });
+
     notifyListeners();
   }
 
   Future<void> proceedWithBid(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     meetings.removeWhere((m) => m['id'] == id);
     meetings.add({
       ...meetings.firstWhere((m) => m['id'] == id),
       'seller_approvel': '1',
       'admin_approvel': '1',
     });
-    await prefs.setStringList('userMeetings', meetings.map((m) => jsonEncode(m)).toList());
+
     notifyListeners();
   }
 
   Future<void> cancelMeeting(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     meetings.removeWhere((m) => m['id'] == id);
-    await prefs.setStringList('userMeetings', meetings.map((m) => jsonEncode(m)).toList());
+
     notifyListeners();
   }
 }

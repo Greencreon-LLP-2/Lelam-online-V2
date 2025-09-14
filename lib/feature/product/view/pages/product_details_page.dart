@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
@@ -13,7 +15,6 @@ import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -53,7 +54,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String? _shortlistErrorMessage;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
+
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
   final String _token = '5cb2c9b569416b5db1604e0e12478ded';
@@ -68,6 +69,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _fetchLocations();
     _fetchDetailsData();
     _fetchSellerInfo();
     _fetchShortlistStatus();
@@ -236,6 +238,36 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
+  Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+
+    try {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Invalid API response format');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
   Future<void> _fetchDetailsData() async {
     setState(() {
       isLoadingDetails = true;
@@ -243,16 +275,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     });
 
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
-        _locations = locationResponse.data;
-      } else {
-        throw Exception('Failed to load locations');
-      }
+      attributes = await TempApiService.fetchAttributes();
 
-      attributes = await ApiService.fetchAttributes();
-
-      attributeVariations = await ApiService.fetchAttributeVariations(
+      attributeVariations = await TempApiService.fetchAttributeVariations(
         widget.product.filters,
       );
 

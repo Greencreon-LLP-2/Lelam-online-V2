@@ -5,16 +5,19 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/auction_cars_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -37,7 +40,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
   List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
+
   final AuctionService _auctionService = AuctionService();
   List<Attribute> attributes = [];
   List<AttributeVariation> attributeVariations = [];
@@ -52,7 +55,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String sellerActiveFrom = 'N/A';
   String? userId;
   String _currentHighestBid = '0';
-  
 
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
@@ -107,12 +109,39 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   }
 
   Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    final userData = userProvider.userData;
     setState(() {
-      userId = prefs.getString('userId') ?? 'Unknown';
+      userId = userData?.userId ?? '';
     });
+    debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
+  }
 
-    debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
+  Future<void> _fetchLocations() async {
+    try {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Invalid API response format');
+      }
+    } catch (e) {
+      print(e);
+    }
   }
 
   Future<void> _fetchData() async {
@@ -122,15 +151,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     });
 
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
-        _locations = locationResponse.data;
-      } else {
-        throw Exception('Failed to load locations');
-      }
+      _fetchLocations();
 
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations(
+      attributes = await TempApiService.fetchAttributes();
+      attributeVariations = await TempApiService.fetchAttributeVariations(
         widget.product.filters,
       );
       final attributeValuePairs =
@@ -139,9 +163,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
       _bidHistory = await _auctionService.fetchBidHistory(id);
       _minBidIncrement = double.tryParse(auctionPriceIntervel) ?? 2500.0;
-
-      // New: Fetch highest bid from API
-      await _fetchCurrentHighestBid();
 
       // Fallback to local calculation if API fails (e.g., _currentHighestBid starts with 'Error')
       if (_currentHighestBid == '0' || _currentHighestBid.startsWith('Error')) {
@@ -168,75 +189,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
       setState(() {
         _isLoading = false;
         _isLoadingLocations = false;
-      });
-    }
-  }
-
-  Future<void> _fetchCurrentHighestBid() async {
-    try {
-      setState(() {
-        _isLoading = true; // Reuse for UI feedback
-      });
-
-      final headers = {
-        'token': token,
-        'Cookie':
-            'PHPSESSID=a99k454ctjeu4sp52ie9dgua76', // Reuse from marketplace
-      };
-      final url =
-          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-      debugPrint('Fetching highest bid: $url'); // Logs full URL
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers.addAll(headers);
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      debugPrint(
-        'Full API response body: $responseBody',
-      ); // Shows PHP notice + JSON
-      debugPrint('Response status code: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response data: $responseData'); // Full JSON
-
-        if (responseData['status'] == true) {
-          final dataValue = responseData['data']?.toString() ?? '0';
-          // Check if data is numeric; otherwise, treat as error
-          if (int.tryParse(dataValue) != null) {
-            setState(() {
-              _currentHighestBid = dataValue;
-            });
-            debugPrint('Successfully fetched highest bid: $dataValue');
-          } else {
-            // Handle non-numeric (e.g., "Please provide valid data")
-            debugPrint('API returned non-numeric data (error): $dataValue');
-            setState(() {
-              _currentHighestBid = 'Error: $dataValue';
-            });
-          }
-        } else {
-          debugPrint('API status false: ${responseData['data']}');
-          setState(() {
-            _currentHighestBid = 'Error: Failed to fetch';
-          });
-        }
-      } else {
-        debugPrint(
-          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
-        );
-        setState(() {
-          _currentHighestBid = 'Error: Network issue';
-        });
-      }
-    } catch (e) {
-      debugPrint('Exception in fetch highest bid: $e');
-      setState(() {
-        _currentHighestBid = 'Error: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
       });
     }
   }
@@ -655,179 +607,172 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     );
   }
 
-void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
-  final TextEditingController bidAmountController = TextEditingController();
-  if (isIncrease) {
-    bidAmountController.text =
-        (_currentBid + _minBidIncrement).toInt().toString();
-  }
+  void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
+    final TextEditingController bidAmountController = TextEditingController();
+    if (isIncrease) {
+      bidAmountController.text =
+          (_currentBid + _minBidIncrement).toInt().toString();
+    }
 
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text(isIncrease ? 'Increase Your Bid' : 'Place Your Bid'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Enter your bid amount in rupees'),
-            const SizedBox(height: 16),
-            
-            // Current Bid Info
-            Text(
-              'Current Highest Bid',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _currentHighestBid.startsWith('Error')
-                  ? _currentHighestBid
-                  : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
-              style: TextStyle(
-                color: _currentHighestBid.startsWith('Error') ? Colors.red : null,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            
-            if (isIncrease) ...[
-              const SizedBox(height: 8),
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(isIncrease ? 'Increase Your Bid' : 'Place Your Bid'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Enter your bid amount in rupees'),
+              const SizedBox(height: 16),
+
+              // Current Bid Info
               Text(
-                'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
+                'Current Highest Bid',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _currentHighestBid.startsWith('Error')
+                    ? _currentHighestBid
+                    : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  color:
+                      _currentHighestBid.startsWith('Error')
+                          ? Colors.red
+                          : null,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              if (isIncrease) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // Bid Input Field
+              TextField(
+                controller: bidAmountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: false,
+                ),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  prefixText: '₹',
+                  hintText: '0',
+                  labelText: 'Enter bid amount',
+                  border: OutlineInputBorder(),
                 ),
               ),
             ],
-            
-            const SizedBox(height: 16),
-
-            // Bid Input Field
-            TextField(
-              controller: bidAmountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: false,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              decoration: InputDecoration(
-                prefixText: '₹',
-                hintText: '0',
-                labelText: 'Enter bid amount',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final String amount = bidAmountController.text;
-              if (amount.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a bid amount'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final int bidAmount = int.tryParse(amount) ?? 0;
-              final double minimumPrice =
-                  _currentBid + _minBidIncrement;
-              if (bidAmount <= _currentBid) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              if (bidAmount < minimumPrice) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              if (userId == null || userId == 'Unknown') {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please log in to place a bid'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              try {
-                final success = await _auctionService.placeBid(
-                  id,
-                  userId!, // Use actual userId from SharedPreferences
-                  bidAmount,
-                );
-                if (success) {
-                  setState(() {
-                    _currentBid = bidAmount;
-                    _bidHistory.insert(0, {
-                      'bidder':
-                          'You', // Replace with actual user name if available
-                      'amount':
-                          '₹${NumberFormat('#,##').format(bidAmount)}',
-                      'time': 'Just now',
-                    });
-                  });
-                  Navigator.pop(context);
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final String amount = bidAmountController.text;
+                if (amount.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Bid placed successfully!'),
-                      backgroundColor: Colors.green,
+                      content: Text('Please enter a bid amount'),
+                      backgroundColor: Colors.red,
                     ),
                   );
-                } else {
+                  return;
+                }
+
+                final int bidAmount = int.tryParse(amount) ?? 0;
+                final double minimumPrice = _currentBid + _minBidIncrement;
+                if (bidAmount <= _currentBid) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                if (bidAmount < minimumPrice) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                if (userId == null || userId == 'Unknown') {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Failed to place bid'),
+                      content: Text('Please log in to place a bid'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final success = await _auctionService.placeBid(
+                    id,
+                    userId!, // Use actual userId from SharedPreferences
+                    bidAmount,
+                  );
+                  if (success) {
+                    setState(() {
+                      _currentBid = bidAmount;
+                      _bidHistory.insert(0, {
+                        'bidder':
+                            'You', // Replace with actual user name if available
+                        'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
+                        'time': 'Just now',
+                      });
+                    });
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bid placed successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to place bid'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error placing bid: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error placing bid: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: Text(isIncrease ? 'Increase Bid' : 'Submit Bid'),
-          ),
-        ],
-      );
-    },
-  );
-}
+              },
+              child: Text(isIncrease ? 'Increase Bid' : 'Submit Bid'),
+            ),
+          ],
+        );
+      },
+    );
+  }
   // void _showMeetingDialog(BuildContext context) {
   //   DateTime selectedDate = DateTime.now();
   //   TimeOfDay selectedTime = TimeOfDay.now();

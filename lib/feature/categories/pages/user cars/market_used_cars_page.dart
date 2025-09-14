@@ -4,32 +4,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
+
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
-  final String? userId;
 
   const MarketPlaceProductDetailsPage({
     super.key,
     required this.product,
     this.isAuction = false,
-    this.userId,
   });
 
   @override
@@ -52,7 +55,7 @@ class _MarketPlaceProductDetailsPageState
   bool _isBidDialogOpen = false;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
+
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
@@ -61,21 +64,39 @@ class _MarketPlaceProductDetailsPageState
   String sellerErrorMessage = '';
   String? userId;
   double _minBidIncrement = 1000;
-
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
   bool _isLoadingGallery = true;
   List<String> _galleryImages = [];
   String _galleryError = '';
+  late LoggedUserProvider _userProvider;
+
+  String get baseUrl => 'https://lelamonline.com/admin/api/v1';
+  String get token => '5cb2c9b569416b5db1604e0e12478ded';
 
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _loadUserId();
+    _fetchLocations();
     _fetchDetailsData();
     _fetchSellerInfo();
     _checkShortlistStatus();
     _fetchGalleryImages();
+  }
+
+  Future<void> _loadUserId() async {
+    setState(() {
+      if (_userProvider.isLoggedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User ID not found. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _fetchGalleryImages() async {
@@ -101,8 +122,7 @@ class _MarketPlaceProductDetailsPageState
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint(
-          'Parsed responseData type: ${responseData.runtimeType}',);
+        debugPrint('Parsed responseData type: ${responseData.runtimeType}');
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -113,14 +133,11 @@ class _MarketPlaceProductDetailsPageState
                     (item) =>
                         'https://lelamonline.com/admin/${item['image'] ?? ''}',
                   )
-                  .where(
-                    (img) => img.isNotEmpty && img.contains('uploads/'),
-                  ) // Filter valid image paths
+                  .where((img) => img.isNotEmpty && img.contains('uploads/'))
                   .toList();
           debugPrint(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
-          ); // Updated: Log the list
-
+          );
         } else {
           throw Exception(
             'Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}',
@@ -154,35 +171,25 @@ class _MarketPlaceProductDetailsPageState
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url =
-          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-      debugPrint(
-        'Fetching highest bid: $url',
-      ); 
+          '$baseUrl/current-highest-bid-for-post.php?token=$token&post_id=$id';
+      debugPrint('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint(
-        'Full API response body: $responseBody',
-      ); 
+      debugPrint('Full API response body: $responseBody');
       debugPrint('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint(
-          'Parsed response data: $responseData',
-        ); 
+        debugPrint('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
-
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
           final parsed = double.tryParse(dataValue);
-          // New: Check if data is numeric (likely a bid amount); otherwise, treat as error
           if (parsed != null) {
-
             setState(() {
-              // store numeric string without "Error:" prefix
               _currentHighestBid = parsed.toString();
             });
             debugPrint('Successfully fetched highest bid: $dataValue');
@@ -191,14 +198,13 @@ class _MarketPlaceProductDetailsPageState
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
-              _currentHighestBid =
-                  'Error: $dataValue'; 
+              _currentHighestBid = 'Error: $dataValue';
             });
           }
         } else {
           debugPrint('API status false: ${responseData['data']}');
           setState(() {
-            _currentHighestBid = '0'; 
+            _currentHighestBid = '0';
           });
         }
       } else {
@@ -206,14 +212,13 @@ class _MarketPlaceProductDetailsPageState
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
-          _currentHighestBid = '0'; 
+          _currentHighestBid = '0';
         });
       }
     } catch (e) {
       debugPrint('Exception in fetch highest bid: $e');
       setState(() {
-        _currentHighestBid = 'Error: $e'; // Store error for display
-
+        _currentHighestBid = 'Error: $e';
       });
     } finally {
       setState(() {
@@ -222,63 +227,43 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-  Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
-    });
-    debugPrint('MarketPlaceProductDetailsPage - Loaded userId: $userId');
-  }
-
   Future<void> _checkShortlistStatus() async {
-    if (userId == null || userId == 'Unknown') return;
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
 
     try {
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
-      final url = '$baseUrl/list-shortlist.php?token=$token&user_id=$userId';
-      debugPrint('Checking shortlist status: $url');
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers.addAll(headers);
+      final Map<String, dynamic> response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": _userProvider.userId},
+      );
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      debugPrint('list-shortlist.php response: $responseBody');
+      if (response['status'] == 'true') {
+        final userData = UserData.fromJson(
+          response['data'][0] as Map<String, dynamic>,
+        );
+        print("works");
+        // final response = await request.send();
+        // final responseBody = await response.stream.bytesToString();
+        // debugPrint('list-shortlist.php response: $responseBody');
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(responseBody);
-        if (responseData['status'] == true && responseData['data'] is List) {
-          final shortlisted = responseData['data'].any(
-            (item) => item['post_id'] == id && item['user_id'] == userId,
-          );
-          setState(() {
-            _isFavorited = shortlisted;
-          });
+        // if (response.statusCode == 200) {
+        //   final responseData = jsonDecode(responseBody);
+        //   if (responseData['status'] == true && responseData['data'] is List) {
+        //     final shortlisted = responseData['data'].any(
+        //       (item) => item['post_id'] == id && item['user_id'] == userId,
+        //     );
+        //     setState(() {
+        //       _isFavorited = shortlisted;
+        //     });
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('shortlist_$userId', responseBody);
-          debugPrint('Shortlist status cached for userId: $userId');
-        }
-      } else {
-        debugPrint('Failed to check shortlist: ${response.reasonPhrase}');
+        //     final prefs = await SharedPreferences.getInstance();
+        //     await prefs.setString('shortlist_$userId', responseBody);
+        //     debugPrint('Shortlist status cached for userId: $userId');
+        //   }
+        // } else {
+        //   debugPrint('Failed to check shortlist: ${response.reasonPhrase}');
       }
     } catch (e) {
       debugPrint('Error checking shortlist status: $e');
-      final prefs = await SharedPreferences.getInstance();
-      final cachedShortlist = prefs.getString('shortlist_$userId');
-      if (cachedShortlist != null) {
-        final responseData = jsonDecode(cachedShortlist);
-        if (responseData['status'] == true && responseData['data'] is List) {
-          final shortlisted = responseData['data'].any(
-            (item) => item['post_id'] == id && item['user_id'] == userId,
-          );
-          setState(() {
-            _isFavorited = shortlisted;
-          });
-        }
-      }
     }
   }
 
@@ -294,10 +279,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     try {
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': token};
       final url =
           '$baseUrl/add-to-shortlist.php?token=$token&user_id=$userId&post_id=$id';
       debugPrint('Adding to shortlist: $url');
@@ -320,36 +302,11 @@ class _MarketPlaceProductDetailsPageState
               backgroundColor: Colors.green,
             ),
           );
-
-          final prefs = await SharedPreferences.getInstance();
-          final cachedShortlist = prefs.getString('shortlist_$userId');
-          List<dynamic> shortlistData = [];
-          if (cachedShortlist != null) {
-            final data = jsonDecode(cachedShortlist);
-            if (data['status'] == true && data['data'] is List) {
-              shortlistData = data['data'];
-            }
-          }
-          shortlistData.add({
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'user_id': userId,
-            'post_id': id,
-            'created_on': DateFormat(
-              'yyyy-MM-dd HH:mm:ss',
-            ).format(DateTime.now()),
-            'updated_on': DateFormat(
-              'yyyy-MM-dd HH:mm:ss',
-            ).format(DateTime.now()),
-          });
-          await prefs.setString(
-            'shortlist_$userId',
-            jsonEncode({'status': true, 'data': shortlistData, 'code': 0}),
-          );
           debugPrint('Shortlist updated in SharedPreferences');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Shortlist Added '),
+              content: Text('Shortlist Added'),
               backgroundColor: Colors.green,
             ),
           );
@@ -402,39 +359,6 @@ class _MarketPlaceProductDetailsPageState
             dataMessage.toLowerCase().contains('success') ||
             dataMessage.toLowerCase().contains('placed successfully');
         if (statusIsTrue || dataLooksLikeSuccess) {
-          final prefs = await SharedPreferences.getInstance();
-          final cachedBids = prefs.getStringList('userBids') ?? [];
-          final newBid = {
-            'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'user_id': userId,
-            'post_id': id,
-            'if_auction': widget.isAuction ? '1' : '0',
-            'if_auction_end': '0',
-            'status': '1',
-            'created_on': DateFormat(
-              'yyyy-MM-dd HH:mm:ss',
-            ).format(DateTime.now()),
-            'updated_on': DateFormat(
-              'yyyy-MM-dd HH:mm:ss',
-            ).format(DateTime.now()),
-            'bidPrice': bidAmount.toString(),
-            'targetPrice': price,
-            'title': title,
-            'carImage': image,
-            'appId': 'AD_$id',
-            'bidDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-            'expirationDate': DateFormat(
-              'yyyy-MM-dd',
-            ).format(DateTime.now().add(Duration(days: 7))),
-            'location': landMark,
-            'store': byDealer == '1' ? 'Dealer' : 'Individual',
-            'fromHighBids': bidAmount >= (double.tryParse(price) ?? 0),
-            'fromLowBids': bidAmount < (double.tryParse(price) ?? 0),
-          };
-          cachedBids.add(jsonEncode(newBid));
-          await prefs.setStringList('userBids', cachedBids);
-          debugPrint('Bid cached: $newBid');
-
           return responseData['data'] ?? 'Bid placed successfully';
         } else {
           throw Exception('Failed to place bid: ${responseData['data']}');
@@ -453,14 +377,10 @@ class _MarketPlaceProductDetailsPageState
   }
 
   void showProductBidDialog(BuildContext context) async {
-    // Fetch highest bid first
     setState(() => _isBidDialogOpen = true);
-
     await _fetchCurrentHighestBid();
-
     final TextEditingController _bidController = TextEditingController();
 
-    // Helper to show a simple response dialog
     Future<void> _showResponseDialog(String message, bool isSuccess) {
       return showDialog<void>(
         context: context,
@@ -476,11 +396,6 @@ class _MarketPlaceProductDetailsPageState
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // if (isDialogOpen) {
-                  //   Navigator.of(context).pop();
-                  //   isDialogOpen = false;
-                  //   _bidController.dispose();
-                  // }
                   if (isSuccess) {
                     Navigator.push(
                       context,
@@ -489,7 +404,7 @@ class _MarketPlaceProductDetailsPageState
                             (context) => MyBidsWidget(
                               baseUrl: baseUrl,
                               token: token,
-                              userId: userId,
+                              userId: userId ?? 'Unknown',
                             ),
                       ),
                     );
@@ -508,7 +423,7 @@ class _MarketPlaceProductDetailsPageState
                             (context) => MyBidsWidget(
                               baseUrl: baseUrl,
                               token: token,
-                              userId: userId,
+                              userId: userId ?? 'Unknown',
                             ),
                       ),
                     );
@@ -525,7 +440,6 @@ class _MarketPlaceProductDetailsPageState
       );
     }
 
-    // Show the bid input dialog and return a result map when it closes
     final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -632,9 +546,7 @@ class _MarketPlaceProductDetailsPageState
                 actions: [
                   TextButton(
                     onPressed: () {
-                      Navigator.of(
-                        dialogContext,
-                      ).pop(null); // user closed dialog
+                      Navigator.of(dialogContext).pop(null);
                     },
                     child: const Text(
                       'Close',
@@ -677,18 +589,15 @@ class _MarketPlaceProductDetailsPageState
                                 });
                                 return;
                               }
-                               try{
+
                               setDialogState(() {
                                 _isLoadingBid = true;
                               });
-                               }catch (_){}
-                               try {
-                              FocusScope.of(dialogContext).unfocus();
-                            } catch (_) {}
+
                               try {
+                                FocusScope.of(dialogContext).unfocus();
                                 final String responseMessage =
                                     await _saveBidData(bidAmount);
-                                // return success result with message
                                 Navigator.of(dialogContext).pop({
                                   'success': true,
                                   'message': responseMessage,
@@ -698,14 +607,11 @@ class _MarketPlaceProductDetailsPageState
                                   'success': false,
                                   'message': 'Error placing bid: $e',
                                 });
-                              }finally {
-                              try {
+                              } finally {
                                 setDialogState(() {
                                   _isLoadingBid = false;
                                 });
-                              } catch (_) {}
-                            }
-                              
+                              }
                             },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
@@ -720,17 +626,11 @@ class _MarketPlaceProductDetailsPageState
         );
       },
     );
-    await Future.delayed(const Duration(milliseconds: 200));
-    try{
-      FocusScope.of(context).unfocus();
-    }catch(_){}
-    try{
-      _bidController.dispose();
-    } catch(_){}
-    
-    
 
-    
+    await Future.delayed(const Duration(milliseconds: 200));
+    FocusScope.of(context).unfocus();
+    _bidController.dispose();
+
     if (result != null) {
       final bool ok = result['success'] == true;
       final String msg =
@@ -789,6 +689,36 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
+  Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+
+    try {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Invalid API response format');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
   Future<void> _fetchDetailsData() async {
     setState(() {
       isLoadingDetails = true;
@@ -796,15 +726,8 @@ class _MarketPlaceProductDetailsPageState
     });
 
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
-        _locations = locationResponse.data;
-      } else {
-        throw Exception('Failed to load locations');
-      }
-
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations(
+      attributes = await TempApiService.fetchAttributes();
+      attributeVariations = await TempApiService.fetchAttributeVariations(
         widget.product.filters,
       );
       final attributeValuePairs =
@@ -1587,7 +1510,8 @@ class _MarketPlaceProductDetailsPageState
                   context: context,
                   barrierDismissible: false,
                   builder:
-                      (context) => const ReviewDialog(userId: '', postId: ''),
+                      (context) =>
+                          ReviewDialog(userId: userId ?? '', postId: id),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -1614,13 +1538,6 @@ class _MarketPlaceProductDetailsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Padding(
-                  //   padding: const EdgeInsets.all(16.0),
-                  //   // child: Text(
-                  //   //   'User ID: ${userId ?? 'Unknown'}',
-                  //   //   style: const TextStyle(fontSize: 16, color: Colors.grey),
-                  //   // ),
-                  // ),
                   Stack(
                     children: [
                       SizedBox(
@@ -1680,9 +1597,7 @@ class _MarketPlaceProductDetailsPageState
                                   );
                                 },
                               ),
-                            if (!_isLoadingGallery &&
-                                _galleryError
-                                    .isEmpty) // Only show counter if not loading/error
+                            if (!_isLoadingGallery && _galleryError.isEmpty)
                               Positioned(
                                 right: 16,
                                 bottom: 16,
@@ -1710,24 +1625,26 @@ class _MarketPlaceProductDetailsPageState
                       CustomSafeArea(
                         child: Row(
                           children: [
-                             IconButton(
-  onPressed: () {
-    if (_isBidDialogOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please close the bid dialog first'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    Navigator.pop(context);
-  },
-  icon: const Icon(
-    Icons.arrow_back,
-    color: Colors.white,
-  ),
-), 
+                            IconButton(
+                              onPressed: () {
+                                if (_isBidDialogOpen) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please close the bid dialog first',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                Navigator.pop(context);
+                              },
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                            ),
                             const Spacer(),
                             IconButton(
                               icon: Icon(
@@ -1835,10 +1752,12 @@ class _MarketPlaceProductDetailsPageState
                                       onChatWithSupport: () {
                                         Navigator.push(
                                           context,
-                                          SupportTicketPage(
-                                                userId: userId ?? '',
-                                              )
-                                              as Route<Object?>,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => SupportTicketPage(
+                                                  userId: userId ?? '',
+                                                ),
+                                          ),
                                         );
                                       },
                                       onChatWithSeller: () {
@@ -2044,7 +1963,6 @@ class _MarketPlaceProductDetailsPageState
                       ],
                     ),
                   ),
-                  // Add padding to prevent content from being hidden under fixed buttons
                   const SizedBox(height: 80),
                 ],
               ),

@@ -3,8 +3,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import 'my_bids_widget.dart'
     as AttributeValueService; // Adjust import as needed
 
@@ -25,6 +26,7 @@ class MyBidsWidget extends StatefulWidget {
 }
 
 class _MyBidsWidgetState extends State<MyBidsWidget> {
+  late final userProvider;
   String? selectedBidType = 'Low Bids';
   List<Map<String, dynamic>> bids = [];
   List<Map<String, dynamic>> districts = [];
@@ -34,19 +36,21 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
   @override
   void initState() {
+   userProvider  = Provider.of<LoggedUserProvider>(context, listen: false);
+
     super.initState();
     _loadUserIdAndBids();
   }
 
- Future<void> _loadUserIdAndBids() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawUserId = prefs.getString('userId');  // Log raw value
-    debugPrint('MyBidsWidget - Raw prefs.getString("userId"): $rawUserId');
+  Future<void> _loadUserIdAndBids() async {
+   
+   // debugPrint('MyBidsWidget - Raw userData.userId: ${userData?.userId}');
     setState(() {
-      _userId = widget.userId ?? rawUserId ?? 'Unknown';
+      _userId = userProvider. userData?.userId ?? "";
     });
-    debugPrint('MyBidsWidget - Loaded userId: $_userId (fallback from widget: ${widget.userId})');
-    
+    debugPrint(
+      'MyBidsWidget - Loaded userId: $_userId (fallback from widget: ${widget.userId})',
+    );
     // Fetch districts with error handling
     // try {
     //   districts = await AttributeValueService.fetchDistricts();
@@ -55,7 +59,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     //   districts = [];
     // }
     // debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
-    
+
     // If still unknown, try a fallback (e.g., check another key or prompt login)
     if (_userId == 'Unknown') {
       debugPrint('MyBidsWidget - User ID unknown; prompting login');
@@ -67,9 +71,10 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
       return;
     }
-    
+
     await _loadBids();
   }
+
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     try {
       final response = await http.get(
@@ -222,142 +227,201 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     }
   }
 
-Future<void> _proceedWithBid(BuildContext context, String bidId, String postId) async {
-  debugPrint('Opening time dialog for bid_id: $bidId, post_id: $postId');
+  Future<void> _proceedWithBid(
+    BuildContext context,
+    String bidId,
+    String postId,
+  ) async {
+    debugPrint('Opening time dialog for bid_id: $bidId, post_id: $postId');
 
-  // Validate bid_id and post_id
-  final bid = bids.firstWhere(
-    (b) => b['id'] == bidId && b['post_id'] == postId,
-    orElse: () => {},
-  );
-  if (bid.isEmpty) {
-    debugPrint('Invalid bid: bid_id=$bidId, post_id=$postId not found in bids list');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Error: Invalid bid or post ID')),
+    // Validate bid_id and post_id
+    final bid = bids.firstWhere(
+      (b) => b['id'] == bidId && b['post_id'] == postId,
+      orElse: () => {},
     );
-    return;
-  }
-  debugPrint('Bid details: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, bid_amount=${bid['my_bid_amount']}, target_price=${bid['targetPrice']}');
-
-  final meetingTimes = await _fetchMeetingTimes();
-  if (meetingTimes.isEmpty) {
-    debugPrint('No meeting times available');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No meeting times available')),
+    if (bid.isEmpty) {
+      debugPrint(
+        'Invalid bid: bid_id=$bidId, post_id=$postId not found in bids list',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Invalid bid or post ID')),
+      );
+      return;
+    }
+    debugPrint(
+      'Bid details: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, bid_amount=${bid['my_bid_amount']}, target_price=${bid['targetPrice']}',
     );
-    return;
-  }
 
-  String? selectedTimeValue;
-  String? selectedTimeName;
+    final meetingTimes = await _fetchMeetingTimes();
+    if (meetingTimes.isEmpty) {
+      debugPrint('No meeting times available');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No meeting times available')),
+      );
+      return;
+    }
 
-  await showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Text('Select Meeting Time'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButton<String>(
-              isExpanded: true,
-              value: selectedTimeValue,
-              hint: const Text('Choose a time'),
-              items: meetingTimes.map((time) {
-                return DropdownMenuItem<String>(
-                  value: time['value'],
-                  child: Text(time['name']!),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedTimeValue = value;
-                  selectedTimeName = meetingTimes.firstWhere(
-                    (time) => time['value'] == value,
-                    orElse: () => {'name': ''},
-                  )['name'];
-                  debugPrint('Selected time: $selectedTimeName ($selectedTimeValue)');
-                });
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              debugPrint('Time dialog cancelled');
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: selectedTimeValue == null
-                ? null
-                : () async {
-                    debugPrint('Submitting meeting time: $selectedTimeValue for bid_id: $bidId');
-                    try {
-                      final userIdToUse = widget.userId ?? _userId;
-                      final requestUrl =
-                          '${widget.baseUrl}/procced-meeting-with-bid.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId&customerbid_id=$bidId&meeting_times=$selectedTimeValue';
-                      debugPrint('Request URL: $requestUrl');
-                      final response = await http.get(
-                        Uri.parse(requestUrl),
-                        headers: {
-                          'token': widget.token,
-                          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+    String? selectedTimeValue;
+    String? selectedTimeName;
+
+    await showDialog(
+      context: context,
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('Select Meeting Time'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedTimeValue,
+                        hint: const Text('Choose a time'),
+                        items:
+                            meetingTimes.map((time) {
+                              return DropdownMenuItem<String>(
+                                value: time['value'],
+                                child: Text(time['name']!),
+                              );
+                            }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedTimeValue = value;
+                            selectedTimeName =
+                                meetingTimes.firstWhere(
+                                  (time) => time['value'] == value,
+                                  orElse: () => {'name': ''},
+                                )['name'];
+                            debugPrint(
+                              'Selected time: $selectedTimeName ($selectedTimeValue)',
+                            );
+                          });
                         },
-                      );
-                      debugPrint('procced-meeting-with-bid.php response: ${response.body}');
-                      if (response.statusCode == 200) {
-                        final data = jsonDecode(response.body);
-                        if (data['status'] == true || data['status'] == 'true') {
-                          if (data['code'] == 2) {
-                            debugPrint('Bid not found for bid_id: $bidId');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Error: Bid not found on server')),
-                            );
-                          } else if (data['code'] == 1) {
-                            debugPrint('Post not found for post_id: $postId');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Error: Post not found')),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Meeting scheduled for $selectedTimeName')),
-                            );
-                            await _loadBids(); // Refresh bids
-                            // Notify MyMeetingsWidget to refresh (if integrated)
-                            debugPrint('Meeting scheduled, refreshing meetings recommended');
-                          }
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text(
-                                    'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}')),
-                          );
-                        }
-                      } else {
-                        debugPrint(
-                            'procced-meeting-with-bid.php failed with status ${response.statusCode}');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Failed to schedule meeting')),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Error scheduling meeting with bid: $e');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Error scheduling meeting')),
-                      );
-                    }
-                    Navigator.pop(dialogContext);
-                  },
-            child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        debugPrint('Time dialog cancelled');
+                        Navigator.pop(dialogContext);
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          selectedTimeValue == null
+                              ? null
+                              : () async {
+                                debugPrint(
+                                  'Submitting meeting time: $selectedTimeValue for bid_id: $bidId',
+                                );
+                                try {
+                                  final userIdToUse = widget.userId ?? _userId;
+                                  final requestUrl =
+                                      '${widget.baseUrl}/procced-meeting-with-bid.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId&customerbid_id=$bidId&meeting_times=$selectedTimeValue';
+                                  debugPrint('Request URL: $requestUrl');
+                                  final response = await http.get(
+                                    Uri.parse(requestUrl),
+                                    headers: {
+                                      'token': widget.token,
+                                      'Cookie':
+                                          'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+                                    },
+                                  );
+                                  debugPrint(
+                                    'procced-meeting-with-bid.php response: ${response.body}',
+                                  );
+                                  if (response.statusCode == 200) {
+                                    final data = jsonDecode(response.body);
+                                    if (data['status'] == true ||
+                                        data['status'] == 'true') {
+                                      if (data['code'] == 2) {
+                                        debugPrint(
+                                          'Bid not found for bid_id: $bidId',
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Error: Bid not found on server',
+                                            ),
+                                          ),
+                                        );
+                                      } else if (data['code'] == 1) {
+                                        debugPrint(
+                                          'Post not found for post_id: $postId',
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Error: Post not found',
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Meeting scheduled for $selectedTimeName',
+                                            ),
+                                          ),
+                                        );
+                                        await _loadBids(); // Refresh bids
+                                        // Notify MyMeetingsWidget to refresh (if integrated)
+                                        debugPrint(
+                                          'Meeting scheduled, refreshing meetings recommended',
+                                        );
+                                      }
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    debugPrint(
+                                      'procced-meeting-with-bid.php failed with status ${response.statusCode}',
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Failed to schedule meeting',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  debugPrint(
+                                    'Error scheduling meeting with bid: $e',
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Error scheduling meeting'),
+                                    ),
+                                  );
+                                }
+                                Navigator.pop(dialogContext);
+                              },
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
           ),
-        ],
-      ),
-    ),
-  );
-}
+    );
+  }
+
   Future<void> _proceedWithoutBid(BuildContext context, String postId) async {
     final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
     try {
@@ -479,115 +543,129 @@ Future<void> _proceedWithBid(BuildContext context, String bidId, String postId) 
     );
   }
 
-Future<void> _loadBids() async {
-  setState(() {
-    isLoading = true;
-    error = null;
-  });
-
-  if (_userId == null || _userId == 'Unknown') {
+  Future<void> _loadBids() async {
     setState(() {
-      isLoading = false;
-      error = 'Please log in to view your bids';
+      isLoading = true;
+      error = null;
     });
-    return;
-  }
 
-  try {
-    final headers = {
-      'token': widget.token,
-      'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
-    };
-
-    List<Map<String, dynamic>> allBids = [];
-
-    final lowBidsResponse = await http.get(
-      Uri.parse('${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId'),
-      headers: headers,
-    );
-
-    debugPrint('my-bids-low.php status: ${lowBidsResponse.statusCode}');
-    debugPrint('my-bids-low.php response: ${lowBidsResponse.body}');
-
-    if (lowBidsResponse.statusCode == 200) {
-      final lowBidsData = jsonDecode(lowBidsResponse.body);
-      if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
-        final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
-        for (var bid in lowBids) {
-          bid['fromLowBids'] = true;
-          allBids.add(bid);
-        }
-        debugPrint('Low bids fetched: ${lowBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
-      }
+    if (_userId == null || _userId == 'Unknown') {
+      setState(() {
+        isLoading = false;
+        error = 'Please log in to view your bids';
+      });
+      return;
     }
 
-    final highBidsResponse = await http.get(
-      Uri.parse('${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId'),
-      headers: headers,
-    );
+    try {
+      final headers = {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+      };
 
-    debugPrint('my-bids-high.php status: ${highBidsResponse.statusCode}');
-    debugPrint('my-bids-high.php response: ${highBidsResponse.body}');
+      List<Map<String, dynamic>> allBids = [];
 
-    if (highBidsResponse.statusCode == 200) {
-      final highBidsData = jsonDecode(highBidsResponse.body);
-      if (highBidsData['status'] == true && highBidsData['data'] is List) {
-        final highBids = List<Map<String, dynamic>>.from(highBidsData['data']);
-        for (var bid in highBids) {
-          bid['fromHighBids'] = true;
-          allBids.add(bid);
+      final lowBidsResponse = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId',
+        ),
+        headers: headers,
+      );
+
+      debugPrint('my-bids-low.php status: ${lowBidsResponse.statusCode}');
+      debugPrint('my-bids-low.php response: ${lowBidsResponse.body}');
+
+      if (lowBidsResponse.statusCode == 200) {
+        final lowBidsData = jsonDecode(lowBidsResponse.body);
+        if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
+          final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
+          for (var bid in lowBids) {
+            bid['fromLowBids'] = true;
+            allBids.add(bid);
+          }
           debugPrint(
-              'High bid: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, my_bid_amount=${bid['my_bid_amount']}, exp_date=${bid['exp_date']}');
+            'Low bids fetched: ${lowBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
+          );
         }
-        debugPrint('High bids fetched: ${highBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
-      }
-    }
-
-    debugPrint('Total bids fetched: ${allBids.length}');
-
-    for (var bid in allBids) {
-      debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
-
-      final postDetails = await _fetchPostDetails(bid['post_id']);
-      if (postDetails == null) {
-        debugPrint('Skipping bid ${bid['id']} due to missing post details');
-        continue;
       }
 
-      bid['title'] = postDetails['title'];
-      bid['carImage'] = postDetails['image'];
-      bid['targetPrice'] = postDetails['price'];
-      bid['location'] = postDetails['location'];
-      bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
-      bid['appId'] = 'APP_${bid['post_id']}';
-      bid['bidPrice'] = bid['my_bid_amount']?.toString() ?? '0';
-      bid['expirationDate'] = bid['exp_date']?.toString() ?? 'N/A';
-      bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
-      bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
+      final highBidsResponse = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId',
+        ),
+        headers: headers,
+      );
 
-      debugPrint('Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}');
+      debugPrint('my-bids-high.php status: ${highBidsResponse.statusCode}');
+      debugPrint('my-bids-high.php response: ${highBidsResponse.body}');
+
+      if (highBidsResponse.statusCode == 200) {
+        final highBidsData = jsonDecode(highBidsResponse.body);
+        if (highBidsData['status'] == true && highBidsData['data'] is List) {
+          final highBids = List<Map<String, dynamic>>.from(
+            highBidsData['data'],
+          );
+          for (var bid in highBids) {
+            bid['fromHighBids'] = true;
+            allBids.add(bid);
+            debugPrint(
+              'High bid: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, my_bid_amount=${bid['my_bid_amount']}, exp_date=${bid['exp_date']}',
+            );
+          }
+          debugPrint(
+            'High bids fetched: ${highBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
+          );
+        }
+      }
+
+      debugPrint('Total bids fetched: ${allBids.length}');
+
+      for (var bid in allBids) {
+        debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
+
+        final postDetails = await _fetchPostDetails(bid['post_id']);
+        if (postDetails == null) {
+          debugPrint('Skipping bid ${bid['id']} due to missing post details');
+          continue;
+        }
+
+        bid['title'] = postDetails['title'];
+        bid['carImage'] = postDetails['image'];
+        bid['targetPrice'] = postDetails['price'];
+        bid['location'] = postDetails['location'];
+        bid['store'] =
+            postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
+        bid['appId'] = 'APP_${bid['post_id']}';
+        bid['bidPrice'] = bid['my_bid_amount']?.toString() ?? '0';
+        bid['expirationDate'] = bid['exp_date']?.toString() ?? 'N/A';
+        bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
+        bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
+
+        debugPrint(
+          'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}',
+        );
+      }
+
+      // final prefs = await SharedPreferences.getInstance();
+      // await prefs.setStringList(
+      //   'userBids',
+      //   allBids.map((b) => jsonEncode(b)).toList(),
+      // );
+
+      setState(() {
+        bids = allBids;
+        isLoading = false;
+      });
+
+      debugPrint('Bids loaded successfully: ${bids.length} items');
+    } catch (e) {
+      debugPrint('Error loading bids: $e');
+      setState(() {
+        isLoading = false;
+        error = 'Error loading bids: $e';
+      });
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      'userBids',
-      allBids.map((b) => jsonEncode(b)).toList(),
-    );
-
-    setState(() {
-      bids = allBids;
-      isLoading = false;
-    });
-
-    debugPrint('Bids loaded successfully: ${bids.length} items');
-  } catch (e) {
-    debugPrint('Error loading bids: $e');
-    setState(() {
-      isLoading = false;
-      error = 'Error loading bids: $e';
-    });
   }
-}
 
   List<Map<String, dynamic>> _getFilteredBids() {
     return bids.where((bid) {

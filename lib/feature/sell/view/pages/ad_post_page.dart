@@ -6,15 +6,14 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
+
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/core/utils/districts.dart';
+
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class Brand {
   final String id;

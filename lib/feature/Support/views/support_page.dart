@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:intl/intl.dart';
 
 class SupportTicketPage extends StatefulWidget {
@@ -20,7 +20,7 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   final String baseUrl = "https://lelamonline.com/admin/api/v1";
   String token = "5cb2c9b569416b5db1604e0e12478ded";
   List<dynamic> tickets = [];
- // bool isLoading = true;
+  // bool isLoading = true;
 
   @override
   void initState() {
@@ -54,12 +54,16 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
 
   // Safely parses JSON response for ticket list
   List<dynamic> _parseJsonSafely(String body) {
-    String cleanBody = body
-        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
-        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
-        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
-        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
-        .trim();
+    String cleanBody =
+        body
+            .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+            .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+            .replaceAll(
+              RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'),
+              '',
+            )
+            .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+            .trim();
     if (kDebugMode) print('Cleaned Body (List): $cleanBody');
     try {
       final parsed = jsonDecode(cleanBody);
@@ -76,12 +80,16 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
 
   // Safely parses JSON response for ticket creation
   Map<String, dynamic> _parseJsonMapSafely(String body) {
-    String cleanBody = body
-        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
-        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
-        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
-        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
-        .trim();
+    String cleanBody =
+        body
+            .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+            .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+            .replaceAll(
+              RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'),
+              '',
+            )
+            .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+            .trim();
     if (kDebugMode) print('Cleaned Body (Map): $cleanBody');
     try {
       final parsed = jsonDecode(cleanBody);
@@ -94,9 +102,8 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
     }
   }
 
-
   // Future<void> _fetchTickets() async {
-  
+
   //   if (widget.userId.isEmpty) {
   //     if (mounted) {
   //       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,7 +113,7 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   //     setState(() => isLoading = false);
   //     return;
   //   }
-   
+
   //   final url = Uri.parse(
   //     '$baseUrl/support-ticket-list.php?token=$token&user_id=${widget.userId}',
   //   );
@@ -159,7 +166,6 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   //   final subjectController = TextEditingController();
   //   final mobileController = TextEditingController();
   //   final messageController = TextEditingController();
-
 
   //   showDialog(
   //     context: context,
@@ -356,58 +362,59 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
   void _showTicketCreatedCard(String ticketId, String subject, String date) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        content: Card(
-          elevation: 4,
-          color: Colors.green[50],
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 48,
+      builder:
+          (context) => AlertDialog(
+            content: Card(
+              elevation: 4,
+              color: Colors.green[50],
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Ticket Created Successfully!',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text('Ticket ID: $ticketId'),
+                    const SizedBox(height: 4),
+                    Text('Subject: $subject'),
+                    const SizedBox(height: 4),
+                    Text('Date: $date'),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showChatDialog(ticketId, subject, widget.userId);
+                        },
+                        icon: const Icon(Icons.chat),
+                        label: const Text('Open Chat'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Ticket Created Successfully!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text('Ticket ID: $ticketId'),
-                const SizedBox(height: 4),
-                Text('Subject: $subject'),
-                const SizedBox(height: 4),
-                Text('Date: $date'),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showChatDialog(ticketId, subject, widget.userId);
-                    },
-                    icon: const Icon(Icons.chat),
-                    label: const Text('Open Chat'),
-                  ),
-                ),
-              ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -419,14 +426,15 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
     );
     showDialog(
       context: context,
-      builder: (context) => ChatDialog(
-        baseUrl: baseUrl,
-        token: token,
-        ticketId: ticketId,
-        ticketName: ticketName,
-        userId: userId,
-        initialMessage: ticket['msg'] ?? 'No Message',
-      ),
+      builder:
+          (context) => ChatDialog(
+            baseUrl: baseUrl,
+            token: token,
+            ticketId: ticketId,
+            ticketName: ticketName,
+            userId: userId,
+            initialMessage: ticket['msg'] ?? 'No Message',
+          ),
     );
   }
 
@@ -453,69 +461,63 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Padding(
-  padding: const EdgeInsets.all(16.0),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      // New Ticket button
-      // Expanded(
-      //   child: ElevatedButton.icon(
-      //     onPressed: _showAddTicketDialog,
-      //     icon: const Icon(Icons.add),
-      //     label: const Text('New Ticket'),
-      //     style: ElevatedButton.styleFrom(
-      //       backgroundColor: Theme.of(context).primaryColor,
-      //       foregroundColor: Colors.white,
-      //       padding: const EdgeInsets.symmetric(vertical: 12),
-      //     ),
-      //   ),
-      // ),
-      
-      const SizedBox(height: 10),
-      
-      // WhatsApp Support button
-      ElevatedButton.icon(
-        onPressed: _launchWhatsApp,
-        icon: const Icon(Icons.chat_bubble),
-        label: const Text('WhatsApp Support'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-      
-      const SizedBox(height: 10),
-      
-      // Chat with Seller button
-      ElevatedButton.icon(
-        onPressed: () async {
-          final prefs = await SharedPreferences.getInstance();
-          final sessionId = prefs.getString('session_id') ?? '';
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // New Ticket button
+                // Expanded(
+                //   child: ElevatedButton.icon(
+                //     onPressed: _showAddTicketDialog,
+                //     icon: const Icon(Icons.add),
+                //     label: const Text('New Ticket'),
+                //     style: ElevatedButton.styleFrom(
+                //       backgroundColor: Theme.of(context).primaryColor,
+                //       foregroundColor: Colors.white,
+                //       padding: const EdgeInsets.symmetric(vertical: 12),
+                //     ),
+                //   ),
+                // ),
+                const SizedBox(height: 10),
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatListPage(
-                userId: widget.userId,
-                sessionId: sessionId,
-              ),
+                // WhatsApp Support button
+                ElevatedButton.icon(
+                  onPressed: _launchWhatsApp,
+                  icon: const Icon(Icons.chat_bubble),
+                  label: const Text('WhatsApp Support'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Chat with Seller button
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => ChatListPage(userId: widget.userId),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.chat),
+                  label: const Text('Chat with Seller'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ],
             ),
-          );
-        },
-        icon: const Icon(Icons.chat),
-        label: const Text('Chat with Seller'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-      ),
-    ],
-  ),
-),
+          ),
 
-         // const Divider(height: 1),
+          // const Divider(height: 1),
           // Expanded(
           //   child: isLoading
           //       ? const Center(child: CircularProgressIndicator())
@@ -539,11 +541,10 @@ class _SupportTicketPageState extends State<SupportTicketPage> {
           //               itemCount: tickets.length,
           //               itemBuilder: (context, index) {
           //                 final ticket = tickets[index];
-                
+
           //                 final status = ticket['status'] == '0' ? 'Open' : 'Closed';
           //                 Color statusColor = status == 'Open' ? Colors.blue : Colors.green;
 
-                          
           //                 // return Card(
           //                 //   margin: const EdgeInsets.only(bottom: 12.0),
           //                 //   elevation: 4,
@@ -664,12 +665,16 @@ class _ChatDialogState extends State<ChatDialog> {
 
   // Safely parses JSON response for comments
   List<dynamic> _parseJsonSafely(String body) {
-    String cleanBody = body
-        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
-        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
-        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
-        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
-        .trim();
+    String cleanBody =
+        body
+            .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+            .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+            .replaceAll(
+              RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'),
+              '',
+            )
+            .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+            .trim();
     if (kDebugMode) print('Cleaned Body (Comments): $cleanBody');
     try {
       final parsed = jsonDecode(cleanBody);
@@ -745,9 +750,9 @@ class _ChatDialogState extends State<ChatDialog> {
     } catch (e) {
       if (kDebugMode) print('Error fetching comments: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching comments: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching comments: $e')));
       }
     }
   }
@@ -757,9 +762,9 @@ class _ChatDialogState extends State<ChatDialog> {
     final comment = commentController.text.trim();
     if (comment.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a reply')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please enter a reply')));
       }
       return;
     }
@@ -809,9 +814,9 @@ class _ChatDialogState extends State<ChatDialog> {
     } catch (e) {
       if (kDebugMode) print('Error sending reply: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending reply: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sending reply: $e')));
       }
     } finally {
       if (mounted) {
@@ -849,106 +854,123 @@ class _ChatDialogState extends State<ChatDialog> {
                   color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: comments.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No messages yet. Start the conversation!',
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(12.0),
-                        itemCount: comments.length,
-                        itemBuilder: (context, index) {
-                          final comment = comments[index];
-                          final isUser = comment['isUser'] ?? false;
-                          final timestamp = comment['timestamp'] == 'Initial Message'
-                              ? comment['timestamp']
-                              : DateFormat('MMM d, yyyy HH:mm').format(
-                                  DateTime.parse(
-                                    comment['timestamp'] ?? DateTime.now().toString(),
-                                  ),
-                                );
+                child:
+                    comments.isEmpty
+                        ? const Center(
+                          child: Text(
+                            'No messages yet. Start the conversation!',
+                          ),
+                        )
+                        : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(12.0),
+                          itemCount: comments.length,
+                          itemBuilder: (context, index) {
+                            final comment = comments[index];
+                            final isUser = comment['isUser'] ?? false;
+                            final timestamp =
+                                comment['timestamp'] == 'Initial Message'
+                                    ? comment['timestamp']
+                                    : DateFormat('MMM d, yyyy HH:mm').format(
+                                      DateTime.parse(
+                                        comment['timestamp'] ??
+                                            DateTime.now().toString(),
+                                      ),
+                                    );
 
-                          return Align(
-                            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(
-                                vertical: 6.0,
-                                horizontal: 8.0,
-                              ),
-                              constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.7,
-                              ),
-                              child: Card(
-                                elevation: 2,
-                                color: isUser ? Colors.blue[50] : Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: isUser ? Colors.blue[200]! : Colors.grey[300]!,
-                                  ),
+                            return Align(
+                              alignment:
+                                  isUser
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 6.0,
+                                  horizontal: 8.0,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-                                        children: [
-                                          if (!isUser)
-                                            CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.blue,
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.7,
+                                ),
+                                child: Card(
+                                  elevation: 2,
+                                  color:
+                                      isUser ? Colors.blue[50] : Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color:
+                                          isUser
+                                              ? Colors.blue[200]!
+                                              : Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          isUser
+                                              ? CrossAxisAlignment.end
+                                              : CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              isUser
+                                                  ? MainAxisAlignment.end
+                                                  : MainAxisAlignment.start,
+                                          children: [
+                                            if (!isUser)
+                                              CircleAvatar(
+                                                radius: 16,
+                                                backgroundColor: Colors.blue,
+                                                child: Text(
+                                                  'S',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
                                               child: Text(
-                                                'S',
-                                                style: TextStyle(
-                                                  color: Colors.white,
+                                                comment['comment'] ??
+                                                    'No Comment',
+                                                style: const TextStyle(
+                                                  fontSize: 14,
                                                 ),
                                               ),
                                             ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              comment['comment'] ?? 'No Comment',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          if (isUser) const SizedBox(width: 8),
-                                          if (isUser)
-                                            CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.green,
-                                              child: Text(
-                                                'U',
-                                                style: TextStyle(
-                                                  color: Colors.white,
+                                            if (isUser)
+                                              const SizedBox(width: 8),
+                                            if (isUser)
+                                              CircleAvatar(
+                                                radius: 16,
+                                                backgroundColor: Colors.green,
+                                                child: Text(
+                                                  'U',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        timestamp,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          timestamp,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                            );
+                          },
+                        ),
               ),
             ),
             const Divider(height: 1),
@@ -984,22 +1006,23 @@ class _ChatDialogState extends State<ChatDialog> {
                       onTap: isSending ? null : _sendReply,
                       child: Container(
                         padding: const EdgeInsets.all(12),
-                        child: isSending
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                        child:
+                            isSending
+                                ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
+                                )
+                                : const Icon(
+                                  Icons.send,
+                                  color: Colors.white,
+                                  size: 24,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.send,
-                                color: Colors.white,
-                                size: 24,
-                              ),
                       ),
                     ),
                   ),

@@ -118,7 +118,7 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.mainscaffold,
       builder: (context, state) {
         final loggedUser = context.watch<LoggedUserProvider>();
-        return MainScaffold(userId: loggedUser.userData?.userId ?? '');
+        return MainScaffold();
       },
     ),
 

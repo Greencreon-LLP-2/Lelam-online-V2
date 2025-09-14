@@ -1,15 +1,14 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:provider/provider.dart';
 
 class ExpiredMeetingsPage extends StatefulWidget {
-  final String? userId;
-
-  const ExpiredMeetingsPage({super.key, required this.userId});
+  const ExpiredMeetingsPage({super.key});
 
   @override
   _ExpiredMeetingsPageState createState() => _ExpiredMeetingsPageState();
@@ -19,19 +18,21 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   String token = "5cb2c9b569416b5db1604e0e12478ded";
   List<dynamic> meetings = [];
   bool isLoading = true;
+  String? userId; // Add userId variable
+  late final LoggedUserProvider userProvider;
 
   @override
   void initState() {
     super.initState();
-    if (kDebugMode) print('User ID: ${widget.userId}');
+    userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _loadConfigAndFetchMeetings();
   }
 
-
   Future<void> _loadConfigAndFetchMeetings() async {
-    final prefs = await SharedPreferences.getInstance();
+    final userData = userProvider.userData;
     setState(() {
-      token = prefs.getString('auth_token') ?? token;
+     // token = userData?.authToken ?? token; // Adjust field name as needed
+      userId = userData?.userId ?? 'Unknown'; // Adjust field name as needed
       isLoading = true;
     });
 
@@ -41,6 +42,16 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
           const SnackBar(
             content: Text('Authentication token missing. Please log in again.'),
           ),
+        );
+      }
+      setState(() => isLoading = false);
+      return;
+    }
+
+    if (userId == null || userId == 'Unknown') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User ID is required')),
         );
       }
       setState(() => isLoading = false);
@@ -72,18 +83,8 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   }
 
   Future<void> _fetchMeetings() async {
-    if (widget.userId!.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID is required')),
-        );
-      }
-      setState(() => isLoading = false);
-      return;
-    }
-
     final url = Uri.parse(
-      '$baseUrl/my-meeting-expired.php?token=$token&user_id=${widget.userId}',
+      '$baseUrl/my-meeting-expired.php?token=$token&user_id=$userId',
     );
     if (kDebugMode) print('Fetching expired meetings from: $url');
     try {
@@ -129,7 +130,6 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : meetings.isEmpty

@@ -27,5 +27,9 @@ class LoggedUserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? get userId =>
+      _userData != null && _userData!.userId.isNotEmpty
+          ? _userData!.userId
+          : '';
   bool get isLoggedIn => _userData != null && _userData!.userId.isNotEmpty;
 }

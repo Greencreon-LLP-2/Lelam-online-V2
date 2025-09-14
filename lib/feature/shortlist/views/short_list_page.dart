@@ -3,24 +3,23 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart'
     show MarketplacePost;
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import '../../categories/services/used_cars_service.dart'
-    hide MarketplaceService;
+import 'package:provider/provider.dart';
 
 class ShortListPage extends StatefulWidget {
-  final String? userId;
-  const ShortListPage({super.key, this.userId});
+  const ShortListPage({super.key, String? userId});
 
   @override
   State<ShortListPage> createState() => _ShortListPageState();
@@ -35,7 +34,7 @@ class _ShortListPageState extends State<ShortListPage> {
   String? errorMessage;
   String? userId;
   final MarketplaceService _marketplaceService = MarketplaceService();
-  final LocationService _locationService = LocationService();
+
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;
 
@@ -60,30 +59,50 @@ class _ShortListPageState extends State<ShortListPage> {
   }
 
   Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    final userData = userProvider.userData;
     setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+      userId = userData?.userId ?? 'Unknown';
+      debugPrint('ShortListPage - Loaded userId: $userId');
+      if (userId == 'Unknown') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User ID not found. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     });
-    debugPrint('ShortListPage - Loaded userId: $userId');
   }
 
   Future<void> _fetchLocations() async {
     setState(() {
       _isLoadingLocations = true;
     });
+
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
         });
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Invalid API response format');
       }
     } catch (e) {
       setState(() {
-        errorMessage = 'Error loading locations: $e';
         _isLoadingLocations = false;
       });
     }
@@ -134,9 +153,6 @@ class _ShortListPageState extends State<ShortListPage> {
               isLoading = false;
             });
 
-            // Cache in SharedPreferences
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('shortlist_$userId', responseBody);
             debugPrint(
               'Shortlisted items cached: ${shortlistedProducts.length} items',
             );
@@ -162,43 +178,6 @@ class _ShortListPageState extends State<ShortListPage> {
         errorMessage = 'Error loading shortlist: $e';
         isLoading = false;
       });
-
-      // Fallback to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      final cachedShortlist = prefs.getString('shortlist_$userId');
-      if (cachedShortlist != null) {
-        try {
-          final responseData = jsonDecode(cachedShortlist);
-          if (responseData['status'] == 'true' &&
-              responseData['data'] is List) {
-            shortlistData = List<Map<String, dynamic>>.from(
-              responseData['data'],
-            );
-            final postIds =
-                shortlistData
-                    .map<String>((item) => item['post_id'].toString())
-                    .toList();
-            final products = await _fetchProductsForPostIds(postIds);
-            setState(() {
-              shortlistedProducts = products;
-              isLoading = false;
-            });
-            debugPrint('Loaded ${shortlistedProducts.length} items from cache');
-          } else {
-            setState(() {
-              shortlistedProducts = [];
-              shortlistData = [];
-              isLoading = false;
-            });
-          }
-        } catch (e) {
-          debugPrint('Error parsing cached shortlist: $e');
-          setState(() {
-            errorMessage = 'Error loading cached shortlist';
-            isLoading = false;
-          });
-        }
-      }
     }
   }
 
@@ -229,6 +208,7 @@ class _ShortListPageState extends State<ShortListPage> {
             [
               ...marketplacePosts,
               ...auctionPosts,
+              // ignore: unnecessary_null_comparison
             ].where((post) => post != null).cast<MarketplacePost>().toList();
 
         // Find matching post
@@ -272,7 +252,10 @@ class _ShortListPageState extends State<ShortListPage> {
                 visiterCount: '',
                 ifSold: '',
                 ifExpired: '',
-                updatedOn: '', ifOfferPrice: '', offerPrice: '', ifVerifyed: '',
+                updatedOn: '',
+                ifOfferPrice: '',
+                offerPrice: '',
+                ifVerifyed: '',
               ),
         );
         products.add(matchingPost.toProduct());
@@ -335,7 +318,6 @@ class _ShortListPageState extends State<ShortListPage> {
             builder:
                 (context) => MarketPlaceProductDetailsPage(
                   product: product,
-                  userId: userId,
                   isAuction: isAuction,
                 ),
           ),
@@ -353,10 +335,7 @@ class _ShortListPageState extends State<ShortListPage> {
               Container(
                 width: 100,
                 height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  // borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: Colors.grey.shade200),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
@@ -429,7 +408,6 @@ class _ShortListPageState extends State<ShortListPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        // centerTitle: true,
         toolbarHeight: 50,
         title: const Text("Shortlist"),
         backgroundColor: AppTheme.primaryColor,

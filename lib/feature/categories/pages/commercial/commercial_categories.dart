@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_details_page.dart';
-
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 class MarketplacePost {
@@ -94,7 +94,8 @@ class MarketplacePost {
       if (value is String) {
         try {
           final decoded = jsonDecode(value);
-          if (decoded is List) return List<String>.from(decoded.map((e) => e.toString()));
+          if (decoded is List)
+            return List<String>.from(decoded.map((e) => e.toString()));
         } catch (e) {
           return value.split(',').map((e) => e.trim()).toList();
         }
@@ -106,7 +107,9 @@ class MarketplacePost {
       if (value == null) return {};
       if (value is Map) {
         return Map<String, List<String>>.from(
-          value.map((key, value) => MapEntry(key.toString(), parseStringList(value))),
+          value.map(
+            (key, value) => MapEntry(key.toString(), parseStringList(value)),
+          ),
         );
       }
       if (value is String) {
@@ -114,7 +117,10 @@ class MarketplacePost {
           final decoded = jsonDecode(value);
           if (decoded is Map) {
             return Map<String, List<String>>.from(
-              decoded.map((key, value) => MapEntry(key.toString(), parseStringList(value))),
+              decoded.map(
+                (key, value) =>
+                    MapEntry(key.toString(), parseStringList(value)),
+              ),
             );
           }
         } catch (e) {
@@ -174,7 +180,8 @@ class MarketplaceService {
     required String categoryId,
     required String userZoneId,
   }) async {
-    final url = '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+    final url =
+        '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
@@ -206,8 +213,7 @@ class MarketplaceService {
 }
 
 class CommercialVehiclesPage extends StatefulWidget {
-  final String? userId;
-  const CommercialVehiclesPage({super.key, this.userId});
+  const CommercialVehiclesPage({super.key});
 
   @override
   State<CommercialVehiclesPage> createState() => _CommercialVehiclesPageState();
@@ -216,14 +222,14 @@ class CommercialVehiclesPage extends StatefulWidget {
 class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  List<String> _selectedVehicleTypes = [];
+  final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
-  List<String> _selectedFuelTypes = [];
+  final List<String> _selectedFuelTypes = [];
 
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
-  final LocationService _locationService = LocationService();
+
   List<MarketplacePost> _posts = [];
   List<LocationData> _locations = [];
   bool _isLoading = true;
@@ -259,17 +265,28 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   }
 
   Future<void> _fetchLocations() async {
-    setState(() => _isLoadingLocations = true);
+    setState(() {
+      _isLoadingLocations = true;
+      _errorMessage = null;
+    });
+
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print('Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}');
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
         });
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Invalid API response format');
       }
     } catch (e) {
       setState(() {
@@ -334,58 +351,82 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((post) {
-        final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first.toLowerCase() : '';
-        return post.title.toLowerCase().contains(query) ||
-            post.brand.toLowerCase().contains(query) ||
-            vehicleType.contains(query) ||
-            post.landMark.toLowerCase().contains(query);
-      }).toList();
+      filtered =
+          filtered.where((post) {
+            final vehicleType =
+                post.filters['type']?.isNotEmpty ?? false
+                    ? post.filters['type']!.first.toLowerCase()
+                    : '';
+            return post.title.toLowerCase().contains(query) ||
+                post.brand.toLowerCase().contains(query) ||
+                vehicleType.contains(query) ||
+                post.landMark.toLowerCase().contains(query);
+          }).toList();
     }
 
     if (_selectedLocation != 'all') {
-      filtered = filtered.where((post) => post.userZoneId == _selectedLocation || post.parentZoneId == _selectedLocation).toList();
+      filtered =
+          filtered
+              .where(
+                (post) =>
+                    post.userZoneId == _selectedLocation ||
+                    post.parentZoneId == _selectedLocation,
+              )
+              .toList();
     }
 
     if (_selectedVehicleTypes.isNotEmpty) {
-      filtered = filtered.where((post) {
-        final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first : '';
-        return _selectedVehicleTypes.contains(vehicleType);
-      }).toList();
+      filtered =
+          filtered.where((post) {
+            final vehicleType =
+                post.filters['type']?.isNotEmpty ?? false
+                    ? post.filters['type']!.first
+                    : '';
+            return _selectedVehicleTypes.contains(vehicleType);
+          }).toList();
     }
 
     if (_selectedPriceRange != 'all') {
-      filtered = filtered.where((post) {
-        int price = int.tryParse(post.price) ?? 0;
-        switch (_selectedPriceRange) {
-          case 'Under 5L':
-            return price < 500000;
-          case '5L-10L':
-            return price >= 500000 && price < 1000000;
-          case '10L-20L':
-            return price >= 1000000 && price < 2000000;
-          case '20L-50L':
-            return price >= 2000000 && price < 5000000;
-          case 'Above 50L':
-            return price >= 5000000;
-          default:
-            return true;
-        }
-      }).toList();
+      filtered =
+          filtered.where((post) {
+            int price = int.tryParse(post.price) ?? 0;
+            switch (_selectedPriceRange) {
+              case 'Under 5L':
+                return price < 500000;
+              case '5L-10L':
+                return price >= 500000 && price < 1000000;
+              case '10L-20L':
+                return price >= 1000000 && price < 2000000;
+              case '20L-50L':
+                return price >= 2000000 && price < 5000000;
+              case 'Above 50L':
+                return price >= 5000000;
+              default:
+                return true;
+            }
+          }).toList();
     }
 
     if (_selectedCondition != 'all') {
-      filtered = filtered.where((post) {
-        final condition = post.filters['condition']?.isNotEmpty ?? false ? post.filters['condition']!.first : '';
-        return condition == _selectedCondition;
-      }).toList();
+      filtered =
+          filtered.where((post) {
+            final condition =
+                post.filters['condition']?.isNotEmpty ?? false
+                    ? post.filters['condition']!.first
+                    : '';
+            return condition == _selectedCondition;
+          }).toList();
     }
 
     if (_selectedFuelTypes.isNotEmpty) {
-      filtered = filtered.where((post) {
-        final fuel = post.filters['fuel']?.isNotEmpty ?? false ? post.filters['fuel']!.first : '';
-        return _selectedFuelTypes.contains(fuel);
-      }).toList();
+      filtered =
+          filtered.where((post) {
+            final fuel =
+                post.filters['fuel']?.isNotEmpty ?? false
+                    ? post.filters['fuel']!.first
+                    : '';
+            return _selectedFuelTypes.contains(fuel);
+          }).toList();
     }
 
     return filtered;
@@ -396,119 +437,166 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.85,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filter Vehicles',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setModalState) => Container(
+                  height: MediaQuery.of(context).size.height * 0.85,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          _selectedVehicleTypes.clear();
-                          _selectedPriceRange = 'all';
-                          _selectedCondition = 'all';
-                          _selectedFuelTypes.clear();
-                        });
-                      },
-                      child: const Text(
-                        'Clear All',
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMultiSelectFilterSection('Vehicle Type', _vehicleTypes, _selectedVehicleTypes, setModalState),
-                      _buildSingleSelectFilterSection(
-                        'Price Range',
-                        _priceRanges,
-                        _selectedPriceRange,
-                        (value) => setModalState(() => _selectedPriceRange = value),
-                        subtitle: 'Filter by sale price',
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                      _buildSingleSelectFilterSection('Condition', _conditions, _selectedCondition, (value) => setModalState(() => _selectedCondition = value)),
-                      _buildMultiSelectFilterSection('Fuel Type', _fuelTypes, _selectedFuelTypes, setModalState),
-                      const SizedBox(height: 100),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Filter Vehicles',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  _selectedVehicleTypes.clear();
+                                  _selectedPriceRange = 'all';
+                                  _selectedCondition = 'all';
+                                  _selectedFuelTypes.clear();
+                                });
+                              },
+                              child: const Text(
+                                'Clear All',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildMultiSelectFilterSection(
+                                'Vehicle Type',
+                                _vehicleTypes,
+                                _selectedVehicleTypes,
+                                setModalState,
+                              ),
+                              _buildSingleSelectFilterSection(
+                                'Price Range',
+                                _priceRanges,
+                                _selectedPriceRange,
+                                (value) => setModalState(
+                                  () => _selectedPriceRange = value,
+                                ),
+                                subtitle: 'Filter by sale price',
+                              ),
+                              _buildSingleSelectFilterSection(
+                                'Condition',
+                                _conditions,
+                                _selectedCondition,
+                                (value) => setModalState(
+                                  () => _selectedCondition = value,
+                                ),
+                              ),
+                              _buildMultiSelectFilterSection(
+                                'Fuel Type',
+                                _fuelTypes,
+                                _selectedFuelTypes,
+                                setModalState,
+                              ),
+                              const SizedBox(height: 100),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            top: BorderSide(color: Colors.grey.shade200),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primarypink,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setState(() {});
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primaryblue,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Apply Filters',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {});
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
-        ),
-      ),
     );
   }
 
@@ -522,40 +610,56 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20),
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: options.map((option) {
-            final isSelected = selectedValues.contains(option);
-            return GestureDetector(
-              onTap: () {
-                setModalState(() {
-                  if (isSelected) {
-                    selectedValues.remove(option);
-                  } else {
-                    selectedValues.add(option);
-                  }
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isSelected ? Palette.primarypink : Colors.grey.shade300),
-                ),
-                child: Text(
-                  option,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          children:
+              options.map((option) {
+                final isSelected = selectedValues.contains(option);
+                return GestureDetector(
+                  onTap: () {
+                    setModalState(() {
+                      if (isSelected) {
+                        selectedValues.remove(option);
+                      } else {
+                        selectedValues.add(option);
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? Palette.primarypink
+                              : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color:
+                            isSelected
+                                ? Palette.primarypink
+                                : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      option,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
         ),
       ],
     );
@@ -572,37 +676,60 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20),
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic)),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: options.map((option) {
-            final isSelected = selectedValue == option;
-            final displayText = option == 'all' ? 'Any $title' : option;
-            return GestureDetector(
-              onTap: () => onChanged(option),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isSelected ? Palette.primarypink : Colors.grey.shade300),
-                ),
-                child: Text(
-                  displayText,
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          children:
+              options.map((option) {
+                final isSelected = selectedValue == option;
+                final displayText = option == 'all' ? 'Any $title' : option;
+                return GestureDetector(
+                  onTap: () => onChanged(option),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? Palette.primarypink
+                              : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color:
+                            isSelected
+                                ? Palette.primarypink
+                                : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Text(
+                      displayText,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            );
-          }).toList(),
+                );
+              }).toList(),
         ),
       ],
     );
@@ -631,17 +758,18 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           hintText: 'Search vehicles...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                      });
+                    },
+                  )
+                  : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -660,17 +788,18 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         hintText: 'Search by vehicle type, brand, location...',
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon: _searchQuery.isNotEmpty
-            ? IconButton(
-                icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                onPressed: () {
-                  setState(() {
-                    _searchQuery = '';
-                    _searchController.clear();
-                  });
-                },
-              )
-            : null,
+        suffixIcon:
+            _searchQuery.isNotEmpty
+                ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+                : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200),
@@ -685,13 +814,17 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         ),
         filled: true,
         fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
@@ -699,21 +832,22 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -762,105 +896,138 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                  icon: const Icon(Icons.location_on, color: Colors.black87),
-                  onSelected: (String value) {
-                    setState(() {
-                      _selectedLocation = value == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == value).id;
-                      _fetchPosts();
-                    });
-                  },
-                  itemBuilder: (BuildContext context) {
-                    return _keralaCities.map((String city) {
-                      return PopupMenuItem<String>(
-                        value: city,
-                        child: Row(
-                          children: [
-                            if (_selectedLocation == (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
-                              const Icon(Icons.check, color: Colors.blue, size: 16),
-                            if (_selectedLocation == (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
-                              const SizedBox(width: 8),
-                            Text(city == 'all' ? 'All Kerala' : city),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  },
-                ),
+                icon: const Icon(Icons.location_on, color: Colors.black87),
+                onSelected: (String value) {
+                  setState(() {
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
+                    _fetchPosts();
+                  });
+                },
+                itemBuilder: (BuildContext context) {
+                  return _keralaCities.map((String city) {
+                    return PopupMenuItem<String>(
+                      value: city,
+                      child: Row(
+                        children: [
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const Icon(
+                              Icons.check,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const SizedBox(width: 8),
+                          Text(city == 'all' ? 'All Kerala' : city),
+                        ],
+                      ),
+                    );
+                  }).toList();
+                },
+              ),
         ],
       ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
-            child: _isLoadingLocations
-                ? const Center(child: CircularProgressIndicator())
-                : Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: _buildSearchField(),
-                  ),
+            child:
+                _isLoadingLocations
+                    ? const Center(child: CircularProgressIndicator())
+                    : Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: _buildSearchField(),
+                    ),
           ),
           if (!_isLoadingLocations)
             _isLoading
-                ? const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()))
+                ? const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator()),
+                )
                 : _errorMessage != null
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error: $_errorMessage',
-                                style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _fetchPosts,
-                                child: const Text('Retry'),
-                              ),
-                            ],
+                ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: $_errorMessage',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
                           ),
                         ),
-                      )
-                    : filteredPosts.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No vehicles found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Try adjusting your filters or search terms',
-                                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final post = filteredPosts[index];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _buildVehicleCard(post),
-                                );
-                              },
-                              childCount: filteredPosts.length,
-                            ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchPosts,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                : filteredPosts.isEmpty
+                ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No vehicles found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final post = filteredPosts[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _buildVehicleCard(post),
+                    );
+                  }, childCount: filteredPosts.length),
+                ),
         ],
       ),
     );
@@ -869,7 +1036,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   Widget _buildVehicleCard(MarketplacePost post) {
     final isFinanceAvailable = post.ifFinance == '1';
     final isFeatured = post.feature == '1';
-    final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first : 'N/A';
+    final vehicleType =
+        post.filters['type']?.isNotEmpty ?? false
+            ? post.filters['type']!.first
+            : 'N/A';
     final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
     final isVerified = post.adminApproval == '1';
 
@@ -880,10 +1050,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => CommercialProductDetailsPage(
-                  post: post,
-                  userId: widget.userId,
-                ),
+                builder: (context) => CommercialProductDetailsPage(post: post),
               ),
             );
           },
@@ -914,12 +1081,16 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                         height: 138,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
-                          borderRadius: const BorderRadius.all(Radius.circular(12)),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(12),
+                          ),
                           image: DecorationImage(
                             image: NetworkImage(getImageUrl(post.image)),
                             fit: BoxFit.fill,
                             onError: (exception, stackTrace) {
-                              print('Failed to load image: ${getImageUrl(post.image)}');
+                              print(
+                                'Failed to load image: ${getImageUrl(post.image)}',
+                              );
                               print('Error: $exception');
                             },
                           ),
@@ -944,7 +1115,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             ),
                             Text(
                               vehicleType,
-                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -958,17 +1132,28 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                Icon(Icons.location_on, size: 14, color: Colors.grey.shade500),
+                                Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey.shade500,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _getLocationName(post.parentZoneId),
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             _buildDetailChip(
-                              Icon(Icons.person, size: 8, color: Colors.grey[700]),
+                              Icon(
+                                Icons.person,
+                                size: 8,
+                                color: Colors.grey[700],
+                              ),
                               sellerType,
                             ),
                           ],
@@ -981,9 +1166,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _buildFinanceInfo(isFinanceAvailable),
-                      ),
+                      Expanded(child: _buildFinanceInfo(isFinanceAvailable)),
                     ],
                   ),
               ],
@@ -1007,7 +1190,11 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           const SizedBox(width: 8),
           Text(
             'Finance Available',
-            style: TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),

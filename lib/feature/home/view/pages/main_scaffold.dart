@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
@@ -9,13 +10,12 @@ import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/status_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class MainScaffold extends StatefulWidget {
-  final String? userId;
   final Map<String, dynamic>? adData;
 
-  const MainScaffold({super.key, this.userId, this.adData});
+  const MainScaffold({super.key, this.adData});
 
   @override
   State<MainScaffold> createState() => _MainScaffoldState();
@@ -34,45 +34,21 @@ class _MainScaffoldState extends State<MainScaffold> {
   void initState() {
     super.initState();
     adData = widget.adData;
-    _loadUserId();
   }
 
   @override
   void didUpdateWidget(MainScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.userId != oldWidget.userId) {
-      setState(() {
-        userId = widget.userId;
-        isLoading = false;
-      });
-      _loadUserId(); // Reload from SharedPreferences to ensure consistency
-    }
   }
-
-  Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
-      sessionId = prefs.getString('sessionId');
-    });
-    if (kDebugMode) {
-      print('Loaded userId: $userId');
-      print('Loaded sessionId: $sessionId');
-    }
-  }
-
-  bool get _isUserIdValid => userId != null;
 
   List<Widget> get _pages => [
-    HomePage(userId: userId),
+    HomePage(),
     isStatus
         ? BuyingStatusPage(userId: userId)
         : SupportTicketPage(userId: userId ?? 'Unknown'),
+    isStatus ? SellingStatusPage(userId: userId, adData: adData) : SellPage(),
     isStatus
-        ? SellingStatusPage(userId: userId, adData: adData)
-        : SellPage(userId: userId),
-    isStatus
-        ? ChatListPage(userId: userId ?? 'Unknown', sessionId: sessionId ?? '')
+        ? ChatListPage(userId: userId ?? 'Unknown')
         : StatusPage(userId: userId),
     Center(
       child: Text(

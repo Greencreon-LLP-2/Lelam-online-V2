@@ -4,32 +4,30 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
-import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
+    hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
-  final String? userId;
 
-  const CommercialProductDetailsPage({
-    super.key,
-    required this.post,
-    this.userId,
-  });
+  const CommercialProductDetailsPage({super.key, required this.post});
 
   @override
   State<CommercialProductDetailsPage> createState() =>
@@ -52,10 +50,10 @@ class _CommercialProductDetailsPageState
   bool _isLoadingFavorite = false;
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
-  final LocationService _locationService = LocationService();
- final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
+
+  final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
   final String _token = '5cb2c9b569416b5db1604e0e12478ded';
-  
+
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
@@ -67,6 +65,7 @@ class _CommercialProductDetailsPageState
   @override
   void initState() {
     super.initState();
+    _fetchLocations();
     _initialize();
   }
 
@@ -80,11 +79,15 @@ class _CommercialProductDetailsPageState
   }
 
   Future<void> _loadUserId() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    final userData = userProvider.userData;
     setState(() {
-      userId = prefs.getString('userId') ?? widget.userId ?? 'Unknown';
+      userId = userData?.userId ?? '';
     });
-    debugPrint('CommercialProductDetailsPage - Loaded userId: $userId');
+    debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
   }
 
   Future<void> _checkShortlistStatus() async {
@@ -101,9 +104,7 @@ class _CommercialProductDetailsPageState
 
     try {
       final response = await http.get(
-        Uri.parse(
-          '$baseUrl/list-shortlist.php?token=$token&user_id=$userId',
-        ),
+        Uri.parse('$baseUrl/list-shortlist.php?token=$token&user_id=$userId'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
@@ -113,7 +114,9 @@ class _CommercialProductDetailsPageState
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData['status'] == 'true' && responseData['data'] is List) {
-          final shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
+          final shortlistData = List<Map<String, dynamic>>.from(
+            responseData['data'],
+          );
           final isShortlisted = shortlistData.any(
             (item) => item['post_id'].toString() == widget.post.id,
           );
@@ -128,7 +131,9 @@ class _CommercialProductDetailsPageState
           });
         }
       } else {
-        throw Exception('Failed to check shortlist status: ${response.reasonPhrase}');
+        throw Exception(
+          'Failed to check shortlist status: ${response.reasonPhrase}',
+        );
       }
     } catch (e) {
       debugPrint('Error checking shortlist status: $e');
@@ -159,10 +164,7 @@ class _CommercialProductDetailsPageState
           'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'user_id': userId,
-          'post_id': widget.post.id,
-        }),
+        body: jsonEncode({'user_id': userId, 'post_id': widget.post.id}),
       );
 
       if (response.statusCode == 200) {
@@ -175,43 +177,14 @@ class _CommercialProductDetailsPageState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                _isFavorited
-                    ? 'Added to shortlist'
-                    : 'Removed from shortlist',
+                _isFavorited ? 'Added to shortlist' : 'Removed from shortlist',
               ),
             ),
           );
-
-          final prefs = await SharedPreferences.getInstance();
-          final cachedShortlist = prefs.getString('shortlist_$userId');
-          if (cachedShortlist != null) {
-            try {
-              final responseData = jsonDecode(cachedShortlist);
-              if (responseData['status'] == 'true' && responseData['data'] is List) {
-                List<Map<String, dynamic>> shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
-                if (_isFavorited) {
-                  shortlistData.add({
-                    'post_id': widget.post.id,
-                    'user_id': userId,
-                    'created_on': DateTime.now().toIso8601String(),
-                  });
-                } else {
-                  shortlistData.removeWhere((item) => item['post_id'].toString() == widget.post.id);
-                }
-                await prefs.setString(
-                  'shortlist_$userId',
-                  jsonEncode({
-                    'status': 'true',
-                    'data': shortlistData,
-                  }),
-                );
-              }
-            } catch (e) {
-              debugPrint('Error updating shortlist cache: $e');
-            }
-          }
         } else {
-          throw Exception('Failed to update shortlist: ${responseData['data']}');
+          throw Exception(
+            'Failed to update shortlist: ${responseData['data']}',
+          );
         }
       } else {
         throw Exception('Failed to update shortlist: ${response.reasonPhrase}');
@@ -221,9 +194,9 @@ class _CommercialProductDetailsPageState
       setState(() {
         _isLoadingFavorite = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -264,9 +237,9 @@ class _CommercialProductDetailsPageState
       }
     } catch (e) {
       debugPrint('Error placing bid: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -318,6 +291,36 @@ class _CommercialProductDetailsPageState
     }
   }
 
+  Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
+
+    try {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
+        setState(() {
+          _locations = locationResponse.data;
+          _isLoadingLocations = false;
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
+        });
+      } else {
+        throw Exception('Invalid API response format');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
   Future<void> _fetchDetailsData() async {
     setState(() {
       isLoadingDetails = true;
@@ -325,15 +328,8 @@ class _CommercialProductDetailsPageState
     });
 
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
-        _locations = locationResponse.data;
-      } else {
-        throw Exception('Failed to load locations');
-      }
-
-      attributes = await ApiService.fetchAttributes();
-      attributeVariations = await ApiService.fetchAttributeVariations(
+      attributes = await TempApiService.fetchAttributes();
+      attributeVariations = await TempApiService.fetchAttributeVariations(
         widget.post.filters,
       );
 
@@ -381,14 +377,15 @@ class _CommercialProductDetailsPageState
         final filterValue = filters[attributeId]!.first;
         final variation = attributeVariations.firstWhere(
           (variation) => variation.id == filterValue,
-          orElse: () => AttributeVariation(
-            id: '',
-            name: filterValue,
-            attributeId: '',
-            status: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+          orElse:
+              () => AttributeVariation(
+                id: '',
+                name: filterValue,
+                attributeId: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
         );
         final value = variation.name.isNotEmpty ? variation.name : filterValue;
         attributeValues[attribute.name] = value;
@@ -403,21 +400,22 @@ class _CommercialProductDetailsPageState
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -488,19 +486,21 @@ class _CommercialProductDetailsPageState
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -527,7 +527,8 @@ class _CommercialProductDetailsPageState
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -567,7 +568,9 @@ class _CommercialProductDetailsPageState
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -576,9 +579,10 @@ class _CommercialProductDetailsPageState
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -589,18 +593,19 @@ class _CommercialProductDetailsPageState
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
+                                        placeholder:
+                                            (context, url) => const Center(
                                               child: SizedBox(
                                                 width: 20,
                                                 height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                ),
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
                                               ),
                                             ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
                                               Icons.error,
                                               size: 20,
                                             ),
@@ -771,61 +776,62 @@ class _CommercialProductDetailsPageState
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-            ? Center(
-                child: Text(
-                  sellerErrorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              )
-            : GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          SellerInformationPage(userId: widget.post.createdBy),
-                    ),
-                  );
-                },
-                child: Row(
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.post.createdBy),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage:
-                          sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                              ? CachedNetworkImageProvider(sellerProfileImage!)
-                              : const AssetImage('assets/images/avatar.gif')
-                                  as ImageProvider,
-                      radius: 30,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sellerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Member Since $sellerActiveFrom',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Posts: $sellerNoOfPosts',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                        ],
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
                   ],
                 ),
-              );
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -842,7 +848,7 @@ class _CommercialProductDetailsPageState
               ),
             ),
             ElevatedButton(
-               onPressed: () {
+              onPressed: () {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -900,11 +906,13 @@ class _CommercialProductDetailsPageState
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  placeholder:
+                                      (context, url) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                  errorWidget:
+                                      (context, url, error) =>
+                                          const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -970,22 +978,25 @@ class _CommercialProductDetailsPageState
                           const Spacer(),
                           _isLoadingFavorite
                               ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
                                   ),
-                                )
-                              : IconButton(
-                                  icon: Icon(
-                                    _isFavorited
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: _isFavorited ? Colors.red : Colors.white,
-                                  ),
-                                  onPressed: _toggleShortlist,
                                 ),
+                              )
+                              : IconButton(
+                                icon: Icon(
+                                  _isFavorited
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color:
+                                      _isFavorited ? Colors.red : Colors.white,
+                                ),
+                                onPressed: _toggleShortlist,
+                              ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -1020,16 +1031,16 @@ class _CommercialProductDetailsPageState
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -1062,53 +1073,51 @@ class _CommercialProductDetailsPageState
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                                if (userId == null || userId == 'Unknown') {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please log in to chat with the seller',
-                                      ),
-                                      backgroundColor: Colors.red,
+                              if (userId == null || userId == 'Unknown') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Please log in to chat with the seller',
                                     ),
-                                  );
-                                  return;
-                                }
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return ChatOptionsDialog(
-                                      onChatWithSupport: () {
-                                        Navigator.push(
-                                          context,
-                                          SupportTicketPage(
-                                                userId: userId ?? '',
-                                              )
-                                              as Route<Object?>,
-                                        );
-                                      },
-                                      onChatWithSeller: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (context) => ChatPage(
-                                                  userId: userId!,
-                                                  listenerId:
-                                                      widget.post.createdBy,
-                                                  listenerName: sellerName,
-                                                  listenerImage:
-                                                      sellerProfileImage ??
-                                                      'seller.jpg',
-                                                ),
-                                          ),
-                                        );
-                                      },
-                                      baseUrl: _baseUrl,
-                                      token: _token,
-                                    );
-                                  },
+                                    backgroundColor: Colors.red,
+                                  ),
                                 );
-                              },
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return ChatOptionsDialog(
+                                    onChatWithSupport: () {
+                                      Navigator.push(
+                                        context,
+                                        SupportTicketPage(userId: userId ?? '')
+                                            as Route<Object?>,
+                                      );
+                                    },
+                                    onChatWithSeller: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => ChatPage(
+                                                userId: userId!,
+                                                listenerId:
+                                                    widget.post.createdBy,
+                                                listenerName: sellerName,
+                                                listenerImage:
+                                                    sellerProfileImage ??
+                                                    'seller.jpg',
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    baseUrl: _baseUrl,
+                                    token: _token,
+                                  );
+                                },
+                              );
+                            },
                             icon: const Icon(Icons.call),
                             label: const Text('Call Support'),
                             style: ElevatedButton.styleFrom(
@@ -1206,17 +1215,16 @@ class _CommercialProductDetailsPageState
                         const Center(child: CircularProgressIndicator())
                       else
                         Column(
-                          children: orderedAttributeValues
-                              .where(
-                                (entry) => entry.key != 'Seller Type',
-                              )
-                              .map(
-                                (entry) => _buildSellerCommentItem(
-                                  entry.key,
-                                  entry.value,
-                                ),
-                              )
-                              .toList(),
+                          children:
+                              orderedAttributeValues
+                                  .where((entry) => entry.key != 'Seller Type')
+                                  .map(
+                                    (entry) => _buildSellerCommentItem(
+                                      entry.key,
+                                      entry.value,
+                                    ),
+                                  )
+                                  .toList(),
                         ),
                     ],
                   ),

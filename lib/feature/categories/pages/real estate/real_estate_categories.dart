@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/services/location_service.dart';
+
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 
@@ -230,7 +232,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String _listingType = 'sale'; // Added for sale/auction toggle
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
-  final LocationService _locationService = LocationService();
+
   List<MarketplacePost> _posts = [];
   List<LocationData> _locations = [];
   bool _isLoading = true;
@@ -276,10 +278,17 @@ class _RealEstatePageState extends State<RealEstatePage> {
   Future<void> _fetchLocations() async {
     setState(() {
       _isLoadingLocations = true;
+      _errorMessage = null;
     });
+
     try {
-      final locationResponse = await _locationService.fetchLocations();
-      if (locationResponse != null && locationResponse.status) {
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
+
+      if (response['status'].toString() == 'true' && response['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(response);
+
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
@@ -288,7 +297,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
           );
         });
       } else {
-        throw Exception('Failed to load locations');
+        throw Exception('Invalid API response format');
       }
     } catch (e) {
       setState(() {
