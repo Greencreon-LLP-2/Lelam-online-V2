@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/api/hive_helper.dart';
+import 'package:provider/provider.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/authentication/views/pages/login_page.dart';
 
 class AppDrawerWidget extends StatelessWidget {
-  const AppDrawerWidget({super.key, String? userId});
+  const AppDrawerWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Get user data from Provider
+    final userData = Provider.of<UserData?>(context, listen: false);
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -22,29 +26,53 @@ class AppDrawerWidget extends StatelessWidget {
                 CircleAvatar(
                   radius: 30,
                   backgroundColor: Colors.white,
-                  child: Image.asset(
-                    'assets/images/avatar.gif',
-                    width: 160,
-                    height: 160,
-                    fit: BoxFit.cover,
+                  child: ClipOval(
+                    child:
+                        userData?.profile != null &&
+                                userData!.profile!.isNotEmpty
+                            ? Image.network(
+                              userData!.profile!,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                // Fallback if network image fails
+                                return Image.asset(
+                                  'assets/images/avatar.gif',
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            )
+                            : Image.asset(
+                              'assets/images/avatar.gif',
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                            ),
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Welcome',
-                  style: TextStyle(
+                Text(
+                  userData?.name.isNotEmpty == true
+                      ? 'Hello, ${userData!.name}'
+                      : 'Welcome',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Text(
-                  'Sign in to access all features',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
+                if (userData?.mobile.isNotEmpty == true)
+                  Text(
+                    userData!.mobile,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
               ],
             ),
           ),
+
           _buildDrawerItem(
             icon: Icons.category,
             title: 'Categories',
@@ -58,19 +86,29 @@ class AppDrawerWidget extends StatelessWidget {
             icon: Icons.favorite_outlined,
             title: 'Favourites',
             onTap: () {
-              Navigator.pop(context);
-              context.pushNamed(RouteNames.shortlistpage);
+              if (userData?.userId.isNotEmpty == true) {
+                Navigator.pop(context);
+                context.pushNamed(RouteNames.shortlistpage);
+              } else {
+                context.goNamed(RouteNames.loginPage);
+              }
             },
           ),
           _buildDrawerItem(
             icon: Icons.add_to_photos_rounded,
             title: 'My Post',
             onTap: () {
-              Navigator.pop(context);
-              context.pushNamed(RouteNames.sellingstatuspage);
+              if (userData?.userId.isNotEmpty == true) {
+                Navigator.pop(context);
+                context.pushNamed(
+                  RouteNames.sellingstatuspage,
+                  extra: {'userId': userData!.userId},
+                );
+              } else {
+                context.goNamed(RouteNames.loginPage);
+              }
             },
           ),
-
           _buildDrawerItem(
             icon: Icons.question_answer,
             title: 'FAQ',
@@ -83,80 +121,37 @@ class AppDrawerWidget extends StatelessWidget {
             leading: const Icon(Icons.info_outlined, color: Colors.black),
             title: const Text('Info'),
             children: [
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 72),
-                title: const Text('EULA'),
-                leading: const Icon(
-                  Icons.privacy_tip_outlined,
-                  color: Colors.black,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 72),
-                title: const Text('Privacy Policy'),
-                leading: const Icon(
-                  Icons.privacy_tip_outlined,
-                  color: Colors.black,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 72),
-                title: const Text('Terms of Service'),
-                leading: const Icon(
-                  Icons.privacy_tip_outlined,
-                  color: Colors.black,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 72),
-                title: const Text('About Us'),
-                leading: const Icon(
-                  Icons.privacy_tip_outlined,
-                  color: Colors.black,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 72),
-                title: const Text('Shipping Policy'),
-                leading: const Icon(
-                  Icons.privacy_tip_outlined,
-                  color: Colors.black,
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
+              ...[
+                    'EULA',
+                    'Privacy Policy',
+                    'Terms of Service',
+                    'About Us',
+                    'Shipping Policy',
+                  ]
+                  .map(
+                    (title) => ListTile(
+                      contentPadding: const EdgeInsets.only(left: 72),
+                      title: Text(title),
+                      leading: const Icon(
+                        Icons.privacy_tip_outlined,
+                        color: Colors.black,
+                      ),
+                      onTap: () => Navigator.pop(context),
+                    ),
+                  )
+                  .toList(),
             ],
           ),
           const Divider(),
           _buildDrawerItem(
             icon: Icons.phone,
             title: 'Contact Us',
-            onTap: () {
-              // TODO: Navigate to settings
-              Navigator.pop(context);
-            },
+            onTap: () => Navigator.pop(context),
           ),
-
           _buildDrawerItem(
             icon: Icons.help_outline,
             title: 'Help & Support',
-            onTap: () {
-              // TODO: Navigate to help
-              Navigator.pop(context);
-            },
+            onTap: () => Navigator.pop(context),
           ),
           _buildDrawerItem(
             icon: Icons.settings,
@@ -170,13 +165,22 @@ class AppDrawerWidget extends StatelessWidget {
             isfavourite: true,
             isLogOut: true,
             icon: Icons.logout,
-            title: 'Login',
-            onTap: () {
-              Navigator.pop(context); // Close the drawer first
+            title: userData != null ? 'Logout' : 'Login',
+            onTap: () async {
+              Navigator.pop(context);
 
-              // Navigate to LoginPage and remove all previous routes
+              if (userData != null) {
+                // Clear Hive data
+                await HiveHelper().logout();
 
-              // Navigate to login page and clear stack
+                // Update Provider
+                Provider.of<UserData?>(
+                  context,
+                  listen: false,
+                ); // will be replaced in MultiProvider
+                // Optionally, use a ChangeNotifier for UserData and set it to null
+              }
+
               context.goNamed(RouteNames.loginPage);
             },
           ),

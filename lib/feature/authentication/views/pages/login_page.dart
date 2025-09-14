@@ -1,10 +1,12 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/api/api_service.dart';
+import 'package:lelamonline_flutter/core/api/hive_helper.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
+
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
@@ -20,39 +22,40 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _otpController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _isOtpMode = true;
+  bool _isOtpMode = false;
+  final String _hardcodedOtp = '9021'; // Hardcoded OTP for testing
+  final String _mobileCode = '91'; // Hardcoded mobile code
+  final ApiService _apiService = ApiService();
+  final HiveHelper _hiveHelper = HiveHelper();
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _passwordController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
-  // Normalize mobile number by removing country code, spaces, or special characters
+  // Normalize mobile number
   String _normalizeMobileNumber(String? mobile) {
     if (mobile == null || mobile.isEmpty) return '';
     return mobile
-        .replaceAll('+91', '')
-        .replaceAll('91', '')
-        .replaceAll(
-          RegExp(r'[\s\-\(\)]'),
-          '',
-        ) // Remove spaces, dashes, parentheses
-        .replaceAll(RegExp(r'^\+?0*'), '') // Remove leading zeros or +
+        .replaceAll('+$_mobileCode', '')
+        .replaceAll(_mobileCode, '')
+        .replaceAll(RegExp(r'[\s\-\(\)]'), '')
+        .replaceAll(RegExp(r'^\+?0*'), '')
         .trim();
   }
 
+  // Handle login or OTP verification
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
-      if (kDebugMode) {
-        print('Form validation failed');
-      }
       Fluttertoast.showToast(
-        msg: 'Please enter a valid phone number',
+        msg:
+            _isOtpMode
+                ? 'Please enter a valid OTP'
+                : 'Please enter a valid phone number',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red.withOpacity(0.8),
@@ -64,127 +67,91 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
     try {
-      if (_isOtpMode) {
-        const bool isTestMode = kDebugMode;
-        const String testOtp = '9021';
-        const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-        const String token = '5cb2c9b569416b5db1604e0e12478ded';
-        final String mobile = _phoneController.text;
-        final String normalizedMobile = _normalizeMobileNumber(mobile);
-
-        if (kDebugMode) {
-          print(
-            'Entered mobile: "$mobile", Normalized mobile: "$normalizedMobile"',
-          );
-        }
-
-        // Step 1: Check if the phone number is registered using index.php
-        final userCheckRequest = http.Request(
-          'GET',
-          Uri.parse('$baseUrl/index.php?token=$token'),
+      if (!_isOtpMode) {
+        // Step 1: Check if user exists
+        final mobile = _normalizeMobileNumber(_phoneController.text);
+        final Map<String, dynamic> response = await _apiService.get(
+          url: userDetails,
+          queryParams: {'mobile_code': _mobileCode, 'mobile': mobile},
         );
-        userCheckRequest.headers.addAll({
-          'Cookie': 'PHPSESSID=qn0i8arcee0rhudfamnfodk8qt',
-        });
-        final userCheckResponse = await userCheckRequest.send();
-        final userCheckResponseBody =
-            await userCheckResponse.stream.bytesToString();
+        // Check if mobile is verified or just existence
+        if (response['status'] == true && response['code'] == 200) {
+          // User exists, proceed to OTP mode
+          setState(() => _isOtpMode = true);
+          Fluttertoast.showToast(
+            msg: 'OTP sent to +$_mobileCode$mobile',
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.green.withOpacity(0.8),
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
+        } else {
+          // User does not exist, register user
+          final Map<String, dynamic> registerResponse = await _apiService.get(
+            url: userRegister,
+            queryParams: {'mobile_code': _mobileCode, 'mobile': mobile},
+          );
 
-        if (userCheckResponse.statusCode == 200) {
-          dynamic userListResponse;
-          try {
-            userListResponse = jsonDecode(userCheckResponseBody);
-          } catch (e) {
-            if (kDebugMode) {
-              print('Failed to parse index.php response: $e');
-            }
-            throw Exception('Failed to parse response from index.php: $e');
-          }
-
-          // Check if response has the expected structure
-          if (userListResponse is! Map ||
-              userListResponse['status'] != 'true' ||
-              userListResponse['data'] is! List) {
-            if (kDebugMode) {
-              print('Invalid response structure: $userListResponse');
-            }
-            throw Exception(
-              'Invalid user list format: Expected a map with status "true" and data as a list',
-            );
-          }
-
-          final userList = userListResponse['data'] as List<dynamic>;
-          Map<String, dynamic> user = {};
-          for (var u in userList) {
-            final apiMobile = _normalizeMobileNumber(u['mobile']?.toString());
-            final apiMobileCode = u['mobile_code']?.toString() ?? '';
-            if (kDebugMode) {
-              print(
-                'Comparing API mobile: "$apiMobile" (code: "$apiMobileCode") with input: "$normalizedMobile"',
-              );
-            }
-            if (apiMobile == normalizedMobile &&
-                (apiMobileCode == '91' || apiMobileCode.isEmpty)) {
-              user = u as Map<String, dynamic>;
-              break;
-            }
-          }
-
-          if (user.isEmpty) {
-            if (mounted) {
-              Fluttertoast.showToast(
-                msg: 'Phone number not registered. Please sign up.',
-                toastLength: Toast.LENGTH_LONG,
-                gravity: ToastGravity.BOTTOM,
-                backgroundColor: Colors.red.withOpacity(0.8),
-                textColor: Colors.white,
-                fontSize: 16.0,
-              );
-            }
-            if (kDebugMode) {
-              print('No user found for mobile: $normalizedMobile');
-            }
-            return;
-          }
-
-          final userId = user['user_id']?.toString();
-          if (userId == null) {
-            if (kDebugMode) {
-              print('User found but user_id is null: $user');
-            }
-            throw Exception('User ID not found');
-          }
-
-          if (kDebugMode) {
-            print('Found user with user_id: $userId');
-          }
-
-          // Step 2: Use test OTP and navigate to OtpVerificationPage
-          if (mounted) {
-            // Create a new map to avoid modifying widget.extra
-            final extra = <String, dynamic>{
-              ...?widget.extra, // Spread existing extra, if any
-              'phone': '+91$mobile',
-              'testOtp': isTestMode ? testOtp : null,
-              'userId': userId,
-            };
-            context.pushNamed(RouteNames.otpVerificationPage, extra: extra);
+          if (registerResponse['status'] == true) {
+            setState(() => _isOtpMode = true);
             Fluttertoast.showToast(
-              msg:
-                  isTestMode
-                      ? 'Test OTP sent: $testOtp'
-                      : 'OTP sent to +91$mobile',
+              msg: 'OTP sent to +$_mobileCode$mobile',
               toastLength: Toast.LENGTH_LONG,
               gravity: ToastGravity.BOTTOM,
               backgroundColor: Colors.green.withOpacity(0.8),
               textColor: Colors.white,
               fontSize: 16.0,
             );
+          } else {
+            throw Exception(
+              'Registration failed, Somethign happen from our end}',
+            );
           }
-        } else {
-          if (mounted) {
+        }
+      } else {
+        // Step 2: Verify OTP
+        final inputOtp = _otpController.text;
+        if (inputOtp == _hardcodedOtp) {
+          // Fetch user data again to ensure we have the latest
+          final mobile = _normalizeMobileNumber(_phoneController.text);
+          final Map<String, dynamic> response = await _apiService.get(
+            url: userDetails,
+            queryParams: {'mobile_code': _mobileCode, 'mobile': mobile},
+          );
+
+          if (response['status'] == true && response['code'] == 200) {
+            final UserData userData = UserData.fromJson(
+              response['data'][0] as Map<String, dynamic>,
+            );
+
+            final success = await _hiveHelper.saveUserData(userData);
+
+            if (!mounted) return; // Check if widget is still in the tree
+
+            if (success) {
+              context.goNamed(RouteNames.mainscaffold);
+              Fluttertoast.showToast(
+                msg: 'Login Sucess taking you to home page',
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: Colors.green.withOpacity(0.8),
+                textColor: Colors.white,
+                fontSize: 16.0,
+              );
+            } else {
+              Fluttertoast.showToast(
+                msg: 'Failed to save user data',
+                toastLength: Toast.LENGTH_SHORT,
+                gravity: ToastGravity.BOTTOM,
+                backgroundColor: Colors.red.withOpacity(0.8),
+                textColor: Colors.white,
+                fontSize: 16.0,
+              );
+            }
+          } else {
             Fluttertoast.showToast(
-              msg: 'Failed to check user: ${userCheckResponse.reasonPhrase}',
+              msg: 'Failed to fetch user data after OTP verification',
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.BOTTOM,
               backgroundColor: Colors.red.withOpacity(0.8),
@@ -192,16 +159,9 @@ class _LoginPageState extends State<LoginPage> {
               fontSize: 16.0,
             );
           }
-          if (kDebugMode) {
-            print(
-              'index.php failed: ${userCheckResponse.statusCode} ${userCheckResponse.reasonPhrase}',
-            );
-          }
-        }
-      } else {
-        if (mounted) {
+        } else {
           Fluttertoast.showToast(
-            msg: 'Password login not supported',
+            msg: 'Invalid OTP',
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.BOTTOM,
             backgroundColor: Colors.red.withOpacity(0.8),
@@ -210,24 +170,19 @@ class _LoginPageState extends State<LoginPage> {
           );
         }
       }
-    } catch (e) {
-      if (mounted) {
-        Fluttertoast.showToast(
-          msg: 'Error: ${e.toString()}',
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.8),
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-      }
-      if (kDebugMode) {
-        print('Error in _handleSubmit: $e');
-      }
+    } catch (e, stack) {
+      print(stack);
+
+      Fluttertoast.showToast(
+        msg: 'Error: ${e.toString()}',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => _isLoading = false);
     }
   }
 
@@ -243,236 +198,194 @@ class _LoginPageState extends State<LoginPage> {
       ),
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 60),
-                Text(
-                  'Welcome Back',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 60),
+                  Text(
+                    _isOtpMode ? 'Verify OTP' : 'Welcome Back',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sign in to continue',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 48),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Use Password',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                    const SizedBox(width: 8),
-                    Switch(
-                      value: !_isOtpMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _isOtpMode = !value;
-                        });
-                      },
-                      activeColor: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Use OTP',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                  ],
-                ),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!, width: 1),
+                  const SizedBox(height: 8),
+                  Text(
+                    _isOtpMode
+                        ? 'Enter the OTP sent to +$_mobileCode${_phoneController.text}'
+                        : 'Sign in to continue',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12),
-                            bottomLeft: Radius.circular(12),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.phone,
-                              size: 20,
-                              color: AppTheme.primaryColor,
+                  const SizedBox(height: 48),
+                  if (!_isOtpMode) ...[
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '+91',
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w500,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                bottomLeft: Radius.circular(12),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          style: const TextStyle(fontSize: 16),
-                          decoration: InputDecoration(
-                            hintText: 'Phone number',
-                            hintStyle: TextStyle(color: Colors.grey[400]),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.phone,
+                                  size: 20,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '+$_mobileCode',
+                                  style: TextStyle(
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            errorStyle: const TextStyle(height: 0.8),
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your phone number';
-                            }
-                            if (value.length < 10) {
-                              return 'Please enter a valid phone number';
-                            }
-                            return null;
-                          },
-                        ),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              style: const TextStyle(fontSize: 16),
+                              decoration: InputDecoration(
+                                hintText: 'Phone number',
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                errorStyle: const TextStyle(height: 0.8),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your phone number';
+                                }
+                                if (value.length < 10) {
+                                  return 'Please enter a valid phone number';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (!_isOtpMode) ...[
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!, width: 1),
                     ),
-                    child: TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(fontSize: 16),
+                  ],
+                  if (_isOtpMode) ...[
+                    TextFormField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: TextStyle(color: Colors.grey[400]),
-                        border: InputBorder.none,
+                        hintText: 'Enter OTP',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 16,
                         ),
-                        prefixIcon: Icon(
-                          Icons.lock_outline,
-                          size: 20,
-                          color: AppTheme.primaryColor,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.grey[600],
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
                         errorStyle: const TextStyle(height: 0.8),
                       ),
                       validator: (value) {
-                        if (!_isOtpMode && (value == null || value.isEmpty)) {
-                          return 'Please enter your password';
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter the OTP';
                         }
-                        if (!_isOtpMode && value != null && value.length < 6) {
-                          return 'Password must be at least 6 characters';
+                        if (value.length != 4) {
+                          return 'OTP must be 4 digits';
                         }
                         return null;
                       },
                     ),
-                  ),
-                ],
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: _isLoading ? null : _handleSubmit,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  ],
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _handleSubmit,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                    child:
-                        _isLoading
-                            ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
+                              )
+                              : Text(
+                                _isOtpMode ? 'Verify OTP' : 'Send OTP',
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            )
-                            : Text(
-                              _isOtpMode ? 'Send OTP' : 'Sign In',
-                              style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          'By continuing, you agree to our Terms and Privacy Policy',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (!_isOtpMode) ...[
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              context.pushNamed(RouteNames.signupPage);
+                            },
+                            child: Text(
+                              "Don't have an account? Sign Up",
+                              style: TextStyle(
+                                color: AppTheme.primaryColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                  ),
-                ),
-                const Spacer(),
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'By continuing, you agree to our Terms and Privacy Policy',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () {
-                          context.pushNamed(RouteNames.signupPage);
-                        },
-                        child: Text(
-                          "Don't have an account? Sign Up",
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-              ],
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         ),
