@@ -27,11 +27,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.loginPage,
       name: RouteNames.loginPage,
-      builder: (context, state) => LoginPage(
-        extra: state.extra is Map<String, dynamic>
-            ? state.extra as Map<String, dynamic>
-            : null,
-      ),
+      builder:
+          (context, state) => LoginPage(
+            extra:
+                state.extra is Map<String, dynamic>
+                    ? state.extra as Map<String, dynamic>
+                    : null,
+          ),
     ),
     GoRoute(
       path: RouteNames.categoriespage,
@@ -51,8 +53,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.productDetailsPage,
       name: RouteNames.productDetailsPage,
-      builder: (context, state) =>
-          ProductDetailsPage(product: state.extra),
+      builder: (context, state) => ProductDetailsPage(product: state.extra),
     ),
     GoRoute(
       path: RouteNames.faqPage,
@@ -62,7 +63,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.settingsPage,
       name: RouteNames.settingsPage,
-      builder: (context, state) => const SettingsPage(),
+      builder: (context, state) {
+        final loggedUser = context.watch<LoggedUserProvider>();
+        if (loggedUser.isLoggedIn) {
+          return SettingsPage();
+        }
+        return LoginPage();
+      },
     ),
     GoRoute(
       path: RouteNames.editProfilePage,
@@ -86,8 +93,9 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ad-post',
       name: RouteNames.adPostPage,
-      builder: (context, state) =>
-          AdPostPage(extra: state.extra as Map<String, dynamic>?),
+      builder:
+          (context, state) =>
+              AdPostPage(extra: state.extra as Map<String, dynamic>?),
     ),
     GoRoute(
       path: RouteNames.usedCarsPage,
@@ -97,8 +105,9 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.marketPlaceProductDetailsPage,
       name: RouteNames.marketPlaceProductDetailsPage,
-      builder: (context, state) =>
-          const MarketPlaceProductDetailsPage(product: null),
+      builder:
+          (context, state) =>
+              const MarketPlaceProductDetailsPage(product: null),
     ),
 
     /// MAIN SCAFFOLD (always load)
@@ -117,7 +126,10 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.shortlistpage,
       builder: (context, state) {
         final loggedUser = context.watch<LoggedUserProvider>();
-        return ShortListPage(userId: loggedUser.userData?.userId ?? '');
+        if (loggedUser.isLoggedIn) {
+          return ShortListPage(userId: loggedUser.userData?.userId);
+        }
+        return LoginPage();
       },
     ),
 
@@ -129,16 +141,21 @@ final GoRouter appRouter = GoRouter(
         final loggedUser = context.watch<LoggedUserProvider>();
         final extra = state.extra as Map<String, dynamic>?;
         final adData = extra?['adData'];
-        return SellingStatusPage(
-          userId: loggedUser.userData?.userId ?? '',
-          adData: adData,
-        );
+
+        if (loggedUser.isLoggedIn) {
+          return SellingStatusPage(
+            userId: loggedUser.userData?.userId ?? '',
+            adData: adData,
+          );
+        }
+        return LoginPage();
       },
     ),
   ],
 
   /// Error fallback
-  errorBuilder: (context, state) => Scaffold(
-    body: Center(child: Text('Something went wrong in navigation')),
-  ),
+  errorBuilder:
+      (context, state) => Scaffold(
+        body: Center(child: Text('Something went wrong in navigation')),
+      ),
 );

@@ -29,6 +29,7 @@ const String attributeVariations =
     '$baseUrl/filter-attribute-variations.php?token=$token';
 
 //others
+const String getImageFromServer = '$baseUrl/get-image.php?file=';
 const String faqUrl = '$baseUrl/list-faq.php';
 const String allusers = '$baseUrl/index.php';
 const String userDetails = '$baseUrl/user-details.php';

@@ -21,6 +21,16 @@ class UserData {
   final String createdOn;
   final String updatedOn;
 
+  // --- Profile fields ---
+  final String profileId;
+  final String address1;
+  final String address2;
+  final String state;
+  final String pincode;
+  final String city;
+  final String country;
+  final String? image;
+
   UserData({
     required this.userId,
     required this.userLevel,
@@ -43,6 +53,14 @@ class UserData {
     required this.ban,
     required this.createdOn,
     required this.updatedOn,
+    required this.profileId,
+    required this.address1,
+    required this.address2,
+    required this.state,
+    required this.pincode,
+    required this.city,
+    required this.country,
+     this.image,
   });
 
   factory UserData.fromJson(Map<String, dynamic> json) {
@@ -68,6 +86,14 @@ class UserData {
       ban: json['ban'] ?? '',
       createdOn: json['created_on'] ?? '',
       updatedOn: json['updated_on'] ?? '',
+      profileId: json['profile_id'] ?? '',
+      address1: json['address1'] ?? '',
+      address2: json['address2'] ?? '',
+      state: json['state'] ?? '',
+      pincode: json['pincode'] ?? '',
+      city: json['city'] ?? '',
+      country: json['country'] ?? '',
+      image: json['image'] ?? '',
     );
   }
 
@@ -94,6 +120,14 @@ class UserData {
       'ban': ban,
       'created_on': createdOn,
       'updated_on': updatedOn,
+      'profile_id': profileId,
+      'address1': address1,
+      'address2': address2,
+      'state': state,
+      'pincode': pincode,
+      'city': city,
+      'country': country,
+      'image': image,
     };
   }
 }
