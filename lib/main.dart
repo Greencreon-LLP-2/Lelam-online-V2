@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lelamonline_flutter/core/router/app_router.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:provider/provider.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Hive.initFlutter();
 
   // Edge-to-edge display
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-  // Optional: Customize system bars appearance
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -20,24 +22,31 @@ void main() {
     ),
   );
 
-  runApp(const App());
+  // Initialize user provider
+  final loggedUserProvider = LoggedUserProvider();
+  await loggedUserProvider.loadUser(); // load from Hive before runApp
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => loggedUserProvider),
+        ChangeNotifierProvider(
+          create: (_) => ProductProvider()..fetchFeaturedProducts(),
+        ),
+      ],
+      child: const LelamOnlineWidget(),
+    ),
+  );
 }
 
-class App extends StatelessWidget {
-  const App({super.key});
+class LelamOnlineWidget extends StatelessWidget {
+  const LelamOnlineWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(
-          create: (context) => ProductProvider()..fetchFeaturedProducts(),
-        ),
-      ],
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
-        routerConfig: appRouter,
-      ),
+    return MaterialApp.router(
+      debugShowCheckedModeBanner: false,
+      routerConfig: appRouter,
     );
   }
 }

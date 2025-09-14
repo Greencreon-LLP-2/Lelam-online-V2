@@ -86,10 +86,10 @@ class _MarketPlaceProductDetailsPageState
       });
 
       final headers = {
-        'token': _token,
+        'token': token,
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
-      final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+      final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
       debugPrint('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -102,7 +102,7 @@ class _MarketPlaceProductDetailsPageState
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         debugPrint(
-          'Parsed responseData type: ${responseData.runtimeType}',
+          'Parsed responseData type: ${responseData.runtimeType}',);
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -476,11 +476,11 @@ class _MarketPlaceProductDetailsPageState
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  if (isDialogOpen) {
-                    Navigator.of(context).pop();
-                    isDialogOpen = false;
-                    _bidController.dispose();
-                  }
+                  // if (isDialogOpen) {
+                  //   Navigator.of(context).pop();
+                  //   isDialogOpen = false;
+                  //   _bidController.dispose();
+                  // }
                   if (isSuccess) {
                     Navigator.push(
                       context,
