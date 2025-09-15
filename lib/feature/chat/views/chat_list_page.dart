@@ -7,8 +7,11 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // Add flutter_svg package
+import 'package:flutter_svg/flutter_svg.dart';
 
 class ChatListPage extends HookWidget {
   const ChatListPage({super.key});
@@ -28,7 +31,7 @@ class ChatListPage extends HookWidget {
     final userName = userProvider.userData?.name ?? 'Guest User';
 
     Future<void> _openWhatsApp() async {
-      const phoneNumber = '+918089308048'; 
+      const phoneNumber = '+918089308048';
       final whatsappUrl =
           'https://wa.me/$phoneNumber?text=Hello%20Support%20Team';
       final uri = Uri.parse(whatsappUrl);
@@ -37,7 +40,6 @@ class ChatListPage extends HookWidget {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          // Fallback to browser
           await launchUrl(uri, mode: LaunchMode.platformDefault);
         }
       } catch (e) {
@@ -148,9 +150,35 @@ class ChatListPage extends HookWidget {
         }
       }
 
-      fetchChatRooms();
+      if (userProvider.isLoggedIn) {
+        fetchChatRooms();
+      }
       return null;
     }, [userId]);
+
+    if (!userProvider.isLoggedIn) {
+      return Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () {
+              context.pushNamed(RouteNames.loginPage);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Log In to View Chats',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      );
+    }
 
     Widget _buildUserTile(Map<String, dynamic> chatRoom, String otherUserId) {
       final displayName =
@@ -183,17 +211,13 @@ class ChatListPage extends HookWidget {
             vertical: 8,
           ),
           leading: CircleAvatar(
-            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
+            backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
             radius: 28,
             backgroundImage:
                 displayImage.isNotEmpty ? NetworkImage(displayImage) : null,
             child:
                 displayImage.isEmpty
-                    ? Icon(
-                      Icons.person,
-                      color: Theme.of(context).primaryColor,
-                      size: 28,
-                    )
+                    ? Icon(Icons.person, color: AppTheme.primaryColor, size: 28)
                     : null,
           ),
           title: Text(
@@ -257,7 +281,7 @@ class ChatListPage extends HookWidget {
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).primaryColor,
+                  AppTheme.primaryColor,
                 ),
               ),
             ),
@@ -290,8 +314,8 @@ class ChatListPage extends HookWidget {
         backgroundColor: Colors.grey[50],
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
           title: const Text(
             'Chats',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
@@ -300,6 +324,7 @@ class ChatListPage extends HookWidget {
             preferredSize: const Size.fromHeight(1),
             child: Divider(height: 1, thickness: 0.5, color: Colors.grey[200]),
           ),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
         floatingActionButton: Column(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -321,7 +346,6 @@ class ChatListPage extends HookWidget {
                 'assets/icons/whatsapp_icon.svg',
                 width: 24,
                 height: 24,
-                // colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               ),
             ),
           ],

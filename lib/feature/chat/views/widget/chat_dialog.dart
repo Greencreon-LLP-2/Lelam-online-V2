@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
 class ChatOptionsDialog extends StatelessWidget {
@@ -67,7 +71,7 @@ class ChatOptionsDialog extends StatelessWidget {
                     const SnackBar(content: Text('Could not launch dialer')),
                   );
                 }
-                onChatWithSupport(); 
+                onChatWithSupport();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -84,12 +88,52 @@ class ChatOptionsDialog extends StatelessWidget {
         ),
       );
     } else {
-      // Handle seller chat as before
+      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+      if (!userProvider.isLoggedIn) {
+        Navigator.of(context).pop();
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            title: const Text(
+              'Login Required',
+              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+            ),
+            content: const Text('Please log in to chat with the seller.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.pushNamed(RouteNames.loginPage);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
+                child: const Text(
+                  'Log In',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       final data = await createChatRoom(context, userIdTo);
       if (data.isNotEmpty) {
         final chatRoomId = data['chat_room_id'];
         final message = data['message'];
-        
+
         if (message != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(message)),
@@ -109,22 +153,20 @@ class ChatOptionsDialog extends StatelessWidget {
     return AlertDialog(
       backgroundColor: Colors.white,
       title: const Text(
-        'Choose Chat Option',
+        '',
         style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
       ),
-      content: const Text('Who would you like to chat with?'),
       actions: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-           
             const SizedBox(height: 8.0),
             ElevatedButton(
               onPressed: () {
                 handleChat(context, 5, 'support', onChatWithSupport);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.green,
                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.0),
@@ -135,12 +177,12 @@ class ChatOptionsDialog extends StatelessWidget {
                 style: TextStyle(color: Colors.white),
               ),
             ),
-             ElevatedButton(
+            ElevatedButton(
               onPressed: () {
                 handleChat(context, 5, 'seller', onChatWithSeller);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: Colors.blue,
                 padding: const EdgeInsets.symmetric(vertical: 12.0),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.0),

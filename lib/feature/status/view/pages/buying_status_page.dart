@@ -1,26 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/expired_widget.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart' hide MyMeetingsWidget;
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart' hide MyBidsWidget;
+import 'package:provider/provider.dart';
 
 class BuyingStatusPage extends StatelessWidget {
   const BuyingStatusPage({super.key, String? userId});
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+
+    if (!userProvider.isLoggedIn) {
+      return Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () {
+              context.pushNamed(RouteNames.loginPage);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Log In to View Buying Status',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      );
+    }
+
     return DefaultTabController(
-      length: 3, // must match number of tabs and views
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Buying Status'),
+          title: const Text(
+            'Buying Status',
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
           bottom: const TabBar(
             dividerColor: Colors.transparent,
-            isScrollable: false, // enables scrolling for many tabs
-            indicatorColor: AppTheme.primaryColor,
-            labelColor: AppTheme.primaryColor,
-            unselectedLabelColor: Colors.black54,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            isScrollable: false,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             unselectedLabelStyle: TextStyle(fontSize: 14),
             tabs: [
               Tab(text: 'My Bids'),
@@ -29,6 +65,7 @@ class BuyingStatusPage extends StatelessWidget {
             ],
           ),
         ),
+        backgroundColor: Colors.grey[50],
         body: TabBarView(
           children: [
             const MyBidsWidget(),

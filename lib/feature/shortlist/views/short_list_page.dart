@@ -12,11 +12,11 @@ import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.da
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class ShortListPage extends StatefulWidget {
   const ShortListPage({super.key, String? userId});
@@ -51,8 +51,7 @@ class _ShortListPageState extends State<ShortListPage> {
       await _fetchShortlistedItems();
     } else {
       setState(() {
-        errorMessage =
-            'please_login'; // Use a specific error code for login issues
+        errorMessage = 'please_login';
         isLoading = false;
       });
     }
@@ -90,18 +89,15 @@ class _ShortListPageState extends State<ShortListPage> {
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
-            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
-          );
         });
       } else {
         throw Exception('Invalid API response format');
       }
     } catch (e) {
+      debugPrint('Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
@@ -134,35 +130,25 @@ class _ShortListPageState extends State<ShortListPage> {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('list-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         if (responseData['status'] == 'true') {
           if (responseData['data'] is List) {
-            shortlistData = List<Map<String, dynamic>>.from(
-              responseData['data'],
-            );
+            shortlistData = List<Map<String, dynamic>>.from(responseData['data']);
             final postIds =
-                shortlistData
-                    .map<String>((item) => item['post_id'].toString())
-                    .toList();
+                shortlistData.map<String>((item) => item['post_id'].toString()).toList();
             final products = await _fetchProductsForPostIds(postIds);
             setState(() {
               shortlistedProducts = products;
               isLoading = false;
             });
-
-            debugPrint(
-              'Shortlisted items cached: ${shortlistedProducts.length} items',
-            );
           } else if (responseData['data'] == 'Data not found') {
             setState(() {
               shortlistedProducts = [];
               shortlistData = [];
               isLoading = false;
             });
-            debugPrint('No shortlisted items found for userId: $userId');
           } else {
             throw Exception('Unexpected data format');
           }
@@ -183,85 +169,82 @@ class _ShortListPageState extends State<ShortListPage> {
 
   Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
     List<Product> products = [];
-    for (String postId in postIds) {
-      try {
-        // Fetch marketplace and auction posts
-        final marketplacePosts =
-            (await _marketplaceService.fetchPosts(
-              categoryId: '1',
-              userZoneId: '0',
-              listingType: 'sale',
-              userId: userId ?? '2',
-            )) ??
-            [];
-        final auctionPosts =
-            (await _marketplaceService.fetchPosts(
-              categoryId: '1',
-              userZoneId: '0',
-              listingType: 'auction',
-              userId: userId ?? '2',
-            )) ??
-            [];
+    // Fetch marketplace and auction posts concurrently
+    try {
+      final results = await Future.wait([
+        _marketplaceService.fetchPosts(
+          categoryId: '1',
+          userZoneId: '0',
+          listingType: 'sale',
+          userId: userId ?? '2',
+        ),
+        _marketplaceService.fetchPosts(
+          categoryId: '1',
+          userZoneId: '0',
+          listingType: 'auction',
+          userId: userId ?? '2',
+        ),
+      ]);
 
-        // Combine posts and filter out null values
-        final allPosts =
-            [
-              ...marketplacePosts,
-              ...auctionPosts,
-              // ignore: unnecessary_null_comparison
-            ].where((post) => post != null).cast<MarketplacePost>().toList();
+      final allPosts = [
+        ...?results[0],
+        ...?results[1],
+      ].where((post) => post != null).cast<MarketplacePost>().toList();
 
-        // Find matching post
-        final matchingPost = allPosts.firstWhere(
-          (post) => post.id == postId,
-          orElse:
-              () => MarketplacePost(
-                id: postId,
-                title: 'Product $postId',
-                image: '',
-                price: '0',
-                parentZoneId: 'Unknown',
-                createdOn: '',
-                createdBy: 'Unknown',
-                byDealer: '0',
-                filters: {},
-                ifAuction: '0',
-                auctionStartingPrice: '0',
-                auctionAttempt: '0',
-                ifFinance: '0',
-                ifExchange: '0',
-                slug: '',
-                categoryId: '',
-                brand: '',
-                model: '',
-                modelVariation: '',
-                description: '',
-                auctionPriceInterval: '',
-                attributeId: [],
-                attributeVariationsId: [],
-                latitude: '',
-                longitude: '',
-                userZoneId: '',
-                landMark: '',
-                auctionStatus: '',
-                auctionStartin: '',
-                auctionEndin: '',
-                adminApproval: '',
-                feature: '',
-                status: '',
-                visiterCount: '',
-                ifSold: '',
-                ifExpired: '',
-                updatedOn: '',
-                ifOfferPrice: '',
-                offerPrice: '',
-                ifVerifyed: '',
-              ),
-        );
-        products.add(matchingPost.toProduct());
-      } catch (e) {
-        debugPrint('Error fetching product for post_id $postId: $e');
+      for (String postId in postIds) {
+        try {
+          final matchingPost = allPosts.firstWhere(
+            (post) => post.id == postId,
+            orElse: () => MarketplacePost(
+              id: postId,
+              title: 'Product $postId',
+              image: '',
+              price: '0',
+              parentZoneId: 'Unknown',
+              createdOn: '',
+              createdBy: 'Unknown',
+              byDealer: '0',
+              filters: {},
+              ifAuction: '0',
+              auctionStartingPrice: '0',
+              auctionAttempt: '0',
+              ifFinance: '0',
+              ifExchange: '0',
+              slug: '',
+              categoryId: '',
+              brand: '',
+              model: '',
+              modelVariation: '',
+              description: '',
+              auctionPriceInterval: '',
+              attributeId: [],
+              attributeVariationsId: [],
+              latitude: '',
+              longitude: '',
+              userZoneId: '',
+              landMark: '',
+              auctionStatus: '',
+              auctionStartin: '',
+              auctionEndin: '',
+              adminApproval: '',
+              feature: '',
+              status: '',
+              visiterCount: '',
+              ifSold: '',
+              ifExpired: '',
+              updatedOn: '',
+              ifOfferPrice: '',
+              offerPrice: '',
+              ifVerifyed: '',
+            ),
+          );
+          products.add(matchingPost.toProduct());
+        } catch (e) {
+          debugPrint('Error fetching product for post_id $postId: $e');
+        }
       }
+    } catch (e) {
+      debugPrint('Error fetching posts: $e');
     }
     return products;
   }
@@ -270,22 +253,21 @@ class _ShortListPageState extends State<ShortListPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -305,21 +287,17 @@ class _ShortListPageState extends State<ShortListPage> {
     }
   }
 
-  Widget _buildProductCard(
-    Product product,
-    Map<String, dynamic> shortlistItem,
-  ) {
+  Widget _buildProductCard(Product product, Map<String, dynamic> shortlistItem) {
     final isAuction = product.ifAuction == '1';
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => MarketPlaceProductDetailsPage(
-                  product: product,
-                  isAuction: isAuction,
-                ),
+            builder: (context) => MarketPlaceProductDetailsPage(
+              product: product,
+              isAuction: isAuction,
+            ),
           ),
         );
       },
@@ -341,15 +319,18 @@ class _ShortListPageState extends State<ShortListPage> {
                   child: CachedNetworkImage(
                     imageUrl: 'https://lelamonline.com/admin/${product.image}',
                     fit: BoxFit.cover,
-                    placeholder:
-                        (context, url) =>
-                            const Center(child: CircularProgressIndicator()),
-                    errorWidget:
-                        (context, url, error) => Icon(
-                          Icons.directions_car,
-                          size: 40,
-                          color: Colors.grey.shade400,
-                        ),
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Icon(
+                      Icons.directions_car,
+                      size: 40,
+                      color: Colors.grey.shade400,
+                    ),
                   ),
                 ),
               ),
@@ -402,6 +383,68 @@ class _ShortListPageState extends State<ShortListPage> {
     );
   }
 
+  Widget _buildShimmerEffect() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: 5, // Show 5 shimmer placeholders
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Card(
+            color: Colors.white,
+            elevation: 2,
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: 16,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 100,
+                          height: 14,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 150,
+                          height: 14,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 120,
+                          height: 14,
+                          color: Colors.grey[300],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint('STARTING WIDGET UPDATE');
@@ -413,85 +456,83 @@ class _ShortListPageState extends State<ShortListPage> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body:
-          isLoading || _isLoadingLocations
-              ? const Center(
-                child: CircularProgressIndicator(color: AppTheme.primaryColor),
-              )
-              : errorMessage != null
+      body: isLoading || _isLoadingLocations
+          ? _buildShimmerEffect()
+          : errorMessage != null
               ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      errorMessage == 'please_login'
-                          ? 'Please log in to view your shortlist'
-                          : errorMessage!,
-                      style: const TextStyle(fontSize: 16, color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (errorMessage == 'please_login') ...[
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          context.pushReplacementNamed(RouteNames.loginPage);
-                          debugPrint('Navigating to login page');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
+                      Text(
+                        errorMessage == 'please_login'
+                            ? 'Please log in to view your shortlist'
+                            : errorMessage!,
+                        style: const TextStyle(fontSize: 16, color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (errorMessage == 'please_login') ...[
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            context.pushReplacementNamed(RouteNames.loginPage);
+                            debugPrint('Navigating to login page');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                            textStyle: const TextStyle(fontSize: 16),
                           ),
-                          textStyle: const TextStyle(fontSize: 16),
+                          child: const Text('Log In'),
                         ),
-                        child: const Text('Log In'),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-              )
+                  ),
+                )
               : shortlistedProducts.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.favorite_border,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No shortlisted items found',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.favorite_border,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No shortlisted items found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: shortlistedProducts.length,
+                      itemExtent: 150, // Fixed height for better performance
+                      itemBuilder: (context, index) {
+                        final product = shortlistedProducts[index];
+                        final shortlistItem = shortlistData.firstWhere(
+                          (item) => item['post_id'].toString() == product.id,
+                          orElse: () => {'created_on': ''},
+                        );
+                        return _buildProductCard(product, shortlistItem);
+                      },
                     ),
-                  ],
-                ),
-              )
-              : ListView.builder(
-                padding: const EdgeInsets.all(8),
-                itemCount: shortlistedProducts.length,
-                itemBuilder: (context, index) {
-                  final product = shortlistedProducts[index];
-                  final shortlistItem = shortlistData.firstWhere(
-                    (item) => item['post_id'].toString() == product.id,
-                    orElse: () => {'created_on': ''},
-                  );
-                  return _buildProductCard(product, shortlistItem);
-                },
-              ),
     );
   }
 }

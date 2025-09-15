@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/model/user_model.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
@@ -19,6 +21,7 @@ import 'package:lelamonline_flutter/feature/categories/services/details_service.
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
@@ -352,7 +355,61 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text(
+          'Login Required',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Please log in to $action.',
+          style: const TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.pushNamed(RouteNames.loginPage);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text(
+              'Log In',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      );
+    },
+  );
+}
+
   void showProductBidDialog(BuildContext context) async {
+
+if (!_userProvider.isLoggedIn) {
+    _showLoginPromptDialog(context, 'place a bid');
+    return;
+  }
+
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
     final TextEditingController _bidController = TextEditingController();
@@ -420,7 +477,7 @@ class _MarketPlaceProductDetailsPageState
                   if (isSuccess) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => MyBidsWidget()),
+                      MaterialPageRoute(builder: (context) => BuyingStatusPage()),
                     );
                   }
                 },
@@ -1157,15 +1214,6 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<void> _fixMeeting(DateTime selectedDate) async {
-    if (_userProvider.userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in to schedule a meeting'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
     try {
       final headers = {'token': token};
@@ -1219,6 +1267,10 @@ class _MarketPlaceProductDetailsPageState
   }
 
   void _showMeetingDialog(BuildContext context) {
+   if (!_userProvider.isLoggedIn) {
+    _showLoginPromptDialog(context, 'schedule a meeting');
+    return;
+  }
     DateTime selectedDate = DateTime.now();
     showDialog(
       context: context,
