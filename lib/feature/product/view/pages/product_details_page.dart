@@ -1192,15 +1192,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                 builder: (context) {
                                   return ChatOptionsDialog(
                                     onChatWithSupport: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => SupportTicketPage(
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder:
+                                      //         (context) => SupportTicketPage(
                                                
-                                              ),
-                                        ),
-                                      );
+                                      //         ),
+                                      //   ),
+                                      // );
                                     },
                                     onChatWithSeller: () {
                                       Navigator.push(

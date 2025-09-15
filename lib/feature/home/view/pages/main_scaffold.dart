@@ -34,6 +34,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void initState() {
     super.initState();
+    print('MainScaffold initialized'); // Debug print for navigation
     adData = widget.adData;
   }
 
@@ -43,21 +44,17 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   List<Widget> get _pages => [
-    HomePage(),
-    isStatus
-        ? BuyingStatusPage()
-        : SupportTicketPage(),
-    isStatus ? SellingStatusPage (adData: adData) : SellPage(),
-    isStatus
-        ? ShortListPage( )
-        : StatusPage(),
-    Center(
-      child: Text(
-        'Profile: User ID ${userId ?? 'Unknown'}',
-        style: const TextStyle(fontSize: 16),
-      ),
-    ),
-  ];
+        HomePage(),
+        isStatus ? BuyingStatusPage() : ChatListPage(),
+        isStatus ? SellingStatusPage(adData: adData) : SellPage(),
+        isStatus ? ShortListPage() : StatusPage(),
+        Center(
+          child: Text(
+            'Profile: User ID ${userId ?? 'Unknown'}',
+            style: const TextStyle(fontSize: 16),
+          ),
+        ),
+      ];
 
   Future<bool> _onWillPop() async {
     if (currentIndex != 0) {
@@ -70,21 +67,20 @@ class _MainScaffoldState extends State<MainScaffold> {
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Exit App'),
-            content: const Text('Are you sure you want to exit the app?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Exit'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Exit App'),
+        content: const Text('Are you sure you want to exit the app?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
     );
 
     return shouldExit ?? false;
@@ -101,52 +97,53 @@ class _MainScaffoldState extends State<MainScaffold> {
         body: SafeArea(child: _pages[currentIndex]),
         bottomNavigationBar: SafeArea(
           bottom: true,
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            currentIndex: currentIndex,
-            onTap: (index) {
-              if (kDebugMode) print('Selected index: $index');
-              if (index == 4) {
-                _scaffoldKey.currentState?.openDrawer();
-                return;
-              }
-              setState(() {
-                currentIndex = index;
-                if (index == 0) {
-                  isStatus = false;
-                } else if (index == 3) {
-                  isStatus = true;
+          child: Container(
+            height: 35, // Reduced height for BottomNavigationBar
+            child: BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              currentIndex: currentIndex,
+              onTap: (index) {
+                if (kDebugMode) print('Selected index: $index');
+                if (index == 4) {
+                  _scaffoldKey.currentState?.openDrawer();
+                  return;
                 }
-              });
-            },
-            selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
-            unselectedItemColor: Colors.grey,
-            showUnselectedLabels: true,
-            showSelectedLabels: true,
-            selectedLabelStyle: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w600,
-            ),
-            unselectedLabelStyle: const TextStyle(fontSize: 8),
-            selectedFontSize: 8,
-            unselectedFontSize: 8,
-            iconSize: 14,
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+                setState(() {
+                  currentIndex = index;
+                  if (index == 0) {
+                    isStatus = false;
+                  } else if (index == 3) {
+                    isStatus = true;
+                  }
+                });
+              },
+              selectedItemColor: isStatus ? Colors.redAccent : Colors.black,
+              unselectedItemColor: Colors.grey,
+              showUnselectedLabels: true,
+              showSelectedLabels: true,
+              selectedLabelStyle: const TextStyle(
+                fontSize: 7, // Reduced font size
+                fontWeight: FontWeight.w600,
               ),
-              BottomNavigationBarItem(
-                icon: Icon(
-                  isStatus ? Icons.shopping_cart : Icons.support_agent,
+              unselectedLabelStyle: const TextStyle(fontSize: 7), // Reduced font size
+              selectedFontSize: 7,
+              unselectedFontSize: 7,
+              iconSize: 16, // Reduced icon size
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Home',
                 ),
-                label: isStatus ? 'Buying' : 'Support',
-              ),
-              BottomNavigationBarItem(
-                icon:
-                    isStatus
-                        ? const Icon(Icons.sell)
-                        : FittedBox(
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    isStatus ? Icons.add_shopping_cart : Icons.chat_bubble_outline,
+                  ),
+                  label: isStatus ? 'Buying' : 'Chat',
+                ),
+                BottomNavigationBarItem(
+                  icon: isStatus
+                      ? const Icon(Icons.sell)
+                      : FittedBox(
                           fit: BoxFit.contain,
                           child: Container(
                             padding: const EdgeInsets.all(1),
@@ -156,22 +153,23 @@ class _MainScaffoldState extends State<MainScaffold> {
                             ),
                             child: const Icon(
                               Icons.add,
-                              size: 12,
+                              size: 10, // Reduced icon size
                               color: Color.fromARGB(255, 12, 9, 233),
                             ),
                           ),
                         ),
-                label: isStatus ? 'Selling' : 'Sell',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(isStatus ? Icons.star : Icons.stream_outlined),
-                label: isStatus ? 'Short List' : 'Status',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.more_vert),
-                label: 'More',
-              ),
-            ],
+                  label: isStatus ? 'Selling' : 'Sell',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(isStatus ? Icons.star : Icons.stream_outlined),
+                  label: isStatus ? 'Short List' : 'Status',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.more_vert),
+                  label: 'More',
+                ),
+              ],
+            ),
           ),
         ),
       ),

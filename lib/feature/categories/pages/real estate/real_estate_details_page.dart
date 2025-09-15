@@ -1087,11 +1087,11 @@ class _RealEstateProductDetailsPageState
                                 builder: (context) {
                                   return ChatOptionsDialog(
                                     onChatWithSupport: () {
-                                      Navigator.push(
-                                        context,
-                                        SupportTicketPage()
-                                            as Route<Object?>,
-                                      );
+                                      // Navigator.push(
+                                      //   context,
+                                      //   SupportTicketPage()
+                                      //       as Route<Object?>,
+                                      // );
                                     },
                                     onChatWithSeller: () {
                                       Navigator.push(

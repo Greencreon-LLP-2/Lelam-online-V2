@@ -32,6 +32,7 @@ dependencies:
   hive_flutter: ^1.1.0
   retry: ^3.1.2
   flutter_native_splash: ^2.4.6
+  flutter_svg: ^2.2.1
 
   
   
@@ -42,7 +43,12 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/lelam_logo.png"
 
 flutter:
 
@@ -52,4 +58,5 @@ flutter:
   assets:
     - assets/images/
     - assets/
+    - assets/icons/
 

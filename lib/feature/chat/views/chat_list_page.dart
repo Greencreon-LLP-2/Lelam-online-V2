@@ -7,6 +7,8 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // Add flutter_svg package
 
 class ChatListPage extends HookWidget {
   const ChatListPage({super.key});
@@ -20,8 +22,21 @@ class ChatListPage extends HookWidget {
     final isFetchingUsers = useState(false);
     final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     final userId = userProvider.userId ?? '';
-    final userName = userProvider.userData?.name ?? 'Guest User'; 
+    final userName = userProvider.userData?.name ?? 'Guest User';
 
+    // Function to open WhatsApp
+    Future<void> _openWhatsApp() async {
+      const phoneNumber = '1234567890'; // Replace with your support phone number
+      final whatsappUrl = 'https://wa.me/$phoneNumber?text=Hello%20Support%20Team';
+      
+      if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
+        await launchUrl(Uri.parse(whatsappUrl));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open WhatsApp')),
+        );
+      }
+    }
 
     Future<void> _fetchOtherUsers(
       String userId,
@@ -263,6 +278,31 @@ class ChatListPage extends HookWidget {
             preferredSize: const Size.fromHeight(1),
             child: Divider(height: 1, thickness: 0.5, color: Colors.grey[200]),
           ),
+        ),
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text(
+              'Support',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            FloatingActionButton(
+              onPressed: _openWhatsApp,
+              backgroundColor: const Color(0xFF25D366),
+              child: SvgPicture.asset(
+                'assets/icons/whatsapp_icon.svg', 
+                width: 24,
+                height: 24,
+               // colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+              ),
+            ),
+          ],
         ),
         body: isLoading.value
             ? const Center(

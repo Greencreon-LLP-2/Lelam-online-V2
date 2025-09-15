@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/utils/splash_page.dart';
 import 'package:provider/provider.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
@@ -21,19 +22,22 @@ import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_ca
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: RouteNames.mainscaffold,
+  initialLocation: '/', // Set SplashScreen as the initial route
   routes: [
+    // Splash Screen Route
+    GoRoute(
+      path: '/',
+      name: 'splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+
     /// PUBLIC ROUTES
     GoRoute(
       path: RouteNames.loginPage,
       name: RouteNames.loginPage,
-      builder:
-          (context, state) => LoginPage(
-            extra:
-                state.extra is Map<String, dynamic>
-                    ? state.extra as Map<String, dynamic>
-                    : null,
-          ),
+      builder: (context, state) => LoginPage(
+        extra: state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null,
+      ),
     ),
     GoRoute(
       path: RouteNames.categoriespage,
@@ -95,9 +99,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/ad-post',
       name: RouteNames.adPostPage,
-      builder:
-          (context, state) =>
-              AdPostPage(extra: state.extra as Map<String, dynamic>?),
+      builder: (context, state) => AdPostPage(extra: state.extra as Map<String, dynamic>?),
     ),
     GoRoute(
       path: RouteNames.usedCarsPage,
@@ -107,9 +109,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RouteNames.marketPlaceProductDetailsPage,
       name: RouteNames.marketPlaceProductDetailsPage,
-      builder:
-          (context, state) =>
-              const MarketPlaceProductDetailsPage(product: null),
+      builder: (context, state) => const MarketPlaceProductDetailsPage(product: null),
     ),
 
     /// MAIN SCAFFOLD (always load)
@@ -156,8 +156,7 @@ final GoRouter appRouter = GoRouter(
   ],
 
   /// Error fallback
-  errorBuilder:
-      (context, state) => Scaffold(
-        body: Center(child: Text('Something went wrong in navigation')),
-      ),
+  errorBuilder: (context, state) => Scaffold(
+    body: Center(child: Text('Something went wrong in navigation')),
+  ),
 );

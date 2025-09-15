@@ -1,6 +1,6 @@
 class RouteNames {
   static const String categoriespage = "/categoriespage";
-  static const String mainscaffold = "/";
+  static const String mainscaffold = "/mainscaffold";
   static const String homepage = "/homepage";
   static const String sellpage = "/sellpage";
   static const String shortlistpage = "/shortlistpage";
