@@ -43,12 +43,10 @@ class _SellPageState extends State<SellPage> {
 
   Future<bool> _checkPostLimit(String categoryId) async {
     try {
-      // Reverted to original endpoint (exists on server and returns JSON)
       final response = await http.get(
         Uri.parse(
           'https://lelamonline.com/admin/api/v1/select-category.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=${_userProvider.userId}&cat_id=$categoryId',
         ),
-        headers: {'token': '5cb2c9b569416b5db1604e0e12478ded'},
       );
 
       if (response.statusCode == 200) {
@@ -102,10 +100,10 @@ class _SellPageState extends State<SellPage> {
 
     final canPost = await _checkPostLimit(categoryId);
     if (!canPost) {
-      return; // Dialog shown in _checkPostLimit, or failed silently
+      return; 
     }
 
-    // Pass extra as Map<String, dynamic> for type safety
+
     final extraData = <String, dynamic>{'categoryId': categoryId};
 
     if (mounted) {

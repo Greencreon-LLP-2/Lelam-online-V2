@@ -6,14 +6,15 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/seller_tab_bar_widget.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:provider/provider.dart';
 
 class MyAdsWidget extends StatefulWidget {
-  final String? userId;
   final Map<String, dynamic>? adData;
 
-  const MyAdsWidget({super.key, this.userId, this.adData});
+  const MyAdsWidget({super.key, this.adData});
 
   @override
   State<MyAdsWidget> createState() => _MyAdsWidgetState();
@@ -29,12 +30,14 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
   static const String phpSessId = 'g6nr0pkfdnp6o573mn9srq20b4';
   Timer? _refreshTimer;
+  late final LoggedUserProvider _userProvider;
 
   @override
   void initState() {
     super.initState();
+      _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _loadAds();
-    // Periodically refresh ads to ensure new ads are fetched
+   
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) _loadAds();
     });
@@ -46,12 +49,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       errorMessage = null;
     });
 
-    print('MyAdsWidget - userId: ${widget.userId}');
-    print('MyAdsWidget - adData: ${widget.adData}');
+
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/sell.php?token=$token&user_id=${widget.userId}'),
+        Uri.parse('$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}'),
         headers: {'token': token, 'Cookie': 'PHPSESSID=$phpSessId'},
       );
 
@@ -61,12 +63,10 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final fetchedAds = List<Map<String, dynamic>>.from(responseData['data']);
 
-          // Initialize expanded images
           for (var ad in fetchedAds) {
             _expandedImages[ad['id']] = false;
           }
 
-          // Add adData if provided and not already in fetched ads
           if (widget.adData != null) {
             final passedAdId = widget.adData!['id'];
             final isAlreadyIncluded = fetchedAds.any((ad) => ad['id'] == passedAdId);
@@ -257,7 +257,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   Future<void> _acceptTerms(String postId) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/seller-accept-terms.php?token=$token&post_id=$postId&user_id=${widget.userId}'),
+        Uri.parse('$baseUrl/seller-accept-terms.php?token=$token&post_id=$postId&user_id=${_userProvider.userId}'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=$phpSessId',
@@ -392,7 +392,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   Future<void> _deleteAd(String adId) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/sell.php?token=$token&user_id=${widget.userId}'),
+        Uri.parse('$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}'),
         headers: {
           'token': token,
           'Cookie': 'PHPSESSID=$phpSessId',
@@ -401,7 +401,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         body: {'id': adId, 'action': 'delete'},
       );
 
-      print('Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${widget.userId}');
+      print('Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}');
       print('Delete ad request body: id=$adId, action=delete');
       print('Delete ad response status: ${response.statusCode}');
       print('Delete ad response body: ${response.body}');
@@ -516,7 +516,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                       context.pushNamed(
                         RouteNames.adPostPage,
                         extra: {
-                          'userId': widget.userId,
                           'categoryId': ad['category_id']?.toString() ?? '',
                           'adData': ad,
                         },
@@ -658,7 +657,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               height: 250,
               child: SellerTabBarWidget(
                 adData: ad,
-                userId: widget.userId,
                 postId: ad['id'] as String,
               ),
             ),

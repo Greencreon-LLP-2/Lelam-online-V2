@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
@@ -17,6 +18,7 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
+import 'package:provider/provider.dart';
 
 class BikeDetailsPage extends StatefulWidget {
   final Bike bike;
@@ -45,10 +47,12 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
-  String? userId;
+   late final LoggedUserProvider _userProvider;
+
   @override
   void initState() {
     super.initState();
+     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _fetchLocations();
     _fetchSellerInfo();
   }
@@ -817,17 +821,6 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              if (userId == null || userId == 'Unknown') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please log in to chat with the seller',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
                               showDialog(
                                 context: context,
                                 builder: (context) {

@@ -1733,7 +1733,7 @@ class _MarketPlaceProductDetailsPageState
                                 );
                               },
                               icon: const Icon(Icons.call),
-                              label: const Text('Call Support'),
+                              label: const Text('Contact Seller'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,

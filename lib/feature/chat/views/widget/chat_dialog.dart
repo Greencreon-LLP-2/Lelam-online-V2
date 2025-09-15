@@ -50,7 +50,7 @@ class ChatOptionsDialog extends StatelessWidget {
             'Call Support',
             style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
           ),
-          content: const Text('Contact support at: +1234567890'),
+          content: const Text('Contact support at: +918089308048'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -117,22 +117,7 @@ class ChatOptionsDialog extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ElevatedButton(
-              onPressed: () {
-                handleChat(context, 5, 'seller', onChatWithSeller);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 12.0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
-              child: const Text(
-                'Chat with Seller',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
+           
             const SizedBox(height: 8.0),
             ElevatedButton(
               onPressed: () {
@@ -146,7 +131,23 @@ class ChatOptionsDialog extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Call Support',
+                'Call Sales Expert',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+             ElevatedButton(
+              onPressed: () {
+                handleChat(context, 5, 'seller', onChatWithSeller);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(vertical: 12.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+              ),
+              child: const Text(
+                'Chat with Seller',
                 style: TextStyle(color: Colors.white),
               ),
             ),

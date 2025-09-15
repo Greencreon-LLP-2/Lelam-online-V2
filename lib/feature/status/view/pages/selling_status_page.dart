@@ -4,7 +4,7 @@ import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/m
 
 class SellingStatusPage extends StatelessWidget {
   final String? userId;
-  final Map<String, dynamic>? adData; // Add this parameter
+  final Map<String, dynamic>? adData; 
   
   const SellingStatusPage({super.key, this.userId, this.adData});
 
@@ -33,7 +33,7 @@ class SellingStatusPage extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            MyAdsWidget(userId: userId, adData: adData), // Pass adData here
+            MyAdsWidget( adData: adData), // Pass adData here
             const Center(child: Text('Sold')),
           ],
         ),

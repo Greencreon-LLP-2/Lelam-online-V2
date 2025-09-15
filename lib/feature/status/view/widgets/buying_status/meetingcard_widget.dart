@@ -43,7 +43,6 @@ class MeetingCard extends StatelessWidget {
         ),
         headers: {
           'token': token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
       if (response.statusCode == 200) {
@@ -85,7 +84,6 @@ class MeetingCard extends StatelessWidget {
         ),
         headers: {
           'token': token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
       if (response.statusCode == 200) {
@@ -111,7 +109,6 @@ class MeetingCard extends StatelessWidget {
         ),
         headers: {
           'token': token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
       if (response.statusCode == 200) {
@@ -135,7 +132,6 @@ class MeetingCard extends StatelessWidget {
         ),
         headers: {
           'token': token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
       if (response.statusCode == 200) {
@@ -173,7 +169,6 @@ class MeetingCard extends StatelessWidget {
         ),
         headers: {
           'token': token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
       if (response.statusCode == 200) {

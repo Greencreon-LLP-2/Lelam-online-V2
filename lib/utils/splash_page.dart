@@ -37,13 +37,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         print('Attempting to navigate to ${RouteNames.mainscaffold}'); // Debug print
         try {
           context.go(RouteNames.mainscaffold);
         } catch (e) {
-          print('Navigation error: $e'); // Debug print
+          print('Navigation error: $e'); 
         }
       } else {
         print('Widget not mounted, skipping navigation');
@@ -73,7 +73,7 @@ backgroundColor: Color(0xFF3261AB),
                 FadeTransition(
                   opacity: _imageFadeAnimation,
                   child: Image.asset(
-                    'assets/images/lelam_logo.png', // Ensure this path is correct
+                    'assets/images/lelam_logo.png',
                     width: 200,
                     height: 200,
                   ),
