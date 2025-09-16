@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_list_page.dart';
@@ -7,7 +11,6 @@ import 'package:lelamonline_flutter/feature/home/view/pages/home_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/app_drawer.dart';
 import 'package:lelamonline_flutter/feature/sell/view/pages/sell_page.dart';
 import 'package:lelamonline_flutter/feature/shortlist/views/short_list_page.dart';
-
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/status_page.dart';
@@ -26,21 +29,171 @@ class _MainScaffoldState extends State<MainScaffold> {
   int currentIndex = 0;
   bool isStatus = false;
   String? userId;
-  String? sessionId;
   Map<String, dynamic>? adData;
   bool isLoading = true;
+  bool _hasShownNameDialog = false; // Flag to track if dialog has been shown
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _nameController = TextEditingController();
+   late final LoggedUserProvider _userProvider;
 
   @override
   void initState() {
     super.initState();
-    print('MainScaffold initialized'); // Debug print for navigation
+    print('MainScaffold initialized');
+     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     adData = widget.adData;
+    // Check user data and show name dialog if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowNameDialog();
+    });
   }
 
   @override
-  void didUpdateWidget(MainScaffold oldWidget) {
-    super.didUpdateWidget(oldWidget);
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _checkAndShowNameDialog() {
+    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    if (kDebugMode) {
+      print('Checking dialog conditions:');
+      print('userId: ${userProvider.userData?.userId}');
+      print('name: ${userProvider.userData?.name}');
+      print('hasShownNameDialog: $_hasShownNameDialog');
+    }
+    // Show dialog only if userId exists, name is null/empty, and dialog hasn't been shown
+    if (userProvider.userData?.userId != null &&
+        (userProvider.userData?.name == null || userProvider.userData!.name.isEmpty) &&
+        !_hasShownNameDialog) {
+      _showNameDialog();
+    }
+  }
+
+  // Show name input dialog
+  void _showNameDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent closing without action
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          title: const Text(
+            'Please enter your name to continue',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          content: TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              hintText: 'Your name',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _hasShownNameDialog = true; // Mark dialog as shown
+                });
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (_nameController.text.isNotEmpty &&
+                    _nameController.text.length >= 2) {
+                  _saveName();
+                } else {
+                  Fluttertoast.showToast(
+                    msg: "Please enter a valid name (at least 2 characters)",
+                    toastLength: Toast.LENGTH_SHORT,
+                    gravity: ToastGravity.BOTTOM,
+                    backgroundColor: Colors.red.withOpacity(0.8),
+                    textColor: Colors.white,
+                    fontSize: 16.0,
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+              ),
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _saveName() async {
+    try {
+      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+      final changedFields = <String, String>{
+        'user_id': userProvider.userData?.userId ?? '',
+        'name': _nameController.text,
+      };
+
+      final response = await ApiService().postMultipart(
+        url: userProfileUpdate,
+        fields: changedFields,
+        fileField: "image",
+        filePath: null,
+      );
+
+      if (response["status"] == true && response["code"] == 200) {
+        final updatedUserData = UserData.fromJson(response["data"]);
+        await userProvider.setUser(updatedUserData);
+        Fluttertoast.showToast(
+          msg: "Name updated successfully",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+        setState(() {
+          _hasShownNameDialog = true; 
+        });
+        Navigator.of(context).pop();
+      } else {
+        Fluttertoast.showToast(
+          msg: response["data"].toString(),
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error: $e",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
 
   List<Widget> get _pages => [
@@ -88,6 +241,8 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    userId = userProvider.userData?.userId; // Update userId for profile page
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(

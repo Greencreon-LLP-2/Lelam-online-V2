@@ -41,20 +41,24 @@ class _ShortListPageState extends State<ShortListPage> {
   @override
   void initState() {
     super.initState();
+    debugPrint('ShortListPage - initState: Starting initialization');
     _initialize();
   }
 
   Future<void> _initialize() async {
     await _loadUserId();
-    await _fetchLocations();
-    if (userId != null && userId != 'Unknown') {
-      await _fetchShortlistedItems();
-    } else {
+    debugPrint('ShortListPage - _initialize: userId=$userId, errorMessage=$errorMessage');
+    if (userId == null || userId!.isEmpty) {
       setState(() {
         errorMessage = 'please_login';
         isLoading = false;
+        _isLoadingLocations = false;
       });
+      debugPrint('ShortListPage - _initialize: Set please_login due to null/empty userId');
+      return;
     }
+    await _fetchLocations();
+    await _fetchShortlistedItems();
   }
 
   Future<void> _loadUserId() async {
@@ -64,9 +68,12 @@ class _ShortListPageState extends State<ShortListPage> {
     );
     final userData = userProvider.userData;
     setState(() {
-      userId = userData?.userId ?? 'Unknown';
-      debugPrint('ShortListPage - Loaded userId: $userId');
-      if (userId == 'Unknown') {
+      userId = userData?.userId;
+      debugPrint('ShortListPage - _loadUserId: userId=$userId, userData?.userId=${userData?.userId}');
+      if (userId == null || userId!.isEmpty) {
+        errorMessage = 'please_login';
+        isLoading = false;
+        _isLoadingLocations = false;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('User ID not found. Please log in again.'),
@@ -97,7 +104,7 @@ class _ShortListPageState extends State<ShortListPage> {
         throw Exception('Invalid API response format');
       }
     } catch (e) {
-      debugPrint('Error fetching locations: $e');
+      debugPrint('ShortListPage - _fetchLocations: Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
@@ -105,11 +112,13 @@ class _ShortListPageState extends State<ShortListPage> {
   }
 
   Future<void> _fetchShortlistedItems() async {
-    if (userId == null || userId == 'Unknown') {
+    if (userId == null || userId!.isEmpty) {
       setState(() {
         errorMessage = 'please_login';
         isLoading = false;
+        _isLoadingLocations = false;
       });
+      debugPrint('ShortListPage - _fetchShortlistedItems: Set please_login due to null/empty userId');
       return;
     }
 
@@ -124,7 +133,7 @@ class _ShortListPageState extends State<ShortListPage> {
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url = '$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId';
-      debugPrint('Fetching shortlisted items: $url');
+      debugPrint('ShortListPage - _fetchShortlistedItems: Fetching shortlisted items: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -159,7 +168,7 @@ class _ShortListPageState extends State<ShortListPage> {
         throw Exception('Failed to load shortlist: ${response.reasonPhrase}');
       }
     } catch (e) {
-      debugPrint('Error fetching shortlist: $e');
+      debugPrint('ShortListPage - _fetchShortlistedItems: Error fetching shortlist: $e');
       setState(() {
         errorMessage = 'Error loading shortlist: $e';
         isLoading = false;
@@ -169,7 +178,6 @@ class _ShortListPageState extends State<ShortListPage> {
 
   Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
     List<Product> products = [];
-    // Fetch marketplace and auction posts concurrently
     try {
       final results = await Future.wait([
         _marketplaceService.fetchPosts(
@@ -240,11 +248,11 @@ class _ShortListPageState extends State<ShortListPage> {
           );
           products.add(matchingPost.toProduct());
         } catch (e) {
-          debugPrint('Error fetching product for post_id $postId: $e');
+          debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching product for post_id $postId: $e');
         }
       }
     } catch (e) {
-      debugPrint('Error fetching posts: $e');
+      debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching posts: $e');
     }
     return products;
   }
@@ -447,7 +455,12 @@ class _ShortListPageState extends State<ShortListPage> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('STARTING WIDGET UPDATE');
+    debugPrint('ShortListPage - build: userId=$userId, errorMessage=$errorMessage, isLoading=$isLoading, _isLoadingLocations=$_isLoadingLocations');
+    if (errorMessage == 'please_login') {
+      debugPrint('ShortListPage - build: Rendering login button due to please_login');
+    } else if (isLoading || _isLoadingLocations) {
+      debugPrint('ShortListPage - build: Rendering shimmer effect');
+    }
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -456,83 +469,114 @@ class _ShortListPageState extends State<ShortListPage> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: isLoading || _isLoadingLocations
-          ? _buildShimmerEffect()
-          : errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 64,
-                        color: Colors.red,
+      body: errorMessage == 'please_login'
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // const Icon(
+                  //   Icons.error_outline,
+                  //   size: 64,
+                  //   color: Colors.red,
+                  // ),
+                  const SizedBox(height: 16),
+                
+               
+                  ElevatedButton(
+                    
+                    onPressed: () {
+                      context.pushReplacementNamed(RouteNames.loginPage);
+                      debugPrint('ShortListPage - Navigating to login page');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 0,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        errorMessage == 'please_login'
-                            ? 'Please log in to view your shortlist'
-                            : errorMessage!,
-                        style: const TextStyle(fontSize: 16, color: Colors.red),
-                        textAlign: TextAlign.center,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      if (errorMessage == 'please_login') ...[
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.pushReplacementNamed(RouteNames.loginPage);
-                            debugPrint('Navigating to login page');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            textStyle: const TextStyle(fontSize: 16),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Icon(
+                        //   Icons.login,
+                        //   color: Colors.white,
+                        //   size: 20.0,
+                        // ),
+                        SizedBox(width: 8.0),
+                        Text(
+                          'Please Login to View Shortlist',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: const Text('Log In'),
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                )
-              : shortlistedProducts.isEmpty
+                ],
+              ),
+            )
+          : isLoading || _isLoadingLocations
+              ? _buildShimmerEffect()
+              : errorMessage != null
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.favorite_border,
+                          const Icon(
+                            Icons.error_outline,
                             size: 64,
-                            color: Colors.grey[400],
+                            color: Colors.red,
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No shortlisted items found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey[600],
-                            ),
+                            errorMessage!,
+                            style: const TextStyle(fontSize: 16, color: Colors.red),
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: shortlistedProducts.length,
-                      itemExtent: 150, // Fixed height for better performance
-                      itemBuilder: (context, index) {
-                        final product = shortlistedProducts[index];
-                        final shortlistItem = shortlistData.firstWhere(
-                          (item) => item['post_id'].toString() == product.id,
-                          orElse: () => {'created_on': ''},
-                        );
-                        return _buildProductCard(product, shortlistItem);
-                      },
-                    ),
+                  : shortlistedProducts.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite_border,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No shortlisted items found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(8),
+                          itemCount: shortlistedProducts.length,
+                          itemExtent: 150, // Fixed height for better performance
+                          itemBuilder: (context, index) {
+                            final product = shortlistedProducts[index];
+                            final shortlistItem = shortlistData.firstWhere(
+                              (item) => item['post_id'].toString() == product.id,
+                              orElse: () => {'created_on': ''},
+                            );
+                            return _buildProductCard(product, shortlistItem);
+                          },
+                        ),
     );
   }
 }

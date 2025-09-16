@@ -121,9 +121,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
       }
     } catch (e) {
-      print('Error loading ads: $e');
+      print('No ads Found');
       setState(() {
-        errorMessage = 'Error loading ads: $e';
+        errorMessage = '$e';
         isLoading = false;
       });
     }

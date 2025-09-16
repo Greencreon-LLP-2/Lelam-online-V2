@@ -521,7 +521,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         } else {
           debugPrint('Unexpected response format: ${responseData.toString()}');
-          errorMessage = 'Unexpected response format from server';
+          errorMessage = 'Currently No data';
         }
 
         debugPrint('Total meetings loaded: ${meetings.length}');

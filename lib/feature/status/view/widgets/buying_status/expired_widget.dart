@@ -15,7 +15,6 @@ class ExpiredMeetingsPage extends StatefulWidget {
 }
 
 class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
-  String token = "5cb2c9b569416b5db1604e0e12478ded";
   List<dynamic> meetings = [];
   bool isLoading = true;
   String? userId; // Add userId variable
@@ -31,8 +30,7 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   Future<void> _loadConfigAndFetchMeetings() async {
     final userData = userProvider.userData;
     setState(() {
-     // token = userData?.authToken ?? token; // Adjust field name as needed
-      userId = userData?.userId ?? 'Unknown'; // Adjust field name as needed
+      userId = userData?.userId ?? 'Unknown'; 
       isLoading = true;
     });
 

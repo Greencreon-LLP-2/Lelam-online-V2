@@ -1,33 +1,39 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class AuctionService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
   // Fetch bid history
-  Future<List<Map<String, dynamic>>> fetchBidHistory(String postId) async {
-    final url = '$baseUrl/auction-bid-history.php?token=$token&post_id=$postId';
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
-          return List<Map<String, dynamic>>.from(jsonResponse['data']);
-        } else if (jsonResponse['data'] == 'No one yet placed a bid !') {
-          return [];
-        } else {
-          throw Exception('Invalid bid history response');
-        }
+Future<List<Map<String, dynamic>>> fetchBidHistory(String postId) async {
+  final url = '$baseUrl/auction-bid-history.php?token=$token&post_id=$postId';
+  try {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
+        return List<Map<String, dynamic>>.from(jsonResponse['data']).map((bid) {
+          return {
+            'bidder': bid['user_name'] ?? 'Unknown',
+            'amount': '₹${NumberFormat('#,##0').format(double.tryParse(bid['amount'] ?? '0')?.toInt() ?? 0)}',
+            'time': 'N/A', // Set to 'N/A' since API doesn't provide timestamp
+          };
+        }).toList();
+      } else if (jsonResponse['data'] == 'No one yet placed a bid !') {
+        return [];
       } else {
-        throw Exception('Failed to load bid history: ${response.statusCode}');
+        throw Exception('Invalid bid history response');
       }
-    } catch (e) {
-      print('Error fetching bid history: $e');
-      throw Exception('Error fetching bid history: $e');
+    } else {
+      throw Exception('Failed to load bid history: ${response.statusCode}');
     }
+  } catch (e) {
+    print('Error fetching bid history: $e');
+    throw Exception('Error fetching bid history: $e');
   }
-
+}
   // Fetch minimum bid increment
   Future<int> fetchMinBidIncrement(String postId) async {
     final url = '$baseUrl/auction-increase-min-bid-value.php?token=$token&post_id=$postId';

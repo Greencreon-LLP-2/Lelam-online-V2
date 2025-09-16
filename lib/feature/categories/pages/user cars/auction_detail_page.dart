@@ -8,13 +8,10 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/auction_cars_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
+import 'package:lelamonline_flutter/feature/categories/services/auction_cars_service.dart';
+import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
@@ -39,13 +36,12 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   bool _isLoadingLocations = true;
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
+  String attributesErrorMessage = '';
   List<LocationData> _locations = [];
+  List<SellerComment> uniqueSellerComments = [];
+  List<SellerComment> detailComments = [];
 
   final AuctionService _auctionService = AuctionService();
-  List<Attribute> attributes = [];
-  List<AttributeVariation> attributeVariations = [];
-  Map<String, String> attributeValues = {};
-  List<MapEntry<String, String>> orderedAttributeValues = [];
   List<Map<String, dynamic>> _bidHistory = [];
   int _currentBid = 0;
   double _minBidIncrement = 0.0;
@@ -117,10 +113,13 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     setState(() {
       userId = userData?.userId ?? '';
     });
-    debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
+    debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
   }
 
   Future<void> _fetchLocations() async {
+    setState(() {
+      _isLoadingLocations = true;
+    });
     try {
       final Map<String, dynamic> response = await ApiService().get(
         url: locations,
@@ -132,7 +131,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          debugPrint(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -140,7 +139,83 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         throw Exception('Invalid API response format');
       }
     } catch (e) {
-      print(e);
+      debugPrint('Error fetching locations: $e');
+      setState(() {
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  Future<void> _fetchAttributesData() async {
+    setState(() {
+      _isLoading = true;
+      attributesErrorMessage = '';
+    });
+
+    try {
+      const token = '5cb2c9b569416b5db1604e0e12478ded';
+      final headers = {'token': token};
+      final url =
+          'https://lelamonline.com/admin/api/v1/post-attribute-values.php?token=$token&post_id=$id';
+      debugPrint('Fetching attributes: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Attributes API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final sellerComments = SellerCommentsModel.fromJson(responseData);
+
+        final Map<String, SellerComment> uniqueAttributes = {};
+        final List<SellerComment> orderedComments = [];
+
+        // Process attributes for uniqueness
+        for (var comment in sellerComments.data) {
+          final key = comment.attributeName
+              .toLowerCase()
+              .replaceAll(RegExp(r'\s+'), '');
+          if (!uniqueAttributes.containsKey(key)) {
+            uniqueAttributes[key] = comment;
+            orderedComments.add(comment);
+          }
+        }
+
+        setState(() {
+          uniqueSellerComments = orderedComments;
+
+          // Filter for Details section
+          detailComments = uniqueSellerComments.where((comment) {
+            final name = comment.attributeName.toLowerCase().trim();
+            return [
+              'year',
+              'no of owners',
+              'fuel type',
+              'transmission',
+              'km range'
+            ].contains(name);
+          }).toList();
+
+          debugPrint(
+            'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+          debugPrint(
+            'Filtered detailComments: ${detailComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+        });
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching attributes: $e');
+      setState(() {
+        attributesErrorMessage = 'Failed to load attributes: $e';
+      });
     }
   }
 
@@ -151,44 +226,38 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     });
 
     try {
-      _fetchLocations();
+      await Future.wait([
+        _fetchLocations(),
+        _fetchAttributesData(),
+        _auctionService.fetchBidHistory(id).then((value) {
+          _bidHistory = value;
+        }),
+        _auctionService.fetchMinBidIncrement(id).then((value) {
+          _minBidIncrement = value.toDouble();
+        }),
+      ]);
 
-      attributes = await TempApiService.fetchAttributes();
-      attributeVariations = await TempApiService.fetchAttributeVariations(
-        widget.product.filters,
-      );
-      final attributeValuePairs =
-          await AttributeValueService.fetchAttributeValuePairs();
-      _mapFiltersToValues(attributeValuePairs);
-
-      _bidHistory = await _auctionService.fetchBidHistory(id);
-      _minBidIncrement = double.tryParse(auctionPriceIntervel) ?? 2500.0;
-
-      // Fallback to local calculation if API fails (e.g., _currentHighestBid starts with 'Error')
-      if (_currentHighestBid == '0' || _currentHighestBid.startsWith('Error')) {
-        _currentBid =
-            _bidHistory.isNotEmpty
-                ? int.tryParse(
-                      _bidHistory[0]['amount']
-                              ?.replaceAll('₹', '')
-                              .replaceAll(',', '') ??
-                          '0',
-                    ) ??
-                    0
-                : int.tryParse(auctionStartingPrice) ?? 0;
-      } else {
-        _currentBid = int.tryParse(_currentHighestBid) ?? 0;
-      }
-
+      // Set _currentHighestBid and _currentBid
       setState(() {
+        if (_bidHistory.isNotEmpty) {
+          _currentHighestBid = _bidHistory[0]['amount']
+                  ?.replaceAll('₹', '')
+                  .replaceAll(',', '') ??
+              '0';
+          _currentBid = int.tryParse(_currentHighestBid) ?? 0;
+        } else {
+          _currentHighestBid = auctionStartingPrice;
+          _currentBid = int.tryParse(auctionStartingPrice) ?? 0;
+        }
         _isLoading = false;
         _isLoadingLocations = false;
       });
     } catch (e) {
-      print('Error fetching auction data: $e');
+      debugPrint('Error fetching auction data: $e');
       setState(() {
         _isLoading = false;
         _isLoadingLocations = false;
+        _currentHighestBid = 'Error: Failed to fetch bid data';
       });
     }
   }
@@ -208,7 +277,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             jsonResponse['data'].isNotEmpty) {
           final data = jsonResponse['data'][0];
           setState(() {
-            sellerName = data['name'] ?? 'Unknown';
+            sellerName = data['user_name'] ?? 'Unknown';
             sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
             sellerActiveFrom = data['active_from'] ?? 'N/A';
@@ -234,150 +303,25 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     }
   }
 
-  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters as Map<String, dynamic>;
-    attributeValues.clear();
-    orderedAttributeValues.clear();
-
-    final Set<String> processedAttributes = {};
-
-    for (var pair in attributeValuePairs) {
-      if (pair.attributeName.isNotEmpty &&
-          pair.attributeValue.isNotEmpty &&
-          !processedAttributes.contains(pair.attributeName)) {
-        attributeValues[pair.attributeName] = pair.attributeValue;
-        orderedAttributeValues.add(
-          MapEntry(pair.attributeName, pair.attributeValue),
-        );
-        processedAttributes.add(pair.attributeName);
-      }
-    }
-
-    if (filters.containsKey('3')) {
-      String variationId;
-      if (filters['3'] is String) {
-        variationId = filters['3'] as String;
-      } else if (filters['3'] is List<dynamic> &&
-          (filters['3'] as List).isNotEmpty) {
-        variationId = (filters['3'] as List)[0].toString();
-      } else {
-        variationId = '';
-      }
-      if (variationId.isNotEmpty) {
-        attributeValues['KM Range'] = variationId;
-        final kmIndex = orderedAttributeValues.indexWhere(
-          (entry) => entry.key == 'KM Range',
-        );
-        if (kmIndex != -1) {
-          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
-        } else {
-          orderedAttributeValues.add(MapEntry('KM Range', variationId));
-        }
-        processedAttributes.add('KM Range');
-      }
-    }
-
-    filters.forEach((attributeId, variation) {
-      if (attributeId != '3') {
-        String variationId;
-        if (variation is String) {
-          variationId = variation;
-        } else if (variation is List<dynamic> && variation.isNotEmpty) {
-          variationId = variation[0].toString();
-        } else {
-          return;
-        }
-
-        if (variationId.isNotEmpty) {
-          final attribute = attributes.firstWhere(
-            (attr) => attr.id == attributeId,
-            orElse:
-                () => Attribute(
-                  id: attributeId,
-                  slug: '',
-                  name: _getAttributeNameFromId(attributeId),
-                  listOrder: '',
-                  categoryId: '',
-                  formValidation: '',
-                  ifDetailsIcons: '',
-                  detailsIcons: '',
-                  detailsIconsOrder: '',
-                  showFilter: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          if (!processedAttributes.contains(attribute.name)) {
-            final variationObj = attributeVariations.firstWhere(
-              (varAttr) =>
-                  varAttr.id == variationId &&
-                  varAttr.attributeId == attributeId,
-              orElse:
-                  () => AttributeVariation(
-                    id: variationId,
-                    attributeId: attributeId,
-                    name: '',
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
-            );
-            if (variationObj.name.isNotEmpty &&
-                variationObj.name != variationId) {
-              attributeValues[attribute.name] = variationObj.name;
-              orderedAttributeValues.add(
-                MapEntry(attribute.name, variationObj.name),
-              );
-              processedAttributes.add(attribute.name);
-            }
-          }
-        }
-      }
-    });
-  }
-
-  String _getAttributeNameFromId(String id) {
-    switch (id) {
-      case '1':
-        return 'Year';
-      case '2':
-        return 'No of owners';
-      case '3':
-        return 'KM Range';
-      case '4':
-        return 'Fuel Type';
-      case '5':
-        return 'Transmission';
-      case '6':
-        return 'Service History';
-      case '28':
-        return 'Sold by';
-      default:
-        return 'Unknown Attribute';
-    }
-  }
-
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -464,21 +408,19 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -505,8 +447,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -546,9 +487,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
+                                      duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -557,10 +496,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -571,22 +509,21 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
+                                        placeholder: (context, url) =>
+                                            const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
+                                          Icons.error,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -624,13 +561,12 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Enter your bid amount in rupees'),
+              const Text('Enter your bid amount in rupees'),
               const SizedBox(height: 16),
-
-              // Current Bid Info
               Text(
                 'Current Highest Bid',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(
@@ -638,33 +574,28 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ? _currentHighestBid
                     : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
                 style: TextStyle(
-                  color:
-                      _currentHighestBid.startsWith('Error')
-                          ? Colors.red
-                          : null,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
+                  color: _currentHighestBid.startsWith('Error')
+                      ? Colors.red
+                      : null,
                 ),
               ),
-
               if (isIncrease) ...[
                 const SizedBox(height: 8),
                 Text(
                   'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style:
+                      const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ],
-
               const SizedBox(height: 16),
-
-              // Bid Input Field
               TextField(
                 controller: bidAmountController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: false,
-                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: false),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   prefixText: '₹',
                   hintText: '0',
                   labelText: 'Enter bid amount',
@@ -676,7 +607,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -729,15 +660,15 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 try {
                   final success = await _auctionService.placeBid(
                     id,
-                    userId!, // Use actual userId from SharedPreferences
+                    userId!,
                     bidAmount,
                   );
                   if (success) {
                     setState(() {
                       _currentBid = bidAmount;
+                      _currentHighestBid = bidAmount.toString();
                       _bidHistory.insert(0, {
-                        'bidder':
-                            'You', // Replace with actual user name if available
+                        'bidder': 'You',
                         'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
                         'time': 'Just now',
                       });
@@ -773,6 +704,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
       },
     );
   }
+
   // void _showMeetingDialog(BuildContext context) {
   //   DateTime selectedDate = DateTime.now();
   //   TimeOfDay selectedTime = TimeOfDay.now();
@@ -879,7 +811,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   //                 final success = await _auctionService.agreeToBidding(
   //                   id,
   //                   '6',
-  //                 ); // Replace '6' with actual user_id
+  //                 );
   //                 if (success) {
   //                   Navigator.pop(context);
   //                   ScaffoldMessenger.of(context).showSnackBar(
@@ -945,12 +877,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         backgroundColor: Colors.white,
         body: Stack(
           children: [
-            // Scrollable content
             SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Image Gallery
                   Stack(
                     children: [
                       SizedBox(
@@ -973,13 +903,11 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                     width: double.infinity,
                                     height: 400,
                                     fit: BoxFit.cover,
-                                    placeholder:
-                                        (context, url) => const Center(
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                    errorWidget:
-                                        (context, url, error) =>
-                                            const Icon(Icons.error),
+                                    placeholder: (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.error),
                                   ),
                                 );
                               },
@@ -1046,8 +974,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                       ),
                     ],
                   ),
-                  // Current Highest Bid Banner
-                  // Current Highest Bid Banner
                   if (_isLoading)
                     const Center(child: CircularProgressIndicator())
                   else
@@ -1068,15 +994,14 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                             const SizedBox(height: 4),
                             Text(
                               _currentHighestBid.startsWith('Error')
-                                  ? _currentHighestBid // e.g., "Error: Please provide valid data"
+                                  ? _currentHighestBid
                                   : '₹${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    _currentHighestBid.startsWith('Error')
-                                        ? Colors.red
-                                        : Colors.black,
+                                color: _currentHighestBid.startsWith('Error')
+                                    ? Colors.red
+                                    : Colors.black,
                               ),
                             ),
                           ],
@@ -1105,7 +1030,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                   //     ),
                   //   ),
                   // ),
-                  // Product Details
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1137,16 +1061,16 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                             const SizedBox(width: 4),
                             _isLoadingLocations
                                 ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
+                                    landMark,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
                             const Spacer(),
                             // const Icon(
                             //   Icons.access_time,
@@ -1237,7 +1161,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ),
                   const Divider(),
-                  // Details Section
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1253,6 +1176,15 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         const SizedBox(height: 12),
                         if (_isLoading)
                           const Center(child: CircularProgressIndicator())
+                        else if (attributesErrorMessage.isNotEmpty)
+                          Center(
+                            child: Text(
+                              attributesErrorMessage,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          )
+                        else if (detailComments.isEmpty)
+                          const Center(child: Text('No details available'))
                         else
                           Column(
                             children: [
@@ -1261,15 +1193,38 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'year',
+                                            orElse: () => SellerComment(
+                                              attributeName: 'Year',
+                                              attributeValue: 'N/A',
+                                            ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.person,
                                       _getOwnerText(
-                                        attributeValues['No of owners'] ??
-                                            'N/A',
+                                        detailComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'no of owners',
+                                              orElse: () => SellerComment(
+                                                attributeName: 'No of owners',
+                                                attributeValue: 'N/A',
+                                              ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                   ),
@@ -1277,7 +1232,19 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                     child: _buildDetailItem(
                                       Icons.speed,
                                       _formatNumber(
-                                        attributeValues['KM Range'] ?? 'N/A',
+                                        detailComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'km range',
+                                              orElse: () => SellerComment(
+                                                attributeName: 'KM Range',
+                                                attributeValue: 'N/A',
+                                              ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                   ),
@@ -1289,13 +1256,37 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'fuel type',
+                                            orElse: () => SellerComment(
+                                              attributeName: 'Fuel Type',
+                                              attributeValue: 'N/A',
+                                            ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.settings,
-                                      attributeValues['Transmission'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'transmission',
+                                            orElse: () => SellerComment(
+                                              attributeName: 'Transmission',
+                                              attributeValue: 'N/A',
+                                            ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
                                 ],
@@ -1306,7 +1297,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ),
                   const Divider(),
-                  // Seller Comments
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1322,31 +1312,36 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         const SizedBox(height: 12),
                         if (_isLoading)
                           const Center(child: CircularProgressIndicator())
+                        else if (attributesErrorMessage.isNotEmpty)
+                          Center(
+                            child: Text(
+                              attributesErrorMessage,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          )
+                        else if (uniqueSellerComments.isEmpty)
+                          const Center(child: Text('No seller comments available'))
                         else
                           Column(
-                            children:
-                                orderedAttributeValues
-                                    .where(
-                                      (entry) =>
-                                          entry.value != 'N/A' &&
-                                          entry.key !=
-                                              'Co driver side rear tyre',
-                                    )
-                                    .map(
-                                      (entry) => _buildSellerCommentItem(
-                                        entry.key,
-                                        entry.key == 'No of owners'
-                                            ? _getOwnerText(entry.value)
-                                            : entry.value,
-                                      ),
-                                    )
-                                    .toList(),
+                            children: uniqueSellerComments
+                                .where((comment) =>
+                                    comment.attributeName.toLowerCase().trim() !=
+                                    'co driver side rear tyre')
+                                .map(
+                                  (comment) => _buildSellerCommentItem(
+                                    comment.attributeName,
+                                    comment.attributeName.toLowerCase().trim() ==
+                                            'no of owners'
+                                        ? _getOwnerText(comment.attributeValue)
+                                        : comment.attributeValue,
+                                  ),
+                                )
+                                .toList(),
                           ),
                       ],
                     ),
                   ),
                   const Divider(),
-                  // Seller Information
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1365,7 +1360,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                   ),
                   const Divider(),
-                  // Bidding History
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1388,26 +1382,23 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                           )
                         else
                           Column(
-                            children:
-                                _bidHistory
-                                    .map(
-                                      (bid) => _buildBidHistoryItem(
-                                        bid['bidder'] ?? 'Unknown',
-                                        bid['amount'] ?? 'N/A',
-                                        bid['time'] ?? 'N/A',
-                                      ),
-                                    )
-                                    .toList(),
+                            children: _bidHistory
+                                .map(
+                                  (bid) => _buildBidHistoryItem(
+                                    bid['bidder'] ?? 'Unknown',
+                                    bid['amount'] ?? 'N/A',
+                                    bid['time'] ?? 'N/A',
+                                  ),
+                                )
+                                .toList(),
                           ),
                       ],
                     ),
                   ),
-                  // Bottom padding to prevent content from being hidden under fixed buttons
-                  const SizedBox(height: 80), // Adjusted to match button height
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
-            // Fixed buttons at the bottom
             Positioned(
               left: 0,
               right: 0,
@@ -1442,8 +1433,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed:
-                            () => _showBidDialog(context, isIncrease: true),
+                        onPressed: () =>
+                            _showBidDialog(context, isIncrease: true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,
@@ -1492,7 +1483,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             label,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16),
+          ),
         ],
       ),
     );
@@ -1506,7 +1500,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
           CircleAvatar(
             backgroundColor: Colors.blue.shade100,
             child: Text(
-              bidder.substring(0, 1),
+              bidder.isNotEmpty ? bidder.substring(0, 1) : '?',
               style: const TextStyle(color: Colors.blue),
             ),
           ),
@@ -1546,59 +1540,63 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SellerInformationPage(userId: createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SellerInformationPage(userId: createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage: sellerProfileImage != null &&
+                              sellerProfileImage!.isNotEmpty
+                          ? CachedNetworkImageProvider(sellerProfileImage!)
+                          : const AssetImage('assets/images/avatar.gif')
+                              as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 }

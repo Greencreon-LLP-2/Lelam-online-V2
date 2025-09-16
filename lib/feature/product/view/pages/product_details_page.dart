@@ -7,10 +7,8 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
@@ -38,11 +36,13 @@ class ProductDetailsPage extends StatefulWidget {
 }
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
-  List<Attribute> attributes = [];
-  List<AttributeVariation> attributeVariations = [];
   bool isLoadingDetails = false;
-  Map<String, String> attributeValues = {};
-  List<MapEntry<String, String>> orderedAttributeValues = [];
+  bool isLoadingSellerComments = false;
+  String errorMessage = '';
+  List<SellerComment> uniqueSellerComments = [];
+  List<SellerComment> detailComments = []; // For Details section
+  bool _isLoadingLocations = true;
+  List<LocationData> _locations = [];
 
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
@@ -52,8 +52,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   bool _isShortlisted = false;
   bool _isLoadingShortlist = false;
   String? _shortlistErrorMessage;
-  bool _isLoadingLocations = true;
-  List<LocationData> _locations = [];
 
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
@@ -70,7 +68,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   void initState() {
     super.initState();
     _fetchLocations();
-    _fetchDetailsData();
+    _fetchAttributesData(); // Unified API call
     _fetchSellerInfo();
     _fetchShortlistStatus();
   }
@@ -80,6 +78,86 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchAttributesData() async {
+    setState(() {
+      isLoadingDetails = true;
+      isLoadingSellerComments = true;
+      errorMessage = '';
+    });
+
+    try {
+      final headers = {'token': token};
+      final url = '$baseUrl/post-attribute-values.php?token=$token&post_id=$id';
+      debugPrint('Fetching attributes: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Attributes API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final sellerComments = SellerCommentsModel.fromJson(responseData);
+
+        final Map<String, SellerComment> uniqueAttributes = {};
+        final List<SellerComment> orderedComments = [];
+
+        // Process attributes for uniqueness
+        for (var comment in sellerComments.data) {
+          final key = comment.attributeName.toLowerCase().replaceAll(
+            RegExp(r'\s+'),
+            '',
+          );
+          if (!uniqueAttributes.containsKey(key)) {
+            uniqueAttributes[key] = comment;
+            orderedComments.add(comment);
+          }
+        }
+
+        setState(() {
+          uniqueSellerComments = orderedComments;
+
+          // Filter for Details section
+          detailComments =
+              uniqueSellerComments.where((comment) {
+                final name = comment.attributeName.toLowerCase().trim();
+                return [
+                  'year',
+                  'no of owners',
+                  'fuel type',
+                  'transmission',
+                  'km range',
+                  'engine condition',
+                ].contains(name);
+              }).toList();
+
+          debugPrint(
+            'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+          debugPrint(
+            'Filtered detailComments: ${detailComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+
+          isLoadingDetails = false;
+          isLoadingSellerComments = false;
+        });
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching attributes: $e');
+      setState(() {
+        errorMessage = 'Failed to load attributes: $e';
+        isLoadingDetails = false;
+        isLoadingSellerComments = false;
+      });
+    }
   }
 
   Future<void> _fetchSellerInfo() async {
@@ -169,8 +247,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       setState(() {
         _shortlistErrorMessage = 'Please log in to shortlist';
       });
-      // Optionally, redirect to login page
-      // context.pushNamed(RouteNames.pleaseLoginPage);
       return;
     }
 
@@ -186,7 +262,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           'token': token,
           'user_id': userId,
           'post_id': widget.product.id,
-          'status': _isShortlisted ? '0' : '1', // Toggle status
+          'status': _isShortlisted ? '0' : '1',
         },
       );
 
@@ -218,7 +294,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       });
     }
 
-    // Show feedback to user
     if (_shortlistErrorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -254,7 +329,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          debugPrint(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -265,212 +340,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       setState(() {
         _isLoadingLocations = false;
       });
-    }
-  }
-
-  Future<void> _fetchDetailsData() async {
-    setState(() {
-      isLoadingDetails = true;
-      _isLoadingLocations = true;
-    });
-
-    try {
-      attributes = await TempApiService.fetchAttributes();
-
-      attributeVariations = await TempApiService.fetchAttributeVariations(
-        widget.product.filters,
-      );
-
-      final attributeValuePairs =
-          await AttributeValueService.fetchAttributeValuePairs();
-
-      _mapFiltersToValues(attributeValuePairs);
-
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    } catch (e) {
-      print('Error fetching details: $e');
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    }
-  }
-
-  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters as Map<String, dynamic>;
-    attributeValues.clear();
-    orderedAttributeValues.clear();
-
-    print('Attribute Value Pairs: $attributeValuePairs');
-    print('Attribute Variations: $attributeVariations');
-    print('Filters: $filters');
-
-    final Set<String> processedAttributes = {};
-
-    for (var pair in attributeValuePairs) {
-      if (pair.attributeName.isNotEmpty &&
-          pair.attributeValue.isNotEmpty &&
-          !processedAttributes.contains(pair.attributeName)) {
-        attributeValues[pair.attributeName] = pair.attributeValue;
-        orderedAttributeValues.add(
-          MapEntry(pair.attributeName, pair.attributeValue),
-        );
-        processedAttributes.add(pair.attributeName);
-        print('Added from API: ${pair.attributeName} = ${pair.attributeValue}');
-      } else {
-        print('Skipped API pair: ${pair.attributeName} (duplicate or invalid)');
-      }
-    }
-
-    if (filters.containsKey('3')) {
-      final variationList = filters['3'] as List<dynamic>?;
-      if (variationList != null &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
-        attributeValues['KM Range'] = variationId;
-        final kmIndex = orderedAttributeValues.indexWhere(
-          (entry) => entry.key == 'KM Range',
-        );
-        if (kmIndex != -1) {
-          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
-        } else {
-          orderedAttributeValues.add(MapEntry('KM Range', variationId));
-        }
-        processedAttributes.add('KM Range');
-        print('Added KM Range from filters: $variationId');
-      }
-    }
-
-    filters.forEach((attributeId, variationList) {
-      if (attributeId != '3' &&
-          variationList is List &&
-          variationList.isNotEmpty &&
-          variationList[0].toString().isNotEmpty) {
-        final variationId = variationList[0].toString();
-        final attribute = attributes.firstWhere(
-          (attr) => attr.id == attributeId,
-          orElse:
-              () => Attribute(
-                id: attributeId,
-                slug: '',
-                name: _getAttributeNameFromId(attributeId),
-                listOrder: '',
-                categoryId: '',
-                formValidation: '',
-                ifDetailsIcons: '',
-                detailsIcons: '',
-                detailsIconsOrder: '',
-                showFilter: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
-        );
-        if (!processedAttributes.contains(attribute.name)) {
-          final variation = attributeVariations.firstWhere(
-            (varAttr) =>
-                varAttr.id == variationId && varAttr.attributeId == attributeId,
-            orElse:
-                () => AttributeVariation(
-                  id: variationId,
-                  attributeId: attributeId,
-                  name: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          print(
-            'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variation.name}',
-          );
-          if (variation.name.isNotEmpty && variation.name != variationId) {
-            attributeValues[attribute.name] = variation.name;
-            orderedAttributeValues.add(
-              MapEntry(attribute.name, variation.name),
-            );
-            processedAttributes.add(attribute.name);
-            print(
-              'Added from variations: ${attribute.name} = ${variation.name}',
-            );
-          } else {
-            print(
-              'Skipped variation: ${attribute.name} (invalid name or ID match)',
-            );
-          }
-        }
-      } else {
-        print('Skipped filter: attribute_id=$attributeId (empty or invalid)');
-      }
-    });
-
-    print('Final attributeValues: $attributeValues');
-    print('Final orderedAttributeValues: $orderedAttributeValues');
-  }
-
-  String _getAttributeNameFromId(String id) {
-    switch (id) {
-      case '1':
-        return 'Year';
-      case '2':
-        return 'No of owners';
-      case '3':
-        return 'KM Range';
-      case '4':
-        return 'Fuel Type';
-      case '5':
-        return 'Transmission';
-      case '6':
-        return 'Service History';
-      case '7':
-        return 'Accident History';
-      case '8':
-        return 'Replacements';
-      case '9':
-        return 'Flood Affected';
-      case '10':
-        return 'Engine Condition';
-      case '11':
-        return 'Transmission Condition';
-      case '12':
-        return 'Suspension Condition';
-      case '13':
-        return 'Features';
-      case '14':
-        return 'Functions';
-      case '15':
-        return 'Battery';
-      case '16':
-        return 'Driver side front tyre';
-      case '17':
-        return 'Driver side rear tyre';
-      case '18':
-        return 'Co driver side front tyre';
-      case '19':
-        return 'Co driver side rear tyre';
-      case '20':
-        return 'Rust';
-      case '21':
-        return 'Emission Norms';
-      case '22':
-        return 'Status Of RC';
-      case '23':
-        return 'Registration valid till';
-      case '24':
-        return 'Insurance Type';
-      case '25':
-        return 'Insurance Upto';
-      case '26':
-        return 'Scratches';
-      case '27':
-        return 'Dents';
-      case '28':
-        return 'Sold by';
-      default:
-        return 'Unknown Attribute';
+      debugPrint('Error fetching locations: $e');
     }
   }
 
@@ -808,7 +678,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                print(
+                debugPrint(
                   'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                 );
                 Navigator.pop(context);
@@ -888,11 +758,21 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
           ),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.right,
+            ),
+          ),
         ],
       ),
     );
@@ -978,7 +858,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) => ReviewDialog( postId: ''),
+                  builder: (context) => ReviewDialog(postId: id),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -990,6 +870,60 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildSellerCommentsSection() {
+    if (isLoadingSellerComments) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return Center(
+        child: Text(errorMessage, style: const TextStyle(color: Colors.red)),
+      );
+    }
+
+    if (uniqueSellerComments.isEmpty) {
+      return const Center(child: Text('No seller comments available'));
+    }
+
+    String formatAttributeName(String name) {
+      return name
+          .split(' ')
+          .map(
+            (word) =>
+                word.isNotEmpty
+                    ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
+                    : '',
+          )
+          .join(' ');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Seller Comments',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        ...uniqueSellerComments
+            .where(
+              (comment) =>
+                  comment.attributeName.toLowerCase().trim() !=
+                  'co driver side rear tyre',
+            )
+            .map(
+              (comment) => _buildSellerCommentItem(
+                formatAttributeName(comment.attributeName),
+                comment.attributeName.toLowerCase().trim() == 'no of owners'
+                    ? _getOwnerText(comment.attributeValue)
+                    : comment.attributeValue,
+              ),
+            )
+            .toList(),
       ],
     );
   }
@@ -1195,10 +1129,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       // Navigator.push(
                                       //   context,
                                       //   MaterialPageRoute(
-                                      //     builder:
-                                      //         (context) => SupportTicketPage(
-                                               
-                                      //         ),
+                                      //     builder: (context) => SupportTicketPage(),
                                       //   ),
                                       // );
                                     },
@@ -1208,7 +1139,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => ChatPage(
-                                              
                                                 listenerId:
                                                     widget.product.createdBy,
                                                 listenerName: sellerName,
@@ -1269,31 +1199,79 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         const SizedBox(height: 12),
                         if (isLoadingDetails)
                           const Center(child: CircularProgressIndicator())
+                        else if (errorMessage.isNotEmpty)
+                          Center(
+                            child: Text(
+                              errorMessage,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          )
+                        else if (detailComments.isEmpty)
+                          const Center(child: Text('No details available'))
                         else
                           Column(
                             children: [
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        attributeValues['KM Range'] ?? '0',
-                                      ),
-                                    ),
-                                  ),
+                                  // Expanded(
+                                  //   child: _buildDetailItem(
+                                  //     Icons.speed,
+                                  //     _formatNumber(
+                                  //       detailComments
+                                  //           .firstWhere(
+                                  //             (comment) =>
+                                  //                 comment.attributeName
+                                  //                     .toLowerCase()
+                                  //                     .trim() ==
+                                  //                 'km range',
+                                  //             orElse:
+                                  //                 () => SellerComment(
+                                  //                   attributeName: 'KM Range',
+                                  //                   attributeValue: 'N/A',
+                                  //                 ),
+                                  //           )
+                                  //           .attributeValue,
+                                  //     ),
+                                  //   ),
+                                  // ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.local_gas_station,
-                                      attributeValues['Fuel Type'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'fuel type',
+                                            orElse:
+                                                () => SellerComment(
+                                                  attributeName: 'Fuel Type',
+                                                  attributeValue: 'N/A',
+                                                ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.person,
                                       _getOwnerText(
-                                        attributeValues['No of owners'] ??
-                                            'N/A',
+                                        detailComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'no of owners',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName:
+                                                        'No of owners',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                   ),
@@ -1305,22 +1283,61 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.calendar_today,
-                                      attributeValues['Year'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'year',
+                                            orElse:
+                                                () => SellerComment(
+                                                  attributeName: 'Year',
+                                                  attributeValue: 'N/A',
+                                                ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.settings,
-                                      attributeValues['Transmission'] ?? 'N/A',
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'transmission',
+                                            orElse:
+                                                () => SellerComment(
+                                                  attributeName: 'Transmission',
+                                                  attributeValue: 'N/A',
+                                                ),
+                                          )
+                                          .attributeValue,
                                     ),
                                   ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.build,
-                                      attributeValues['Engine Condition'] ??
-                                          'N/A',
-                                    ),
-                                  ),
+                                  // Expanded(
+                                  //   child: _buildDetailItem(
+                                  //     Icons.build,
+                                  //     detailComments
+                                  //         .firstWhere(
+                                  //           (comment) =>
+                                  //               comment.attributeName
+                                  //                   .toLowerCase()
+                                  //                   .trim() ==
+                                  //               'engine condition',
+                                  //           orElse:
+                                  //               () => SellerComment(
+                                  //                 attributeName:
+                                  //                     'Engine Condition',
+                                  //                 attributeValue: 'N/A',
+                                  //               ),
+                                  //         )
+                                  //         .attributeValue,
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ],
@@ -1332,40 +1349,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 const Divider(),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Seller Comments',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (isLoadingDetails)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.value != 'N/A' &&
-                                        entry.key != 'Co driver side rear tyre',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.key == 'No of owners'
-                                          ? _getOwnerText(entry.value)
-                                          : entry.value,
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-                    ],
-                  ),
+                  child: _buildSellerCommentsSection(),
                 ),
                 const Divider(),
                 Padding(
@@ -1403,7 +1387,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     ],
                   ),
                 ),
-                SizedBox(height: 25),
+                const SizedBox(height: 25),
               ],
             ),
           ),

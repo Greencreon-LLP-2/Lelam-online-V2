@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/sell/view/pages/sold_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_ads_widget.dart';
 import 'package:provider/provider.dart';
 
@@ -71,7 +72,7 @@ class SellingStatusPage extends StatelessWidget {
         body: TabBarView(
           children: [
             MyAdsWidget(adData: adData),
-            const Center(child: Text('Sold')),
+            SoldPage(),
           ],
         ),
       ),

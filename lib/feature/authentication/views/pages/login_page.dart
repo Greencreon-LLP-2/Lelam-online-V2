@@ -112,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
           }
         }
       } else {
-        // Step 2: Verify OTP
+
         final inputOtp = _otpController.text;
         if (inputOtp == _hardcodedOtp) {
           // Fetch user data again to ensure we have the latest
@@ -133,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
               listen: false,
             ).setUser(userData);
 
-            context.goNamed(RouteNames.mainscaffold);
+            context.goNamed(RouteNames.splashPage);
             Fluttertoast.showToast(
               msg: 'Login Sucess taking you to home page',
               toastLength: Toast.LENGTH_SHORT,

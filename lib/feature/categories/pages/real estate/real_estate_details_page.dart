@@ -8,17 +8,14 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
     hide baseUrl, token;
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
+import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
@@ -41,12 +38,6 @@ class RealEstateProductDetailsPage extends StatefulWidget {
 
 class _RealEstateProductDetailsPageState
     extends State<RealEstateProductDetailsPage> {
-  List<Attribute> attributes = [];
-  List<AttributeVariation> attributeVariations = [];
-  bool isLoadingDetails = false;
-  Map<String, String> attributeValues = {};
-  List<MapEntry<String, String>> orderedAttributeValues = [];
-
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
@@ -56,7 +47,11 @@ class _RealEstateProductDetailsPageState
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
   bool _isLoadingLocations = true;
+  bool isLoadingDetails = true;
+  String attributesErrorMessage = '';
   List<LocationData> _locations = [];
+  List<SellerComment> uniqueSellerComments = [];
+  List<SellerComment> detailComments = [];
 
   String sellerName = 'Unknown';
   String? sellerProfileImage;
@@ -74,23 +69,21 @@ class _RealEstateProductDetailsPageState
 
   Future<void> _initialize() async {
     _loadUserId();
-    await _fetchLocations();
-    await _fetchDetailsData();
-    await _fetchSellerInfo();
-    if (userId != null && userId != 'Unknown') {
-      await _checkShortlistStatus();
-    }
+    await Future.wait([
+      _fetchLocations(),
+      _fetchAttributesData(),
+      _fetchSellerInfo(),
+      if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
+    ]);
   }
 
   void _loadUserId() {
-    // Access the LoggedUserProvider to get user data
     final userProvider = Provider.of<LoggedUserProvider>(
       context,
       listen: false,
     );
     final userData = userProvider.userData;
     setState(() {
-      // Assuming userData has a userId field; adjust based on your LoggedUserProvider structure
       userId = userData?.userId ?? '';
     });
     debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
@@ -110,9 +103,9 @@ class _RealEstateProductDetailsPageState
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-shortlist.php?token=$token&user_id=$userId'),
+        Uri.parse('$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId'),
         headers: {
-          'token': token,
+          'token': _token,
           'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
@@ -162,12 +155,11 @@ class _RealEstateProductDetailsPageState
     });
 
     try {
-      // Assuming an API endpoint like `add-shortlist.php` or `remove-shortlist.php`
       final action = _isFavorited ? 'remove' : 'add';
       final response = await http.post(
-        Uri.parse('$baseUrl/$action-shortlist.php?token=$token'),
+        Uri.parse('$_baseUrl/$action-shortlist.php?token=$_token'),
         headers: {
-          'token': token,
+          'token': _token,
           'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
           'Content-Type': 'application/json',
         },
@@ -201,24 +193,17 @@ class _RealEstateProductDetailsPageState
       setState(() {
         _isLoadingFavorite = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _transformationController.dispose();
-    super.dispose();
   }
 
   Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
         ),
       );
 
@@ -267,11 +252,10 @@ class _RealEstateProductDetailsPageState
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          debugPrint(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -279,106 +263,110 @@ class _RealEstateProductDetailsPageState
         throw Exception('Invalid API response format');
       }
     } catch (e) {
+      debugPrint('Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
     }
   }
 
-  Future<void> _fetchDetailsData() async {
+  Future<void> _fetchAttributesData() async {
     setState(() {
       isLoadingDetails = true;
-      _isLoadingLocations = true;
+      attributesErrorMessage = '';
     });
 
     try {
-      attributes = await TempApiService.fetchAttributes();
-      attributeVariations = await TempApiService.fetchAttributeVariations(
-        widget.product.filters,
-      );
+      final url =
+          '$_baseUrl/post-attribute-values.php?token=$_token&post_id=${widget.product.id}';
+      debugPrint('Fetching attributes: $url');
 
-      final attributeValuePairs =
-          await AttributeValueService.fetchAttributeValuePairs();
+      final response = await http.get(Uri.parse(url), headers: {'token': _token});
 
-      _mapFiltersToValues(attributeValuePairs);
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final sellerComments = SellerCommentsModel.fromJson(responseData);
 
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    } catch (e) {
-      print('Error fetching details: $e');
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    }
-  }
+        final Map<String, SellerComment> uniqueAttributes = {};
+        final List<SellerComment> orderedComments = [];
 
-  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters;
-    attributeValues.clear();
-    orderedAttributeValues.clear();
+        // Process attributes for uniqueness
+        for (var comment in sellerComments.data) {
+          final key = comment.attributeName
+              .toLowerCase()
+              .replaceAll(RegExp(r'\s+'), '');
+          if (!uniqueAttributes.containsKey(key)) {
+            uniqueAttributes[key] = comment;
+            orderedComments.add(comment);
+          }
+        }
 
-    print('Attribute Value Pairs: $attributeValuePairs');
-    print('Attribute Variations: $attributeVariations');
-    print('Filters: $filters');
-
-    final Set<String> processedAttributes = {};
-
-    // Map seller type from byDealer field
-    attributeValues['Seller Type'] =
-        widget.product.byDealer == '1' ? 'Dealer' : 'Owner';
-    orderedAttributeValues.add(
-      MapEntry('Seller Type', attributeValues['Seller Type']!),
-    );
-    processedAttributes.add('Seller Type');
-
-    // Map filters to attribute names and values
-    for (var attribute in attributes) {
-      final attributeId = attribute.id;
-      if (filters.containsKey(attributeId) &&
-          filters[attributeId]!.isNotEmpty &&
-          filters[attributeId]!.first.isNotEmpty) {
-        final filterValue = filters[attributeId]!.first;
-        // Check if the filter value is an ID that needs mapping
-        final variation = attributeVariations.firstWhere(
-          (variation) => variation.id == filterValue,
-          orElse:
-              () => AttributeVariation(
-                id: '',
-                name: filterValue,
-                attributeId: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
+        // Add Seller Type from byDealer
+        orderedComments.add(SellerComment(
+          attributeName: 'Seller Type',
+          attributeValue:
+              widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+        ));
+        uniqueAttributes['sellertype'] = SellerComment(
+          attributeName: 'Seller Type',
+          attributeValue:
+              widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
         );
-        final value = variation.name.isNotEmpty ? variation.name : filterValue;
-        attributeValues[attribute.name] = value;
-        orderedAttributeValues.add(MapEntry(attribute.name, value));
-        processedAttributes.add(attribute.name);
-        print('Added from filters: ${attribute.name} = $value');
-      }
-    }
 
-    // Add auction-specific attributes if isAuction is true
-    if (widget.isAuction) {
-      attributeValues['Auction Starting Price'] = formatPriceInt(
-        double.tryParse(widget.product.auctionStartingPrice) ?? 0,
-      );
-      attributeValues['Auction Attempts'] = widget.product.auctionAttempt;
-      orderedAttributeValues.add(
-        MapEntry(
-          'Auction Starting Price',
-          attributeValues['Auction Starting Price']!,
-        ),
-      );
-      orderedAttributeValues.add(
-        MapEntry('Auction Attempts', attributeValues['Auction Attempts']!),
-      );
-      processedAttributes.add('Auction Starting Price');
-      processedAttributes.add('Auction Attempts');
+        // Add auction-specific attributes if isAuction is true
+        if (widget.isAuction) {
+          orderedComments.add(SellerComment(
+            attributeName: 'Auction Starting Price',
+            attributeValue: formatPriceInt(
+              double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+            ),
+          ));
+          orderedComments.add(SellerComment(
+            attributeName: 'Auction Attempts',
+            attributeValue: widget.product.auctionAttempt,
+          ));
+          uniqueAttributes['auctionstartingprice'] = SellerComment(
+            attributeName: 'Auction Starting Price',
+            attributeValue: formatPriceInt(
+              double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+            ),
+          );
+          uniqueAttributes['auctionattempts'] = SellerComment(
+            attributeName: 'Auction Attempts',
+            attributeValue: widget.product.auctionAttempt,
+          );
+        }
+
+        setState(() {
+          uniqueSellerComments = orderedComments;
+          // Filter for Details section
+          detailComments = uniqueSellerComments.where((comment) {
+            final name = comment.attributeName.toLowerCase().trim();
+            return [
+              'seller type',
+              if (widget.isAuction) 'auction attempts',
+            ].contains(name);
+          }).toList();
+
+          debugPrint(
+            'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+          debugPrint(
+            'Filtered detailComments: ${detailComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
+          isLoadingDetails = false;
+        });
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching attributes: $e');
+      setState(() {
+        attributesErrorMessage = 'Failed to load attributes: $e';
+        isLoadingDetails = false;
+      });
     }
   }
 
@@ -386,22 +374,21 @@ class _RealEstateProductDetailsPageState
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -413,7 +400,6 @@ class _RealEstateProductDetailsPageState
   String get landMark => _getLocationName(widget.product.parentZoneId);
   String get createdOn => widget.product.createdOn;
   String get createdBy => widget.product.createdBy;
-  String get byDealer => widget.product.byDealer;
   bool get isFinanceAvailable => widget.product.ifFinance == '1';
   bool get isFeatured => widget.product.feature == '1';
 
@@ -472,21 +458,19 @@ class _RealEstateProductDetailsPageState
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
                                     ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -513,8 +497,7 @@ class _RealEstateProductDetailsPageState
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed:
-                                        () => Navigator.of(context).pop(),
+                                    onPressed: () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -554,9 +537,7 @@ class _RealEstateProductDetailsPageState
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
+                                      duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -565,10 +546,9 @@ class _RealEstateProductDetailsPageState
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color:
-                                            _currentImageIndex == index
-                                                ? Colors.blue
-                                                : Colors.transparent,
+                                        color: _currentImageIndex == index
+                                            ? Colors.blue
+                                            : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -579,22 +559,21 @@ class _RealEstateProductDetailsPageState
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder:
-                                            (context, url) => const Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              ),
+                                        placeholder: (context, url) =>
+                                            const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
                                             ),
-                                        errorWidget:
-                                            (context, url, error) => const Icon(
-                                              Icons.error,
-                                              size: 20,
-                                            ),
+                                          ),
+                                        ),
+                                        errorWidget: (context, url, error) =>
+                                            const Icon(
+                                          Icons.error,
+                                          size: 20,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -694,7 +673,7 @@ class _RealEstateProductDetailsPageState
             ),
             ElevatedButton(
               onPressed: () {
-                print(
+                debugPrint(
                   'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                 );
                 Navigator.pop(context);
@@ -752,7 +731,10 @@ class _RealEstateProductDetailsPageState
             label,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16),
+          ),
         ],
       ),
     );
@@ -762,62 +744,64 @@ class _RealEstateProductDetailsPageState
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) =>
-                        SellerInformationPage(userId: widget.product.createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          SellerInformationPage(userId: widget.product.createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage: sellerProfileImage != null &&
+                              sellerProfileImage!.isNotEmpty
+                          ? CachedNetworkImageProvider(sellerProfileImage!)
+                          : const AssetImage('assets/images/avatar.gif')
+                              as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 
   Widget _buildQuestionsSection() {
@@ -838,8 +822,7 @@ class _RealEstateProductDetailsPageState
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder:
-                      (context) => const ReviewDialog( postId: ''),
+                  builder: (context) => ReviewDialog(postId: widget.product.id),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -892,13 +875,11 @@ class _RealEstateProductDetailsPageState
                                   width: double.infinity,
                                   height: 400,
                                   fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
                                 ),
                               );
                             },
@@ -964,25 +945,23 @@ class _RealEstateProductDetailsPageState
                           const Spacer(),
                           _isLoadingFavorite
                               ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(Colors.white),
                                   ),
-                                ),
-                              )
+                                )
                               : IconButton(
-                                icon: Icon(
-                                  _isFavorited
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  color:
-                                      _isFavorited ? Colors.red : Colors.white,
+                                  icon: Icon(
+                                    _isFavorited
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: _isFavorited ? Colors.red : Colors.white,
+                                  ),
+                                  onPressed: _toggleShortlist,
                                 ),
-                                onPressed: _toggleShortlist,
-                              ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -1017,16 +996,16 @@ class _RealEstateProductDetailsPageState
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -1089,24 +1068,21 @@ class _RealEstateProductDetailsPageState
                                     onChatWithSupport: () {
                                       // Navigator.push(
                                       //   context,
-                                      //   SupportTicketPage()
-                                      //       as Route<Object?>,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) => const SupportPage(),
+                                      //   ),
                                       // );
                                     },
                                     onChatWithSeller: () {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder:
-                                              (context) => ChatPage(
-                                              
-                                                listenerId:
-                                                    widget.product.createdBy,
-                                                listenerName: sellerName,
-                                                listenerImage:
-                                                    sellerProfileImage ??
-                                                    'seller.jpg',
-                                              ),
+                                          builder: (context) => ChatPage(
+                                            listenerId: widget.product.createdBy,
+                                            listenerName: sellerName,
+                                            listenerImage:
+                                                sellerProfileImage ?? 'seller.jpg',
+                                          ),
                                         ),
                                       );
                                     },
@@ -1182,18 +1158,39 @@ class _RealEstateProductDetailsPageState
                         const SizedBox(height: 12),
                         if (isLoadingDetails)
                           const Center(child: CircularProgressIndicator())
+                        else if (attributesErrorMessage.isNotEmpty)
+                          Center(
+                            child: Text(
+                              attributesErrorMessage,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          )
+                        else if (detailComments.isEmpty)
+                          const Center(child: Text('No details available'))
                         else
                           Column(
                             children: [
                               _buildDetailItem(
                                 Icons.person,
-                                attributeValues['Seller Type'] ?? 'N/A',
+                                detailComments
+                                    .firstWhere(
+                                      (comment) =>
+                                          comment.attributeName
+                                              .toLowerCase()
+                                              .trim() ==
+                                          'seller type',
+                                      orElse: () => SellerComment(
+                                        attributeName: 'Seller Type',
+                                        attributeValue: 'N/A',
+                                      ),
+                                    )
+                                    .attributeValue,
                               ),
                               if (widget.isAuction) ...[
                                 const SizedBox(height: 12),
                                 _buildDetailItem(
                                   Icons.gavel,
-                                  'Attempts: ${attributeValues['Auction Attempts'] ?? '0'}/3',
+                                  'Attempts: ${detailComments.firstWhere((comment) => comment.attributeName.toLowerCase().trim() == 'auction attempts', orElse: () => SellerComment(attributeName: 'Auction Attempts', attributeValue: '0')).attributeValue}/3',
                                 ),
                               ],
                             ],
@@ -1218,23 +1215,30 @@ class _RealEstateProductDetailsPageState
                       const SizedBox(height: 12),
                       if (isLoadingDetails)
                         const Center(child: CircularProgressIndicator())
+                      else if (attributesErrorMessage.isNotEmpty)
+                        Center(
+                          child: Text(
+                            attributesErrorMessage,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        )
+                      else if (uniqueSellerComments.isEmpty)
+                        const Center(child: Text('No seller comments available'))
                       else
                         Column(
-                          children:
-                              orderedAttributeValues
-                                  .where(
-                                    (entry) =>
-                                        entry.key != 'Seller Type' &&
-                                        entry.key != 'Auction Starting Price' &&
-                                        entry.key != 'Auction Attempts',
-                                  )
-                                  .map(
-                                    (entry) => _buildSellerCommentItem(
-                                      entry.key,
-                                      entry.value,
-                                    ),
-                                  )
-                                  .toList(),
+                          children: uniqueSellerComments
+                              .where((comment) => ![
+                                    'seller type',
+                                    'auction starting price',
+                                    'auction attempts'
+                                  ].contains(comment.attributeName.toLowerCase().trim()))
+                              .map(
+                                (comment) => _buildSellerCommentItem(
+                                  comment.attributeName,
+                                  comment.attributeValue,
+                                ),
+                              )
+                              .toList(),
                         ),
                     ],
                   ),
@@ -1321,7 +1325,7 @@ class _RealEstateProductDetailsPageState
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          showBidDialog(context); // Call the dialog function
+                          showBidDialog(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,

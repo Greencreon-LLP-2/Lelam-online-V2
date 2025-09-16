@@ -172,11 +172,34 @@ class ChatOptionsDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8.0),
                 ),
               ),
-              child: const Text(
-                'Call Sales Expert',
-                style: TextStyle(color: Colors.white),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.phone,
+                    color: Colors.white,
+                    size: 20.0,
+                  ),
+                  SizedBox(width: 8.0),
+                  Text(
+                    'Call Sales Expert',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(height: 4.0),
+            const Text(
+              'Super Fast Response | for loans Exchange and other queries',
+              style: TextStyle(
+                fontSize: 12.0,
+                color: Colors.blueGrey,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8.0),
             ElevatedButton(
               onPressed: () {
                 handleChat(context, 5, 'seller', onChatWithSeller);
@@ -188,10 +211,32 @@ class ChatOptionsDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8.0),
                 ),
               ),
-              child: const Text(
-                'Chat with Seller',
-                style: TextStyle(color: Colors.white),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    color: Colors.white,
+                    size: 20.0,
+                  ),
+                  SizedBox(width: 8.0),
+                  Text(
+                    'Chat with Seller',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 4.0),
+            const Text(
+              'Response according to seller availability | call sales expert for quick response',
+              style: TextStyle(
+                fontSize: 12.0,
+                color: Colors.blueGrey,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8.0),
             TextButton(

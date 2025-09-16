@@ -156,25 +156,65 @@ class ChatListPage extends HookWidget {
       return null;
     }, [userId]);
 
-    if (!userProvider.isLoggedIn) {
-      return Scaffold(
-        body: Center(
-          child: ElevatedButton(
-            onPressed: () {
-              context.pushNamed(RouteNames.loginPage);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    if (!userProvider.isLoggedIn || userId.isEmpty) {
+      return CustomSafeArea(
+        child: Scaffold(
+          backgroundColor: Colors.grey[50],
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // const Text(
+                //   'Log in to view your chats',
+                //   style: TextStyle(fontSize: 18, color: Colors.grey),
+                // ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    context.pushNamed(RouteNames.loginPage);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Log In to View Chats',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          floatingActionButton: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text(
+                'Support',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
-            ),
-            child: const Text(
-              'Log In to View Chats',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+              const SizedBox(height: 8),
+              FloatingActionButton(
+                onPressed: _openWhatsApp,
+                backgroundColor: const Color(0xFF25D366),
+                child: SvgPicture.asset(
+                  'assets/icons/whatsapp_icon.svg',
+                  width: 24,
+                  height: 24,
+                ),
+              ),
+            ],
           ),
         ),
       );

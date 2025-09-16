@@ -12,22 +12,19 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
     hide token, baseUrl;
-import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
-import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
-
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
-
-import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+
+
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -46,11 +43,7 @@ class MarketPlaceProductDetailsPage extends StatefulWidget {
 
 class _MarketPlaceProductDetailsPageState
     extends State<MarketPlaceProductDetailsPage> {
-  List<Attribute> attributes = [];
-  List<AttributeVariation> attributeVariations = [];
   bool isLoadingDetails = false;
-  Map<String, String> attributeValues = {};
-  List<MapEntry<String, String>> orderedAttributeValues = [];
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
@@ -75,32 +68,79 @@ class _MarketPlaceProductDetailsPageState
   String _galleryError = '';
   late LoggedUserProvider _userProvider;
 
+  SellerCommentsModel? sellerComments;
+  bool isLoadingSellerComments = false;
+  String sellerCommentsError = '';
+  List<SellerComment> uniqueSellerComments = [];
+
   @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    //  _loadUserId();
     _fetchLocations();
-    _fetchDetailsData();
+    _fetchSellerComments();
     _fetchSellerInfo();
     _checkShortlistStatus();
     _fetchGalleryImages();
   }
 
-  // Future<void> _loadUserId() async {
-  //   setState(() {
-  //     if (!_userProvider.isLoggedIn) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Please log in to post an ad'),
-  //           backgroundColor: Colors.orange,
-  //         ),
-  //       );
-  //     }
-  //   }
-  //   });
-  // }
+  Future<void> _fetchSellerComments() async {
+    setState(() {
+      isLoadingSellerComments = true;
+      sellerCommentsError = '';
+    });
+
+    try {
+      final headers = {'token': token};
+      final url = '$baseUrl/post-attribute-values.php?token=$token&post_id=$id';
+      debugPrint('Fetching seller comments: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Seller comments API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        setState(() {
+  sellerComments = SellerCommentsModel.fromJson(responseData);
+
+
+  final Map<String, SellerComment> uniqueAttributes = {};
+  final List<SellerComment> orderedComments = [];
+
+  for (var comment in sellerComments!.data) {
+    final key = comment.attributeName
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ''); 
+    if (!uniqueAttributes.containsKey(key)) {
+      uniqueAttributes[key] = comment;
+      orderedComments.add(comment); 
+    }
+  }
+
+  uniqueSellerComments = orderedComments;
+  debugPrint(
+    'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+  );
+
+  isLoadingSellerComments = false;
+});
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching seller comments: $e');
+      setState(() {
+        sellerCommentsError = 'Failed to load seller comments: $e';
+        isLoadingSellerComments = false;
+      });
+    }
+  }
 
   Future<void> _fetchGalleryImages() async {
     try {
@@ -355,60 +395,69 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-void _showLoginPromptDialog(BuildContext context, String action) {
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text(
-          'Login Required',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Please log in to $action.',
-          style: const TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
-            ),
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.pushNamed(RouteNames.loginPage);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text(
-              'Log In',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-        ],
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      );
-    },
-  );
-}
+          content: Text(
+            'Please log in to $action.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.pushNamed(RouteNames.loginPage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Log In',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
 
   void showProductBidDialog(BuildContext context) async {
-
-if (!_userProvider.isLoggedIn) {
-    _showLoginPromptDialog(context, 'place a bid');
-    return;
-  }
+    if (!_userProvider.isLoggedIn) {
+      _showLoginPromptDialog(context, 'place a bid');
+      return;
+    }
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
@@ -477,29 +526,14 @@ if (!_userProvider.isLoggedIn) {
                   if (isSuccess) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => BuyingStatusPage()),
+                      MaterialPageRoute(
+                        builder: (context) => BuyingStatusPage(),
+                      ),
                     );
                   }
                 },
                 child: const Text('OK', style: TextStyle(color: Colors.grey)),
               ),
-              // if (isSuccess)
-              //   ElevatedButton(
-              //     onPressed: () {
-              //       Navigator.of(ctx).pop();
-              //       Navigator.push(
-              //         context,
-              //         MaterialPageRoute(
-              //           builder: (context) => SupportTicketPage(),
-              //         ),
-              //       );
-              //     },
-              //     style: ElevatedButton.styleFrom(
-              //       backgroundColor: Colors.blue,
-              //       foregroundColor: Colors.white,
-              //     ),
-              //     child: const Text('Support'),
-              //   ),
             ],
           );
         },
@@ -593,14 +627,6 @@ if (!_userProvider.isLoggedIn) {
                                 );
                                 return;
                               }
-
-                              // if (_userProvider.userId == null) {
-                              //   Navigator.of(dialogContext).pop({
-                              //     'success': false,
-                              //     'message': 'Please log in to place a bid',
-                              //   });
-                              //   return;
-                              // }
 
                               setDialogState(() {
                                 _isLoadingBid = true;
@@ -728,231 +754,6 @@ if (!_userProvider.isLoggedIn) {
       setState(() {
         _isLoadingLocations = false;
       });
-    }
-  }
-
-  Future<void> _fetchDetailsData() async {
-    setState(() {
-      isLoadingDetails = true;
-      _isLoadingLocations = true;
-    });
-
-    try {
-      attributes = await TempApiService.fetchAttributes();
-      attributeVariations = await TempApiService.fetchAttributeVariations(
-        widget.product.filters,
-      );
-      final attributeValuePairs =
-          await AttributeValueService.fetchAttributeValuePairs();
-
-      _mapFiltersToValues(attributeValuePairs);
-
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    } catch (e) {
-      debugPrint('Error fetching details: $e');
-      setState(() {
-        isLoadingDetails = false;
-        _isLoadingLocations = false;
-      });
-    }
-  }
-
-  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-    final filters = widget.product.filters as Map<String, dynamic>;
-    attributeValues.clear();
-    orderedAttributeValues.clear();
-
-    debugPrint('Attribute Value Pairs: $attributeValuePairs');
-    debugPrint(
-      'Attribute Variations: ${attributeVariations.map((v) => {'id': v.id, 'attribute_id': v.attributeId, 'name': v.name}).toList()}',
-    );
-    debugPrint('Filters: $filters');
-
-    final Set<String> processedAttributes = {};
-
-    for (var pair in attributeValuePairs) {
-      if (pair.attributeName.isNotEmpty &&
-          pair.attributeValue.isNotEmpty &&
-          !processedAttributes.contains(pair.attributeName)) {
-        attributeValues[pair.attributeName] = pair.attributeValue;
-        orderedAttributeValues.add(
-          MapEntry(pair.attributeName, pair.attributeValue),
-        );
-        processedAttributes.add(pair.attributeName);
-        debugPrint(
-          'Added from API: ${pair.attributeName} = ${pair.attributeValue}',
-        );
-      } else {
-        debugPrint(
-          'Skipped API pair: ${pair.attributeName} (duplicate or invalid)',
-        );
-      }
-    }
-
-    if (filters.containsKey('3')) {
-      String variationId;
-      if (filters['3'] is String) {
-        variationId = filters['3'] as String;
-      } else if (filters['3'] is List<dynamic> &&
-          (filters['3'] as List).isNotEmpty) {
-        variationId = (filters['3'] as List)[0].toString();
-      } else {
-        variationId = '';
-      }
-      if (variationId.isNotEmpty) {
-        attributeValues['KM Range'] = variationId;
-        final kmIndex = orderedAttributeValues.indexWhere(
-          (entry) => entry.key == 'KM Range',
-        );
-        if (kmIndex != -1) {
-          orderedAttributeValues[kmIndex] = MapEntry('KM Range', variationId);
-        } else {
-          orderedAttributeValues.add(MapEntry('KM Range', variationId));
-        }
-        processedAttributes.add('KM Range');
-        debugPrint('Added KM Range from filters: $variationId');
-      }
-    }
-
-    filters.forEach((attributeId, variation) {
-      if (attributeId != '3') {
-        String variationId;
-        if (variation is String) {
-          variationId = variation;
-        } else if (variation is List<dynamic> && variation.isNotEmpty) {
-          variationId = variation[0].toString();
-        } else {
-          debugPrint(
-            'Skipped filter: attribute_id=$attributeId (empty or invalid)',
-          );
-          return;
-        }
-
-        if (variationId.isNotEmpty) {
-          final attribute = attributes.firstWhere(
-            (attr) => attr.id == attributeId,
-            orElse:
-                () => Attribute(
-                  id: attributeId,
-                  slug: '',
-                  name: _getAttributeNameFromId(attributeId),
-                  listOrder: '',
-                  categoryId: '',
-                  formValidation: '',
-                  ifDetailsIcons: '',
-                  detailsIcons: '',
-                  detailsIconsOrder: '',
-                  showFilter: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          if (!processedAttributes.contains(attribute.name)) {
-            final variationObj = attributeVariations.firstWhere(
-              (varAttr) =>
-                  varAttr.id == variationId &&
-                  varAttr.attributeId == attributeId,
-              orElse:
-                  () => AttributeVariation(
-                    id: variationId,
-                    attributeId: attributeId,
-                    name: '',
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
-            );
-            debugPrint(
-              'Attribute ID: $attributeId, Variation ID: $variationId, Name: ${variationObj.name}',
-            );
-            if (variationObj.name.isNotEmpty &&
-                variationObj.name != variationId) {
-              attributeValues[attribute.name] = variationObj.name;
-              orderedAttributeValues.add(
-                MapEntry(attribute.name, variationObj.name),
-              );
-              processedAttributes.add(attribute.name);
-              debugPrint(
-                'Added from variations: ${attribute.name} = ${variationObj.name}',
-              );
-            } else {
-              debugPrint(
-                'Skipped variation: ${attribute.name} (invalid name or ID match)',
-              );
-            }
-          }
-        }
-      }
-    });
-
-    debugPrint('Final attributeValues: $attributeValues');
-    debugPrint('Final orderedAttributeValues: $orderedAttributeValues');
-  }
-
-  String _getAttributeNameFromId(String id) {
-    switch (id) {
-      case '1':
-        return 'Year';
-      case '2':
-        return 'No of owners';
-      case '3':
-        return 'KM Range';
-      case '4':
-        return 'Fuel Type';
-      case '5':
-        return 'Transmission';
-      case '6':
-        return 'Service History';
-      case '7':
-        return 'Accident History';
-      case '8':
-        return 'Replacements';
-      case '9':
-        return 'Flood Affected';
-      case '10':
-        return 'Engine Condition';
-      case '11':
-        return 'Transmission Condition';
-      case '12':
-        return 'Suspension Condition';
-      case '13':
-        return 'Features';
-      case '14':
-        return 'Functions';
-      case '15':
-        return 'Battery';
-      case '16':
-        return 'Driver side front tyre';
-      case '17':
-        return 'Driver side rear tyre';
-      case '18':
-        return 'Co driver side front tyre';
-      case '19':
-        return 'Co driver side rear tyre';
-      case '20':
-        return 'Rust';
-      case '21':
-        return 'Emission Norms';
-      case '22':
-        return 'Status Of RC';
-      case '23':
-        return 'Registration valid till';
-      case '24':
-        return 'Insurance Type';
-      case '25':
-        return 'Insurance Upto';
-      case '26':
-        return 'Scratches';
-      case '27':
-        return 'Dents';
-      case '28':
-        return 'Sold by';
-      default:
-        return 'Unknown Attribute';
     }
   }
 
@@ -1214,7 +1015,6 @@ if (!_userProvider.isLoggedIn) {
   }
 
   Future<void> _fixMeeting(DateTime selectedDate) async {
-
     try {
       final headers = {'token': token};
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
@@ -1267,10 +1067,10 @@ if (!_userProvider.isLoggedIn) {
   }
 
   void _showMeetingDialog(BuildContext context) {
-   if (!_userProvider.isLoggedIn) {
-    _showLoginPromptDialog(context, 'schedule a meeting');
-    return;
-  }
+    if (!_userProvider.isLoggedIn) {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
     DateTime selectedDate = DateTime.now();
     showDialog(
       context: context,
@@ -1378,28 +1178,6 @@ if (!_userProvider.isLoggedIn) {
     return formatter.format(price.round());
   }
 
-  String _getOwnerText(String owners) {
-    switch (owners) {
-      case '1':
-      case '1st Owner':
-        return '1st Owner';
-      case '2':
-      case '2nd Owner':
-        return '2nd Owner';
-      case '3':
-      case '3rd Owner':
-        return '3rd Owner';
-      default:
-        return owners.isNotEmpty ? owners : 'N/A';
-    }
-  }
-
-  String _formatNumber(String value) {
-    if (value == 'N/A') return 'N/A';
-    final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
-    return '$number KM';
-  }
-
   Widget _buildDetailItem(IconData icon, String text) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
@@ -1409,7 +1187,7 @@ if (!_userProvider.isLoggedIn) {
         Flexible(
           child: Text(
             text,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.fade,
             style: TextStyle(fontSize: 15, color: Colors.grey[700]),
           ),
         ),
@@ -1423,11 +1201,21 @@ if (!_userProvider.isLoggedIn) {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
           ),
-          Text(value, style: const TextStyle(fontSize: 16)),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 16),
+              textAlign: TextAlign.right,
+            ),
+          ),
         ],
       ),
     );
@@ -1495,36 +1283,143 @@ if (!_userProvider.isLoggedIn) {
         );
   }
 
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Login Required',
+          style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+        ),
+        content: const Text('Please log in to ask a question.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.pushNamed(RouteNames.loginPage);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8.0),
               ),
             ),
-            ElevatedButton(
-              onPressed: () {
+            child: const Text(
+              'Log In',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+              if (!userProvider.isLoggedIn) {
+                _showLoginDialog();
+              } else {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (context) => ReviewDialog(postId: id),
                 );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text('Ask a question'),
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
-          ],
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.question_answer,
+                  color: Colors.white,
+                  size: 20.0,
+                ),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
+
+  // Build seller comments section using the new API
+  Widget _buildSellerCommentsSection() {
+    if (isLoadingSellerComments) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (sellerCommentsError.isNotEmpty) {
+      return Center(
+        child: Text(
+          sellerCommentsError,
+          style: const TextStyle(color: Colors.red),
         ),
+      );
+    }
+
+    if (uniqueSellerComments.isEmpty) {
+      return const Center(child: Text('No seller comments available'));
+    }
+
+    // Helper function to format attribute names (e.g., "no of owners" -> "No of Owners")
+    String formatAttributeName(String name) {
+      return name
+          .split(' ')
+          .map(
+            (word) =>
+                word.isNotEmpty
+                    ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}'
+                    : '',
+          )
+          .join(' ');
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Seller Comments',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        // Ensure the comments are rendered in the order of uniqueSellerComments
+        ...uniqueSellerComments
+            .map(
+              (comment) => _buildSellerCommentItem(
+                formatAttributeName(comment.attributeName),
+                comment.attributeValue,
+              ),
+            )
+            .toList(),
       ],
     );
   }
@@ -1736,17 +1631,6 @@ if (!_userProvider.isLoggedIn) {
                             ),
                             ElevatedButton.icon(
                               onPressed: () {
-                                // if (_userProvider.userId != null) {
-                                //   ScaffoldMessenger.of(context).showSnackBar(
-                                //     const SnackBar(
-                                //       content: Text(
-                                //         'Please log in to chat with the seller',
-                                //       ),
-                                //       backgroundColor: Colors.red,
-                                //     ),
-                                //   );
-                                //   return;
-                                // }
                                 showDialog(
                                   context: context,
                                   builder: (context) {
@@ -1826,8 +1710,10 @@ if (!_userProvider.isLoggedIn) {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          if (isLoadingDetails)
+                          if (isLoadingSellerComments)
                             const Center(child: CircularProgressIndicator())
+                          else if (uniqueSellerComments.isEmpty)
+                            const Center(child: Text('No details available'))
                           else
                             Column(
                               children: [
@@ -1836,24 +1722,60 @@ if (!_userProvider.isLoggedIn) {
                                     Expanded(
                                       child: _buildDetailItem(
                                         Icons.calendar_today,
-                                        attributeValues['Year'] ?? 'N/A',
+                                        uniqueSellerComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'year',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName: 'Year',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildDetailItem(
                                         Icons.person,
-                                        _getOwnerText(
-                                          attributeValues['No of owners'] ??
-                                              'N/A',
-                                        ),
+                                        uniqueSellerComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'no of owners',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName:
+                                                        'No of owners',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildDetailItem(
-                                        Icons.speed,
-                                        _formatNumber(
-                                          attributeValues['KM Range'] ?? 'N/A',
-                                        ),
+                                        Icons.settings,
+                                        uniqueSellerComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'transmission',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName:
+                                                        'Transmission',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                   ],
@@ -1864,21 +1786,39 @@ if (!_userProvider.isLoggedIn) {
                                     Expanded(
                                       child: _buildDetailItem(
                                         Icons.local_gas_station,
-                                        attributeValues['Fuel Type'] ?? 'N/A',
+                                        uniqueSellerComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'fuel type',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName: 'Fuel Type',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                     Expanded(
                                       child: _buildDetailItem(
-                                        Icons.settings,
-                                        attributeValues['Transmission'] ??
-                                            'N/A',
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.build,
-                                        attributeValues['Engine Condition'] ??
-                                            'N/A',
+                                        Icons.speed,
+                                        uniqueSellerComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'km range',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName: 'KM Range',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
                                       ),
                                     ),
                                   ],
@@ -1890,43 +1830,10 @@ if (!_userProvider.isLoggedIn) {
                     ),
                   ),
                   const Divider(),
+                  // Seller Comments Section
                   Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Seller Comments',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (isLoadingDetails)
-                          const Center(child: CircularProgressIndicator())
-                        else
-                          Column(
-                            children:
-                                orderedAttributeValues
-                                    .where(
-                                      (entry) =>
-                                          entry.value != 'N/A' &&
-                                          entry.key !=
-                                              'Co driver side rear tyre',
-                                    )
-                                    .map(
-                                      (entry) => _buildSellerCommentItem(
-                                        entry.key,
-                                        entry.key == 'No of owners'
-                                            ? _getOwnerText(entry.value)
-                                            : entry.value,
-                                      ),
-                                    )
-                                    .toList(),
-                          ),
-                      ],
-                    ),
+                    child: _buildSellerCommentsSection(),
                   ),
                   const Divider(),
                   Padding(
@@ -1960,7 +1867,7 @@ if (!_userProvider.isLoggedIn) {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildQuestionsSection(),
+                        _buildQuestionsSection(context, id),
                       ],
                     ),
                   ),
