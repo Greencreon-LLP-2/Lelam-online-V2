@@ -62,7 +62,6 @@ class _MainScaffoldState extends State<MainScaffold> {
       print('name: ${userProvider.userData?.name}');
       print('hasShownNameDialog: $_hasShownNameDialog');
     }
-    // Show dialog only if userId exists, name is null/empty, and dialog hasn't been shown
     if (userProvider.userData?.userId != null &&
         (userProvider.userData?.name == null || userProvider.userData!.name.isEmpty) &&
         !_hasShownNameDialog) {
@@ -70,11 +69,10 @@ class _MainScaffoldState extends State<MainScaffold> {
     }
   }
 
-  // Show name input dialog
   void _showNameDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevent closing without action
+      barrierDismissible: false, 
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(

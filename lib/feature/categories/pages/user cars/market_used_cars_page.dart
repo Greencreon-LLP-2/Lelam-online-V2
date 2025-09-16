@@ -24,8 +24,6 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 
-
-
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
@@ -73,16 +71,59 @@ class _MarketPlaceProductDetailsPageState
   String sellerCommentsError = '';
   List<SellerComment> uniqueSellerComments = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  String? _bannerImageUrl;
+  bool _isLoadingBanner = false;
+  String _bannerError = '';
+
+ @override
+void initState() {
+  super.initState();
+  debugPrint('MarketPlaceProductDetailsPage - initState: Starting initialization');
+  _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  debugPrint('MarketPlaceProductDetailsPage - initState: userProvider initialized, userId=${_userProvider.userId}');
+
+  try {
     _fetchLocations();
-    _fetchSellerComments();
-    _fetchSellerInfo();
-    _checkShortlistStatus();
-    _fetchGalleryImages();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchLocations completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _fetchLocations: $e\n$stackTrace');
   }
+
+  try {
+    _fetchSellerComments();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchSellerComments completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _fetchSellerComments: $e\n$stackTrace');
+  }
+
+  try {
+    _fetchSellerInfo();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchSellerInfo completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _fetchSellerInfo: $e\n$stackTrace');
+  }
+
+  try {
+    _checkShortlistStatus();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _checkShortlistStatus completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _checkShortlistStatus: $e\n$stackTrace');
+  }
+
+  try {
+    _fetchGalleryImages();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchGalleryImages completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _fetchGalleryImages: $e\n$stackTrace');
+  }
+
+  try {
+    _fetchBannerImage();
+    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchBannerImage completed');
+  } catch (e, stackTrace) {
+    debugPrint('Error in _fetchBannerImage: $e\n$stackTrace');
+  }
+}
 
   Future<void> _fetchSellerComments() async {
     setState(() {
@@ -105,29 +146,29 @@ class _MarketPlaceProductDetailsPageState
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
         setState(() {
-  sellerComments = SellerCommentsModel.fromJson(responseData);
+          sellerComments = SellerCommentsModel.fromJson(responseData);
 
+          final Map<String, SellerComment> uniqueAttributes = {};
+          final List<SellerComment> orderedComments = [];
 
-  final Map<String, SellerComment> uniqueAttributes = {};
-  final List<SellerComment> orderedComments = [];
+          for (var comment in sellerComments!.data) {
+            final key = comment.attributeName.toLowerCase().replaceAll(
+              RegExp(r'\s+'),
+              '',
+            );
+            if (!uniqueAttributes.containsKey(key)) {
+              uniqueAttributes[key] = comment;
+              orderedComments.add(comment);
+            }
+          }
 
-  for (var comment in sellerComments!.data) {
-    final key = comment.attributeName
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), ''); 
-    if (!uniqueAttributes.containsKey(key)) {
-      uniqueAttributes[key] = comment;
-      orderedComments.add(comment); 
-    }
-  }
+          uniqueSellerComments = orderedComments;
+          debugPrint(
+            'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+          );
 
-  uniqueSellerComments = orderedComments;
-  debugPrint(
-    'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
-  );
-
-  isLoadingSellerComments = false;
-});
+          isLoadingSellerComments = false;
+        });
       } else {
         throw Exception(
           'HTTP ${response.statusCode}: ${response.reasonPhrase}',
@@ -395,6 +436,100 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
+Future<void> _fetchBannerImage() async {
+  debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Starting');
+  try {
+    setState(() {
+      _isLoadingBanner = true;
+      _bannerError = '';
+    });
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl');
+
+    final headers = {
+      'token': token,
+      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+    };
+    final url = '$baseUrl/post-ads-image.php?token=$token';
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url');
+
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData');
+
+      if (responseData['status'] == 'true' && responseData['data'] != null) {
+        final bannerImage = responseData['data']['inner_post_image'] ?? '';
+        debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage');
+        setState(() {
+          _bannerImageUrl = bannerImage.isNotEmpty ? 'https://lelamonline.com/admin/$bannerImage' : null;
+          debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl');
+        });
+      } else {
+        throw Exception('Invalid banner data: ${responseData['data']}');
+      }
+    } else {
+      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    }
+  } catch (e, stackTrace) {
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace');
+    setState(() {
+      _bannerError = 'Failed to load banner: $e';
+    });
+  } finally {
+    setState(() {
+      _isLoadingBanner = false;
+    });
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Completed');
+  }
+}
+
+Widget _buildBannerAd() {
+  debugPrint('Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl');
+  
+  if (_isLoadingBanner) {
+    return const Padding(
+      padding: EdgeInsets.all(16.0),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  if (_bannerError.isNotEmpty) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Text(
+          _bannerError,
+          style: const TextStyle(color: Colors.red),
+        ),
+      ),
+    );
+  }
+
+  if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+    debugPrint('No banner image available');
+    return const SizedBox.shrink();
+  }
+
+  return Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: CachedNetworkImage(
+      imageUrl: _bannerImageUrl!,
+      width: double.infinity,
+      height: 40,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+      errorWidget: (context, url, error) => const Center(
+        child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+      ),
+    ),
+  );
+}
   void _showLoginPromptDialog(BuildContext context, String action) {
     showDialog(
       context: context,
@@ -1283,93 +1418,96 @@ class _MarketPlaceProductDetailsPageState
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  void _showLoginDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text(
-          'Login Required',
-          style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-        ),
-        content: const Text('Please log in to ask a question.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.pushNamed(RouteNames.loginPage);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    void _showLoginDialog() {
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text(
+                'Login Required',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
               ),
-            ),
-            child: const Text(
-              'Log In',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'You are the first one to ask question',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-              if (!userProvider.isLoggedIn) {
-                _showLoginDialog();
-              } else {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.question_answer,
-                  color: Colors.white,
-                  size: 20.0,
+              content: const Text('Please log in to ask a question.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
                 ),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.pushNamed(RouteNames.loginPage);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  child: const Text(
+                    'Log In',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'You are the first one to ask question',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  _showLoginDialog();
+                } else {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
@@ -1835,6 +1973,8 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                     padding: const EdgeInsets.all(16.0),
                     child: _buildSellerCommentsSection(),
                   ),
+                  const Divider(),
+                  _buildBannerAd(),
                   const Divider(),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
