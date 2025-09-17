@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
@@ -32,26 +33,122 @@ class ChatListPage extends HookWidget {
         ? userProvider.userData!.name
         : 'Guest User';
 
-    Future<void> _openWhatsApp(BuildContext context) async {
-      const phoneNumber = '+918089308048';
-      final whatsappUrl =
-          'https://wa.me/$phoneNumber?text=Hello%20Support%20Team';
-      final uri = Uri.parse(whatsappUrl);
+ Future<void> _openWhatsApp(BuildContext context) async {
+  const phoneNumber = '+918089308048';
+  const message = 'Hello Support Team';
+  const supportEmail = 'support@lelamonline.com'; // Replace with actual support email
+  final whatsappAppUrl = 'whatsapp://send?phone=$phoneNumber&text=${Uri.encodeComponent(message)}';
+  final whatsappWebUrl = 'https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}';
+  final testBrowserUrl = 'https://www.google.com';
 
-      try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('WhatsApp is not installed')),
-          );
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open WhatsApp: $e')),
-        );
-      }
+  try {
+    // Step 1: Test browser availability
+    debugPrint('Testing browser with URL: $testBrowserUrl');
+    final browserUri = Uri.parse(testBrowserUrl);
+    if (!await canLaunchUrl(browserUri)) {
+      debugPrint('No browser available to handle HTTPS URLs');
+      throw Exception('No browser available to handle HTTPS URLs');
     }
+    debugPrint('Browser URL can be launched');
+
+    // Step 2: Try WhatsApp app URL
+    debugPrint('Attempting WhatsApp app with URL: $whatsappAppUrl');
+    final appUri = Uri.parse(whatsappAppUrl);
+    if (await canLaunchUrl(appUri)) {
+      debugPrint('Launching WhatsApp app');
+      await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    debugPrint('WhatsApp app URL cannot be launched');
+
+    // Step 3: Try WhatsApp web URL
+    debugPrint('Trying WhatsApp web URL: $whatsappWebUrl');
+    final webUri = Uri.parse(whatsappWebUrl);
+    if (await canLaunchUrl(webUri)) {
+      debugPrint('Launching WhatsApp web URL');
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    debugPrint('WhatsApp web URL cannot be launched');
+
+    // Step 4: Fallback to SMS
+    debugPrint('Attempting SMS fallback');
+    final smsUri = Uri.parse('sms:$phoneNumber?body=${Uri.encodeComponent(message)}');
+    if (await canLaunchUrl(smsUri)) {
+      debugPrint('Launching SMS');
+      await launchUrl(smsUri);
+      return;
+    }
+    debugPrint('SMS cannot be launched');
+
+    // Step 5: Fallback to email
+    debugPrint('Attempting email fallback');
+    final emailUri = Uri.parse('mailto:$supportEmail?subject=Support%20Request&body=$message');
+    if (await canLaunchUrl(emailUri)) {
+      debugPrint('Launching email client');
+      await launchUrl(emailUri);
+      return;
+    }
+    debugPrint('Email cannot be launched');
+
+    // Step 6: Show manual instructions with copy option
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Could not open WhatsApp, browser, SMS, or email. Please contact support manually at $phoneNumber or $supportEmail.',
+        ),
+        backgroundColor: Colors.red[800],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Copy Contact',
+          textColor: Colors.white,
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: '$phoneNumber, $supportEmail'));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Support contact copied to clipboard'),
+                backgroundColor: AppTheme.primaryColor,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    debugPrint('Error in _openWhatsApp: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Failed to open WhatsApp or fallbacks: $e'),
+        backgroundColor: Colors.red[800],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: 'Copy Contact',
+          textColor: Colors.white,
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: '$phoneNumber, $supportEmail'));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Support contact copied to clipboard'),
+                backgroundColor: AppTheme.primaryColor,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
 
     Future<void> _fetchOtherUsers(
       String userId,
