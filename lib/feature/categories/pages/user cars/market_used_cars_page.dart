@@ -77,7 +77,7 @@ class _MarketPlaceProductDetailsPageState
   String _bannerError = '';
 
   bool _isMeetingDialogOpen = false;
-  bool _isSchedulingMeeting = false; 
+  bool _isSchedulingMeeting = false;
 
   @override
   void initState() {
@@ -332,15 +332,19 @@ class _MarketPlaceProductDetailsPageState
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
 
     try {
-      final Map<String, dynamic> response = await ApiService().get(
+      final response = await ApiService().get(
         url: shortlist,
-        queryParams: {"user_id": _userProvider.userId},
+        queryParams: {"user_id": _userProvider.userId, "post_id": id},
       );
 
-      if (response['status'] == 'true') {
-        final userData = UserData.fromJson(
-          response['data'][0] as Map<String, dynamic>,
-        );
+      if (response['status'] == 'true' && response['data'].isNotEmpty) {
+        setState(() {
+          _isFavorited = true;
+        });
+      } else {
+        setState(() {
+          _isFavorited = false;
+        });
       }
     } catch (e) {
       debugPrint('Error checking shortlist status: $e');
@@ -363,6 +367,7 @@ class _MarketPlaceProductDetailsPageState
       final url =
           '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
       debugPrint('Adding to shortlist: $url');
+
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -372,22 +377,33 @@ class _MarketPlaceProductDetailsPageState
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        if (responseData['status'] == true) {
+        final statusRaw = responseData['status'];
+        final bool statusIsTrue =
+            statusRaw == true || statusRaw == 'true' || statusRaw == '1';
+
+        if (statusIsTrue) {
           setState(() {
-            _isFavorited = true;
+            _isFavorited = !_isFavorited; // toggle state
           });
+
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Added to shortlist'),
+            SnackBar(
+              content: Text(
+                _isFavorited ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
               backgroundColor: Colors.green,
             ),
           );
-          debugPrint('Shortlist updated in SharedPreferences');
+
+          // ✅ Optional: also update global state / provider here
+          // context.read<ShortlistProvider>().refresh();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Shortlist Added'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: Text(
+                'Failed: ${responseData['message'] ?? 'Unknown error'}',
+              ),
+              backgroundColor: Colors.red,
             ),
           );
         }
@@ -1206,296 +1222,312 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-Future<void> _fixMeeting(DateTime selectedDate) async {
-  if (!mounted) return;
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    if (!mounted) return;
 
-  setState(() {
-    _isSchedulingMeeting = true;
-  });
+    setState(() {
+      _isSchedulingMeeting = true;
+    });
 
-  try {
-    final headers = {'token': token};
-    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-    final url =
-        '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-    debugPrint('Scheduling meeting: $url');
-    debugPrint('User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
+    try {
+      final headers = {'token': token};
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
+      debugPrint('Scheduling meeting: $url');
+      debugPrint(
+        'User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
+      );
 
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('post-fix-meeting.php response: $responseBody');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('post-fix-meeting.php response: $responseBody');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('Parsed response: $responseData');
-      if (responseData['status'] == true) {
-        // Show success snackbar
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                responseData['data'] ?? 'Meeting scheduled successfully',
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed response: $responseData');
+        if (responseData['status'] == true) {
+          // Show success snackbar
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  responseData['data'] ?? 'Meeting scheduled successfully',
+                ),
+                backgroundColor: Colors.green,
               ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+            );
+          }
 
-        // Show confirmation dialog if still mounted
-        if (mounted) {
-          await _showMeetingConfirmationDialog(selectedDate);
+          // Show confirmation dialog if still mounted
+          if (mounted) {
+            await _showMeetingConfirmationDialog(selectedDate);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to schedule meeting: ${responseData['data']}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Failed to schedule meeting: ${responseData['data']}',
-              ),
+              content: Text('Error: ${response.reasonPhrase}'),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
-    } else {
+    } catch (e) {
+      debugPrint('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${response.reasonPhrase}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
-    }
-  } catch (e) {
-    debugPrint('Error scheduling meeting: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSchedulingMeeting = false;
+        });
+      }
+      debugPrint(
+        'User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
     }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isSchedulingMeeting = false;
-      });
-    }
-    debugPrint('User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
   }
-}
-Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
-  if (!mounted) return;
 
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: const Text(
-          'Meeting Scheduled',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Your meeting is scheduled on ${DateFormat('dd/MM/yyyy').format(selectedDate)}. '
-          'For further information, check My Bids in Status or call support.',
-          style: const TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => BuyingStatusPage()),
-                );
-              }
-            },
-            child: const Text(
-              'Check Status',
-              style: TextStyle(color: Colors.grey),
-            ),
+  Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          ElevatedButton(
-            onPressed: _launchPhoneCall, // Fixed: Correct method call
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          title: const Text(
+            'Meeting Scheduled',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Your meeting is scheduled on ${DateFormat('dd/MM/yyyy').format(selectedDate)}. '
+            'For further information, check My Bids in Status or call support.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => BuyingStatusPage()),
+                  );
+                }
+              },
+              child: const Text(
+                'Check Status',
+                style: TextStyle(color: Colors.grey),
               ),
             ),
-            child: const Text(
-              'Call Support',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      );
-    },
-  );
-}
-void _showMeetingDialog(BuildContext context) {
-  if (!_userProvider.isLoggedIn) {
-    _showLoginPromptDialog(context, 'schedule a meeting');
-    return;
-  }
-
-  if (_isMeetingDialogOpen) {
-    debugPrint('Meeting dialog already open');
-    return;
-  }
-
-  setState(() {
-    _isMeetingDialogOpen = true;
-  });
-
-  DateTime selectedDate = DateTime.now();
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            title: Column(
-              children: [
-                const SizedBox(height: 8),
-                const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-                const SizedBox(height: 4),
-                Text(
-                  'Select date',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.normal,
-                  ),
+            ElevatedButton(
+              onPressed: _launchPhoneCall, // Fixed: Correct method call
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
                 ),
-              ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Call Support',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
-            content: Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  void _showMeetingDialog(BuildContext context) {
+    if (!_userProvider.isLoggedIn) {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
+
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(
-                      Icons.calendar_today,
-                      color: AppTheme.primaryColor,
-                    ),
-                    title: const Text('Select Date'),
-                    subtitle: Text(
-                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                      style: const TextStyle(color: AppTheme.primaryColor),
-                    ),
-                    onTap: () async {
-                      final DateTime? picked = await showDatePicker(
-                        context: dialogContext,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 30)),
-                      );
-                      if (picked != null && picked != selectedDate) {
-                        setDialogState(() {
-                          selectedDate = picked;
-                        });
-                      }
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[300]!),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select date',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
-                  if (_isSchedulingMeeting)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          _isSchedulingMeeting = true;
-                        });
-                        try {
-                          await _fixMeeting(selectedDate);
-                          if (mounted) {
-                            Navigator.of(dialogContext).pop();
-                          }
-                        } finally {
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
                           setDialogState(() {
-                            _isSchedulingMeeting = false;
+                            selectedDate = picked;
                           });
                         }
                       },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                ),
-                child: const Text(
-                  'Schedule Meeting',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
               ),
-            ],
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          );
-        },
-      );
-    },
-  ).whenComplete(() {
-    if (mounted) {
-      setState(() {
-        _isMeetingDialogOpen = false;
-      });
-    }
-  });
-}
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
+  }
+
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
