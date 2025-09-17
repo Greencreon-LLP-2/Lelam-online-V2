@@ -859,12 +859,16 @@ class BidCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double bidPrice =
-        double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
-    final double targetPrice =
-        double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
-    final bool isLowBid =
-        bid['fromLowBids'] == true || (bidPrice > 0 && bidPrice < targetPrice);
+    final double bidPrice = double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
+    final double targetPrice = double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
+    final bool isLowBid = bid['fromLowBids'] == true || (bid['fromHighBids'] != true && bidPrice > 0 && bidPrice < targetPrice);
+    final bool isHighBid = bid['fromHighBids'] == true || (bidPrice > 0 && bidPrice >= targetPrice);
+
+    // Debug logging to diagnose bid classification
+    debugPrint('BidCard - Bid ID: ${bid['id']}, Post ID: ${bid['post_id']}');
+    debugPrint('BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
+    debugPrint('BidCard - bidPrice: $bidPrice, targetPrice: $targetPrice');
+    debugPrint('BidCard - isLowBid: $isLowBid, isHighBid: $isHighBid');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -896,18 +900,17 @@ class BidCard extends StatelessWidget {
                         width: 100,
                         height: 150,
                         fit: BoxFit.cover,
-                        placeholder:
-                            (context, url) => Container(
-                              width: 90,
-                              height: 90,
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              ),
+                        placeholder: (context, url) => Container(
+                          width: 90,
+                          height: 90,
+                          color: Colors.grey[200],
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.primaryColor,
                             ),
+                          ),
+                        ),
                         errorWidget: (context, url, error) {
                           debugPrint('Image load error: $error for URL: $url');
                           return Container(
@@ -929,8 +932,7 @@ class BidCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            bid['title'] ??
-                                'Unknown Vehicle (ID: ${bid['post_id']})',
+                            bid['title'] ?? 'Unknown Vehicle (ID: ${bid['post_id']})',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1034,9 +1036,24 @@ class BidCard extends StatelessWidget {
                               ],
                             ),
                           ),
+                          const PopupMenuItem<String>(
+                            value: 'proceed_without_bid',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Meeting without Bid'),
+                              ],
+                            ),
+                          ),
                         ];
-                        if (!isLowBid) {
-                          items.add(
+                        if (isHighBid) {
+                          items.insert(
+                            1, // Insert after "Increase Bid" but before "Meeting without Bid"
                             const PopupMenuItem<String>(
                               value: 'proceed_with_bid',
                               child: Row(
@@ -1053,22 +1070,7 @@ class BidCard extends StatelessWidget {
                             ),
                           );
                         }
-                        items.add(
-                          const PopupMenuItem<String>(
-                            value: 'proceed_without_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.event,
-                                  size: 16,
-                                  color: Colors.orange,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Meeting without Bid'),
-                              ],
-                            ),
-                          ),
-                        );
+                        debugPrint('BidCard - Menu items for bid ${bid['id']}: ${items.map((item) => item.value).toList()}');
                         return items;
                       },
                     ),
@@ -1168,10 +1170,7 @@ class BidCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color:
-                                  isLowBid
-                                      ? Colors.orange[700]
-                                      : Colors.green[700],
+                              color: isLowBid ? Colors.orange[700] : Colors.green[700],
                             ),
                           ),
                         ],
@@ -1184,14 +1183,13 @@ class BidCard extends StatelessWidget {
           ),
           const Divider(),
           SizedBox(
-         
             child: Row(
               children: [
                 Expanded(
                   child: Center(
                     child: Text(
                       isLowBid ? 'Book a meeting' : 'Schedule meeting',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
                         color: Colors.red,
                         fontWeight: FontWeight.w500,

@@ -77,7 +77,7 @@ class _MarketPlaceProductDetailsPageState
   String _bannerError = '';
 
   bool _isMeetingDialogOpen = false;
-  bool _isSchedulingMeeting = false; 
+  bool _isSchedulingMeeting = false;
 
   @override
   void initState() {
@@ -641,153 +641,324 @@ class _MarketPlaceProductDetailsPageState
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
     final TextEditingController _bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(String message, bool isSuccess) {
+    Future<void> _showResponseDialog(String message, bool isSuccess) async {
       // Format the current highest bid
       final String formattedBid =
           _currentHighestBid.startsWith('Error')
               ? _currentHighestBid
               : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
+      // Support phone number (replace with your actual support number)
+      const String supportPhoneNumber = '+919876543210';
+
       return showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) {
           return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
             title: Text(
               isSuccess ? 'Thank You' : 'Error',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isSuccess ? AppTheme.primaryColor : Colors.red,
+              ),
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(message, style: const TextStyle(fontSize: 16)),
-                const SizedBox(height: 12),
-                const Text(
-                  'Last Highest Bid:',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color:
-                          _currentHighestBid.startsWith('Error')
-                              ? Colors.red
-                              : Colors.grey,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    formattedBid,
-                    style: TextStyle(
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          _currentHighestBid.startsWith('Error')
-                              ? Colors.red
-                              : Colors.green,
+                      color: Colors.grey[800],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Last Highest Bid:',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red
+                                : Colors.grey[300]!,
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red[50]
+                              : Colors.green[50],
+                    ),
+                    child: Text(
+                      formattedBid,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red[800]
+                                : Colors.green[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  if (isSuccess) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BuyingStatusPage(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        if (isSuccess) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BuyingStatusPage(),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
                       ),
-                    );
-                  }
-                },
-                child: const Text('OK', style: TextStyle(color: Colors.grey)),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final Uri phoneUri = Uri(
+                          scheme: 'tel',
+                          path: supportPhoneNumber,
+                        );
+                        if (await canLaunchUrl(phoneUri)) {
+                          await launchUrl(phoneUri);
+                        } else {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Unable to initiate call. Please try again or contact support via other channels.',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: Colors.red[800],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Call Support',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
+            actionsPadding: const EdgeInsets.all(16),
           );
         },
       );
     }
 
-    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return WillPopScope(
-          onWillPop: () async {
-            return true;
-          },
-          child: StatefulBuilder(
-            builder: (dialogContext, setDialogState) {
-              return AlertDialog(
-                title: const Text(
-                  'Place Your Bid Amount',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Your Bid Amount *',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+   final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
+  context: context,
+  barrierDismissible: false,
+  builder: (dialogContext) {
+    return WillPopScope(
+      onWillPop: () async => true,
+      child: StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            title: Text(
+              'Place Your Bid Amount',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Your Bid Amount *',
+                    style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                    semanticsLabel: 'Your Bid Amount (required)',
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _bidController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      hintText: 'Enter amount',
+                      prefixIcon: Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 8),
+                        child: Text(
+                          '₹',
+                          style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                                fontSize: 16,
+                                color: Colors.grey[800],
+                              ),
+                        ),
                       ),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Colors.red, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _bidController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: false,
-                      ),
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        hintText: 'Enter amount',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                    style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          color: Colors.grey[800],
+                        ),
+                  ),
+                  if (_isLoadingBid)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12.0),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
                         ),
                       ),
                     ),
-                    if (_isLoadingBid)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: Center(child: CircularProgressIndicator()),
+                ],
+              ),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop(null);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
                       ),
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop(null);
-                    },
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(color: Colors.grey),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        semanticsLabel: 'Close dialog',
+                      ),
                     ),
                   ),
-                  ElevatedButton(
-                    onPressed:
-                        _isLoadingBid
-                            ? null
-                            : () async {
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isLoadingBid
+                          ? null
+                          : () async {
                               final String amount = _bidController.text;
                               if (amount.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter a bid amount'),
-                                    backgroundColor: Colors.red,
+                                  SnackBar(
+                                    content: const Text(
+                                      'Please enter a bid amount',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    backgroundColor: Colors.red[800],
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    margin: const EdgeInsets.all(16),
                                   ),
                                 );
                                 return;
@@ -799,8 +970,14 @@ class _MarketPlaceProductDetailsPageState
                                   SnackBar(
                                     content: Text(
                                       'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                      style: const TextStyle(color: Colors.white),
                                     ),
-                                    backgroundColor: Colors.red,
+                                    backgroundColor: Colors.red[800],
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    margin: const EdgeInsets.all(16),
                                   ),
                                 );
                                 return;
@@ -812,8 +989,7 @@ class _MarketPlaceProductDetailsPageState
 
                               try {
                                 FocusScope.of(dialogContext).unfocus();
-                                final String responseMessage =
-                                    await _saveBidData(bidAmount);
+                                final String responseMessage = await _saveBidData(bidAmount);
                                 Navigator.of(dialogContext).pop({
                                   'success': true,
                                   'message': responseMessage,
@@ -829,19 +1005,42 @@ class _MarketPlaceProductDetailsPageState
                                 });
                               }
                             },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.send, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Submit',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            semanticsLabel: 'Submit bid amount',
+                          ),
+                        ],
+                      ),
                     ),
-                    child: const Text('Submit'),
                   ),
                 ],
-              );
-            },
-          ),
-        );
-      },
+              ),
+            ],
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          );
+        },
+      ),
     );
+  },
+);
 
     await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
@@ -1193,7 +1392,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   void _launchPhoneCall() async {
-    const phoneNumber = 'tel:+1234567890'; // Replace with actual support number
+    const phoneNumber = 'tel:+919626040738';
     if (await canLaunch(phoneNumber)) {
       await launch(phoneNumber);
     } else {
@@ -1206,296 +1405,366 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-Future<void> _fixMeeting(DateTime selectedDate) async {
-  if (!mounted) return;
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    if (!mounted) return;
 
-  setState(() {
-    _isSchedulingMeeting = true;
-  });
+    setState(() {
+      _isSchedulingMeeting = true;
+    });
 
-  try {
-    final headers = {'token': token};
-    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-    final url =
-        '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-    debugPrint('Scheduling meeting: $url');
-    debugPrint('User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
+    try {
+      final headers = {'token': token};
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
+      debugPrint('Scheduling meeting: $url');
+      debugPrint(
+        'User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
+      );
 
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('post-fix-meeting.php response: $responseBody');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('post-fix-meeting.php response: $responseBody');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('Parsed response: $responseData');
-      if (responseData['status'] == true) {
-        // Show success snackbar
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                responseData['data'] ?? 'Meeting scheduled successfully',
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed response: $responseData');
+        if (responseData['status'] == true) {
+          // Show success snackbar
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  responseData['data'] ?? 'Meeting scheduled successfully',
+                ),
+                backgroundColor: Colors.green,
               ),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+            );
+          }
 
-        // Show confirmation dialog if still mounted
-        if (mounted) {
-          await _showMeetingConfirmationDialog(selectedDate);
+          // Show confirmation dialog if still mounted
+          if (mounted) {
+            await _showMeetingConfirmationDialog(selectedDate);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to schedule meeting: ${responseData['data']}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Failed to schedule meeting: ${responseData['data']}',
-              ),
+              content: Text('Error: ${response.reasonPhrase}'),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
-    } else {
+    } catch (e) {
+      debugPrint('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${response.reasonPhrase}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
-    }
-  } catch (e) {
-    debugPrint('Error scheduling meeting: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSchedulingMeeting = false;
+        });
+      }
+      debugPrint(
+        'User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
     }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isSchedulingMeeting = false;
-      });
-    }
-    debugPrint('User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
   }
-}
-Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
-  if (!mounted) return;
 
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        title: const Text(
-          'Meeting Scheduled',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Your meeting is scheduled on ${DateFormat('dd/MM/yyyy').format(selectedDate)}. '
-          'For further information, check My Bids in Status or call support.',
-          style: const TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => BuyingStatusPage()),
-                );
-              }
-            },
-            child: const Text(
-              'Check Status',
-              style: TextStyle(color: Colors.grey),
+  Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          backgroundColor: Colors.white,
+          title: Text(
+            'Meeting Scheduled',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
             ),
           ),
-          ElevatedButton(
-            onPressed: _launchPhoneCall, // Fixed: Correct method call
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Call Support',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      );
-    },
-  );
-}
-void _showMeetingDialog(BuildContext context) {
-  if (!_userProvider.isLoggedIn) {
-    _showLoginPromptDialog(context, 'schedule a meeting');
-    return;
-  }
-
-  if (_isMeetingDialogOpen) {
-    debugPrint('Meeting dialog already open');
-    return;
-  }
-
-  setState(() {
-    _isMeetingDialogOpen = true;
-  });
-
-  DateTime selectedDate = DateTime.now();
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            title: Column(
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 8),
-                const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-                const SizedBox(height: 4),
                 Text(
-                  'Select date',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.normal,
+                  'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}.\n\n'
+                  'For further information, check My Bids in Status or call support.',
+                  style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                  semanticsLabel:
+                      'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}. '
+                      'For further information, check My Bids in Status or call support.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BuyingStatusPage(),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Check Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      semanticsLabel: 'Check bid status',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _launchPhoneCall(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Call Support',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          semanticsLabel: 'Call support team',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-            content: Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  void _showMeetingDialog(BuildContext context) {
+    if (!_userProvider.isLoggedIn) {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
+
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(
-                      Icons.calendar_today,
-                      color: AppTheme.primaryColor,
-                    ),
-                    title: const Text('Select Date'),
-                    subtitle: Text(
-                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                      style: const TextStyle(color: AppTheme.primaryColor),
-                    ),
-                    onTap: () async {
-                      final DateTime? picked = await showDatePicker(
-                        context: dialogContext,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 30)),
-                      );
-                      if (picked != null && picked != selectedDate) {
-                        setDialogState(() {
-                          selectedDate = picked;
-                        });
-                      }
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[300]!),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select date',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
-                  if (_isSchedulingMeeting)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
                 ],
               ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          _isSchedulingMeeting = true;
-                        });
-                        try {
-                          await _fixMeeting(selectedDate);
-                          if (mounted) {
-                            Navigator.of(dialogContext).pop();
-                          }
-                        } finally {
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
                           setDialogState(() {
-                            _isSchedulingMeeting = false;
+                            selectedDate = picked;
                           });
                         }
                       },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                ),
-                child: const Text(
-                  'Schedule Meeting',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
               ),
-            ],
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          );
-        },
-      );
-    },
-  ).whenComplete(() {
-    if (mounted) {
-      setState(() {
-        _isMeetingDialogOpen = false;
-      });
-    }
-  });
-}
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
+  }
+
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
