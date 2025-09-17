@@ -50,10 +50,7 @@ class SellingStatusPage extends StatelessWidget {
             'Selling Status',
             style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
           ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
+        
           backgroundColor: AppTheme.primaryColor,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
