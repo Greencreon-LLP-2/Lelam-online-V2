@@ -20,7 +20,7 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
-
+import 'package:share_plus/share_plus.dart';
 class RealEstateProductDetailsPage extends StatefulWidget {
   final MarketplacePost product;
   final bool isAuction;
@@ -141,7 +141,20 @@ class _RealEstateProductDetailsPageState
       });
     }
   }
-
+  Future<void> _shareListing() async {
+    final postUrl = 'https://lelamonline.com/post/$id';
+    final shareText = '$title\n$postUrl';
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      debugPrint('Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open share options')),
+        );
+      }
+    }
+  }
   Future<void> _toggleShortlist() async {
     if (userId == null || userId == 'Unknown') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -964,9 +977,7 @@ class _RealEstateProductDetailsPageState
                                 ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // Share functionality
-                            },
+                            onPressed: _shareListing
                           ),
                         ],
                       ),

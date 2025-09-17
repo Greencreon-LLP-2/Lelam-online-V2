@@ -18,6 +18,7 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 
+import 'package:share_plus/share_plus.dart';
 const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
@@ -72,14 +73,29 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     _fetchSellerInfo();
     _fetchShortlistStatus();
   }
-
+   
   @override
   void dispose() {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
   }
+ 
 
+    Future<void> _shareListing() async {
+    final postUrl = 'https://lelamonline.com/post/$id';
+    final shareText = '$title\n$postUrl';
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      debugPrint('Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open share options')),
+        );
+      }
+    }
+  }
   Future<void> _fetchAttributesData() async {
     setState(() {
       isLoadingDetails = true;
@@ -1033,9 +1049,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // Share functionality
-                            },
+                            onPressed: _shareListing
                           ),
                         ],
                       ),

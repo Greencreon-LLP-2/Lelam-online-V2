@@ -35,6 +35,8 @@ dependencies:
   flutter_native_splash: ^2.4.6
   flutter_svg: ^2.2.1
 
+  share_plus: ^12.0.0
+
   
   
 

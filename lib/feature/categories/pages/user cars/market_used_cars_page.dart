@@ -23,6 +23,7 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 
 
@@ -345,7 +346,20 @@ class _MarketPlaceProductDetailsPageState
       );
     }
   }
-
+  Future<void> _shareListing() async {
+    final postUrl = 'https://lelamonline.com/post/$id';
+    final shareText = '$title\n$postUrl';
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      debugPrint('Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to open share options')),
+        );
+      }
+    }
+  }
   Future<String> _saveBidData(int bidAmount) async {
     if (_userProvider.userId == null) {
       throw Exception('Please log in to place a bid');
@@ -1557,9 +1571,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                                 Icons.share,
                                 color: Colors.white,
                               ),
-                              onPressed: () {
-                                // Share functionality
-                              },
+                              onPressed: _shareListing
                             ),
                           ],
                         ),

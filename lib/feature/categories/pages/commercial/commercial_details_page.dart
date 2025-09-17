@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +24,7 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
@@ -61,6 +63,23 @@ class _CommercialProductDetailsPageState
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
   String? userId;
+
+  
+  Future<void> _shareListng() async{
+    final postUrl = 'https://lelamonline.com/post/$id';
+    final shareText = '$title\n$postUrl';
+   try{
+    await Share.share(shareText);
+   }
+   catch(e){
+    debugPrint('Error sharing listing: $e');
+    if(mounted){
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sharing listing: $e')),
+      );
+    }
+   }
+  }
 
   @override
   void initState() {
@@ -999,9 +1018,7 @@ class _CommercialProductDetailsPageState
                               ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // Share functionality
-                            },
+                            onPressed: _shareListng
                           ),
                         ],
                       ),
