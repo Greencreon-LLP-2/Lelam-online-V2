@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
@@ -16,10 +19,12 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RealEstateProductDetailsPage extends StatefulWidget {
   final MarketplacePost product;
@@ -61,6 +66,22 @@ class _RealEstateProductDetailsPageState
   String sellerErrorMessage = '';
   String? userId;
 
+  bool _isBidDialogOpen = false;
+  bool _isLoadingBid = false;
+  double _minBidIncrement = 1000;
+  String _currentHighestBid = '0';
+
+  bool _isMeetingDialogOpen = false;
+  bool _isSchedulingMeeting = false;
+
+  bool _isLoadingGallery = true;
+  List<String> _galleryImages = [];
+  String _galleryError = '';
+
+  String? _bannerImageUrl;
+  bool _isLoadingBanner = false;
+  String _bannerError = '';
+
   @override
   void initState() {
     super.initState();
@@ -73,8 +94,1110 @@ class _RealEstateProductDetailsPageState
       _fetchLocations(),
       _fetchAttributesData(),
       _fetchSellerInfo(),
+      _fetchGalleryImages(),
+      _fetchBannerImage(),
       if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
     ]);
+  }
+
+  Future<void> _fetchBannerImage() async {
+    debugPrint('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
+    try {
+      setState(() {
+        _isLoadingBanner = true;
+        _bannerError = '';
+      });
+
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-ads-image.php?token=$_token';
+      debugPrint('Fetching banner image: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint(
+        'Banner API response (status: ${response.statusCode}): $responseBody',
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed banner response: $responseData');
+
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          final bannerImage = responseData['data']['inner_post_image'] ?? '';
+          setState(() {
+            _bannerImageUrl =
+                bannerImage.isNotEmpty
+                    ? 'https://lelamonline.com/admin/$bannerImage'
+                    : null;
+          });
+          debugPrint('Set _bannerImageUrl=$_bannerImageUrl');
+        } else {
+          throw Exception('Invalid banner data: ${responseData['data']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching banner image: $e');
+      setState(() {
+        _bannerError = 'Failed to load banner: $e';
+        _isLoadingBanner = false;
+      });
+    } finally {
+      setState(() {
+        _isLoadingBanner = false;
+      });
+      debugPrint('RealEstateProductDetailsPage - _fetchBannerImage: Completed');
+    }
+  }
+
+  Future<void> _fetchGalleryImages() async {
+    try {
+      setState(() {
+        _isLoadingGallery = true;
+        _galleryError = '';
+      });
+
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/post-gallery.php?token=$_token&post_id=${widget.product.id}';
+      debugPrint('Fetching gallery: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Gallery API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed responseData type: ${responseData.runtimeType}');
+
+        if (responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            (responseData['data'] as List).isNotEmpty) {
+          setState(() {
+            _galleryImages =
+                (responseData['data'] as List)
+                    .map(
+                      (item) =>
+                          'https://lelamonline.com/admin/${item['image'] ?? ''}',
+                    )
+                    .where((img) => img.isNotEmpty && img.contains('uploads/'))
+                    .toList();
+            _isLoadingGallery = false;
+          });
+          debugPrint(
+            'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
+          );
+        } else {
+          throw Exception(
+            'Invalid gallery data: Status is ${responseData['status']}, data is ${responseData['data']?.runtimeType ?? 'null'}',
+          );
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching gallery: $e');
+      setState(() {
+        _galleryError = 'Failed to load gallery: $e';
+        _isLoadingGallery = false;
+      });
+    }
+  }
+
+  void _launchPhoneCall() async {
+    const phoneNumber = 'tel:+919626040738';
+    if (await canLaunchUrl(Uri.parse(phoneNumber))) {
+      await launchUrl(Uri.parse(phoneNumber));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone call'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isSchedulingMeeting = true;
+    });
+
+    try {
+      final headers = {'token': _token};
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.product.id}&user_id=$userId&meeting_date=$formattedDate';
+      debugPrint('Scheduling meeting: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('post-fix-meeting.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed response: $responseData');
+        if (responseData['status'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  responseData['data'] ?? 'Meeting scheduled successfully',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+            await _showMeetingConfirmationDialog(selectedDate);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to schedule meeting: ${responseData['data']}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${response.reasonPhrase}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error scheduling meeting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSchedulingMeeting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          backgroundColor: Colors.white,
+          title: Text(
+            'Meeting Scheduled',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}.\n\n'
+                  'For further information, check My Bids in Status or call support.',
+                  style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                  semanticsLabel:
+                      'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}. '
+                      'For further information, check My Bids in Status or call support.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BuyingStatusPage(),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Check Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      semanticsLabel: 'Check bid status',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _launchPhoneCall(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Call Support',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          semanticsLabel: 'Call support team',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      setState(() {
+        _isLoadingBid = true;
+      });
+
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.product.id}';
+      debugPrint('Fetching highest bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Full API response body: $responseBody');
+      debugPrint('Response status code: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed response data: $responseData');
+
+        if (responseData['status'] == true) {
+          final dataValue = (responseData['data']?.toString() ?? '0').trim();
+          final parsed = double.tryParse(dataValue);
+          if (parsed != null) {
+            setState(() {
+              _currentHighestBid = parsed.toString();
+            });
+            debugPrint('Successfully fetched highest bid: $dataValue');
+          } else {
+            debugPrint('API returned non-numeric data: $dataValue');
+            setState(() {
+              _currentHighestBid = 'Error: $dataValue';
+            });
+          }
+        } else {
+          debugPrint('API status false: ${responseData['data']}');
+          setState(() {
+            _currentHighestBid = '0';
+          });
+        }
+      } else {
+        debugPrint(
+          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
+        );
+        setState(() {
+          _currentHighestBid = '0';
+        });
+      }
+    } catch (e) {
+      debugPrint('Exception in fetch highest bid: $e');
+      setState(() {
+        _currentHighestBid = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
+      });
+    }
+  }
+
+  Future<String> _saveBidData(int bidAmount) async {
+    if (userId == null || userId == 'Unknown') {
+      throw Exception('Please log in to place a bid');
+    }
+
+    try {
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.product.id}&user_id=$userId&bidamt=$bidAmount';
+      debugPrint('Placing bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('place-bid.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint('Parsed place-bid response: $responseData');
+        final statusRaw = responseData['status'];
+        final bool statusIsTrue =
+            statusRaw == true || statusRaw == 'true' || statusRaw == '1';
+
+        final dataMessage = responseData['data']?.toString() ?? '';
+        final bool dataLooksLikeSuccess =
+            dataMessage.toLowerCase().contains('success') ||
+            dataMessage.toLowerCase().contains('placed successfully');
+        if (statusIsTrue || dataLooksLikeSuccess) {
+          return responseData['data'] ?? 'Bid placed successfully';
+        } else {
+          throw Exception('Failed to place bid: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to place bid: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error placing bid: $e');
+      throw e;
+    }
+  }
+
+  void showProductBidDialog(BuildContext context) async {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'place a bid');
+      return;
+    }
+
+    setState(() => _isBidDialogOpen = true);
+    await _fetchCurrentHighestBid();
+    final TextEditingController _bidController = TextEditingController();
+
+    Future<void> _showResponseDialog(String message, bool isSuccess) async {
+      final String formattedBid =
+          _currentHighestBid.startsWith('Error')
+              ? _currentHighestBid
+              : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+      const String supportPhoneNumber = '+919876543210';
+
+      return showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            title: Text(
+              isSuccess ? 'Thank You' : 'Error',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isSuccess ? AppTheme.primaryColor : Colors.red,
+              ),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 16,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Last Highest Bid:',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red
+                                : Colors.grey[300]!,
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red[50]
+                              : Colors.green[50],
+                    ),
+                    child: Text(
+                      formattedBid,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red[800]
+                                : Colors.green[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        if (isSuccess) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const BuyingStatusPage(),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final Uri phoneUri = Uri(
+                          scheme: 'tel',
+                          path: supportPhoneNumber,
+                        );
+                        if (await canLaunchUrl(phoneUri)) {
+                          await launchUrl(phoneUri);
+                        } else {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Unable to initiate call. Please try again or contact support via other channels.',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: Colors.red[800],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Call Support',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            actionsPadding: const EdgeInsets.all(16),
+          );
+        },
+      );
+    }
+
+    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => true,
+          child: StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+                backgroundColor: Colors.white,
+                title: Text(
+                  'Place Your Bid Amount',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                content: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Bid Amount *',
+                        style: Theme.of(
+                          dialogContext,
+                        ).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                        semanticsLabel: 'Your Bid Amount (required)',
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _bidController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: false,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          hintText: 'Enter amount',
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 8),
+                            child: Text(
+                              '₹',
+                              style: Theme.of(
+                                dialogContext,
+                              ).textTheme.bodyMedium?.copyWith(
+                                fontSize: 16,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 0,
+                            minHeight: 0,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: AppTheme.primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        style: Theme.of(dialogContext).textTheme.bodyMedium
+                            ?.copyWith(fontSize: 16, color: Colors.grey[800]),
+                      ),
+                      if (_isLoadingBid)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop(null);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[200],
+                            foregroundColor: Colors.grey[800],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Close',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            semanticsLabel: 'Close dialog',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              _isLoadingBid
+                                  ? null
+                                  : () async {
+                                    final String amount = _bidController.text;
+                                    if (amount.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                            'Please enter a bid amount',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final int bidAmount =
+                                        int.tryParse(amount) ?? 0;
+                                    if (bidAmount < _minBidIncrement) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    setDialogState(() {
+                                      _isLoadingBid = true;
+                                    });
+
+                                    try {
+                                      FocusScope.of(dialogContext).unfocus();
+                                      final String responseMessage =
+                                          await _saveBidData(bidAmount);
+                                      Navigator.of(dialogContext).pop({
+                                        'success': true,
+                                        'message': responseMessage,
+                                      });
+                                    } catch (e) {
+                                      Navigator.of(dialogContext).pop({
+                                        'success': false,
+                                        'message': 'Error placing bid: $e',
+                                      });
+                                    } finally {
+                                      setDialogState(() {
+                                        _isLoadingBid = false;
+                                      });
+                                    }
+                                  },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 2,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.send, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Submit',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                semanticsLabel: 'Submit bid amount',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 200));
+    FocusScope.of(context).unfocus();
+    _bidController.dispose();
+
+    if (result != null) {
+      final bool ok = result['success'] == true;
+      final String msg =
+          result['message']?.toString() ??
+          (ok ? 'Bid placed successfully' : 'Failed to place bid');
+      await _showResponseDialog(msg, ok);
+    }
+    if (mounted) setState(() => _isBidDialogOpen = false);
+  }
+
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Please log in to $action.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.pushNamed(RouteNames.loginPage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Log In',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'add or remove from shortlist');
+      return;
+    }
+
+    if (_isLoadingFavorite) return;
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.product.id}';
+      debugPrint('Toggling shortlist: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('add-to-shortlist.php response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == true || responseData['status'] == 'true';
+        final String message = responseData['data']?.toString() ?? '';
+
+        if (isSuccess) {
+          final bool wasAdded =
+              message.toLowerCase().contains('added') || !_isFavorited;
+          setState(() {
+            _isFavorited = wasAdded;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                wasAdded ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update shortlist: $message'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling shortlist: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoadingFavorite = false;
+      });
+    }
+  }
+
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') {
+      setState(() {
+        _isFavorited = false;
+        _isLoadingFavorite = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": userId},
+      );
+
+      debugPrint('Shortlist API response: $response');
+
+      if (response['status'] == 'true' && response['data'] is List) {
+        final List<dynamic> shortlistData = response['data'];
+        final bool isShortlisted = shortlistData.any(
+          (item) => item['post_id'].toString() == widget.product.id,
+        );
+        setState(() {
+          _isFavorited = isShortlisted;
+          _isLoadingFavorite = false;
+        });
+        debugPrint(
+          'Product ${widget.product.id} isShortlisted: $isShortlisted',
+        );
+      } else {
+        setState(() {
+          _isFavorited = false;
+          _isLoadingFavorite = false;
+        });
+        debugPrint('Invalid shortlist data: ${response['data']}');
+      }
+    } catch (e) {
+      debugPrint('Error checking shortlist status: $e');
+      setState(() {
+        _isFavorited = false;
+        _isLoadingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to check shortlist status: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
   }
 
   void _loadUserId() {
@@ -89,58 +1212,58 @@ class _RealEstateProductDetailsPageState
     debugPrint('RealEstateProductDetailsPage - Loaded userId: $userId');
   }
 
-  Future<void> _checkShortlistStatus() async {
-    if (userId == null || userId == 'Unknown') {
-      setState(() {
-        _isFavorited = false;
-      });
-      return;
-    }
+  // Future<void> _checkShortlistStatus() async {
+  //   if (userId == null || userId == 'Unknown') {
+  //     setState(() {
+  //       _isFavorited = false;
+  //     });
+  //     return;
+  //   }
 
-    setState(() {
-      _isLoadingFavorite = true;
-    });
+  //   setState(() {
+  //     _isLoadingFavorite = true;
+  //   });
 
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId'),
-        headers: {
-          'token': _token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-        },
-      );
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse('$_baseUrl/list-shortlist.php?token=$_token&user_id=$userId'),
+  //       headers: {
+  //         'token': _token,
+  //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+  //       },
+  //     );
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        if (responseData['status'] == 'true' && responseData['data'] is List) {
-          final shortlistData = List<Map<String, dynamic>>.from(
-            responseData['data'],
-          );
-          final isShortlisted = shortlistData.any(
-            (item) => item['post_id'].toString() == widget.product.id,
-          );
-          setState(() {
-            _isFavorited = isShortlisted;
-            _isLoadingFavorite = false;
-          });
-        } else {
-          setState(() {
-            _isFavorited = false;
-            _isLoadingFavorite = false;
-          });
-        }
-      } else {
-        throw Exception(
-          'Failed to check shortlist status: ${response.reasonPhrase}',
-        );
-      }
-    } catch (e) {
-      debugPrint('Error checking shortlist status: $e');
-      setState(() {
-        _isLoadingFavorite = false;
-      });
-    }
-  }
+  //     if (response.statusCode == 200) {
+  //       final responseData = jsonDecode(response.body);
+  //       if (responseData['status'] == 'true' && responseData['data'] is List) {
+  //         final shortlistData = List<Map<String, dynamic>>.from(
+  //           responseData['data'],
+  //         );
+  //         final isShortlisted = shortlistData.any(
+  //           (item) => item['post_id'].toString() == widget.product.id,
+  //         );
+  //         setState(() {
+  //           _isFavorited = isShortlisted;
+  //           _isLoadingFavorite = false;
+  //         });
+  //       } else {
+  //         setState(() {
+  //           _isFavorited = false;
+  //           _isLoadingFavorite = false;
+  //         });
+  //       }
+  //     } else {
+  //       throw Exception(
+  //         'Failed to check shortlist status: ${response.reasonPhrase}',
+  //       );
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error checking shortlist status: $e');
+  //     setState(() {
+  //       _isLoadingFavorite = false;
+  //     });
+  //   }
+  // }
 
   Future<void> _toggleShortlist() async {
     if (userId == null || userId == 'Unknown') {
@@ -193,9 +1316,9 @@ class _RealEstateProductDetailsPageState
       setState(() {
         _isLoadingFavorite = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -281,7 +1404,10 @@ class _RealEstateProductDetailsPageState
           '$_baseUrl/post-attribute-values.php?token=$_token&post_id=${widget.product.id}';
       debugPrint('Fetching attributes: $url');
 
-      final response = await http.get(Uri.parse(url), headers: {'token': _token});
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'token': _token},
+      );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -292,9 +1418,10 @@ class _RealEstateProductDetailsPageState
 
         // Process attributes for uniqueness
         for (var comment in sellerComments.data) {
-          final key = comment.attributeName
-              .toLowerCase()
-              .replaceAll(RegExp(r'\s+'), '');
+          final key = comment.attributeName.toLowerCase().replaceAll(
+            RegExp(r'\s+'),
+            '',
+          );
           if (!uniqueAttributes.containsKey(key)) {
             uniqueAttributes[key] = comment;
             orderedComments.add(comment);
@@ -302,29 +1429,33 @@ class _RealEstateProductDetailsPageState
         }
 
         // Add Seller Type from byDealer
-        orderedComments.add(SellerComment(
-          attributeName: 'Seller Type',
-          attributeValue:
-              widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
-        ));
+        orderedComments.add(
+          SellerComment(
+            attributeName: 'Seller Type',
+            attributeValue: widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+          ),
+        );
         uniqueAttributes['sellertype'] = SellerComment(
           attributeName: 'Seller Type',
-          attributeValue:
-              widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+          attributeValue: widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
         );
 
         // Add auction-specific attributes if isAuction is true
         if (widget.isAuction) {
-          orderedComments.add(SellerComment(
-            attributeName: 'Auction Starting Price',
-            attributeValue: formatPriceInt(
-              double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+          orderedComments.add(
+            SellerComment(
+              attributeName: 'Auction Starting Price',
+              attributeValue: formatPriceInt(
+                double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+              ),
             ),
-          ));
-          orderedComments.add(SellerComment(
-            attributeName: 'Auction Attempts',
-            attributeValue: widget.product.auctionAttempt,
-          ));
+          );
+          orderedComments.add(
+            SellerComment(
+              attributeName: 'Auction Attempts',
+              attributeValue: widget.product.auctionAttempt,
+            ),
+          );
           uniqueAttributes['auctionstartingprice'] = SellerComment(
             attributeName: 'Auction Starting Price',
             attributeValue: formatPriceInt(
@@ -340,13 +1471,14 @@ class _RealEstateProductDetailsPageState
         setState(() {
           uniqueSellerComments = orderedComments;
           // Filter for Details section
-          detailComments = uniqueSellerComments.where((comment) {
-            final name = comment.attributeName.toLowerCase().trim();
-            return [
-              'seller type',
-              if (widget.isAuction) 'auction attempts',
-            ].contains(name);
-          }).toList();
+          detailComments =
+              uniqueSellerComments.where((comment) {
+                final name = comment.attributeName.toLowerCase().trim();
+                return [
+                  'seller type',
+                  if (widget.isAuction) 'auction attempts',
+                ].contains(name);
+              }).toList();
 
           debugPrint(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
@@ -370,25 +1502,69 @@ class _RealEstateProductDetailsPageState
     }
   }
 
+  Widget _buildBannerAd() {
+    debugPrint(
+      'Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl',
+    );
+
+    if (_isLoadingBanner) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_bannerError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+
+    if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+      debugPrint('No banner image available');
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImageUrl!,
+        width: double.infinity,
+        height: 35,
+        fit: BoxFit.fill,
+        placeholder:
+            (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget:
+            (context, url, error) => const Center(
+              child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+            ),
+      ),
+    );
+  }
+
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -404,6 +1580,9 @@ class _RealEstateProductDetailsPageState
   bool get isFeatured => widget.product.feature == '1';
 
   List<String> get _images {
+    if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
+      return _galleryImages;
+    }
     if (image.isNotEmpty) {
       return ['https://lelamonline.com/admin/$image'];
     }
@@ -458,19 +1637,21 @@ class _RealEstateProductDetailsPageState
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -497,7 +1678,8 @@ class _RealEstateProductDetailsPageState
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -537,7 +1719,9 @@ class _RealEstateProductDetailsPageState
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -546,9 +1730,10 @@ class _RealEstateProductDetailsPageState
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -559,21 +1744,22 @@ class _RealEstateProductDetailsPageState
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -595,108 +1781,163 @@ class _RealEstateProductDetailsPageState
   }
 
   void _showMeetingDialog(BuildContext context) {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
+
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
     DateTime selectedDate = DateTime.now();
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select date',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: AppTheme.primaryColor,
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      selectedDate = picked;
-                      Navigator.pop(context);
-                      _showMeetingDialog(context);
-                    }
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[300]!),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                debugPrint(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                );
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text(
-                'Schedule Meeting',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
         );
       },
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
   }
 
   String formatPriceInt(double price) {
@@ -731,10 +1972,7 @@ class _RealEstateProductDetailsPageState
             label,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16),
-          ),
+          Text(value, style: const TextStyle(fontSize: 16)),
         ],
       ),
     );
@@ -744,64 +1982,62 @@ class _RealEstateProductDetailsPageState
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-            ? Center(
-                child: Text(
-                  sellerErrorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              )
-            : GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          SellerInformationPage(userId: widget.product.createdBy),
-                    ),
-                  );
-                },
-                child: Row(
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder:
+                    (context) =>
+                        SellerInformationPage(userId: widget.product.createdBy),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage: sellerProfileImage != null &&
-                              sellerProfileImage!.isNotEmpty
-                          ? CachedNetworkImageProvider(sellerProfileImage!)
-                          : const AssetImage('assets/images/avatar.gif')
-                              as ImageProvider,
-                      radius: 30,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sellerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Member Since $sellerActiveFrom',
-                            style:
-                                TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Posts: $sellerNoOfPosts',
-                            style:
-                                TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                        ],
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios,
-                        size: 16, color: Colors.grey),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
                   ],
                 ),
-              );
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
   }
 
   Widget _buildQuestionsSection() {
@@ -859,52 +2095,80 @@ class _RealEstateProductDetailsPageState
                       height: 400,
                       child: Stack(
                         children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _images.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentImageIndex = index;
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => _showFullScreenGallery(context),
-                                child: CachedNetworkImage(
-                                  imageUrl: _images[index],
-                                  width: double.infinity,
-                                  height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
+                          if (_isLoadingGallery)
+                            const Center(child: CircularProgressIndicator())
+                          else if (_galleryError.isNotEmpty)
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    size: 50,
+                                    color: Colors.red,
                                   ),
-                                  errorWidget: (context, url, error) =>
-                                      const Icon(Icons.error),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _galleryError,
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                  TextButton(
+                                    onPressed: _fetchGalleryImages,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            PageView.builder(
+                              controller: _pageController,
+                              itemCount: _images.length,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentImageIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _showFullScreenGallery(context),
+                                  child: CachedNetworkImage(
+                                    imageUrl: _images[index],
+                                    width: double.infinity,
+                                    height: 400,
+                                    fit: BoxFit.cover,
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) =>
+                                            const Icon(Icons.error),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (!_isLoadingGallery && _galleryError.isEmpty)
+                            Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_currentImageIndex + 1}/${_images.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${_images.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                           if (isFeatured)
                             Positioned(
                               top: 8,
@@ -945,23 +2209,45 @@ class _RealEstateProductDetailsPageState
                           const Spacer(),
                           _isLoadingFavorite
                               ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(Colors.white),
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
                                   ),
-                                )
+                                ),
+                              )
                               : IconButton(
-                                  icon: Icon(
+                                tooltip:
+                                    _isFavorited
+                                        ? 'Remove from Shortlist'
+                                        : 'Add to Shortlist',
+                                icon: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  transitionBuilder:
+                                      (child, animation) => ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      ),
+                                  child: Icon(
                                     _isFavorited
                                         ? Icons.favorite
                                         : Icons.favorite_border,
-                                    color: _isFavorited ? Colors.red : Colors.white,
+                                    key: ValueKey<bool>(_isFavorited),
+                                    color:
+                                        _isFavorited
+                                            ? Colors.red
+                                            : Colors.white,
+                                    size: 28,
+                                    semanticLabel:
+                                        _isFavorited
+                                            ? 'Remove from Shortlist'
+                                            : 'Add to Shortlist',
                                   ),
-                                  onPressed: _toggleShortlist,
                                 ),
+                                onPressed: _toggleFavorite,
+                              ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -996,16 +2282,16 @@ class _RealEstateProductDetailsPageState
                           const SizedBox(width: 4),
                           _isLoadingLocations
                               ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              )
+                              : Text(
+                                landMark,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
                           const Spacer(),
                           const Icon(
                             Icons.access_time,
@@ -1077,12 +2363,15 @@ class _RealEstateProductDetailsPageState
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => ChatPage(
-                                            listenerId: widget.product.createdBy,
-                                            listenerName: sellerName,
-                                            listenerImage:
-                                                sellerProfileImage ?? 'seller.jpg',
-                                          ),
+                                          builder:
+                                              (context) => ChatPage(
+                                                listenerId:
+                                                    widget.product.createdBy,
+                                                listenerName: sellerName,
+                                                listenerImage:
+                                                    sellerProfileImage ??
+                                                    'seller.jpg',
+                                              ),
                                         ),
                                       );
                                     },
@@ -1093,7 +2382,9 @@ class _RealEstateProductDetailsPageState
                               );
                             },
                             icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
+                            label: const Text(
+                              'Contact Seller',
+                            ), // Changed from 'Call Support'
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -1179,10 +2470,11 @@ class _RealEstateProductDetailsPageState
                                               .toLowerCase()
                                               .trim() ==
                                           'seller type',
-                                      orElse: () => SellerComment(
-                                        attributeName: 'Seller Type',
-                                        attributeValue: 'N/A',
-                                      ),
+                                      orElse:
+                                          () => SellerComment(
+                                            attributeName: 'Seller Type',
+                                            attributeValue: 'N/A',
+                                          ),
                                     )
                                     .attributeValue,
                               ),
@@ -1223,22 +2515,32 @@ class _RealEstateProductDetailsPageState
                           ),
                         )
                       else if (uniqueSellerComments.isEmpty)
-                        const Center(child: Text('No seller comments available'))
+                        const Center(
+                          child: Text('No seller comments available'),
+                        )
                       else
                         Column(
-                          children: uniqueSellerComments
-                              .where((comment) => ![
-                                    'seller type',
-                                    'auction starting price',
-                                    'auction attempts'
-                                  ].contains(comment.attributeName.toLowerCase().trim()))
-                              .map(
-                                (comment) => _buildSellerCommentItem(
-                                  comment.attributeName,
-                                  comment.attributeValue,
-                                ),
-                              )
-                              .toList(),
+                          children:
+                              uniqueSellerComments
+                                  .where(
+                                    (comment) =>
+                                        ![
+                                          'seller type',
+                                          'auction starting price',
+                                          'auction attempts',
+                                        ].contains(
+                                          comment.attributeName
+                                              .toLowerCase()
+                                              .trim(),
+                                        ),
+                                  )
+                                  .map(
+                                    (comment) => _buildSellerCommentItem(
+                                      comment.attributeName,
+                                      comment.attributeValue,
+                                    ),
+                                  )
+                                  .toList(),
                         ),
                     ],
                   ),
@@ -1264,6 +2566,8 @@ class _RealEstateProductDetailsPageState
                     ],
                   ),
                 ),
+                const Divider(),
+                _buildBannerAd(),
                 const Divider(),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -1325,7 +2629,7 @@ class _RealEstateProductDetailsPageState
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          showBidDialog(context);
+                         showProductBidDialog(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,

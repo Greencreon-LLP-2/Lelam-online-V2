@@ -1,10 +1,14 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
@@ -13,10 +17,13 @@ import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
@@ -48,10 +55,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
       TransformationController();
-  bool _isFavorited = false;
+
   bool _isShortlisted = false;
   bool _isLoadingShortlist = false;
   String? _shortlistErrorMessage;
+  late LoggedUserProvider _userProvider;
 
   final _storage = const FlutterSecureStorage();
   final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
@@ -64,13 +72,58 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
 
+  bool _isLoadingGallery = true;
+  List<String> _galleryImages = [];
+  String _galleryError = '';
+
+  bool _isLoadingBanner = false;
+  String? _bannerImageUrl;
+  String _bannerError = '';
+
+  bool _isLoadingBid = false;
+  String _currentHighestBid = '0';
+  double _minBidIncrement = 1000;
+  bool _isBidDialogOpen = false;
+
+  bool _isMeetingDialogOpen = false;
+  bool _isSchedulingMeeting = false;
+  String? userId;
+  bool _isFavorited = false;
+  bool _isLoadingFavorite = false;
   @override
   void initState() {
     super.initState();
-    _fetchLocations();
-    _fetchAttributesData(); // Unified API call
-    _fetchSellerInfo();
-    _fetchShortlistStatus();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeData();
+    });
+  }
+
+  Future<void> _initializeData() async {
+    setState(() => isLoadingDetails = true);
+    try {
+      await _loadUserId(); // Ensure userId is loaded first
+      await Future.wait([
+        _fetchLocations(),
+        _fetchAttributesData(),
+        _fetchSellerInfo(),
+        _fetchShortlistStatus(),
+        _fetchGalleryImages(),
+        _fetchBannerImage(),
+      ]);
+    } catch (e, stackTrace) {
+      debugPrint('Error in _initializeData: $e\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load product details: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoadingDetails = false);
+    }
   }
 
   @override
@@ -78,6 +131,1083 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') {
+      setState(() {
+        _isFavorited = false;
+        _isLoadingFavorite = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": userId},
+      );
+
+      debugPrint('Shortlist API response: $response');
+
+      if (response['status'] == 'true' && response['data'] is List) {
+        final List<dynamic> shortlistData = response['data'];
+        final bool isShortlisted = shortlistData.any(
+          (item) => item['post_id'].toString() == widget.product.id,
+        );
+        setState(() {
+          _isFavorited = isShortlisted;
+          _isLoadingFavorite = false;
+        });
+        debugPrint(
+          'Product ${widget.product.id} isShortlisted: $isShortlisted',
+        );
+      } else {
+        setState(() {
+          _isFavorited = false;
+          _isLoadingFavorite = false;
+        });
+        debugPrint('Invalid shortlist data: ${response['data']}');
+      }
+    } catch (e) {
+      debugPrint('Error checking shortlist status: $e');
+      setState(() {
+        _isFavorited = false;
+        _isLoadingFavorite = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to check shortlist status: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
+  Future<void> _fetchGalleryImages() async {
+    try {
+      setState(() {
+        _isLoadingGallery = true;
+        _galleryError = '';
+      });
+
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-gallery.php?token=$_token&post_id=$id';
+      debugPrint('Fetching gallery: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Gallery API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            responseData['data'].isNotEmpty) {
+          _galleryImages =
+              (responseData['data'] as List)
+                  .map(
+                    (item) =>
+                        'https://lelamonline.com/admin/${item['image'] ?? ''}',
+                  )
+                  .where((img) => img.isNotEmpty && img.contains('uploads/'))
+                  .toList();
+          debugPrint(
+            'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
+          );
+        } else {
+          throw Exception('Invalid gallery data: ${responseData['data']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching gallery: $e');
+      setState(() {
+        _galleryError = 'Failed to load gallery: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingGallery = false;
+      });
+    }
+  }
+
+  Future<void> _fetchBannerImage() async {
+    try {
+      setState(() {
+        _isLoadingBanner = true;
+        _bannerError = '';
+      });
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-ads-image.php?token=$_token';
+      debugPrint('Fetching banner image: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Banner API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          final bannerImage = responseData['data']['inner_post_image'] ?? '';
+          setState(() {
+            _bannerImageUrl =
+                bannerImage.isNotEmpty
+                    ? 'https://lelamonline.com/admin/$bannerImage'
+                    : null;
+          });
+        } else {
+          throw Exception('Invalid banner data: ${responseData['data']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching banner image: $e');
+      setState(() {
+        _bannerError = 'Failed to load banner: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBanner = false;
+      });
+    }
+  }
+
+  Widget _buildBannerAd() {
+    if (_isLoadingBanner) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_bannerError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+
+    if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImageUrl!,
+        width: double.infinity,
+        height: 35,
+        fit: BoxFit.fill,
+        placeholder:
+            (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget:
+            (context, url, error) => const Center(
+              child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+            ),
+      ),
+    );
+  }
+
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      setState(() {
+        _isLoadingBid = true;
+      });
+
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=$id';
+      debugPrint('Fetching highest bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Highest bid API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true) {
+          final dataValue = (responseData['data']?.toString() ?? '0').trim();
+          final parsed = double.tryParse(dataValue);
+          if (parsed != null) {
+            setState(() {
+              _currentHighestBid = parsed.toString();
+            });
+          } else {
+            setState(() {
+              _currentHighestBid = 'Error: $dataValue';
+            });
+          }
+        } else {
+          setState(() {
+            _currentHighestBid = '0';
+          });
+        }
+      } else {
+        setState(() {
+          _currentHighestBid = '0';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching highest bid: $e');
+      setState(() {
+        _currentHighestBid = 'Error: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
+      });
+    }
+  }
+
+  Future<void> _loadUserId() async {
+    try {
+      final userProvider = Provider.of<LoggedUserProvider>(
+        context,
+        listen: false,
+      );
+      String? providerUserId = userProvider.userData?.userId;
+      String? storageUserId = await _storage.read(key: 'userId');
+
+      if (providerUserId != null &&
+          providerUserId.isNotEmpty &&
+          providerUserId != 'Unknown') {
+        // Prefer provider userId and sync to storage
+        setState(() {
+          userId = providerUserId;
+        });
+        await _storage.write(key: 'userId', value: providerUserId);
+        debugPrint('Loaded userId from provider: $userId');
+      } else if (storageUserId != null &&
+          storageUserId.isNotEmpty &&
+          storageUserId != 'Unknown') {
+        // Fallback to storage userId and update provider
+        setState(() {
+          userId = storageUserId;
+        });
+        // Assuming LoggedUserProvider has an update method; adjust if needed
+        userProvider.userId;
+        debugPrint('Loaded userId from storage: $userId');
+      } else {
+        // No valid userId found
+        setState(() {
+          userId = null;
+        });
+        debugPrint('No valid userId found');
+      }
+    } catch (e) {
+      debugPrint('Error loading userId: $e');
+      setState(() {
+        userId = null;
+      });
+    }
+  }
+
+  Future<String> _saveBidData(int bidAmount) async {
+    debugPrint('Saving bid with userId: $userId');
+    if (userId == null || userId == 'Unknown') {
+      throw Exception('Please log in to place a bid');
+    }
+
+    try {
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url =
+          '$_baseUrl/place-bid.php?token=$_token&post_id=$id&user_id=$userId&bidamt=$bidAmount';
+      debugPrint('Placing bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Place bid response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final statusRaw = responseData['status'];
+        final bool statusIsTrue =
+            statusRaw == true || statusRaw == 'true' || statusRaw == '1';
+        final dataMessage = responseData['data']?.toString() ?? '';
+        final bool dataLooksLikeSuccess =
+            dataMessage.toLowerCase().contains('success') ||
+            dataMessage.toLowerCase().contains('placed successfully');
+        if (statusIsTrue || dataLooksLikeSuccess) {
+          return dataMessage.isNotEmpty
+              ? dataMessage
+              : 'Bid placed successfully';
+        } else {
+          throw Exception('Failed to place bid: ${responseData['data']}');
+        }
+      } else {
+        throw Exception('Failed to place bid: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error placing bid: $e');
+      throw e;
+    }
+  }
+
+  void showProductBidDialog(BuildContext context) async {
+    final userId = await _storage.read(key: 'userId');
+    if (userId == null) {
+      _showLoginPromptDialog(context, 'place a bid');
+      return;
+    }
+
+    setState(() => _isBidDialogOpen = true);
+    await _fetchCurrentHighestBid();
+    final TextEditingController _bidController = TextEditingController();
+
+    Future<void> _showResponseDialog(String message, bool isSuccess) async {
+      final String formattedBid =
+          _currentHighestBid.startsWith('Error')
+              ? _currentHighestBid
+              : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+      const String supportPhoneNumber = '+919876543210';
+
+      return showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            title: Text(
+              isSuccess ? 'Thank You' : 'Error',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isSuccess ? AppTheme.primaryColor : Colors.red,
+              ),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 16,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Last Highest Bid:',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red
+                                : Colors.grey[300]!,
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red[50]
+                              : Colors.green[50],
+                    ),
+                    child: Text(
+                      formattedBid,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            _currentHighestBid.startsWith('Error')
+                                ? Colors.red[800]
+                                : Colors.green[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        if (isSuccess) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BuyingStatusPage(),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final Uri phoneUri = Uri(
+                          scheme: 'tel',
+                          path: supportPhoneNumber,
+                        );
+                        if (await canLaunchUrl(phoneUri)) {
+                          await launchUrl(phoneUri);
+                        } else {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Unable to initiate call. Please try again or contact support via other channels.',
+                              ),
+                              backgroundColor: Colors.red[800],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Call Support',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            actionsPadding: const EdgeInsets.all(16),
+          );
+        },
+      );
+    }
+
+    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => true,
+          child: StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
+                ),
+                backgroundColor: Colors.white,
+                title: Text(
+                  'Place Your Bid Amount',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                content: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Bid Amount *',
+                        style: Theme.of(
+                          dialogContext,
+                        ).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                        semanticsLabel: 'Your Bid Amount (required)',
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _bidController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: false,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          hintText: 'Enter amount',
+                          prefixIcon: Padding(
+                            padding: const EdgeInsets.only(left: 12, right: 8),
+                            child: Text(
+                              '₹',
+                              style: Theme.of(
+                                dialogContext,
+                              ).textTheme.bodyMedium?.copyWith(
+                                fontSize: 16,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 0,
+                            minHeight: 0,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: AppTheme.primaryColor,
+                              width: 2,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        style: Theme.of(dialogContext).textTheme.bodyMedium
+                            ?.copyWith(fontSize: 16, color: Colors.grey[800]),
+                      ),
+                      if (_isLoadingBid)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12.0),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop(null);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[200],
+                            foregroundColor: Colors.grey[800],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Close',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            semanticsLabel: 'Close dialog',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              _isLoadingBid
+                                  ? null
+                                  : () async {
+                                    final String amount = _bidController.text;
+                                    if (amount.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                            'Please enter a bid amount',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final int bidAmount =
+                                        int.tryParse(amount) ?? 0;
+                                    if (bidAmount < _minBidIncrement) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    setDialogState(() {
+                                      _isLoadingBid = true;
+                                    });
+
+                                    try {
+                                      FocusScope.of(dialogContext).unfocus();
+                                      final String responseMessage =
+                                          await _saveBidData(bidAmount);
+                                      Navigator.of(dialogContext).pop({
+                                        'success': true,
+                                        'message': responseMessage,
+                                      });
+                                    } catch (e) {
+                                      Navigator.of(dialogContext).pop({
+                                        'success': false,
+                                        'message': 'Error placing bid: $e',
+                                      });
+                                    } finally {
+                                      setDialogState(() {
+                                        _isLoadingBid = false;
+                                      });
+                                    }
+                                  },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 2,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.send, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Submit',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                semanticsLabel: 'Submit bid amount',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 200));
+    FocusScope.of(context).unfocus();
+    _bidController.dispose();
+
+    if (result != null) {
+      final bool ok = result['success'] == true;
+      final String msg =
+          result['message']?.toString() ??
+          (ok ? 'Bid placed successfully' : 'Failed to place bid');
+      await _showResponseDialog(msg, ok);
+    }
+    if (mounted) setState(() => _isBidDialogOpen = false);
+  }
+
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    debugPrint('Fixing meeting with userId: $userId');
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSchedulingMeeting = true;
+    });
+
+    try {
+      final headers = {'token': _token};
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=$id&user_id=$userId&meeting_date=$formattedDate';
+      debugPrint('Scheduling meeting: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Meeting API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  responseData['data'] ?? 'Meeting scheduled successfully',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+            await _showMeetingConfirmationDialog(selectedDate);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to schedule meeting: ${responseData['data']}',
+                ),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${response.reasonPhrase}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error scheduling meeting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSchedulingMeeting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          backgroundColor: Colors.white,
+          title: Text(
+            'Meeting Scheduled',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}.\n\n'
+                  'For further information, check My Bids in Status or call support.',
+                  style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                  semanticsLabel:
+                      'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}. For further information, check My Bids in Status or call support.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BuyingStatusPage(),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Check Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      semanticsLabel: 'Check bid status',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _launchPhoneCall,
+                    icon: const Icon(Icons.call),
+                    label: const Text('Call Support'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleShortlist() async {
+    debugPrint('Toggling shortlist with userId: $userId');
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'add or remove from shortlist');
+      return;
+    }
+    if (_isLoadingShortlist) return;
+
+    setState(() {
+      _isLoadingShortlist = true;
+      _shortlistErrorMessage = null;
+    });
+
+    try {
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=$id';
+      debugPrint('Toggling shortlist: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Shortlist API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == true || responseData['status'] == 'true';
+        final String message = responseData['data']?.toString() ?? '';
+
+        if (isSuccess) {
+          final bool wasAdded =
+              message.toLowerCase().contains('added') || !_isShortlisted;
+          setState(() {
+            _isShortlisted = wasAdded;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                wasAdded ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update shortlist: $message'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling shortlist: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoadingShortlist = false;
+      });
+    }
   }
 
   Future<void> _fetchAttributesData() async {
@@ -202,8 +1332,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   Future<void> _fetchShortlistStatus() async {
-    final userId = await _storage.read(key: 'userId');
-    if (userId == null) {
+    debugPrint('Fetching shortlist status with userId: $userId');
+    if (userId == null || userId == 'Unknown') {
       setState(() {
         _shortlistErrorMessage = 'Please log in to view shortlist status';
       });
@@ -238,78 +1368,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       setState(() {
         _shortlistErrorMessage = 'Error fetching shortlist status: $e';
       });
-    }
-  }
-
-  Future<void> _toggleShortlist() async {
-    final userId = await _storage.read(key: 'userId');
-    if (userId == null) {
-      setState(() {
-        _shortlistErrorMessage = 'Please log in to shortlist';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoadingShortlist = true;
-      _shortlistErrorMessage = null;
-    });
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/shortlist.php'),
-        body: {
-          'token': token,
-          'user_id': userId,
-          'post_id': widget.product.id,
-          'status': _isShortlisted ? '0' : '1',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == 'true') {
-          setState(() {
-            _isShortlisted = !_isShortlisted;
-            _isLoadingShortlist = false;
-          });
-        } else {
-          setState(() {
-            _shortlistErrorMessage =
-                jsonResponse['message'] ?? 'Failed to update shortlist';
-            _isLoadingShortlist = false;
-          });
-        }
-      } else {
-        setState(() {
-          _shortlistErrorMessage =
-              'Failed to update shortlist: ${response.statusCode}';
-          _isLoadingShortlist = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _shortlistErrorMessage = 'Error toggling shortlist: $e';
-        _isLoadingShortlist = false;
-      });
-    }
-
-    if (_shortlistErrorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_shortlistErrorMessage!),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isShortlisted ? 'Added to shortlist' : 'Removed from shortlist',
-          ),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
   }
 
@@ -379,29 +1437,37 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
   dynamic _getProperty(String propertyName) {
     if (widget.product == null) return null;
-    switch (propertyName) {
-      case 'id':
-        return widget.product.id;
-      case 'title':
-        return widget.product.title;
-      case 'image':
-        return widget.product.image;
-      case 'price':
-        return widget.product.price;
-      case 'landMark':
-        return _getLocationName(widget.product.parentZoneId);
-      case 'createdOn':
-        return widget.product.createdOn;
-      case 'createdBy':
-        return widget.product.createdBy;
-      case 'byDealer':
-        return widget.product.byDealer;
-      default:
-        return null;
+    try {
+      switch (propertyName) {
+        case 'id':
+          return widget.product.id?.toString() ?? '';
+        case 'title':
+          return widget.product.title ?? '';
+        case 'image':
+          return widget.product.image ?? '';
+        case 'price':
+          return widget.product.price?.toString() ?? '0';
+        case 'landMark':
+          return _getLocationName(widget.product.parentZoneId ?? '');
+        case 'createdOn':
+          return widget.product.createdOn ?? '';
+        case 'createdBy':
+          return widget.product.createdBy?.toString() ?? '';
+        case 'byDealer':
+          return widget.product.byDealer?.toString() ?? '0';
+        default:
+          return null;
+      }
+    } catch (e) {
+      debugPrint('Error accessing property $propertyName: $e');
+      return '';
     }
   }
 
   List<String> get _images {
+    if (!_isLoadingGallery && _galleryImages.isNotEmpty) {
+      return _galleryImages;
+    }
     if (image.isNotEmpty) {
       return ['https://lelamonline.com/admin/$image'];
     }
@@ -600,108 +1666,170 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   void _showMeetingDialog(BuildContext context) {
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
     DateTime selectedDate = DateTime.now();
+
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select date',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
               ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: AppTheme.primaryColor,
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () => Navigator.of(dialogContext).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      selectedDate = picked;
-                      Navigator.pop(context);
-                      _showMeetingDialog(context);
-                    }
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[300]!),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                debugPrint(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                );
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text(
-                'Schedule Meeting',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
         );
       },
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
+  }
+
+  void _launchPhoneCall() async {
+    const phoneNumber = 'tel:+919876543210';
+    if (await canLaunchUrl(Uri.parse(phoneNumber))) {
+      await launchUrl(Uri.parse(phoneNumber));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone call'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String formatPriceInt(double price) {
@@ -854,7 +1982,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                final userId = await _storage.read(key: 'userId');
+                if (userId == null) {
+                  _showLoginPromptDialog(context, 'ask a question');
+                  return;
+                }
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -866,11 +1999,78 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
-              child: const Text('Ask a question'),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text(
+                    'Ask a question',
+                    semanticsLabel: 'Ask a question to the seller',
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    debugPrint('Showing login prompt for action: $action, userId: $userId');
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Please log in to $action.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.pushNamed(RouteNames.loginPage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Log In',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
     );
   }
 
@@ -945,54 +2145,80 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       height: 400,
                       child: Stack(
                         children: [
-                          PageView.builder(
-                            controller: _pageController,
-                            itemCount: _images.length,
-                            onPageChanged: (index) {
-                              setState(() {
-                                _currentImageIndex = index;
-                              });
-                            },
-                            itemBuilder: (context, index) {
-                              return GestureDetector(
-                                onTap: () => _showFullScreenGallery(context),
-                                child: CachedNetworkImage(
-                                  imageUrl: _images[index],
-                                  width: double.infinity,
-                                  height: 400,
-                                  fit: BoxFit.cover,
-                                  placeholder:
-                                      (context, url) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (context, url, error) =>
-                                          const Icon(Icons.error),
+                          if (_isLoadingGallery)
+                            const Center(child: CircularProgressIndicator())
+                          else if (_galleryError.isNotEmpty)
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    size: 50,
+                                    color: Colors.red,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _galleryError,
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                  TextButton(
+                                    onPressed: _fetchGalleryImages,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            PageView.builder(
+                              controller: _pageController,
+                              itemCount: _images.length,
+                              onPageChanged: (index) {
+                                setState(() {
+                                  _currentImageIndex = index;
+                                });
+                              },
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () => _showFullScreenGallery(context),
+                                  child: CachedNetworkImage(
+                                    imageUrl: _images[index],
+                                    width: double.infinity,
+                                    height: 400,
+                                    fit: BoxFit.cover,
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) =>
+                                            const Icon(Icons.error),
+                                  ),
+                                );
+                              },
+                            ),
+                          if (!_isLoadingGallery && _galleryError.isEmpty)
+                            Positioned(
+                              right: 16,
+                              bottom: 16,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-                              );
-                            },
-                          ),
-                          Positioned(
-                            right: 16,
-                            bottom: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_currentImageIndex + 1}/${_images.length}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.7),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${_currentImageIndex + 1}/${_images.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1005,34 +2231,53 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               Icons.arrow_back,
                               color: Colors.white,
                             ),
+                            tooltip: 'Go back',
                           ),
                           const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isShortlisted
-                                  ? Icons.bookmark
-                                  : Icons.bookmark_border,
-                              color:
-                                  _isShortlisted ? Colors.yellow : Colors.white,
-                            ),
-                            onPressed:
-                                _isLoadingShortlist ? null : _toggleShortlist,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
-                          ),
+                          _isLoadingShortlist
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                              : IconButton(
+                                tooltip:
+                                    _isShortlisted
+                                        ? 'Remove from Shortlist'
+                                        : 'Add to Shortlist',
+                                icon: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  transitionBuilder:
+                                      (child, animation) => ScaleTransition(
+                                        scale: animation,
+                                        child: child,
+                                      ),
+                                  child: Icon(
+                                    _isShortlisted
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    key: ValueKey<bool>(_isShortlisted),
+                                    color:
+                                        _isShortlisted
+                                            ? Colors.red
+                                            : Colors.white,
+                                    size: 28,
+                                    semanticLabel:
+                                        _isShortlisted
+                                            ? 'Remove from Shortlist'
+                                            : 'Add to Shortlist',
+                                  ),
+                                ),
+                                onPressed: _toggleShortlist,
+                              ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
+                            tooltip: 'Share',
                             onPressed: () {
                               // Share functionality
                             },
@@ -1108,16 +2353,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             style: const TextStyle(color: Colors.grey),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () async {
-                              final userId = await _storage.read(key: 'userId');
+                            onPressed: () {
+                              debugPrint('Checking userId for chat: $userId');
                               if (userId == null || userId == 'Unknown') {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Please log in to chat with the seller',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
+                                _showLoginPromptDialog(
+                                  context,
+                                  'chat with the seller',
                                 );
                                 return;
                               }
@@ -1125,14 +2366,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                 context: context,
                                 builder: (context) {
                                   return ChatOptionsDialog(
-                                    onChatWithSupport: () {
-                                      // Navigator.push(
-                                      //   context,
-                                      //   MaterialPageRoute(
-                                      //     builder: (context) => SupportTicketPage(),
-                                      //   ),
-                                      // );
-                                    },
+                                    onChatWithSupport: _launchPhoneCall,
                                     onChatWithSeller: () {
                                       Navigator.push(
                                         context,
@@ -1155,8 +2389,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                 },
                               );
                             },
-                            icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
+                            icon: const Icon(Icons.chat),
+                            label: const Text('Chat with Seller'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -1213,27 +2447,27 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             children: [
                               Row(
                                 children: [
-                                  // Expanded(
-                                  //   child: _buildDetailItem(
-                                  //     Icons.speed,
-                                  //     _formatNumber(
-                                  //       detailComments
-                                  //           .firstWhere(
-                                  //             (comment) =>
-                                  //                 comment.attributeName
-                                  //                     .toLowerCase()
-                                  //                     .trim() ==
-                                  //                 'km range',
-                                  //             orElse:
-                                  //                 () => SellerComment(
-                                  //                   attributeName: 'KM Range',
-                                  //                   attributeValue: 'N/A',
-                                  //                 ),
-                                  //           )
-                                  //           .attributeValue,
-                                  //     ),
-                                  //   ),
-                                  // ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.speed,
+                                      _formatNumber(
+                                        detailComments
+                                            .firstWhere(
+                                              (comment) =>
+                                                  comment.attributeName
+                                                      .toLowerCase()
+                                                      .trim() ==
+                                                  'km range',
+                                              orElse:
+                                                  () => SellerComment(
+                                                    attributeName: 'KM Range',
+                                                    attributeValue: 'N/A',
+                                                  ),
+                                            )
+                                            .attributeValue,
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
                                     child: _buildDetailItem(
                                       Icons.local_gas_station,
@@ -1318,26 +2552,26 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                           .attributeValue,
                                     ),
                                   ),
-                                  // Expanded(
-                                  //   child: _buildDetailItem(
-                                  //     Icons.build,
-                                  //     detailComments
-                                  //         .firstWhere(
-                                  //           (comment) =>
-                                  //               comment.attributeName
-                                  //                   .toLowerCase()
-                                  //                   .trim() ==
-                                  //               'engine condition',
-                                  //           orElse:
-                                  //               () => SellerComment(
-                                  //                 attributeName:
-                                  //                     'Engine Condition',
-                                  //                 attributeValue: 'N/A',
-                                  //               ),
-                                  //         )
-                                  //         .attributeValue,
-                                  //   ),
-                                  // ),
+                                  Expanded(
+                                    child: _buildDetailItem(
+                                      Icons.build,
+                                      detailComments
+                                          .firstWhere(
+                                            (comment) =>
+                                                comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'engine condition',
+                                            orElse:
+                                                () => SellerComment(
+                                                  attributeName:
+                                                      'Engine Condition',
+                                                  attributeValue: 'N/A',
+                                                ),
+                                          )
+                                          .attributeValue,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -1347,6 +2581,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 ),
                 const Divider(),
+                _buildBannerAd(),
+                const Divider(),
+
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: _buildSellerCommentsSection(),
@@ -1412,9 +2649,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          showBidDialog(context);
-                        },
+                        onPressed: () => showProductBidDialog(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,
                           foregroundColor: Colors.white,

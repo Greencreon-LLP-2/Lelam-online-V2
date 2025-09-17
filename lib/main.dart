@@ -6,6 +6,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:provider/provider.dart';
 
+//"Hello, new developer. If you are reading this message, please consider leaving this company."
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

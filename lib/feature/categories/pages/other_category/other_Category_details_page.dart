@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
@@ -13,12 +16,14 @@ import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart'
     show ChatPage;
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BikeDetailsPage extends StatefulWidget {
   final Bike bike;
@@ -49,20 +54,313 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
   String sellerErrorMessage = '';
    late final LoggedUserProvider _userProvider;
 
+   String? userId;
+bool _isLoadingFavorite = false;
+bool _isBidDialogOpen = false;
+bool _isLoadingBid = false;
+double _minBidIncrement = 1000;
+String _currentHighestBid = '0';
+bool _isMeetingDialogOpen = false;
+bool _isSchedulingMeeting = false;
+
   @override
   void initState() {
     super.initState();
-     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    _fetchLocations();
-    _fetchSellerInfo();
+_userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+_initialize();
   }
 
+Future<void> _initialize() async {
+  _loadUserId();
+  await Future.wait([
+    _fetchLocations(),
+    _fetchSellerInfo(),
+    if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
+  ]);
+}
+
+
+
+
+Future<void> _loadUserId() async {
+  final userData = _userProvider.userData;
+  setState(() {
+    userId = userData?.userId ?? '';
+  });
+}
   @override
   void dispose() {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
   }
+
+Future<void> _checkShortlistStatus() async {
+  if (userId == null || userId == 'Unknown') {
+    setState(() {
+      _isFavorited = false;
+      _isLoadingFavorite = false;
+    });
+    return;
+  }
+  setState(() => _isLoadingFavorite = true);
+  try {
+    final response = await ApiService().get(
+      url: shortlist,
+      queryParams: {"user_id": userId},
+    );
+    if (response['status'] == 'true' && response['data'] is List) {
+      final List<dynamic> shortlistData = response['data'];
+      final bool isShortlisted = shortlistData.any(
+        (item) => item['post_id'].toString() == widget.bike.id,
+      );
+      setState(() {
+        _isFavorited = isShortlisted;
+        _isLoadingFavorite = false;
+      });
+    } else {
+      setState(() {
+        _isFavorited = false;
+        _isLoadingFavorite = false;
+      });
+    }
+  } catch (e) {
+    setState(() {
+      _isFavorited = false;
+      _isLoadingFavorite = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to check shortlist: $e'), backgroundColor: Colors.red),
+    );
+  }
+}
+
+Future<void> _toggleFavorite() async {
+  if (userId == null || userId == 'Unknown') {
+    _showLoginPromptDialog(context, 'add or remove from shortlist');
+    return;
+  }
+  if (_isLoadingFavorite) return;
+  setState(() => _isLoadingFavorite = true);
+  try {
+    final headers = {'token': _token};
+    final url = '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.bike.id}';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      if (responseData['status'] == 'true') {
+        final bool wasAdded = responseData['data'].toString().toLowerCase().contains('added') || !_isFavorited;
+        setState(() => _isFavorited = wasAdded);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(wasAdded ? 'Added to shortlist' : 'Removed from shortlist'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update shortlist'), backgroundColor: Colors.red),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${response.reasonPhrase}'), backgroundColor: Colors.red),
+      );
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    );
+  } finally {
+    setState(() => _isLoadingFavorite = false);
+  }
+}
+
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Login Required'),
+        content: Text('Please log in to $action.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              context.pushNamed(RouteNames.loginPage);
+            },
+            child: const Text('Log In'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _fetchCurrentHighestBid() async {
+  setState(() => _isLoadingBid = true);
+  try {
+    final headers = {'token': _token};
+    final url = '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.bike.id}';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      if (responseData['status'] == 'true') {
+        setState(() => _currentHighestBid = responseData['data'].toString());
+      } else {
+        setState(() => _currentHighestBid = '0');
+      }
+    } else {
+      setState(() => _currentHighestBid = '0');
+    }
+  } catch (e) {
+    setState(() => _currentHighestBid = '0');
+  } finally {
+    setState(() => _isLoadingBid = false);
+  }
+}
+
+Future<String> _saveBidData(int bidAmount) async {
+  if (userId == null || userId == 'Unknown') {
+    throw Exception('Please log in to place a bid');
+  }
+  try {
+    final headers = {'token': _token};
+    final url = '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&bidamt=$bidAmount';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      if (responseData['status'] == 'true') {
+        return responseData['data'] ?? 'Bid placed successfully';
+      } else {
+        throw Exception('Failed to place bid: ${responseData['data']}');
+      }
+    } else {
+      throw Exception('Failed to place bid: ${response.reasonPhrase}');
+    }
+  } catch (e) {
+    throw Exception('Error placing bid: $e');
+  }
+}
+
+void showProductBidDialog(BuildContext context) async {
+  if (userId == null || userId == 'Unknown') {
+    _showLoginPromptDialog(context, 'place a bid');
+    return;
+  }
+  setState(() => _isBidDialogOpen = true);
+  await _fetchCurrentHighestBid();
+  final TextEditingController _bidController = TextEditingController();
+
+  Future<void> _showResponseDialog(String message, bool isSuccess) async {
+    final String formattedBid = _currentHighestBid == '0'
+        ? 'No bids yet'
+        : '₹${NumberFormat('#,##0').format(double.parse(_currentHighestBid))}';
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(isSuccess ? 'Thank You' : 'Error'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$message\n\nFor further proceedings, call support.'),
+            const SizedBox(height: 16),
+            Text('Last Highest Bid: $formattedBid'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              if (isSuccess) {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyingStatusPage()));
+              }
+            },
+            child: const Text('OK'),
+          ),
+          ElevatedButton(
+            onPressed: _launchPhoneCall,
+            child: const Text('Call Support'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  final Map<String, dynamic>? result = await showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Place Your Bid'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _bidController,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(hintText: 'Enter amount', prefixText: '₹'),
+          ),
+          if (_isLoadingBid) const CircularProgressIndicator(),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(null),
+          child: const Text('Close'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoadingBid
+              ? null
+              : () async {
+                  final amount = _bidController.text;
+                  if (amount.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Enter a bid amount')),
+                    );
+                    return;
+                  }
+                  final bidAmount = int.tryParse(amount) ?? 0;
+                  if (bidAmount < _minBidIncrement) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Minimum bid is ₹$_minBidIncrement')),
+                    );
+                    return;
+                  }
+                  setState(() => _isLoadingBid = true);
+                  try {
+                    final message = await _saveBidData(bidAmount);
+                    Navigator.of(dialogContext).pop({'success': true, 'message': message});
+                  } catch (e) {
+                    Navigator.of(dialogContext).pop({'success': false, 'message': e.toString()});
+                  } finally {
+                    setState(() => _isLoadingBid = false);
+                  }
+                },
+          child: const Text('Submit'),
+        ),
+      ],
+    ),
+  );
+
+  _bidController.dispose();
+  if (result != null) {
+    await _showResponseDialog(result['message'], result['success']);
+  }
+  setState(() => _isBidDialogOpen = false);
+}
+
+
 
   Future<void> _fetchSellerInfo() async {
     try {
@@ -374,111 +672,134 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     );
   }
 
-  void _showMeetingDialog(BuildContext context) {
-    DateTime selectedDate = DateTime.now();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+void _showMeetingDialog(BuildContext context) {
+  if (userId == null || userId == 'Unknown') {
+    _showLoginPromptDialog(context, 'schedule a meeting');
+    return;
+  }
+  if (_isMeetingDialogOpen) return;
+  setState(() => _isMeetingDialogOpen = true);
+  DateTime selectedDate = DateTime.now();
+  showDialog(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => AlertDialog(
+        title: const Text('Schedule Meeting'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
+              onTap: () async {
+                final DateTime? picked = await showDatePicker(
+                  context: dialogContext,
+                  initialDate: selectedDate,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 30)),
+                );
+                if (picked != null && picked != selectedDate) {
+                  setDialogState(() => selectedDate = picked);
+                }
+              },
+            ),
+            if (_isSchedulingMeeting) const CircularProgressIndicator(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _isSchedulingMeeting ? null : () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
           ),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: Palette.primaryblue,
-                  ),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: Palette.primaryblue),
-                  ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      selectedDate = picked;
-                      Navigator.pop(context);
-                      _showMeetingDialog(context);
+          ElevatedButton(
+            onPressed: _isSchedulingMeeting
+                ? null
+                : () async {
+                    setDialogState(() => _isSchedulingMeeting = true);
+                    try {
+                      await _fixMeeting(selectedDate);
+                      Navigator.of(dialogContext).pop();
+                    } finally {
+                      setDialogState(() => _isSchedulingMeeting = false);
                     }
                   },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[300]!),
-                  ),
-                ),
-              ],
-            ),
+            child: const Text('Schedule'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                print(
-                  'Meeting scheduled for ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                );
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Text(
-                'Schedule Meeting',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        ],
+      ),
+    ),
+  ).whenComplete(() => setState(() => _isMeetingDialogOpen = false));
+}
+
+Future<void> _fixMeeting(DateTime selectedDate) async {
+  setState(() => _isSchedulingMeeting = true);
+  try {
+    final headers = {'token': _token};
+    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final url = '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&meeting_date=$formattedDate';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      if (responseData['status'] == 'true') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(responseData['data'] ?? 'Meeting scheduled')),
         );
-      },
+        await _showMeetingConfirmationDialog(selectedDate);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to schedule meeting'), backgroundColor: Colors.red),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${response.reasonPhrase}'), backgroundColor: Colors.red),
+      );
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+    );
+  } finally {
+    setState(() => _isSchedulingMeeting = false);
+  }
+}
+
+Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+  await showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Meeting Scheduled'),
+      content: Text('Scheduled for ${DateFormat('dd/MM/yyyy').format(selectedDate)}. Check status or call support.'),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(dialogContext).pop();
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyingStatusPage()));
+          },
+          child: const Text('Check Status'),
+        ),
+        ElevatedButton(
+          onPressed: _launchPhoneCall,
+          child: const Text('Call Support'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _launchPhoneCall() async {
+  const phoneNumber = 'tel:+919626040738';
+  if (await canLaunchUrl(Uri.parse(phoneNumber))) {
+    await launchUrl(Uri.parse(phoneNumber));
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not launch phone call'), backgroundColor: Colors.red),
     );
   }
-
+}
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
@@ -732,19 +1053,27 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                             ),
                           ),
                           const Spacer(),
-                          IconButton(
-                            icon: Icon(
-                              _isFavorited
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorited ? Colors.red : Colors.white,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isFavorited = !_isFavorited;
-                              });
-                            },
-                          ),
+_isLoadingFavorite
+    ? const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      )
+    : IconButton(
+        tooltip: _isFavorited ? 'Remove from Shortlist' : 'Add to Shortlist',
+        icon: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Icon(
+            _isFavorited ? Icons.favorite : Icons.favorite_border,
+            key: ValueKey<bool>(_isFavorited),
+            color: _isFavorited ? Colors.red : Colors.white,
+          ),
+        ),
+        onPressed: _toggleFavorite,
+      ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -819,56 +1148,41 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                             '#AD ID $id',
                             style: const TextStyle(color: Colors.grey),
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) {
-                                  return ChatOptionsDialog(
-                                    onChatWithSupport: () {
-                                      // Navigator.push(
-                                      //   context,
-                                      //   MaterialPageRoute(
-                                      //     builder:
-                                      //         (context) => SupportTicketPage(
-                                               
-                                      //         ),
-                                      //   ),
-                                      // );
-                                    },
-                                    onChatWithSeller: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => ChatPage(
-                                               
-                                                listenerId:
-                                                    widget.bike.createdBy,
-                                                listenerName: sellerName,
-                                                listenerImage:
-                                                    sellerProfileImage ??
-                                                    'seller.jpg',
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    baseUrl: _baseUrl,
-                                    token: _token,
-                                  );
-                                },
-                              );
-                            },
-                            icon: const Icon(Icons.call),
-                            label: const Text('Call Support'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.zero,
-                              ),
-                            ),
-                          ),
+                       ElevatedButton.icon(
+  onPressed: () {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'contact the seller');
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (context) => ChatOptionsDialog(
+        onChatWithSupport: _launchPhoneCall,
+        onChatWithSeller: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatPage(
+                listenerId: widget.bike.createdBy,
+                listenerName: sellerName,
+                listenerImage: sellerProfileImage ?? 'seller.jpg',
+              ),
+            ),
+          );
+        },
+        baseUrl: _baseUrl,
+        token: _token,
+      ),
+    );
+  },
+  icon: const Icon(Icons.call),
+  label: const Text('Contact Seller'),
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.green,
+    foregroundColor: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+  ),
+),
                         ],
                       ),
                       if (isFinanceAvailable)
@@ -1034,19 +1348,15 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          showBidDialog(context); // Call the dialog function
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
-                          ),
-                        ),
-                        child: const Text('Place Bid'),
-                      ),
+  onPressed: () => showProductBidDialog(context),
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Palette.primarypink,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 0),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+  ),
+  child: const Text('Place Bid'),
+),
                     ),
                     Expanded(
                       child: ElevatedButton(

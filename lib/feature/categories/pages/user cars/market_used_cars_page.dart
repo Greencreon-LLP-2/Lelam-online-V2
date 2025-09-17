@@ -52,6 +52,7 @@ class _MarketPlaceProductDetailsPageState
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
 
+
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
@@ -78,6 +79,9 @@ class _MarketPlaceProductDetailsPageState
 
   bool _isMeetingDialogOpen = false;
   bool _isSchedulingMeeting = false;
+
+  bool _isCheckingShortlist = false;
+  bool _isTogglingFavorite = false;
 
   @override
   void initState() {
@@ -143,6 +147,7 @@ class _MarketPlaceProductDetailsPageState
     } catch (e, stackTrace) {
       debugPrint('Error in _fetchBannerImage: $e\n$stackTrace');
     }
+    _isCheckingShortlist = true;
   }
 
   Future<void> _fetchSellerComments() async {
@@ -202,6 +207,8 @@ class _MarketPlaceProductDetailsPageState
       });
     }
   }
+
+
 
   Future<void> _fetchGalleryImages() async {
     try {
@@ -328,84 +335,156 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-  Future<void> _checkShortlistStatus() async {
-    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-
-    try {
-      final Map<String, dynamic> response = await ApiService().get(
-        url: shortlist,
-        queryParams: {"user_id": _userProvider.userId},
-      );
-
-      if (response['status'] == 'true') {
-        final userData = UserData.fromJson(
-          response['data'][0] as Map<String, dynamic>,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error checking shortlist status: $e');
-    }
+Future<void> _checkShortlistStatus() async {
+  if (_userProvider.userId == null) {
+    setState(() {
+      _isCheckingShortlist = false;
+      _isFavorited = false;
+    });
+    return;
   }
 
-  Future<void> _toggleFavorite() async {
-    if (_userProvider.userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in to add to shortlist'),
-          backgroundColor: Colors.red,
-        ),
+  setState(() {
+    _isCheckingShortlist = true;
+  });
+
+  try {
+    final response = await ApiService().get(
+      url: shortlist,
+      queryParams: {"user_id": _userProvider.userId},
+    );
+
+    debugPrint('Shortlist API response: $response');
+
+    if (response['status'] == 'true' && response['data'] is List) {
+      final List<dynamic> shortlistData = response['data'];
+      // Check if the current product ID is in the shortlist
+      final bool isShortlisted = shortlistData.any(
+        (item) => item['post_id'].toString() == id,
       );
-      return;
+      setState(() {
+        _isFavorited = isShortlisted;
+        _isCheckingShortlist = false;
+      });
+      debugPrint('Product $id isShortlisted: $isShortlisted');
+    } else {
+      setState(() {
+        _isFavorited = false;
+        _isCheckingShortlist = false;
+      });
+      debugPrint('Invalid shortlist data: ${response['data']}');
     }
+  } catch (e) {
+    debugPrint('Error checking shortlist status: $e');
+    setState(() {
+      _isFavorited = false;
+      _isCheckingShortlist = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Failed to check shortlist status: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+}
 
-    try {
-      final headers = {'token': token};
-      final url =
-          '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
-      debugPrint('Adding to shortlist: $url');
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers.addAll(headers);
+Future<void> _toggleFavorite() async {
+  if (_userProvider.userId == null) {
+    _showLoginPromptDialog(context, 'add or remove from shortlist');
+    return;
+  }
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      debugPrint('add-to-shortlist.php response: $responseBody');
+  if (_isTogglingFavorite) return;
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(responseBody);
-        if (responseData['status'] == true) {
-          setState(() {
-            _isFavorited = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Added to shortlist'),
-              backgroundColor: Colors.green,
+  setState(() {
+    _isTogglingFavorite = true;
+  });
+
+  try {
+    final headers = {'token': token};
+    final url =
+        '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
+    debugPrint('Toggling shortlist: $url');
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    debugPrint('add-to-shortlist.php response: $responseBody');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      final bool isSuccess = responseData['status'] == true || responseData['status'] == 'true';
+      final String message = responseData['data']?.toString() ?? '';
+
+      if (isSuccess) {
+        final bool wasAdded = message.toLowerCase().contains('added') ||
+            !_isFavorited; // Assume add if message contains 'added' or was not favorited
+        setState(() {
+          _isFavorited = wasAdded;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(wasAdded ? 'Added to shortlist' : 'Removed from shortlist'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-          );
-          debugPrint('Shortlist updated in SharedPreferences');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Shortlist Added'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${response.reasonPhrase}'),
+            content: Text('Failed to update shortlist: $message'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Error adding to shortlist: $e');
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Error: ${response.reasonPhrase}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
       );
     }
+  } catch (e) {
+    debugPrint('Error toggling shortlist: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  } finally {
+    setState(() {
+      _isTogglingFavorite = false;
+    });
   }
+}
 
   Future<String> _saveBidData(int bidAmount) async {
     if (_userProvider.userId == null) {
@@ -2114,51 +2193,67 @@ class _MarketPlaceProductDetailsPageState
                           ],
                         ),
                       ),
-                      CustomSafeArea(
-                        child: Row(
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                if (_isBidDialogOpen) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please close the bid dialog first',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                Navigator.pop(context);
-                              },
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: Icon(
-                                _isFavorited
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isFavorited ? Colors.red : Colors.white,
-                              ),
-                              onPressed: _toggleFavorite,
-                            ),
-                            IconButton(
-                              icon: const Icon(
-                                Icons.share,
-                                color: Colors.white,
-                              ),
-                              onPressed: () {
-                                // Share functionality
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+  CustomSafeArea(
+  child: Row(
+    children: [
+      IconButton(
+        onPressed: () {
+          if (_isBidDialogOpen) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please close the bid dialog first'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+          Navigator.pop(context);
+        },
+        icon: const Icon(
+          Icons.arrow_back,
+          color: Colors.white,
+        ),
+      ),
+      const Spacer(),
+      _isCheckingShortlist || _isTogglingFavorite
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : IconButton(
+              tooltip: _isFavorited ? 'Remove from Shortlist' : 'Add to Shortlist',
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: animation,
+                  child: child,
+                ),
+                child: Icon(
+                  _isFavorited ? Icons.favorite : Icons.favorite_border,
+                  key: ValueKey<bool>(_isFavorited),
+                  color: _isFavorited ? Colors.red : Colors.white,
+                  size: 28,
+                  semanticLabel: _isFavorited ? 'Remove from Shortlist' : 'Add to Shortlist',
+                ),
+              ),
+              onPressed: _toggleFavorite,
+            ),
+      IconButton(
+        icon: const Icon(
+          Icons.share,
+          color: Colors.white,
+        ),
+        onPressed: () {
+          // Share functionality
+        },
+      ),
+    ],
+  ),
+),
                     ],
                   ),
                   Padding(
