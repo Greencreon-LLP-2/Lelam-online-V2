@@ -516,6 +516,9 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'timer': statusData?['timer'] ?? '0',
             };
             debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
+            debugPrint(
+              'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
+            );
             meetings.add(meetingData);
             await Future.delayed(const Duration(milliseconds: 200));
           }
@@ -731,27 +734,29 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                             meeting: meeting,
                             baseUrl: widget.baseUrl,
                             token: widget.token,
-                            onCancel: () {
-                              if (mounted) {
-                                setState(() {
-                                  meetings.removeWhere(
-                                    (m) => m['id'] == meeting['id'],
-                                  );
+                            // onCancel: () {
+                            //   if (mounted) {
+                            //     setState(() {
+                            //       meetings.removeWhere(
+                            //         (m) => m['id'] == meeting['id'],
+                            //       );
 
-                                  _loadMeetings();
-                                });
-                              }
-                            },
+                            //       _loadMeetings();
+                            //     });
+                            //   }
+                            // },
                             onLocationRequestSent: _onLocationRequestSent,
-                            onProceedWithBid:
-                                () => _proceedWithBid(context, meeting),
-                            onIncreaseBid: () => _increaseBid(context, meeting),
+                            onProceedWithBid: () {
+                              debugPrint('Proceed with Bid triggered for meeting ${meeting['id']}');
+                              _proceedWithBid(context, meeting);
+                            },
+                            // onIncreaseBid: () => _increaseBid(context, meeting),
                             onEditDate:
                                 (meeting) => _editDate(context, meeting),
                             onEditTime:
                                 (meeting) => _editTime(context, meeting),
-                            onCancelMeeting:
-                                (meeting) => _cancelMeeting(context, meeting),
+                            // onCancelMeeting:
+                            //     (meeting) => _cancelMeeting(context, meeting),
                             onSendLocationRequest:
                                 (meeting) =>
                                     _sendLocationRequest(context, meeting),
@@ -771,7 +776,9 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
+    debugPrint('Proceed with Bid called for meeting ${meeting['id']}');
     if (_userId == null || _userId == 'Unknown') {
+      debugPrint('Invalid user ID');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
       );
@@ -780,9 +787,29 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     if (meeting['bid_amount'] == null ||
         meeting['bid_amount'] == '0.00' ||
         meeting['bid_id'] == '0') {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No valid bid found')));
+      debugPrint(
+        'Proceed with Bid failed: bid_amount=${meeting['bid_amount']}, bid_id=${meeting['bid_id']}',
+      );
+      final bool? placeBid = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Bid Found'),
+          content: const Text('No valid bid exists for this meeting. Would you like to place a bid?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Place Bid'),
+            ),
+          ],
+        ),
+      );
+      // if (placeBid == true) {
+      //   await _increaseBid(context, meeting);
+      // }
       return;
     }
 
@@ -875,128 +902,128 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<void> _increaseBid(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    final TextEditingController bidController = TextEditingController();
-    double? newBidAmount;
+  // Future<void> _increaseBid(
+  //   BuildContext context,
+  //   Map<String, dynamic> meeting,
+  // ) async {
+  //   if (_userId == null || _userId == 'Unknown') {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Invalid user ID. Please log in again.')),
+  //     );
+  //     return;
+  //   }
+  //   final TextEditingController bidController = TextEditingController();
+  //   double? newBidAmount;
 
-    await showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Increase Bid'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: bidController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'New Bid Amount',
-                    hintText: 'Enter new bid amount',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    newBidAmount = double.tryParse(value);
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  if (newBidAmount == null || newBidAmount! <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid bid amount'),
-                      ),
-                    );
-                    return;
-                  }
-                  try {
-                    final response = await retry(
-                      () => http.get(
-                        Uri.parse(
-                          '${widget.baseUrl}/my-meeting-increase-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bid_id=${meeting['bid_id']}&bidamt=$newBidAmount',
-                        ),
-                        headers: {
-                          'token': widget.token,
-                          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-                        },
-                      ),
-                      maxAttempts: 3,
-                      delayFactor: const Duration(seconds: 2),
-                      randomizationFactor: 0.25,
-                      onRetry: (e) {
-                        debugPrint('Retrying increase bid: $e');
-                      },
-                    );
-                    debugPrint(
-                      'my-meeting-increase-bid.php response: ${response.body}',
-                    );
-                    if (response.statusCode == 200) {
-                      final data = jsonDecode(response.body);
-                      if (data['status'] == true || data['status'] == 'true') {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Bid increased successfully'),
-                          ),
-                        );
+  //   await showDialog(
+  //     context: context,
+  //     builder:
+  //         (context) => AlertDialog(
+  //           title: const Text('Increase Bid'),
+  //           content: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             children: [
+  //               TextField(
+  //                 controller: bidController,
+  //                 keyboardType: TextInputType.number,
+  //                 decoration: const InputDecoration(
+  //                   labelText: 'New Bid Amount',
+  //                   hintText: 'Enter new bid amount',
+  //                   border: OutlineInputBorder(),
+  //                 ),
+  //                 onChanged: (value) {
+  //                   newBidAmount = double.tryParse(value);
+  //                 },
+  //               ),
+  //             ],
+  //           ),
+  //           actions: [
+  //             TextButton(
+  //               onPressed: () => Navigator.pop(context),
+  //               child: const Text('Cancel'),
+  //             ),
+  //             TextButton(
+  //               onPressed: () async {
+  //                 if (newBidAmount == null || newBidAmount! <= 0) {
+  //                   ScaffoldMessenger.of(context).showSnackBar(
+  //                     const SnackBar(
+  //                       content: Text('Please enter a valid bid amount'),
+  //                     ),
+  //                   );
+  //                   return;
+  //                 }
+  //                 try {
+  //                   final response = await retry(
+  //                     () => http.get(
+  //                       Uri.parse(
+  //                         '${widget.baseUrl}/my-meeting-increase-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bid_id=${meeting['bid_id']}&bidamt=$newBidAmount',
+  //                       ),
+  //                       headers: {
+  //                         'token': widget.token,
+  //                         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+  //                       },
+  //                     ),
+  //                     maxAttempts: 3,
+  //                     delayFactor: const Duration(seconds: 2),
+  //                     randomizationFactor: 0.25,
+  //                     onRetry: (e) {
+  //                       debugPrint('Retrying increase bid: $e');
+  //                     },
+  //                   );
+  //                   debugPrint(
+  //                     'my-meeting-increase-bid.php response: ${response.body}',
+  //                   );
+  //                   if (response.statusCode == 200) {
+  //                     final data = jsonDecode(response.body);
+  //                     if (data['status'] == true || data['status'] == 'true') {
+  //                       ScaffoldMessenger.of(context).showSnackBar(
+  //                         const SnackBar(
+  //                           content: Text('Bid increased successfully'),
+  //                         ),
+  //                       );
 
-                        await _loadMeetings();
-                        widget.onRefreshMeetings?.call();
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Failed to increase bid: ${data['message'] ?? 'Unknown error'}',
-                            ),
-                          ),
-                        );
-                      }
-                    } else if (response.statusCode == 429) {
-                      debugPrint('Rate limit exceeded for increase bid');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Too many requests. Please try again later.',
-                          ),
-                        ),
-                      );
-                    } else {
-                      debugPrint(
-                        'my-meeting-increase-bid.php failed with status ${response.statusCode}',
-                      );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Failed to increase bid')),
-                      );
-                    }
-                  } catch (e) {
-                    debugPrint('Error increasing bid: $e');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Error increasing bid')),
-                    );
-                  }
-                  Navigator.pop(context);
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-    );
-  }
+  //                       await _loadMeetings();
+  //                       widget.onRefreshMeetings?.call();
+  //                     } else {
+  //                       ScaffoldMessenger.of(context).showSnackBar(
+  //                         SnackBar(
+  //                           content: Text(
+  //                             'Failed to increase bid: ${data['message'] ?? 'Unknown error'}',
+  //                           ),
+  //                         ),
+  //                       );
+  //                     }
+  //                   } else if (response.statusCode == 429) {
+  //                     debugPrint('Rate limit exceeded for increase bid');
+  //                     ScaffoldMessenger.of(context).showSnackBar(
+  //                       const SnackBar(
+  //                         content: Text(
+  //                           'Too many requests. Please try again later.',
+  //                         ),
+  //                       ),
+  //                     );
+  //                   } else {
+  //                     debugPrint(
+  //                       'my-meeting-increase-bid.php failed with status ${response.statusCode}',
+  //                     );
+  //                     ScaffoldMessenger.of(context).showSnackBar(
+  //                       const SnackBar(content: Text('Failed to increase bid')),
+  //                     );
+  //                   }
+  //                 } catch (e) {
+  //                   debugPrint('Error increasing bid: $e');
+  //                   ScaffoldMessenger.of(context).showSnackBar(
+  //                     const SnackBar(content: Text('Error increasing bid')),
+  //                   );
+  //                 }
+  //                 Navigator.pop(context);
+  //               },
+  //               child: const Text('OK'),
+  //             ),
+  //           ],
+  //         ),
+  //   );
+  // }
 
   Future<void> _editTime(
     BuildContext context,
@@ -1303,60 +1330,60 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<void> _cancelMeeting(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-meeting-cancel.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-        },
-      );
-      debugPrint('my-meeting-cancel.php response: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Meeting cancelled successfully')),
-          );
+  // Future<void> _cancelMeeting(
+  //   BuildContext context,
+  //   Map<String, dynamic> meeting,
+  // ) async {
+  //   if (_userId == null || _userId == 'Unknown') {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Invalid user ID. Please log in again.')),
+  //     );
+  //     return;
+  //   }
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse(
+  //         '${widget.baseUrl}/my-meeting-cancel.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
+  //       ),
+  //       headers: {
+  //         'token': widget.token,
+  //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+  //       },
+  //     );
+  //     debugPrint('my-meeting-cancel.php response: ${response.body}');
+  //     if (response.statusCode == 200) {
+  //       final data = jsonDecode(response.body);
+  //       if (data['status'] == true || data['status'] == 'true') {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(content: Text('Meeting cancelled successfully')),
+  //         );
 
-          await _loadMeetings();
-          widget.onRefreshMeetings?.call();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to cancel meeting: ${data['message'] ?? 'Unknown error'}',
-              ),
-            ),
-          );
-        }
-      } else {
-        debugPrint(
-          'my-meeting-cancel.php failed with status ${response.statusCode}',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to cancel meeting')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error cancelling meeting: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error cancelling meeting')));
-    }
-  }
+  //         await _loadMeetings();
+  //         widget.onRefreshMeetings?.call();
+  //       } else {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text(
+  //               'Failed to cancel meeting: ${data['message'] ?? 'Unknown error'}',
+  //             ),
+  //           ),
+  //         );
+  //       }
+  //     } else {
+  //       debugPrint(
+  //         'my-meeting-cancel.php failed with status ${response.statusCode}',
+  //       );
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Failed to cancel meeting')),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error cancelling meeting: $e');
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(const SnackBar(content: Text('Error cancelling meeting')));
+  //   }
+  // }
 
   Future<void> _viewLocation(
     BuildContext context,
@@ -1397,5 +1424,3 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 }
-
-

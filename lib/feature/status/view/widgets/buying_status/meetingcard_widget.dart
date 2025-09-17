@@ -9,13 +9,13 @@ class MeetingCard extends StatelessWidget {
   final Map<String, dynamic> meeting;
   final String baseUrl;
   final String token;
-  final VoidCallback onCancel;
+  // final VoidCallback onCancel;
   final Function(String) onLocationRequestSent;
   final VoidCallback onProceedWithBid;
-  final VoidCallback onIncreaseBid;
+  // final VoidCallback onIncreaseBid;
   final Function(Map<String, dynamic>) onEditDate;
   final Function(Map<String, dynamic>) onEditTime;
-  final Function(Map<String, dynamic>) onCancelMeeting;
+  // final Function(Map<String, dynamic>) onCancelMeeting;
   final Function(Map<String, dynamic>) onSendLocationRequest;
   final Function(Map<String, dynamic>) onViewLocation;
 
@@ -24,13 +24,13 @@ class MeetingCard extends StatelessWidget {
     required this.meeting,
     required this.baseUrl,
     required this.token,
-    required this.onCancel,
+    // required this.onCancel,
     required this.onLocationRequestSent,
     required this.onProceedWithBid,
-    required this.onIncreaseBid,
+    // required this.onIncreaseBid,
     required this.onEditDate,
     required this.onEditTime,
-    required this.onCancelMeeting,
+    // required this.onCancelMeeting,
     required this.onSendLocationRequest,
     required this.onViewLocation,
   });
@@ -140,7 +140,7 @@ class MeetingCard extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Marked as not interested')),
           );
-          onCancel();
+          // onCancel();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -177,7 +177,7 @@ class MeetingCard extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Revisit requested successfully')),
           );
-          onCancel();
+          // onCancel();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -486,10 +486,10 @@ class MeetingCard extends StatelessWidget {
                                       onEditTime(meeting);
                                     } else if (value == 'proceed_with_bid') {
                                       onProceedWithBid();
-                                    } else if (value == 'increase_bid') {
-                                      onIncreaseBid();
-                                    } else if (value == 'cancel_meeting') {
-                                      onCancelMeeting(meeting);
+                                    // } else if (value == 'increase_bid') {
+                                    //   onIncreaseBid();
+                                    // } else if (value == 'cancel_meeting') {
+                                    //   onCancelMeeting(meeting);
                                     } else if (value == 'send_location') {
                                       onSendLocationRequest(meeting);
                                     } else if (value == 'view_location') {

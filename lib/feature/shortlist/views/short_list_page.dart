@@ -176,87 +176,101 @@ class _ShortListPageState extends State<ShortListPage> {
     }
   }
 
-  Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
-    List<Product> products = [];
+Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
+  List<Product> products = [];
+  try {
+    // Fetch marketplace posts (no auction terms required)
+    final marketplacePosts = await _marketplaceService.fetchPosts(
+      categoryId: '1',
+      userZoneId: '0',
+      listingType: 'sale',
+      userId: userId ?? '2',
+    );
+
+    // Fetch auction posts, but handle terms error gracefully
+    List<MarketplacePost> auctionPosts = [];
     try {
-      final results = await Future.wait([
-        _marketplaceService.fetchPosts(
-          categoryId: '1',
-          userZoneId: '0',
-          listingType: 'sale',
-          userId: userId ?? '2',
-        ),
-        _marketplaceService.fetchPosts(
-          categoryId: '1',
-          userZoneId: '0',
-          listingType: 'auction',
-          userId: userId ?? '2',
-        ),
-      ]);
-
-      final allPosts = [
-        ...?results[0],
-        ...?results[1],
-      ].where((post) => post != null).cast<MarketplacePost>().toList();
-
-      for (String postId in postIds) {
-        try {
-          final matchingPost = allPosts.firstWhere(
-            (post) => post.id == postId,
-            orElse: () => MarketplacePost(
-              id: postId,
-              title: 'Product $postId',
-              image: '',
-              price: '0',
-              parentZoneId: 'Unknown',
-              createdOn: '',
-              createdBy: 'Unknown',
-              byDealer: '0',
-              filters: {},
-              ifAuction: '0',
-              auctionStartingPrice: '0',
-              auctionAttempt: '0',
-              ifFinance: '0',
-              ifExchange: '0',
-              slug: '',
-              categoryId: '',
-              brand: '',
-              model: '',
-              modelVariation: '',
-              description: '',
-              auctionPriceInterval: '',
-              attributeId: [],
-              attributeVariationsId: [],
-              latitude: '',
-              longitude: '',
-              userZoneId: '',
-              landMark: '',
-              auctionStatus: '',
-              auctionStartin: '',
-              auctionEndin: '',
-              adminApproval: '',
-              feature: '',
-              status: '',
-              visiterCount: '',
-              ifSold: '',
-              ifExpired: '',
-              updatedOn: '',
-              ifOfferPrice: '',
-              offerPrice: '',
-              ifVerifyed: '',
-            ),
-          );
-          products.add(matchingPost.toProduct());
-        } catch (e) {
-          debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching product for post_id $postId: $e');
-        }
-      }
+      auctionPosts = await _marketplaceService.fetchPosts(
+        categoryId: '1',
+        userZoneId: '0',
+        listingType: 'auction',
+        userId: userId ?? '2',
+      );
     } catch (e) {
-      debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching posts: $e');
+      if (e.toString().contains('Please accept live auction terms')) {
+        debugPrint('ShortListPage - _fetchProductsForPostIds: Auction terms not accepted, skipping auction posts: $e');
+        // Continue with marketplace posts only
+      } else {
+        debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching auction posts: $e');
+      }
     }
-    return products;
-  }
 
+    final allPosts = [
+      ...marketplacePosts,
+      ...auctionPosts,
+    ].where((post) => post != null).cast<MarketplacePost>().toList();
+
+    for (String postId in postIds) {
+      try {
+        final matchingPost = allPosts.firstWhere(
+          (post) => post.id == postId,
+          orElse: () => MarketplacePost(
+            id: postId,
+            title: 'Product $postId',
+            image: '',
+            price: '0',
+            parentZoneId: 'Unknown',
+            createdOn: '',
+            createdBy: 'Unknown',
+            byDealer: '0',
+            filters: {},
+            ifAuction: '0',
+            auctionStartingPrice: '0',
+            auctionAttempt: '0',
+            ifFinance: '0',
+            ifExchange: '0',
+            slug: '',
+            categoryId: '',
+            brand: '',
+            model: '',
+            modelVariation: '',
+            description: '',
+            auctionPriceInterval: '',
+            attributeId: [],
+            attributeVariationsId: [],
+            latitude: '',
+            longitude: '',
+            userZoneId: '',
+            landMark: '',
+            auctionStatus: '',
+            auctionStartin: '',
+            auctionEndin: '',
+            adminApproval: '',
+            feature: '',
+            status: '',
+            visiterCount: '',
+            ifSold: '',
+            ifExpired: '',
+            updatedOn: '',
+            ifOfferPrice: '',
+            offerPrice: '',
+            ifVerifyed: '',
+          ),
+        );
+        products.add(matchingPost.toProduct());
+      } catch (e) {
+        debugPrint('ShortListPage - _fetchProductsForPostIds: Error fetching product for post_id $postId: $e');
+      }
+    }
+  } catch (e) {
+    debugPrint('ShortListPage - _fetchProductsForPostIds: General error fetching posts: $e');
+    setState(() {
+      errorMessage = 'Some items could not be loaded: $e';
+      isLoading = false;
+    });
+  }
+  return products;
+}
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
@@ -485,7 +499,7 @@ class _ShortListPageState extends State<ShortListPage> {
                   ElevatedButton(
                     
                     onPressed: () {
-                      context.pushReplacementNamed(RouteNames.loginPage);
+                      context.push(RouteNames.loginPage);
                       debugPrint('ShortListPage - Navigating to login page');
                     },
                     style: ElevatedButton.styleFrom(

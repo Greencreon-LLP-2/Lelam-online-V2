@@ -8,12 +8,14 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
 class Brand {
   final String id;
@@ -481,8 +483,8 @@ class AdPostPage extends StatefulWidget {
 class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
   String? _categoryId;
-  String? _userId;
   Map<String, dynamic>? _adData;
+    late final LoggedUserProvider _userProvider;
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
@@ -496,7 +498,7 @@ class _AdPostPageState extends State<AdPostPage> {
     print('Received extra: ${widget.extra}');
     if (widget.extra != null) {
       _categoryId = widget.extra!['categoryId']?.toString();
-      _userId = widget.extra!['userId']?.toString() ?? 'Unknown';
+      _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
       _adData = widget.extra!['adData'] as Map<String, dynamic>?;
       if (_categoryId == null) {
         print(
@@ -517,7 +519,6 @@ class _AdPostPageState extends State<AdPostPage> {
     } else {
       print('Error: extra is null');
       _categoryId = null;
-      _userId = 'Unknown';
       Fluttertoast.showToast(
         msg: 'No category or user ID provided',
         toastLength: Toast.LENGTH_LONG,
@@ -562,7 +563,7 @@ class _AdPostPageState extends State<AdPostPage> {
       body: AdPostForm(
         formKey: _formKey,
         categoryId: _categoryId ?? '',
-        userId: _userId,
+        userId: _userProvider.userId,
         adData: _adData,
         onSubmit: _submitForm,
       ),

@@ -48,7 +48,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
-  String sellerActiveFrom = 'N/A';
+  String sellerActiveFrom = '';
   String? userId;
   String _currentHighestBid = '0';
 
@@ -280,7 +280,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             sellerName = data['user_name'] ?? 'Unknown';
             sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
-            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
         } else {
@@ -343,12 +343,12 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
       case '3rd Owner':
         return '3rd Owner';
       default:
-        return owners.isNotEmpty ? owners : 'N/A';
+        return owners.isNotEmpty ? owners : '';
     }
   }
 
   String _formatNumber(String value) {
-    if (value == 'N/A') return 'N/A';
+    if (value == '') return '';
     final number = int.tryParse(value.replaceAll(' KM', '')) ?? 0;
     return '$number KM';
   }
@@ -1202,7 +1202,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                                 'year',
                                             orElse: () => SellerComment(
                                               attributeName: 'Year',
-                                              attributeValue: 'N/A',
+                                              attributeValue: '',
                                             ),
                                           )
                                           .attributeValue,
@@ -1385,9 +1385,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                             children: _bidHistory
                                 .map(
                                   (bid) => _buildBidHistoryItem(
-                                    bid['bidder'] ?? 'Unknown',
+                                    bid['bidder'] ?? 'Guest User',
                                     bid['amount'] ?? 'N/A',
-                                    bid['time'] ?? 'N/A',
+                               
                                   ),
                                 )
                                 .toList(),
@@ -1492,7 +1492,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     );
   }
 
-  Widget _buildBidHistoryItem(String bidder, String amount, String time) {
+  Widget _buildBidHistoryItem(String bidder, String amount, ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1516,10 +1516,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                Text(
-                  time,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
+               
               ],
             ),
           ),

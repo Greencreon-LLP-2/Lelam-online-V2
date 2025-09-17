@@ -28,9 +28,11 @@ class ChatListPage extends HookWidget {
       listen: false,
     );
     final userId = userProvider.userId ?? '';
-    final userName = userProvider.userData?.name ?? 'Guest User';
+    final userName = userProvider.userData?.name?.isNotEmpty == true
+        ? userProvider.userData!.name
+        : 'Guest User';
 
-    Future<void> _openWhatsApp() async {
+    Future<void> _openWhatsApp(BuildContext context) async {
       const phoneNumber = '+918089308048';
       final whatsappUrl =
           'https://wa.me/$phoneNumber?text=Hello%20Support%20Team';
@@ -40,12 +42,14 @@ class ChatListPage extends HookWidget {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          await launchUrl(uri, mode: LaunchMode.platformDefault);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('WhatsApp is not installed')),
+          );
         }
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not open WhatsApp: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open WhatsApp: $e')),
+        );
       }
     }
 
@@ -56,54 +60,57 @@ class ChatListPage extends HookWidget {
     ) async {
       if (chatRooms.value.isEmpty) return;
 
-      final Set<String> otherUserIds = {};
+      // Collect all user IDs (both user_id_from and user_id_to)
+      final Set<String> allUserIds = {};
       for (final chatRoom in chatRooms.value) {
-        final otherUserId =
-            chatRoom['user_id_from'] == userId
-                ? chatRoom['user_id_to'].toString()
-                : chatRoom['user_id_from'].toString();
-        if (otherUserId != userId) {
-          otherUserIds.add(otherUserId);
-        }
+        allUserIds.add(chatRoom['user_id_from'].toString());
+        allUserIds.add(chatRoom['user_id_to'].toString());
       }
 
-      if (otherUserIds.isEmpty) return;
+      if (allUserIds.isEmpty) return;
 
       isFetchingUsers.value = true;
       try {
-        final userIdsQuery = otherUserIds.join(',');
-        final url = Uri.parse(
-          '$baseUrl/user-profile-list.php?token=$token&user_ids=$userIdsQuery',
-        );
-        final response = await http.get(url);
+        final Map<String, Map<String, String>> fetchedUsers = {};
+        // Fetch user data for each user ID individually
+        for (final userIdStr in allUserIds) {
+          final url = Uri.parse(
+            '$baseUrl/index.php?token=$token&user_id=$userIdStr',
+          );
+          final response = await http.get(url);
 
-        debugPrint('ChatListPage: Fetching users: $url');
-        debugPrint(
-          'ChatListPage: User response status: ${response.statusCode}',
-        );
-        debugPrint('ChatListPage: User response body: ${response.body}');
+          debugPrint('ChatListPage: Fetching user: $url');
+          debugPrint('ChatListPage: User response status: ${response.statusCode}');
+          debugPrint('ChatListPage: User response body: ${response.body}');
 
-        if (response.statusCode == 200) {
-          final jsonResponse = jsonDecode(response.body);
-          if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
-            final List<dynamic> usersList = jsonResponse['data'];
-            final Map<String, Map<String, String>> fetchedUsers = {};
-            for (final user in usersList) {
-              final userIdStr = user['user_id'].toString();
+          if (response.statusCode == 200) {
+            final jsonResponse = jsonDecode(response.body);
+            if (jsonResponse['status'] == true && jsonResponse['data'] is List && jsonResponse['data'].isNotEmpty) {
+              final user = jsonResponse['data'][0];
+              final userName = user['name']?.toString();
               fetchedUsers[userIdStr] = {
-                'name': user['name']?.toString() ?? 'Guest User',
-                'image': user['image']?.toString() ?? '',
+                'name': userName != null && userName.isNotEmpty
+                    ? userName
+                    : 'Guest User',
+                'image': user['profile']?.toString() ?? '',
+              };
+            } else {
+              debugPrint('ChatListPage: Invalid user data format for user ID: $userIdStr');
+              fetchedUsers[userIdStr] = {
+                'name': 'Guest User',
+                'image': '',
               };
             }
-            userData.value = fetchedUsers;
           } else {
-            debugPrint('ChatListPage: Invalid user data format');
+            debugPrint('ChatListPage: Failed to fetch user $userIdStr: ${response.statusCode}');
+            fetchedUsers[userIdStr] = {
+              'name': 'Guest User',
+              'image': '',
+            };
           }
-        } else {
-          debugPrint(
-            'ChatListPage: Failed to fetch users: ${response.statusCode}',
-          );
         }
+        userData.value = fetchedUsers;
+        debugPrint('ChatListPage: Updated userData: ${userData.value}');
       } catch (e) {
         debugPrint('ChatListPage: Error fetching users: $e');
       } finally {
@@ -164,10 +171,6 @@ class ChatListPage extends HookWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // const Text(
-                //   'Log in to view your chats',
-                //   style: TextStyle(fontSize: 18, color: Colors.grey),
-                // ),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () {
@@ -192,45 +195,41 @@ class ChatListPage extends HookWidget {
               ],
             ),
           ),
-          floatingActionButton: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const Text(
-                'Support',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                onPressed: _openWhatsApp,
-                backgroundColor: const Color(0xFF25D366),
-                child: SvgPicture.asset(
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => _openWhatsApp(context),
+            backgroundColor: const Color(0xFF25D366),
+            tooltip: 'Contact Support on WhatsApp',
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
                   'assets/icons/whatsapp_icon.svg',
                   width: 24,
                   height: 24,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                const Text(
+                  'Support',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    Widget _buildUserTile(Map<String, dynamic> chatRoom, String otherUserId) {
-      final displayName =
-          otherUserId == userId
-              ? userName
-              : userData.value[otherUserId]?['name']?.isNotEmpty == true
-              ? userData.value[otherUserId]!['name']!
-              : 'Guest User';
-      final displayImage =
-          otherUserId == userId
-              ? userProvider.userData?.image ?? ''
-              : userData.value[otherUserId]?['image'] ?? '';
+    Widget _buildUserTile(Map<String, dynamic> chatRoom) {
+      final userIdFrom = chatRoom['user_id_from'].toString();
+      final userIdTo = chatRoom['user_id_to'].toString();
+      final otherUserId = userIdFrom == userId ? userIdTo : userIdFrom;
+
+      final displayName = userData.value[otherUserId]?['name'] ?? 'Guest User';
+      final displayImage = userData.value[otherUserId]?['image'] ?? '';
 
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -255,10 +254,9 @@ class ChatListPage extends HookWidget {
             radius: 28,
             backgroundImage:
                 displayImage.isNotEmpty ? NetworkImage(displayImage) : null,
-            child:
-                displayImage.isEmpty
-                    ? Icon(Icons.person, color: AppTheme.primaryColor, size: 28)
-                    : null,
+            child: displayImage.isEmpty
+                ? Icon(Icons.person, color: AppTheme.primaryColor, size: 28)
+                : null,
           ),
           title: Text(
             displayName,
@@ -280,12 +278,11 @@ class ChatListPage extends HookWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder:
-                    (context) => ChatPage(
-                      listenerId: otherUserId,
-                      listenerName: displayName,
-                      listenerImage: displayImage,
-                    ),
+                builder: (context) => ChatPage(
+                  listenerId: otherUserId,
+                  listenerName: displayName,
+                  listenerImage: displayImage,
+                ),
               ),
             );
           },
@@ -349,64 +346,62 @@ class ChatListPage extends HookWidget {
       );
     }
 
-    return CustomSafeArea(
-      child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: AppTheme.primaryColor,
-          foregroundColor: Colors.white,
-          title: const Text(
-            'Chats',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
-          ),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Divider(height: 1, thickness: 0.5, color: Colors.grey[200]),
-          ),
-          iconTheme: const IconThemeData(color: Colors.white),
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        title: const Text(
+          'Chats',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
         ),
-        floatingActionButton: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 0.5, color: Colors.grey[200]),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openWhatsApp(context),
+        backgroundColor: const Color(0xFF25D366),
+        tooltip: 'Contact Support on WhatsApp',
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            SvgPicture.asset(
+              'assets/icons/whatsapp_icon.svg',
+              width: 24,
+              height: 24,
+            ),
+            const SizedBox(width: 8),
             const Text(
               'Support',
               style: TextStyle(
                 fontSize: 14,
+                color: Colors.white,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 8),
-            FloatingActionButton(
-              onPressed: _openWhatsApp,
-              backgroundColor: const Color(0xFF25D366),
-              child: SvgPicture.asset(
-                'assets/icons/whatsapp_icon.svg',
-                width: 24,
-                height: 24,
               ),
             ),
           ],
         ),
-        body:
-            isLoading.value
-                ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text(
-                        'Loading chats...',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-                    ],
+      ),
+      body: isLoading.value
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text(
+                    'Loading chats...',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
-                )
-                : error.value != null
-                ? Center(
+                ],
+              ),
+            )
+          : error.value != null
+              ? Center(
                   child: Container(
                     margin: const EdgeInsets.all(24),
                     padding: const EdgeInsets.all(24),
@@ -435,64 +430,58 @@ class ChatListPage extends HookWidget {
                         const SizedBox(height: 8),
                         Text(
                           error.value!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.red[600],
-                          ),
+                          style: TextStyle(fontSize: 14, color: Colors.red[600]),
                           textAlign: TextAlign.center,
                         ),
                       ],
                     ),
                   ),
                 )
-                : chatRooms.value.isEmpty
-                ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline_rounded,
-                        size: 64,
-                        color: Colors.grey[400],
+              : chatRooms.value.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No chats yet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Start a conversation to see your chats here',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No chats yet',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start a conversation to see your chats here',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                )
-                : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: chatRooms.value.length,
-                  itemBuilder: (context, index) {
-                    final chatRoom = chatRooms.value[index];
-                    final otherUserId =
-                        chatRoom['user_id_from'] == userId
-                            ? chatRoom['user_id_to'].toString()
-                            : chatRoom['user_id_from'].toString();
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: chatRooms.value.length,
+                      itemBuilder: (context, index) {
+                        final chatRoom = chatRooms.value[index];
+                        final userIdFrom = chatRoom['user_id_from'].toString();
+                        final userIdTo = chatRoom['user_id_to'].toString();
 
-                    if (isFetchingUsers.value &&
-                        !userData.value.containsKey(otherUserId) &&
-                        otherUserId != userId) {
-                      return _buildLoadingTile(chatRoom);
-                    }
+                        if (isFetchingUsers.value &&
+                            (!userData.value.containsKey(userIdFrom) ||
+                                !userData.value.containsKey(userIdTo))) {
+                          return _buildLoadingTile(chatRoom);
+                        }
 
-                    return _buildUserTile(chatRoom, otherUserId);
-                  },
-                ),
-      ),
+                        return _buildUserTile(chatRoom);
+                      },
+                    ),
     );
   }
 }

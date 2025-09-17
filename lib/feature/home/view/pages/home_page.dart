@@ -169,22 +169,7 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.only(left: 16),
                     child: CategoryWidget(),
                   ),
-                  SizedBox(
-                    child: Row(
-                      children: [
-                        SizedBox(width: 10,),
-                        Text(
-                          'Handpicked Deals',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                
                   const SizedBox(height: 5),
                   ProductSectionWidget(searchQuery: _searchQuery),
                 ],

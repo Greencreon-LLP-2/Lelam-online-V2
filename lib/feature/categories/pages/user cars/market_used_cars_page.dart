@@ -23,6 +23,7 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -75,55 +76,74 @@ class _MarketPlaceProductDetailsPageState
   bool _isLoadingBanner = false;
   String _bannerError = '';
 
- @override
-void initState() {
-  super.initState();
-  debugPrint('MarketPlaceProductDetailsPage - initState: Starting initialization');
-  _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-  debugPrint('MarketPlaceProductDetailsPage - initState: userProvider initialized, userId=${_userProvider.userId}');
+  bool _isMeetingDialogOpen = false;
+  bool _isSchedulingMeeting = false; 
 
-  try {
-    _fetchLocations();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchLocations completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _fetchLocations: $e\n$stackTrace');
-  }
+  @override
+  void initState() {
+    super.initState();
+    debugPrint(
+      'MarketPlaceProductDetailsPage - initState: Starting initialization',
+    );
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    debugPrint(
+      'MarketPlaceProductDetailsPage - initState: userProvider initialized, userId=${_userProvider.userId}',
+    );
 
-  try {
-    _fetchSellerComments();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchSellerComments completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _fetchSellerComments: $e\n$stackTrace');
-  }
+    try {
+      _fetchLocations();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _fetchLocations completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _fetchLocations: $e\n$stackTrace');
+    }
 
-  try {
-    _fetchSellerInfo();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchSellerInfo completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _fetchSellerInfo: $e\n$stackTrace');
-  }
+    try {
+      _fetchSellerComments();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _fetchSellerComments completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _fetchSellerComments: $e\n$stackTrace');
+    }
 
-  try {
-    _checkShortlistStatus();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _checkShortlistStatus completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _checkShortlistStatus: $e\n$stackTrace');
-  }
+    try {
+      _fetchSellerInfo();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _fetchSellerInfo completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _fetchSellerInfo: $e\n$stackTrace');
+    }
 
-  try {
-    _fetchGalleryImages();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchGalleryImages completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _fetchGalleryImages: $e\n$stackTrace');
-  }
+    try {
+      _checkShortlistStatus();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _checkShortlistStatus completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _checkShortlistStatus: $e\n$stackTrace');
+    }
 
-  try {
-    _fetchBannerImage();
-    debugPrint('MarketPlaceProductDetailsPage - initState: _fetchBannerImage completed');
-  } catch (e, stackTrace) {
-    debugPrint('Error in _fetchBannerImage: $e\n$stackTrace');
+    try {
+      _fetchGalleryImages();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _fetchGalleryImages completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _fetchGalleryImages: $e\n$stackTrace');
+    }
+
+    try {
+      _fetchBannerImage();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - initState: _fetchBannerImage completed',
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error in _fetchBannerImage: $e\n$stackTrace');
+    }
   }
-}
 
   Future<void> _fetchSellerComments() async {
     setState(() {
@@ -436,100 +456,123 @@ void initState() {
     }
   }
 
-Future<void> _fetchBannerImage() async {
-  debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Starting');
-  try {
-    setState(() {
-      _isLoadingBanner = true;
-      _bannerError = '';
-    });
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl');
+  Future<void> _fetchBannerImage() async {
+    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Starting');
+    try {
+      setState(() {
+        _isLoadingBanner = true;
+        _bannerError = '';
+      });
+      debugPrint(
+        'MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl',
+      );
 
-    final headers = {
-      'token': token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
-    final url = '$baseUrl/post-ads-image.php?token=$token';
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url');
+      final headers = {
+        'token': token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$baseUrl/post-ads-image.php?token=$token';
+      debugPrint(
+        'MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url',
+      );
 
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint(
+        'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody',
+      );
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData');
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        debugPrint(
+          'MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData',
+        );
 
-      if (responseData['status'] == 'true' && responseData['data'] != null) {
-        final bannerImage = responseData['data']['inner_post_image'] ?? '';
-        debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage');
-        setState(() {
-          _bannerImageUrl = bannerImage.isNotEmpty ? 'https://lelamonline.com/admin/$bannerImage' : null;
-          debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl');
-        });
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          final bannerImage = responseData['data']['inner_post_image'] ?? '';
+          debugPrint(
+            'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage',
+          );
+          setState(() {
+            _bannerImageUrl =
+                bannerImage.isNotEmpty
+                    ? 'https://lelamonline.com/admin/$bannerImage'
+                    : null;
+            debugPrint(
+              'MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl',
+            );
+          });
+        } else {
+          throw Exception('Invalid banner data: ${responseData['data']}');
+        }
       } else {
-        throw Exception('Invalid banner data: ${responseData['data']}');
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    } catch (e, stackTrace) {
+      debugPrint(
+        'MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace',
+      );
+      setState(() {
+        _bannerError = 'Failed to load banner: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBanner = false;
+      });
+      debugPrint(
+        'MarketPlaceProductDetailsPage - _fetchBannerImage: Completed',
+      );
     }
-  } catch (e, stackTrace) {
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace');
-    setState(() {
-      _bannerError = 'Failed to load banner: $e';
-    });
-  } finally {
-    setState(() {
-      _isLoadingBanner = false;
-    });
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Completed');
   }
-}
 
-Widget _buildBannerAd() {
-  debugPrint('Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl');
-  
-  if (_isLoadingBanner) {
-    return const Padding(
-      padding: EdgeInsets.all(16.0),
-      child: Center(child: CircularProgressIndicator()),
+  Widget _buildBannerAd() {
+    debugPrint(
+      'Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl',
     );
-  }
 
-  if (_bannerError.isNotEmpty) {
+    if (_isLoadingBanner) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_bannerError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+
+    if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+      debugPrint('No banner image available');
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Center(
-        child: Text(
-          _bannerError,
-          style: const TextStyle(color: Colors.red),
-        ),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImageUrl!,
+        width: double.infinity,
+        height: 35,
+        fit: BoxFit.fill,
+        placeholder:
+            (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget:
+            (context, url, error) => const Center(
+              child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+            ),
       ),
     );
   }
 
-  if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
-    debugPrint('No banner image available');
-    return const SizedBox.shrink();
-  }
-
-  return Padding(
-    padding: const EdgeInsets.all(16.0),
-    child: CachedNetworkImage(
-      imageUrl: _bannerImageUrl!,
-      width: double.infinity,
-      height: 40,
-      fit: BoxFit.cover,
-      placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-      errorWidget: (context, url, error) => const Center(
-        child: Icon(Icons.error_outline, size: 50, color: Colors.red),
-      ),
-    ),
-  );
-}
   void _showLoginPromptDialog(BuildContext context, String action) {
     showDialog(
       context: context,
@@ -621,7 +664,7 @@ Widget _buildBannerAd() {
                 Text(message, style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 12),
                 const Text(
-                  'Current Highest Bid:',
+                  'Last Highest Bid:',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 4),
@@ -1149,24 +1192,48 @@ Widget _buildBannerAd() {
     );
   }
 
-  Future<void> _fixMeeting(DateTime selectedDate) async {
-    try {
-      final headers = {'token': token};
-      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-      final url =
-          '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-      debugPrint('Scheduling meeting: $url');
+  void _launchPhoneCall() async {
+    const phoneNumber = 'tel:+1234567890'; // Replace with actual support number
+    if (await canLaunch(phoneNumber)) {
+      await launch(phoneNumber);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone call'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
-      final request = http.Request('GET', Uri.parse(url));
-      request.headers.addAll(headers);
+Future<void> _fixMeeting(DateTime selectedDate) async {
+  if (!mounted) return;
 
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      debugPrint('post-fix-meeting.php response: $responseBody');
+  setState(() {
+    _isSchedulingMeeting = true;
+  });
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(responseBody);
-        if (responseData['status'] == true) {
+  try {
+    final headers = {'token': token};
+    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final url =
+        '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
+    debugPrint('Scheduling meeting: $url');
+    debugPrint('User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
+
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    debugPrint('post-fix-meeting.php response: $responseBody');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      debugPrint('Parsed response: $responseData');
+      if (responseData['status'] == true) {
+        // Show success snackbar
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -1175,7 +1242,14 @@ Widget _buildBannerAd() {
               backgroundColor: Colors.green,
             ),
           );
-        } else {
+        }
+
+        // Show confirmation dialog if still mounted
+        if (mounted) {
+          await _showMeetingConfirmationDialog(selectedDate);
+        }
+      } else {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -1185,7 +1259,9 @@ Widget _buildBannerAd() {
             ),
           );
         }
-      } else {
+      }
+    } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${response.reasonPhrase}'),
@@ -1193,121 +1269,233 @@ Widget _buildBannerAd() {
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Error scheduling meeting: $e');
+    }
+  } catch (e) {
+    debugPrint('Error scheduling meeting: $e');
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSchedulingMeeting = false;
+      });
+    }
+    debugPrint('User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}');
+  }
+}
+Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+  if (!mounted) return;
+
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        title: const Text(
+          'Meeting Scheduled',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Your meeting is scheduled on ${DateFormat('dd/MM/yyyy').format(selectedDate)}. '
+          'For further information, check My Bids in Status or call support.',
+          style: const TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => BuyingStatusPage()),
+                );
+              }
+            },
+            child: const Text(
+              'Check Status',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _launchPhoneCall, // Fixed: Correct method call
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Call Support',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      );
+    },
+  );
+}
+void _showMeetingDialog(BuildContext context) {
+  if (!_userProvider.isLoggedIn) {
+    _showLoginPromptDialog(context, 'schedule a meeting');
+    return;
   }
 
-  void _showMeetingDialog(BuildContext context) {
-    if (!_userProvider.isLoggedIn) {
-      _showLoginPromptDialog(context, 'schedule a meeting');
-      return;
-    }
-    DateTime selectedDate = DateTime.now();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+  if (_isMeetingDialogOpen) {
+    debugPrint('Meeting dialog already open');
+    return;
+  }
+
+  setState(() {
+    _isMeetingDialogOpen = true;
+  });
+
+  DateTime selectedDate = DateTime.now();
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Column(
               children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today,
-                    color: AppTheme.primaryColor,
-                  ),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
-                  ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      selectedDate = picked;
-                      Navigator.pop(context);
-                      _showMeetingDialog(context);
-                    }
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[300]!),
+                const SizedBox(height: 8),
+                const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
+                const SizedBox(height: 4),
+                Text(
+                  'Select date',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.normal,
                   ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
-                ),
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.calendar_today,
+                      color: AppTheme.primaryColor,
+                    ),
+                    title: const Text('Select Date'),
+                    subtitle: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(color: AppTheme.primaryColor),
+                    ),
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(const Duration(days: 30)),
+                      );
+                      if (picked != null && picked != selectedDate) {
+                        setDialogState(() {
+                          selectedDate = picked;
+                        });
+                      }
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  if (_isSchedulingMeeting)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
               ),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                await _fixMeeting(selectedDate);
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+            actions: [
+              TextButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () {
+                        Navigator.of(dialogContext).pop();
+                      },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              child: const Text(
-                'Schedule Meeting',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              ElevatedButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          _isSchedulingMeeting = true;
+                        });
+                        try {
+                          await _fixMeeting(selectedDate);
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } finally {
+                          setDialogState(() {
+                            _isSchedulingMeeting = false;
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                ),
+                child: const Text(
+                  'Schedule Meeting',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
-
+            ],
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          );
+        },
+      );
+    },
+  ).whenComplete(() {
+    if (mounted) {
+      setState(() {
+        _isMeetingDialogOpen = false;
+      });
+    }
+  });
+}
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());

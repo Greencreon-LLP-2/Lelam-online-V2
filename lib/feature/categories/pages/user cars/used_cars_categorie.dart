@@ -17,11 +17,12 @@ import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/services/attribute_valuePair_service.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
+import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/categories/services/details_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:provider/provider.dart';
+
 
 class MarketplaceService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
@@ -105,8 +106,12 @@ class MarketplaceService {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-        if (decodedBody is Map && decodedBody.containsKey('data')) {
-          return decodedBody['data']?.toString() ?? '';
+        if (decodedBody is Map && decodedBody.containsKey('data') && decodedBody['data'] is List && decodedBody['data'].isNotEmpty) {
+          final details = decodedBody['data'][0]['details']?.toString() ?? '';
+          if (details.isEmpty) {
+            throw Exception('No terms details found in response');
+          }
+          return details;
         } else {
           throw Exception('Unexpected terms response format');
         }
@@ -386,7 +391,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       debugPrint(
         'Redirecting to login page: userId=$_userId, listingType=$_listingType',
       );
-      context.pushReplacementNamed(
+      context.push(
         RouteNames.loginPage,
         extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
       );
@@ -464,7 +469,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _listingType = widget.showAuctions ? 'auction' : 'sale';
     _checkLoginStatus().then((_) {
       if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-        context.pushReplacementNamed(
+        context.push(
           RouteNames.loginPage,
           extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
         );
@@ -543,64 +548,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       productAttributeValues[product.id] = attributeValues;
     }
     return productAttributeValues;
-  }
-
-  Map<String, String> _mapFiltersToValues(
-    Map<String, String> filters,
-    String productId,
-  ) {
-    final Map<String, String> attributeValues = {};
-    final Set<String> processedAttributes = {};
-    if (_productAttributeValues.containsKey(productId)) {
-      attributeValues.addAll(_productAttributeValues[productId]!);
-      processedAttributes.addAll(attributeValues.keys);
-    }
-    filters.forEach((attributeId, variationId) {
-      if (variationId.isNotEmpty &&
-          !processedAttributes.contains(_getAttributeNameFromId(attributeId))) {
-        try {
-          final attribute = attributes.firstWhere(
-            (attr) => attr.id == attributeId,
-            orElse:
-                () => Attribute(
-                  id: attributeId,
-                  slug: '',
-                  name: _getAttributeNameFromId(attributeId),
-                  listOrder: '',
-                  categoryId: '',
-                  formValidation: '',
-                  ifDetailsIcons: '',
-                  detailsIcons: '',
-                  detailsIconsOrder: '',
-                  showFilter: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          final variation = attributeVariations.firstWhere(
-            (varAttr) =>
-                varAttr.id == variationId && varAttr.attributeId == attributeId,
-            orElse:
-                () => AttributeVariation(
-                  id: variationId,
-                  attributeId: attributeId,
-                  name: _getVariationNameFromId(attributeId, variationId),
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          if (variation.name.isNotEmpty) {
-            attributeValues[attribute.name] = variation.name;
-            processedAttributes.add(attribute.name);
-          }
-        } catch (e) {
-          print('Error mapping attribute $attributeId: $e');
-        }
-      }
-    });
-    return attributeValues;
   }
 
   String _getVariationNameFromId(String attributeId, String variationId) {
@@ -993,340 +940,46 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _listingType == 'auction'
-                                  ? 'Filter Auction Cars'
-                                  : 'Filter Cars',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedBrands.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedYearRange = 'all';
-                                  _selectedOwnersRange = 'all';
-                                  _selectedFuelTypes.clear();
-                                  _selectedTransmissions.clear();
-                                  _selectedKmRange = 'all';
-                                  _selectedSoldBy = 'all';
-                                });
-                              },
-                              child: const Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildMultiSelectFilterSection(
-                                'Brand',
-                                _brands,
-                                _selectedBrands,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Price Range',
-                                _priceRanges,
-                                _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
-                                subtitle:
-                                    _listingType == 'auction'
-                                        ? 'Filter by starting bid price'
-                                        : 'Filter by sale price',
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Year',
-                                _yearRanges,
-                                _selectedYearRange,
-                                (value) => setModalState(
-                                  () => _selectedYearRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Number of Owners',
-                                _ownerRanges,
-                                _selectedOwnersRange,
-                                (value) => setModalState(
-                                  () => _selectedOwnersRange = value,
-                                ),
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Fuel Type',
-                                _fuelTypes,
-                                _selectedFuelTypes,
-                                setModalState,
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Transmission',
-                                _transmissions,
-                                _selectedTransmissions,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'KM Driven',
-                                _kmRanges,
-                                _selectedKmRange,
-                                (value) => setModalState(
-                                  () => _selectedKmRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Sold By',
-                                _soldByOptions,
-                                _selectedSoldBy,
-                                (value) => setModalState(
-                                  () => _selectedSoldBy = value,
-                                ),
-                              ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-    );
-  }
-
-  Widget _buildMultiSelectFilterSection(
-    String title,
-    List<String> options,
-    List<String> selectedValues,
-    StateSetter setModalState,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 20),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSingleSelectFilterSection(
-    String title,
-    List<String> options,
-    String selectedValue,
-    ValueChanged<String> onChanged, {
-    String? subtitle,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 20),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-        ),
-      ],
+      builder: (context) => FilterPage(
+        brands: _brands,
+        priceRanges: _priceRanges,
+        yearRanges: _yearRanges,
+        ownerRanges: _ownerRanges,
+        fuelTypes: _fuelTypes,
+        transmissions: _transmissions,
+        kmRanges: _kmRanges,
+        soldByOptions: _soldByOptions,
+        selectedBrands: _selectedBrands,
+        selectedPriceRange: _selectedPriceRange,
+        selectedYearRange: _selectedYearRange,
+        selectedOwnersRange: _selectedOwnersRange,
+        selectedFuelTypes: _selectedFuelTypes,
+        selectedTransmissions: _selectedTransmissions,
+        selectedKmRange: _selectedKmRange,
+        selectedSoldBy: _selectedSoldBy,
+        listingType: _listingType,
+        onApplyFilters: ({
+          required List<String> selectedBrands,
+          required String selectedPriceRange,
+          required String selectedYearRange,
+          required String selectedOwnersRange,
+          required List<String> selectedFuelTypes,
+          required List<String> selectedTransmissions,
+          required String selectedKmRange,
+          required String selectedSoldBy,
+        }) {
+          setState(() {
+            _selectedBrands = selectedBrands;
+            _selectedPriceRange = selectedPriceRange;
+            _selectedYearRange = selectedYearRange;
+            _selectedOwnersRange = selectedOwnersRange;
+            _selectedFuelTypes = selectedFuelTypes;
+            _selectedTransmissions = selectedTransmissions;
+            _selectedKmRange = selectedKmRange;
+            _selectedSoldBy = selectedSoldBy;
+          });
+        },
+      ),
     );
   }
 
@@ -1539,7 +1192,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                         debugPrint(
                           'Navigating to login page from auction prompt',
                         );
-                        context.pushReplacementNamed(
+                        context.push(
                           RouteNames.loginPage,
                           extra: {
                             'redirectTo': 'usedCars',
@@ -1685,7 +1338,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                           debugPrint(
                                             'Auction button clicked, userId: $_userId',
                                           );
-                                          context.pushReplacementNamed(
+                                          context.push(
                                             RouteNames.loginPage,
                                             extra: {
                                               'redirectTo': 'usedCars',

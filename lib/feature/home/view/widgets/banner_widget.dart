@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shimmer/shimmer.dart';
 
 class BannerWidget extends StatelessWidget {
   const BannerWidget({super.key});
@@ -38,7 +39,7 @@ class BannerWidget extends StatelessWidget {
       future: fetchBannerUrl(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildContainer(child: const CircularProgressIndicator());
+          return _buildShimmerBanner();
         }
 
         if (snapshot.hasError || snapshot.data == null) {
@@ -53,6 +54,11 @@ class BannerWidget extends StatelessWidget {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              errorBuilder: (context, error, stackTrace) => const Text("Failed to load banner"),
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return _buildShimmerBanner();
+              },
             ),
           ),
         );
@@ -67,6 +73,21 @@ class BannerWidget extends StatelessWidget {
       color: Colors.grey.shade200,
       alignment: Alignment.center,
       child: child,
+    );
+  }
+
+  Widget _buildShimmerBanner() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
     );
   }
 }

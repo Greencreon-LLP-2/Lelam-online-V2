@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -10,6 +11,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/seller_tab_bar_widget.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MyAdsWidget extends StatefulWidget {
   final Map<String, dynamic>? adData;
@@ -29,18 +31,13 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
   static const String phpSessId = 'g6nr0pkfdnp6o573mn9srq20b4';
-  Timer? _refreshTimer;
   late final LoggedUserProvider _userProvider;
 
   @override
   void initState() {
     super.initState();
-      _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _loadAds();
-   
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (mounted) _loadAds();
-    });
   }
 
   Future<void> _loadAds() async {
@@ -48,8 +45,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       isLoading = true;
       errorMessage = null;
     });
-
-
 
     try {
       final response = await http.get(
@@ -76,7 +71,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               _expandedImages[passedAdId] = false;
             } else {
               print('Passed ad already exists in fetched ads');
-              // Update existing ad with adData if needed
               final adIndex = fetchedAds.indexWhere((ad) => ad['id'] == passedAdId);
               if (adIndex != -1) {
                 fetchedAds[adIndex] = {...fetchedAds[adIndex], ...widget.adData!};
@@ -84,7 +78,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
             }
           }
 
-          // Sort ads by created_on (newest first)
           fetchedAds.sort((a, b) {
             try {
               final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
@@ -103,14 +96,12 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
           });
           print('Fetched ${ads.length} ads');
 
-          // Check approval status for pending ads
           for (var ad in ads) {
             if (ad['admin_approval'] == '0') {
               _checkApprovalStatus(ad['id']);
             }
           }
 
-          // Load status for all ads
           for (var ad in ads) {
             _loadAdStatus(ad['id']);
           }
@@ -457,7 +448,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         imageUrl = 'https://lelamonline.com/admin/${ad['image'].startsWith('/') ? ad['image'].substring(1) : ad['image']}';
       }
     } else {
-      // Fallback URL based on post ID and expected image name
       imageUrl = 'https://lelamonline.com/admin/Uploads/post/${ad['id']}.jpg';
       print('Warning: Image field empty for ad ${ad['id']}, using fallback URL: $imageUrl');
     }
@@ -561,7 +551,16 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           'Cookie': 'PHPSESSID=$phpSessId',
                         },
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
                         errorWidget: (context, url, error) {
                           print('Error loading image for ad ${ad['id']}: $error');
                           Fluttertoast.showToast(
@@ -666,6 +665,136 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     );
   }
 
+  Widget _buildShimmerAdCard() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade200,
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 18,
+                    height: 18,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 20,
+                    height: 13,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 18,
+                    height: 18,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 20,
+                    height: 13,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 24,
+                    height: 24,
+                    color: Colors.grey[300],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: 110,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 16,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 6),
+                  for (var i = 0; i < 6; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 12,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 120,
+                            height: 12,
+                            color: Colors.grey[300],
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                height: 36,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                height: 1,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                height: 250,
+                color: Colors.grey[300],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _adDetail(String label, String value, {bool highlight = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -725,7 +854,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: 3, // Show 3 shimmer placeholders
+        itemBuilder: (context, index) => _buildShimmerAdCard(),
+      );
     }
 
     if (errorMessage != null) {
@@ -775,7 +908,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
   @override
   void dispose() {
-    _refreshTimer?.cancel();
     super.dispose();
   }
 }
