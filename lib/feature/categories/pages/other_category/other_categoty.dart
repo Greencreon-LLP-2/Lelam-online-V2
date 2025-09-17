@@ -346,6 +346,7 @@ class OthersPage extends StatefulWidget {
 
 class _OthersPageState extends State<OthersPage> {
   String _searchQuery = '';
+   String _norm(String? s) => (s ?? '').toLowerCase().trim();
   String _selectedLocation = 'all';
   List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
@@ -467,17 +468,24 @@ class _OthersPageState extends State<OthersPage> {
     List<Bike> filtered = _bikes;
 
     if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered =
-          filtered.where((bike) {
-            final vehicleType =
-                bike.filters['vehicleType']?.isNotEmpty ?? false
-                    ? bike.filters['vehicleType']!.first.toLowerCase()
-                    : '';
-            return bike.title.toLowerCase().contains(query) ||
-                bike.brand.toLowerCase().contains(query) ||
-                vehicleType.contains(query);
-          }).toList();
+       final query = _norm(_searchQuery);
+      filtered = filtered.where((bike) {
+        final title = _norm(bike.title);
+        final brand = _norm(bike.brand);
+        final vehicleType =
+            (bike.filters['vehicleType'] ?? <String>[]).isNotEmpty
+                ? _norm(bike.filters['vehicleType']!.first)
+                : '';
+        final landmark = _norm(bike.landMark);
+        final parentLocation = _norm(_getLocationName(bike.parentZoneId));
+        final userLocation = _norm(_getLocationName(bike.userZoneId));
+        return title.contains(query) ||
+            brand.contains(query) ||
+            vehicleType.contains(query) ||
+            landmark.contains(query) ||
+            parentLocation.contains(query) ||
+            userLocation.contains(query);
+      }).toList();
     }
 
     if (_selectedLocation != 'all') {
@@ -889,22 +897,40 @@ class _OthersPageState extends State<OthersPage> {
           _searchQuery = value;
         });
       },
+       onSubmitted: (value) {
+       setState(() {
+         _searchQuery = value;
+       });
+       FocusScope.of(context).unfocus();
+    },
       decoration: InputDecoration(
         hintText: 'Search by bike type, brand, location...',
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-                : null,
+         suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_searchQuery.isNotEmpty)
+              IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                  _searchController.clear();
+                 });
+               },
+             ),
+            IconButton(
+              icon: Icon(Icons.search, color: Colors.grey.shade400),
+              onPressed: () {
+                setState(() {
+                  _searchQuery = _searchController.text;
+                });
+                FocusScope.of(context).unfocus();
+              },
+            ),
+          ],
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200),

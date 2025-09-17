@@ -345,23 +345,30 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
   }
+  String _norm(String? s) => (s ?? '').toLowerCase().trim();
 
   List<MarketplacePost> get filteredPosts {
     List<MarketplacePost> filtered = _posts;
 
     if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered =
-          filtered.where((post) {
-            final vehicleType =
-                post.filters['type']?.isNotEmpty ?? false
-                    ? post.filters['type']!.first.toLowerCase()
-                    : '';
-            return post.title.toLowerCase().contains(query) ||
-                post.brand.toLowerCase().contains(query) ||
-                vehicleType.contains(query) ||
-                post.landMark.toLowerCase().contains(query);
-          }).toList();
+      final query = _norm(_searchQuery);
+      filtered = filtered.where((post) {
+        final title = _norm(post.title);
+        final brand = _norm(post.brand);
+        final vehicleType =
+            (post.filters['type'] ?? <String>[]).isNotEmpty
+                ? _norm(post.filters['type']!.first)
+                : '';
+        final landmark = _norm(post.landMark);
+        final parentLocation = _norm(_getLocationName(post.parentZoneId));
+        final userLocation = _norm(_getLocationName(post.userZoneId));
+        return title.contains(query) ||
+            brand.contains(query) ||
+            vehicleType.contains(query) ||
+            landmark.contains(query) ||
+            parentLocation.contains(query) ||
+            userLocation.contains(query);
+      }).toList();
     }
 
     if (_selectedLocation != 'all') {
@@ -784,6 +791,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       onChanged: (value) {
         setState(() => _searchQuery = value);
       },
+      onSubmitted: (value) {
+       setState(() => _searchQuery = value);
+       FocusScope.of(context).unfocus();
+     },
       decoration: InputDecoration(
         hintText: 'Search by vehicle type, brand, location...',
         hintStyle: TextStyle(color: Colors.grey.shade500),

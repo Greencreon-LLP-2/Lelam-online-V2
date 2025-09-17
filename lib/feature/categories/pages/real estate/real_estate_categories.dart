@@ -259,6 +259,21 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _fetchLocations();
   }
 
+  String _norm(String? s) => (s ?? '').toString().toLowerCase().trim();
+
+  int _parsePriceSafe(String s) {
+    final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+    return int.tryParse(digits) ?? 0;
+  }
+
+  void _applySearch() {
+    setState(() {
+      _searchQuery = _searchController.text;
+    });
+
+    _fetchPosts();
+  }
+
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
@@ -381,13 +396,17 @@ class _RealEstatePageState extends State<RealEstatePage> {
       final query = _searchQuery.toLowerCase();
       filtered =
           filtered.where((post) {
-            final propertyType =
-                post.filters['propertyType']?.isNotEmpty ?? false
-                    ? post.filters['propertyType']!.first.toLowerCase()
-                    : '';
-            return post.title.toLowerCase().contains(query) ||
-                post.landMark.toLowerCase().contains(query) ||
-                propertyType.contains(query);
+            final title = _norm(post.title);
+            final landmark = _norm(post.landMark);
+              final parentLocation = _norm(_getLocationName(post.parentZoneId));
+             final userLocation = _norm(_getLocationName(post.userZoneId));
+            final propTypes = post.filters['propertyType'] ?? <String>[];
+            final propMatch = propTypes.any((p) => _norm(p).contains(query));
+            return title.contains(query) ||
+                landmark.contains(query) ||
+                 parentLocation.contains(query) ||
+                 userLocation.contains(query) ||
+                propMatch;
           }).toList();
     }
 
@@ -409,13 +428,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
     }
 
     if (_selectedPropertyTypes.isNotEmpty) {
+      final selectedSet = _selectedPropertyTypes.map((s) => _norm(s)).toSet();
       filtered =
           filtered.where((post) {
-            final propertyType =
-                post.filters['propertyType']?.isNotEmpty ?? false
-                    ? post.filters['propertyType']!.first
-                    : '';
-            return _selectedPropertyTypes.contains(propertyType);
+            final propList = post.filters['propertyType'] ?? <String>[];
+            final propNorm = propList.map((p) => _norm(p)).toList();
+            return propNorm.any((p) => selectedSet.contains(p));
           }).toList();
     }
 
@@ -426,7 +444,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 _listingType == 'auction'
                     ? post.auctionStartingPrice
                     : post.price;
-            int price = int.tryParse(priceStr) ?? 0;
+            int price = _parsePriceSafe(priceStr);
+
             switch (_selectedPriceRange) {
               case 'Under 50L':
                 return price < 5000000;
@@ -495,13 +514,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
     }
 
     if (_selectedFurnishings.isNotEmpty) {
+      final selectedSet = _selectedFurnishings.map((s) => _norm(s)).toSet();
       filtered =
           filtered.where((post) {
-            final furnishing =
-                post.filters['furnishing']?.isNotEmpty ?? false
-                    ? post.filters['furnishing']!.first
-                    : '';
-            return _selectedFurnishings.contains(furnishing);
+            final furnList = post.filters['furnishing'] ?? <String>[];
+            final furnNorm = furnList.map((f) => _norm(f)).toList();
+            return furnNorm.any((f) => selectedSet.contains(f));
           }).toList();
     }
 
@@ -679,8 +697,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
+                                onPressed: () async {
                                   setState(() {});
+                                  await _fetchPosts();
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -872,22 +891,33 @@ class _RealEstatePageState extends State<RealEstatePage> {
           hintText: 'Search properties...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_searchQuery.isNotEmpty)
+                IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                    _applySearch();
+                  },
+                ),
+              IconButton(
+                icon: Icon(Icons.search, color: Colors.grey.shade400),
+                onPressed: _applySearch,
+              ),
+            ],
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
         onChanged: (value) => setState(() => _searchQuery = value),
+        onSubmitted: (value) {
+          _applySearch();
+        },
       ),
     );
   }
@@ -897,6 +927,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
       controller: _searchController,
       onChanged: (value) {
         setState(() => _searchQuery = value);
+      },
+      onSubmitted: (value) {
+        setState(() => _searchQuery = value);
+        _fetchPosts();
       },
       decoration: InputDecoration(
         hintText: 'Search by property type, location, features...',
