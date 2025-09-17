@@ -22,7 +22,7 @@ class ProductSectionWidget extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 5),
             child: const Text(
-              'Hand Picked Deals',
+              'Handpicked Deals',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,

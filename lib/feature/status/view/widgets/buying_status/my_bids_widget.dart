@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -34,36 +35,22 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
   @override
   void initState() {
-   userProvider  = Provider.of<LoggedUserProvider>(context, listen: false);
-
+    userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     super.initState();
     _loadUserIdAndBids();
   }
 
   Future<void> _loadUserIdAndBids() async {
-   
-   // debugPrint('MyBidsWidget - Raw userData.userId: ${userData?.userId}');
     setState(() {
-      _userId = userProvider. userData?.userId ?? "";
+      _userId = userProvider.userData?.userId ?? "";
     });
     debugPrint(
       'MyBidsWidget - Loaded userId: $_userId (fallback from widget: ${widget.userId})',
     );
-    // Fetch districts with error handling
-    // try {
-    //   districts = await AttributeValueService.fetchDistricts();
-    // } catch (e) {
-    //   debugPrint('Error fetching districts: $e');
-    //   districts = [];
-    // }
-    // debugPrint('Loaded districts: ${districts.map((d) => d['name']).toList()}');
 
-    // If still unknown, try a fallback (e.g., check another key or prompt login)
     if (_userId == 'Unknown') {
       debugPrint('MyBidsWidget - User ID unknown; prompting login');
       if (mounted) {
-        // Adjust navigation to your login route
-        // context.pushNamed(RouteNames.loginPage);  // Uncomment and customize
         error = 'Please log in to view your bids';
         setState(() => isLoading = false);
       }
@@ -199,7 +186,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       debugPrint('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // Handle both boolean true and string "true"
         if (data['status'] == true || data['status'] == 'true') {
           if (data['data'] is List && data['data'].isNotEmpty) {
             return List<Map<String, String>>.from(
@@ -232,7 +218,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   ) async {
     debugPrint('Opening time dialog for bid_id: $bidId, post_id: $postId');
 
-    // Validate bid_id and post_id
     final bid = bids.firstWhere(
       (b) => b['id'] == bidId && b['post_id'] == postId,
       orElse: () => {},
@@ -371,8 +356,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                             ),
                                           ),
                                         );
-                                        await _loadBids(); // Refresh bids
-                                        // Notify MyMeetingsWidget to refresh (if integrated)
+                                        await _loadBids();
                                         debugPrint(
                                           'Meeting scheduled, refreshing meetings recommended',
                                         );
@@ -452,9 +436,9 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
     } catch (e) {
       debugPrint('Error scheduling meeting without bid: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error scheduling meeting')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error scheduling meeting')),
+      );
     }
   }
 
@@ -579,6 +563,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
           for (var bid in lowBids) {
             bid['fromLowBids'] = true;
+            bid['fromHighBids'] = false;
             allBids.add(bid);
           }
           debugPrint(
@@ -605,6 +590,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           );
           for (var bid in highBids) {
             bid['fromHighBids'] = true;
+            bid['fromLowBids'] = false;
             allBids.add(bid);
             debugPrint(
               'High bid: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, my_bid_amount=${bid['my_bid_amount']}, exp_date=${bid['exp_date']}',
@@ -640,15 +626,9 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
 
         debugPrint(
-          'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}',
+          'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}, fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}',
         );
       }
-
-      // final prefs = await SharedPreferences.getInstance();
-      // await prefs.setStringList(
-      //   'userBids',
-      //   allBids.map((b) => jsonEncode(b)).toList(),
-      // );
 
       setState(() {
         bids = allBids;
@@ -666,24 +646,18 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   }
 
   List<Map<String, dynamic>> _getFilteredBids() {
-    return bids.where((bid) {
-      final double bidPrice =
-          double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
-      final double targetPrice =
-          double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
-
+    final filtered = bids.where((bid) {
       debugPrint(
-        'Filtering bid ${bid['id']}: bidPrice=$bidPrice, targetPrice=$targetPrice, fromLowBids=${bid['fromLowBids']}, fromHighBids=${bid['fromHighBids']}',
-      );
-
+        'Filtering bid ${bid['id']}: fromLowBids=${bid['fromLowBids']}, fromHighBids=${bid['fromHighBids']}, bidPrice=${bid['bidPrice']}, targetPrice=${bid['targetPrice']}');
       if (selectedBidType == 'Low Bids') {
-        return bid['fromLowBids'] == true ||
-            (bidPrice > 0 && bidPrice < targetPrice);
+        return bid['fromLowBids'] == true;
       } else {
-        return bid['fromHighBids'] == true ||
-            (bidPrice > 0 && bidPrice >= targetPrice);
+        return bid['fromHighBids'] == true;
       }
     }).toList();
+
+    debugPrint('Filtered ${selectedBidType}: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
+    return filtered;
   }
 
   @override
@@ -736,103 +710,280 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           Expanded(
             child: Container(
               color: Colors.grey[50],
-              child:
-                  isLoading
-                      ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppTheme.primaryColor,
-                        ),
-                      )
-                      : error != null
+              child: isLoading
+                  ? const ShimmerLoading()
+                  : error != null
                       ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 64,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              error!,
-                              style: const TextStyle(
-                                fontSize: 16,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
                                 color: Colors.red,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadUserIdAndBids,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      )
+                              const SizedBox(height: 16),
+                              Text(
+                                error!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadUserIdAndBids,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
                       : filteredBids.isEmpty
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.gavel_outlined,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No ${selectedBidType?.toLowerCase()} found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[600],
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.gavel_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No ${selectedBidType?.toLowerCase()} found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Your bids will appear here once you start bidding',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[500],
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filteredBids.length,
+                              itemBuilder: (context, index) {
+                                final bid = filteredBids[index];
+                                return BidCard(
+                                  bid: bid,
+                                  baseUrl: widget.baseUrl,
+                                  token: widget.token,
+                                  userId: _userId ?? '',
+                                  onProceedWithBid: () => _proceedWithBid(
+                                    context,
+                                    bid['id'],
+                                    bid['post_id'],
+                                  ),
+                                  onProceedWithoutBid: () =>
+                                      _proceedWithoutBid(context, bid['post_id']),
+                                  onIncreaseBid: () => _increaseBid(
+                                    context,
+                                    bid['post_id'],
+                                    bid['bidPrice'],
+                                  ),
+                                );
+                              },
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your bids will appear here once you start bidding',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
-                      : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredBids.length,
-                        itemBuilder: (context, index) {
-                          final bid = filteredBids[index];
-                          return BidCard(
-                            bid: bid,
-                            baseUrl: widget.baseUrl,
-                            token: widget.token,
-                            userId: _userId ?? '',
-                            onProceedWithBid:
-                                () => _proceedWithBid(
-                                  context,
-                                  bid['id'],
-                                  bid['post_id'],
-                                ),
-                            onProceedWithoutBid:
-                                () =>
-                                    _proceedWithoutBid(context, bid['post_id']),
-                            onIncreaseBid:
-                                () => _increaseBid(
-                                  context,
-                                  bid['post_id'],
-                                  bid['bidPrice'],
-                                ),
-                          );
-                        },
-                      ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class ShimmerLoading extends StatelessWidget {
+  const ShimmerLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 3, // Show 3 placeholder cards
+      itemBuilder: (context, index) {
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: 16,
+                              color: Colors.grey[300],
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 100,
+                              height: 12,
+                              color: Colors.grey[300],
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: 150,
+                              height: 12,
+                              color: Colors.grey[300],
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              width: 80,
+                              height: 12,
+                              color: Colors.grey[300],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 10,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 100,
+                            height: 12,
+                            color: Colors.grey[300],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 10,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 100,
+                            height: 12,
+                            color: Colors.grey[300],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 10,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 100,
+                            height: 14,
+                            color: Colors.grey[300],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 10,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 100,
+                            height: 14,
+                            color: Colors.grey[300],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  height: 30,
+                  color: Colors.grey[300],
+                ),
+                const Divider(),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  height: 40,
+                  color: Colors.grey[300],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -859,16 +1010,13 @@ class BidCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double bidPrice = double.tryParse(bid['bidPrice']?.toString() ?? '0') ?? 0;
-    final double targetPrice = double.tryParse(bid['targetPrice']?.toString() ?? '0') ?? 0;
-    final bool isLowBid = bid['fromLowBids'] == true || (bid['fromHighBids'] != true && bidPrice > 0 && bidPrice < targetPrice);
-    final bool isHighBid = bid['fromHighBids'] == true || (bidPrice > 0 && bidPrice >= targetPrice);
+    final bool isHighBid = bid['fromHighBids'] == true;
 
-    // Debug logging to diagnose bid classification
+    // Debug logging to verify bid classification
     debugPrint('BidCard - Bid ID: ${bid['id']}, Post ID: ${bid['post_id']}');
     debugPrint('BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
-    debugPrint('BidCard - bidPrice: $bidPrice, targetPrice: $targetPrice');
-    debugPrint('BidCard - isLowBid: $isLowBid, isHighBid: $isHighBid');
+    debugPrint('BidCard - bidPrice: ${bid['bidPrice']}, targetPrice: ${bid['targetPrice']}');
+    debugPrint('BidCard - isHighBid: $isHighBid');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1053,7 +1201,7 @@ class BidCard extends StatelessWidget {
                         ];
                         if (isHighBid) {
                           items.insert(
-                            1, // Insert after "Increase Bid" but before "Meeting without Bid"
+                            1,
                             const PopupMenuItem<String>(
                               value: 'proceed_with_bid',
                               child: Row(
@@ -1140,9 +1288,15 @@ class BidCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            targetPrice == 0
+                            bid['targetPrice'] == null ||
+                                    double.tryParse(
+                                      bid['targetPrice']?.toString() ?? '0',
+                                    ) ==
+                                        0
                                 ? 'N/A'
-                                : '₹${NumberFormat('#,##0').format(targetPrice)}',
+                                : '₹${NumberFormat('#,##0').format(
+                                    double.parse(bid['targetPrice'].toString()),
+                                  )}',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -1164,13 +1318,19 @@ class BidCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            bidPrice == 0
+                            bid['bidPrice'] == null ||
+                                    double.tryParse(
+                                      bid['bidPrice']?.toString() ?? '0',
+                                    ) ==
+                                        0
                                 ? 'N/A'
-                                : '₹${NumberFormat('#,##0').format(bidPrice)}',
+                                : '₹${NumberFormat('#,##0').format(
+                                    double.parse(bid['bidPrice'].toString()),
+                                  )}',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: isLowBid ? Colors.orange[700] : Colors.green[700],
+                              color: isHighBid ? Colors.green[700] : Colors.orange[700],
                             ),
                           ),
                         ],
@@ -1188,7 +1348,7 @@ class BidCard extends StatelessWidget {
                 Expanded(
                   child: Center(
                     child: Text(
-                      isLowBid ? 'Book a meeting' : 'Schedule meeting',
+                      isHighBid ? 'Schedule meeting' : 'Book a meeting',
                       style: const TextStyle(
                         fontSize: 15,
                         color: Colors.red,
@@ -1218,9 +1378,9 @@ class BidCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isLowBid
-                        ? 'For low bids, schedule a meeting to discuss further with the seller.'
-                        : 'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.',
+                    isHighBid
+                        ? 'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.'
+                        : 'For low bids, schedule a meeting to discuss further with the seller.',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.blue[700],
