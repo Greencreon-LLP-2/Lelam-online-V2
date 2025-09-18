@@ -474,262 +474,7 @@ class MeetingCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                PopupMenuButton<String>(
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.more_vert,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  onSelected: (value) {
-                                    if (value == 'edit_date' &&
-                                        status != 'Meeting Completed') {
-                                      onEditDate(meeting);
-                                    } else if (value == 'edit_time' &&
-                                        status != 'Meeting Completed') {
-                                      onEditTime(meeting);
-                                    } else if (value == 'proceed_with_bid') {
-                                      onProceedWithBid();
-                                    // } else if (value == 'increase_bid') {
-                                    //   onIncreaseBid();
-                                    // } else if (value == 'cancel_meeting') {
-                                    //   onCancelMeeting(meeting);
-                                    } else if (value == 'send_location') {
-                                      onSendLocationRequest(meeting);
-                                    } else if (value == 'view_location') {
-                                      onViewLocation(meeting);
-                                    } else if (value == 'not_interested') {
-                                      _notInterested(context, meeting['id']);
-                                    } else if (value == 'revisit') {
-                                      _revisit(context, meeting['id']);
-                                    }
-                                  },
-                                  itemBuilder: (BuildContext context) {
-                                    final currentStatus = _getMeetingStatus(
-                                      meeting,
-                                    );
-                                    List<PopupMenuItem<String>> items = [];
-
-                                    if (currentStatus != 'Meeting Completed') {
-                                      items.addAll([
-                                        const PopupMenuItem<String>(
-                                          value: 'edit_date',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.calendar_today,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Edit Date'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem<String>(
-                                          value: 'edit_time',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.access_time,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Edit Time'),
-                                            ],
-                                          ),
-                                        ),
-                                      ]);
-                                    }
-
-                                    if (currentStatus == 'Meeting Request') {
-                                      items.addAll([
-                                        const PopupMenuItem<String>(
-                                          value: 'proceed_with_bid',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.schedule,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Proceed with Bid'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem<String>(
-                                          value: 'send_location',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.location_on,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Send Location Request'),
-                                            ],
-                                          ),
-                                        ),
-                                      ]);
-                                    } else if (currentStatus == 'Date Fixed') {
-                                      items.addAll([
-                                        const PopupMenuItem<String>(
-                                          value: 'proceed_with_bid',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.schedule,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Proceed with Bid'),
-                                            ],
-                                          ),
-                                        ),
-                                      ]);
-                                      if (withBid && isLowBid) {
-                                        items.add(
-                                          const PopupMenuItem<String>(
-                                            value: 'increase_bid',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.arrow_upward,
-                                                  size: 16,
-                                                  color: Colors.blue,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('Increase Bid'),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                      if (meeting['if_location_request'] !=
-                                          '1') {
-                                        items.add(
-                                          const PopupMenuItem<String>(
-                                            value: 'send_location',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.location_on,
-                                                  size: 16,
-                                                  color: Colors.blue,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('Send Location Request'),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } else if (currentStatus ==
-                                        'Awaiting Location') {
-                                      items.addAll([
-                                        const PopupMenuItem<String>(
-                                          value: 'send_location',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.location_on,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Resend Location Request'),
-                                            ],
-                                          ),
-                                        ),
-                                      ]);
-                                      if (withBid) {
-                                        items.add(
-                                          const PopupMenuItem<String>(
-                                            value: 'proceed_with_bid',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.schedule,
-                                                  size: 16,
-                                                  color: Colors.blue,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('Proceed with Bid'),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } else if (currentStatus ==
-                                        'Ready For Meeting') {
-                                      if (meeting['location_link']
-                                              ?.isNotEmpty ==
-                                          true) {
-                                        items.add(
-                                          const PopupMenuItem<String>(
-                                            value: 'view_location',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.map,
-                                                  size: 16,
-                                                  color: Colors.blue,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('View Location'),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } else if (currentStatus ==
-                                        'Meeting Completed') {
-                                      items.addAll([
-                                        const PopupMenuItem<String>(
-                                          value: 'not_interested',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.cancel,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Not Interested'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem<String>(
-                                          value: 'revisit',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                Icons.refresh,
-                                                size: 16,
-                                                color: Colors.blue,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text('Revisit'),
-                                            ],
-                                          ),
-                                        ),
-                                      ]);
-                                    }
-                                    return items;
-                                  },
-                                ),
+                               
                               ],
                             ),
                             
@@ -898,6 +643,7 @@ class MeetingCard extends StatelessWidget {
                         child: Column(
                           children: [
                             Row(
+                              
                               children: [
                                 Expanded(
                                   child: Center(
@@ -910,6 +656,269 @@ class MeetingCard extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                ),
+                                PopupMenuButton<String>(
+                                  icon: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.menu,
+                                      size:22,
+                                    ),
+                                  ),
+                                  position: PopupMenuPosition.over,
+                                  offset: const Offset(0, -200),
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  onSelected: (value) {
+                                    if (value == 'edit_date' &&
+                                        status != 'Meeting Completed') {
+                                      onEditDate(meeting);
+                                    } else if (value == 'edit_time' &&
+                                        status != 'Meeting Completed') {
+                                      onEditTime(meeting);
+                                    } else if (value == 'proceed_with_bid') {
+                                      onProceedWithBid();
+                                    // } else if (value == 'increase_bid') {
+                                    //   onIncreaseBid();
+                                    // } else if (value == 'cancel_meeting') {
+                                    //   onCancelMeeting(meeting);
+                                    } else if (value == 'send_location') {
+                                      onSendLocationRequest(meeting);
+                                    } else if (value == 'view_location') {
+                                      onViewLocation(meeting);
+                                    } else if (value == 'not_interested') {
+                                      _notInterested(context, meeting['id']);
+                                    } else if (value == 'revisit') {
+                                      _revisit(context, meeting['id']);
+                                    }
+                                  },
+                                  itemBuilder: (BuildContext context) {
+                                    final currentStatus = _getMeetingStatus(
+                                      meeting,
+                                    );
+                                    List<PopupMenuItem<String>> items = [];
+
+                                    if (currentStatus != 'Meeting Completed') {
+                                      items.addAll([
+                                        const PopupMenuItem<String>(
+                                          value: 'edit_date',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_today,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Edit Date'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'edit_time',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.access_time,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Edit Time'),
+                                            ],
+                                          ),
+                                        ),
+                                      ]);
+                                    }
+
+                                    if (currentStatus == 'Meeting Request') {
+                                      items.addAll([
+                                        const PopupMenuItem<String>(
+                                          value: 'proceed_with_bid',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.schedule,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Proceed with Bid'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'send_location',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Send Location Request'),
+                                            ],
+                                          ),
+                                         ),
+                                      ] 
+                                      );
+                                   
+                                    } 
+                                    
+                                    else if (currentStatus == 'Date Fixed') {
+                                      items.addAll([
+                                        const PopupMenuItem<String>(
+                                          value: 'proceed_with_bid',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.schedule,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Proceed with Bid'),
+                                            ],
+                                          ),
+                                        ),
+                                      ]);
+                                      if (withBid && isLowBid) {
+                                        items.add(
+                                          const PopupMenuItem<String>(
+                                            value: 'increase_bid',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.arrow_upward,
+                                                  size: 16,
+                                                  color: Colors.blue,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Increase Bid'),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      if (meeting['if_location_request'] !=
+                                          '1') {
+                                        items.add(
+                                          const PopupMenuItem<String>(
+                                            value: 'send_location',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.location_on,
+                                                  size: 16,
+                                                  color: Colors.blue,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Send Location Request'),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else if (currentStatus ==
+                                        'Awaiting Location') {
+                                      items.addAll([
+                                        const PopupMenuItem<String>(
+                                          value: 'send_location',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Resend Location Request'),
+                                            ],
+                                          ),
+                                        ),
+                                      ]);
+                                      if (withBid) {
+                                        items.add(
+                                          const PopupMenuItem<String>(
+                                            value: 'proceed_with_bid',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.schedule,
+                                                  size: 16,
+                                                  color: Colors.blue,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('Proceed with Bid'),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else if (currentStatus ==
+                                        'Ready For Meeting') {
+                                      if (meeting['location_link']
+                                              ?.isNotEmpty ==
+                                          true) {
+                                        items.add(
+                                          const PopupMenuItem<String>(
+                                            value: 'view_location',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.map,
+                                                  size: 16,
+                                                  color: Colors.blue,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('View Location'),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else if (currentStatus ==
+                                        'Meeting Completed') {
+                                      items.addAll([
+                                        const PopupMenuItem<String>(
+                                          value: 'not_interested',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.cancel,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Not Interested'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'revisit',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.refresh,
+                                                size: 16,
+                                                color: Colors.blue,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Revisit'),
+                                            ],
+                                          ),
+                                        ),
+                                      ]);
+                                    }
+                                    return items;
+                                  },
                                 ),
                               ],
                             ),
