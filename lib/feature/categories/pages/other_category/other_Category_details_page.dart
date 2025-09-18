@@ -976,59 +976,87 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     }
   }
 
-  Future<void> _fetchLocations() async {
-    setState(() {
-      _isLoadingLocations = true;
-    });
+Future<void> _fetchLocations() async {
+  setState(() {
+    _isLoadingLocations = true;
+  });
 
-    try {
-      final Map<String, dynamic> response = await ApiService().get(url: locations);
-      if (response['status'].toString() == 'true' && response['data'] is List) {
-        final locationResponse = LocationResponse.fromJson(response);
+  try {
+    final url = '$_baseUrl/list-location.php?token=$_token';
+    debugPrint('Fetching locations from: $url');
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      },
+    );
+
+    debugPrint('Locations API response (status: ${response.statusCode}): ${response.body}');
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      if (responseData['status'] == 'true' && responseData['data'] is List) {
+        final locationResponse = LocationResponse.fromJson(responseData);
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print('Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}');
+          debugPrint(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
         });
       } else {
-        throw Exception('Invalid API response format');
+        throw Exception('Invalid API response format: ${responseData['data']}');
       }
-    } catch (e) {
-      setState(() {
-        _isLoadingLocations = false;
-      });
+    } else {
+      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
     }
-  }
-
-  String _getLocationName(String zoneId) {
-    if (zoneId == 'all') return 'All Kerala';
-    if (zoneId == '0') return 'All Kerala';
-    final location = _locations.firstWhere(
-      (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
+  } catch (e) {
+    debugPrint('Error fetching locations: $e');
+    setState(() {
+      _isLoadingLocations = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Failed to load locations: $e'),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
       ),
     );
-    return location.name;
   }
+}
+ String _getLocationName() {
+  final zoneId = widget.bike.parentZoneId;
+  if (zoneId == 'all' || zoneId == '0') return 'All Kerala';
+  final location = _locations.firstWhere(
+    (loc) => loc.id == zoneId,
+    orElse: () => LocationData(
+      id: '',
+      slug: '',
+      parentId: '',
+      name: 'Unknown Location',
+      image: '',
+      description: '',
+      latitude: '',
+      longitude: '',
+      popular: '',
+      status: '',
+      allStoreOnOff: '',
+      createdOn: '',
+      updatedOn: '',
+    ),
+  );
+  return location.name.isNotEmpty ? location.name : 'Unknown Location';
+}
 
   String get id => widget.bike.id;
   String get title => widget.bike.title;
   String get image => widget.bike.image;
   String get price => widget.bike.price;
-  String get landMark => widget.bike.landMark;
+String get locationName => _getLocationName();
+//String get landMark => widget.bike.landMark;
   String get createdOn => widget.bike.createdOn.split(' ')[0];
   String get createdBy => widget.bike.createdBy;
   bool get isFinanceAvailable => widget.bike.ifFinance == '1';
@@ -1459,34 +1487,55 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                     ),
                   ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text(landMark, style: const TextStyle(color: Colors.grey)),
-                          const Spacer(),
-                          const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(createdOn, style: const TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                      ),
+          Padding(
+  padding: const EdgeInsets.all(16.0),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          const Icon(Icons.location_on, size: 16, color: Colors.grey),
+          const SizedBox(width: 4),
+          _isLoadingLocations
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(
+                  locationName, // Changed from landMark
+                  style: const TextStyle(color: Colors.grey),
+                ),
+          const Spacer(),
+          const Icon(Icons.access_time, size: 16, color: Colors.grey),
+          const SizedBox(width: 4),
+          Text(createdOn, style: const TextStyle(color: Colors.grey)),
+        ],
+      ),
+      // Optional: Display landMark separately if not empty
+      // if (landMark.isNotEmpty)
+      //   Padding(
+      //     padding: const EdgeInsets.only(top: 8),
+      //     child: Row(
+      //       children: [
+      //         const Icon(Icons.place, size: 16, color: Colors.grey),
+      //         const SizedBox(width: 4),
+      //         Flexible(
+      //           child: Text(
+      //             landMark,
+      //             style: const TextStyle(color: Colors.grey),
+      //             overflow: TextOverflow.ellipsis,
+      //           ),
+      //         ),
+      //       ],
+      //     ),
+      //   ),
+      const SizedBox(height: 16),
+      Text(
+        '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
+        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+      ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
