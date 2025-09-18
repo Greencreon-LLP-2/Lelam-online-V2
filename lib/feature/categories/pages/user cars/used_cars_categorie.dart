@@ -23,7 +23,6 @@ import 'package:lelamonline_flutter/feature/categories/services/details_service.
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:provider/provider.dart';
 
-
 class MarketplaceService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
@@ -106,7 +105,10 @@ class MarketplaceService {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-        if (decodedBody is Map && decodedBody.containsKey('data') && decodedBody['data'] is List && decodedBody['data'].isNotEmpty) {
+        if (decodedBody is Map &&
+            decodedBody.containsKey('data') &&
+            decodedBody['data'] is List &&
+            decodedBody['data'].isNotEmpty) {
           final details = decodedBody['data'][0]['details']?.toString() ?? '';
           if (details.isEmpty) {
             throw Exception('No terms details found in response');
@@ -761,174 +763,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return ['all', ..._locations.map((loc) => loc.name)];
   }
 
-  List<Product> get filteredProducts {
-    List<Product> filtered = _products;
-
-    if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase().trim();
-      filtered =
-          filtered.where((product) {
-            final searchableText = [
-              product.title.toLowerCase(),
-              product.brand.toLowerCase(),
-              product.model.toLowerCase(),
-              product.modelVariation.toLowerCase(),
-              _getLocationName(product.parentZoneId).toLowerCase(),
-              product.filters['4']?.toLowerCase() ?? '',
-              product.filters['5']?.toLowerCase() ?? '',
-              product.filters['1']?.toString() ?? '',
-              product.byDealer == '1' ? 'dealer' : 'owner',
-            ].join(' ');
-            return searchableText.contains(query);
-          }).toList();
-    }
-
-    if (_selectedLocation != 'all') {
-      filtered =
-          filtered
-              .where((product) => product.parentZoneId == _selectedLocation)
-              .toList();
-    }
-
-    if (_listingType == 'auction') {
-      filtered = filtered.where((product) => product.ifAuction == '1').toList();
-    } else if (_listingType == 'sale') {
-      filtered = filtered.where((product) => product.ifAuction == '0').toList();
-    }
-
-    if (_selectedBrands.isNotEmpty) {
-      filtered =
-          filtered
-              .where((product) => _selectedBrands.contains(product.brand))
-              .toList();
-    }
-
-    if (_selectedPriceRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int price =
-                product.ifAuction == '1'
-                    ? (int.tryParse(product.auctionStartingPrice) ?? 0)
-                    : (int.tryParse(product.price) ?? 0);
-            switch (_selectedPriceRange) {
-              case 'Under ₹2 Lakh':
-                return price < 200000;
-              case '₹2-5 Lakh':
-                return price >= 200000 && price < 500000;
-              case '₹5-10 Lakh':
-                return price >= 500000 && price < 1000000;
-              case '₹10-20 Lakh':
-                return price >= 1000000 && price < 2000000;
-              case 'Above ₹20 Lakh':
-                return price >= 2000000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedYearRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int year =
-                int.tryParse(product.filters['1']?.toString() ?? '0') ?? 0;
-            switch (_selectedYearRange) {
-              case '2020 & Above':
-                return year >= 2020;
-              case '2018-2019':
-                return year >= 2018 && year <= 2019;
-              case '2015-2017':
-                return year >= 2015 && year <= 2017;
-              case '2010-2014':
-                return year >= 2010 && year <= 2014;
-              case 'Below 2010':
-                return year < 2010;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedOwnersRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int owners =
-                int.tryParse(product.filters['2']?.toString() ?? '0') ?? 0;
-            switch (_selectedOwnersRange) {
-              case '1st Owner':
-                return owners == 1;
-              case '2nd Owner':
-                return owners == 2;
-              case '3rd Owner':
-                return owners == 3;
-              case '4+ Owners':
-                return owners >= 4;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedFuelTypes.isNotEmpty) {
-      filtered =
-          filtered
-              .where(
-                (product) => _selectedFuelTypes.contains(
-                  product.filters['4']?.toString() ?? '',
-                ),
-              )
-              .toList();
-    }
-
-    if (_selectedTransmissions.isNotEmpty) {
-      filtered =
-          filtered
-              .where(
-                (product) => _selectedTransmissions.contains(
-                  product.filters['5']?.toString() ?? '',
-                ),
-              )
-              .toList();
-    }
-
-    if (_selectedKmRange != 'all') {
-      filtered =
-          filtered.where((product) {
-            int km = int.tryParse(product.filters['3']?.toString() ?? '0') ?? 0;
-            switch (_selectedKmRange) {
-              case 'Under 10K':
-                return km < 10000;
-              case '10K-30K':
-                return km >= 10000 && km < 30000;
-              case '30K-50K':
-                return km >= 30000 && km < 50000;
-              case '50K-80K':
-                return km >= 50000 && km < 80000;
-              case 'Above 80K':
-                return km >= 80000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedSoldBy != 'all') {
-      filtered =
-          filtered.where((product) {
-            switch (_selectedSoldBy) {
-              case 'Owner':
-                return product.byDealer == '0';
-              case 'Certified Dealer':
-                return product.byDealer == '1';
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    return filtered;
-  }
-
   String getImageUrl(String imagePath) {
     final cleanedPath =
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
@@ -940,46 +774,52 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => FilterPage(
-        brands: _brands,
-        priceRanges: _priceRanges,
-        yearRanges: _yearRanges,
-        ownerRanges: _ownerRanges,
-        fuelTypes: _fuelTypes,
-        transmissions: _transmissions,
-        kmRanges: _kmRanges,
-        soldByOptions: _soldByOptions,
-        selectedBrands: _selectedBrands,
-        selectedPriceRange: _selectedPriceRange,
-        selectedYearRange: _selectedYearRange,
-        selectedOwnersRange: _selectedOwnersRange,
-        selectedFuelTypes: _selectedFuelTypes,
-        selectedTransmissions: _selectedTransmissions,
-        selectedKmRange: _selectedKmRange,
-        selectedSoldBy: _selectedSoldBy,
-        listingType: _listingType,
-        onApplyFilters: ({
-          required List<String> selectedBrands,
-          required String selectedPriceRange,
-          required String selectedYearRange,
-          required String selectedOwnersRange,
-          required List<String> selectedFuelTypes,
-          required List<String> selectedTransmissions,
-          required String selectedKmRange,
-          required String selectedSoldBy,
-        }) {
-          setState(() {
-            _selectedBrands = selectedBrands;
-            _selectedPriceRange = selectedPriceRange;
-            _selectedYearRange = selectedYearRange;
-            _selectedOwnersRange = selectedOwnersRange;
-            _selectedFuelTypes = selectedFuelTypes;
-            _selectedTransmissions = selectedTransmissions;
-            _selectedKmRange = selectedKmRange;
-            _selectedSoldBy = selectedSoldBy;
-          });
-        },
-      ),
+      builder:
+          (context) => FilterPage(
+            brands: _brands,
+            priceRanges: _priceRanges,
+            yearRanges: _yearRanges,
+            ownerRanges: _ownerRanges,
+            fuelTypes: _fuelTypes,
+            transmissions: _transmissions,
+            kmRanges: _kmRanges,
+            soldByOptions: _soldByOptions,
+            selectedBrands: _selectedBrands,
+            selectedPriceRange: _selectedPriceRange,
+            selectedYearRange: _selectedYearRange,
+            selectedOwnersRange: _selectedOwnersRange,
+            selectedFuelTypes: _selectedFuelTypes,
+            selectedTransmissions: _selectedTransmissions,
+            selectedKmRange: _selectedKmRange,
+            selectedSoldBy: _selectedSoldBy,
+            listingType: _listingType,
+            onClearAll: (){
+              _fetchProducts();
+              print("works");
+            },
+            onApplyFilters: ({
+              required List<String> selectedBrands,
+              required String selectedPriceRange,
+              required String selectedYearRange,
+              required String selectedOwnersRange,
+              required List<String> selectedFuelTypes,
+              required List<String> selectedTransmissions,
+              required String selectedKmRange,
+              required String selectedSoldBy,
+            }) {
+              setState(() {
+                _selectedBrands = selectedBrands;
+                _selectedPriceRange = selectedPriceRange;
+                _selectedYearRange = selectedYearRange;
+                _selectedOwnersRange = selectedOwnersRange;
+                _selectedFuelTypes = selectedFuelTypes;
+                _selectedTransmissions = selectedTransmissions;
+                _selectedKmRange = selectedKmRange;
+                _selectedSoldBy = selectedSoldBy;
+              });
+              _fetchFilterListings();
+            },
+          ),
     );
   }
 
@@ -1236,7 +1076,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ],
                 ),
               )
-              : filteredProducts.isEmpty
+              : _products.isEmpty
               ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1407,12 +1247,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                     ),
                     SliverList(
                       delegate: SliverChildBuilderDelegate((context, index) {
-                        final product = filteredProducts[index];
+                        final product = _products[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _buildProductCard(product),
                         );
-                      }, childCount: filteredProducts.length),
+                      }, childCount: _products.length),
                     ),
                   ],
                 ),
@@ -1972,4 +1812,266 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return '${formatter.format(number)} KM';
   }
+
+  Future<void> _fetchFilterListings() async {
+    final Map<String, String> queryParams = {};
+    // Brands (multi-select)
+    if (_selectedBrands.isNotEmpty) {
+      queryParams['brands'] = _selectedBrands.join(',');
+    }
+
+    // Price Range
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_price'] = parts[0];
+        queryParams['max_price'] = parts[1];
+      }
+    }
+
+    // Year Range (similar to price)
+    if (_selectedYearRange != 'all') {
+      final parts = _selectedYearRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_year'] = parts[0];
+        queryParams['max_year'] = parts[1];
+      }
+    }
+
+    // Owners Range
+    if (_selectedOwnersRange != 'all') {
+      final parts = _selectedOwnersRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_owners'] = parts[0];
+        queryParams['max_owners'] = parts[1];
+      }
+    }
+
+    // Fuel Types (multi-select)
+    if (_selectedFuelTypes.isNotEmpty) {
+      queryParams['fuel_types'] = _selectedFuelTypes.join(',');
+    }
+
+    // Transmissions (multi-select)
+    if (_selectedTransmissions.isNotEmpty) {
+      queryParams['transmissions'] = _selectedTransmissions.join(',');
+    }
+
+    // KM Range
+    if (_selectedKmRange != 'all') {
+      final parts = _selectedKmRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_km'] = parts[0];
+        queryParams['max_km'] = parts[1];
+      }
+    }
+
+    // Sold By
+    if (_selectedSoldBy != 'all') {
+      queryParams['sold_by'] = _selectedSoldBy;
+    }
+
+    // Add listingType if needed
+    queryParams['listing_type'] = _listingType;
+
+    try {
+      final apiService = ApiService();
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url: "$baseUrl/filter-listings.php",
+        fields: queryParams,
+      );
+
+      final dataList = response['data'] as List<dynamic>? ?? [];
+
+      final finalPosts =
+          dataList.map((item) {
+            final json = item as Map<String, dynamic>;
+            return MarketplacePost.fromJson(json);
+          }).toList();
+
+      final products = finalPosts.map((post) => post.toProduct()).toList();
+
+      // final attributeValuePairs =
+      //     await AttributeValueService.fetchAttributeValuePairs();
+
+      setState(() {
+        _products = products;
+        // _productAttributeValues = _mapAttributeValuePairs(attributeValuePairs);
+        _isLoading = false;
+      });
+
+      print('works');
+      print(response);
+    } catch (e) {
+      print("Error while fetching filter listings: $e");
+    }
+  }
+
+  // List<Product> get filteredFinalProducts {
+  //   List<Product> filtered = _products;
+
+  //   if (_searchQuery.trim().isNotEmpty) {
+  //     final query = _searchQuery.toLowerCase().trim();
+  //     filtered =
+  //         filtered.where((product) {
+  //           final searchableText = [
+  //             product.title.toLowerCase(),
+  //             product.brand.toLowerCase(),
+  //             product.model.toLowerCase(),
+  //             product.modelVariation.toLowerCase(),
+  //             _getLocationName(product.parentZoneId).toLowerCase(),
+  //             product.filters['4']?.toLowerCase() ?? '',
+  //             product.filters['5']?.toLowerCase() ?? '',
+  //             product.filters['1']?.toString() ?? '',
+  //             product.byDealer == '1' ? 'dealer' : 'owner',
+  //           ].join(' ');
+  //           return searchableText.contains(query);
+  //         }).toList();
+  //   }
+
+  //   if (_selectedLocation != 'all') {
+  //     filtered =
+  //         filtered
+  //             .where((product) => product.parentZoneId == _selectedLocation)
+  //             .toList();
+  //   }
+
+  //   if (_listingType == 'auction') {
+  //     filtered = filtered.where((product) => product.ifAuction == '1').toList();
+  //   } else if (_listingType == 'sale') {
+  //     filtered = filtered.where((product) => product.ifAuction == '0').toList();
+  //   }
+
+  //   if (_selectedBrands.isNotEmpty) {
+  //     filtered =
+  //         filtered
+  //             .where((product) => _selectedBrands.contains(product.brand))
+  //             .toList();
+  //   }
+
+  //   if (_selectedPriceRange != 'all') {
+  //     filtered =
+  //         filtered.where((product) {
+  //           int price =
+  //               product.ifAuction == '1'
+  //                   ? (int.tryParse(product.auctionStartingPrice) ?? 0)
+  //                   : (int.tryParse(product.price) ?? 0);
+  //           switch (_selectedPriceRange) {
+  //             case 'Under ₹2 Lakh':
+  //               return price < 200000;
+  //             case '₹2-5 Lakh':
+  //               return price >= 200000 && price < 500000;
+  //             case '₹5-10 Lakh':
+  //               return price >= 500000 && price < 1000000;
+  //             case '₹10-20 Lakh':
+  //               return price >= 1000000 && price < 2000000;
+  //             case 'Above ₹20 Lakh':
+  //               return price >= 2000000;
+  //             default:
+  //               return true;
+  //           }
+  //         }).toList();
+  //   }
+
+  //   if (_selectedYearRange != 'all') {
+  //     filtered =
+  //         filtered.where((product) {
+  //           int year =
+  //               int.tryParse(product.filters['1']?.toString() ?? '0') ?? 0;
+  //           switch (_selectedYearRange) {
+  //             case '2020 & Above':
+  //               return year >= 2020;
+  //             case '2018-2019':
+  //               return year >= 2018 && year <= 2019;
+  //             case '2015-2017':
+  //               return year >= 2015 && year <= 2017;
+  //             case '2010-2014':
+  //               return year >= 2010 && year <= 2014;
+  //             case 'Below 2010':
+  //               return year < 2010;
+  //             default:
+  //               return true;
+  //           }
+  //         }).toList();
+  //   }
+
+  //   if (_selectedOwnersRange != 'all') {
+  //     filtered =
+  //         filtered.where((product) {
+  //           int owners =
+  //               int.tryParse(product.filters['2']?.toString() ?? '0') ?? 0;
+  //           switch (_selectedOwnersRange) {
+  //             case '1st Owner':
+  //               return owners == 1;
+  //             case '2nd Owner':
+  //               return owners == 2;
+  //             case '3rd Owner':
+  //               return owners == 3;
+  //             case '4+ Owners':
+  //               return owners >= 4;
+  //             default:
+  //               return true;
+  //           }
+  //         }).toList();
+  //   }
+
+  //   if (_selectedFuelTypes.isNotEmpty) {
+  //     filtered =
+  //         filtered
+  //             .where(
+  //               (product) => _selectedFuelTypes.contains(
+  //                 product.filters['4']?.toString() ?? '',
+  //               ),
+  //             )
+  //             .toList();
+  //   }
+
+  //   if (_selectedTransmissions.isNotEmpty) {
+  //     filtered =
+  //         filtered
+  //             .where(
+  //               (product) => _selectedTransmissions.contains(
+  //                 product.filters['5']?.toString() ?? '',
+  //               ),
+  //             )
+  //             .toList();
+  //   }
+
+  //   if (_selectedKmRange != 'all') {
+  //     filtered =
+  //         filtered.where((product) {
+  //           int km = int.tryParse(product.filters['3']?.toString() ?? '0') ?? 0;
+  //           switch (_selectedKmRange) {
+  //             case 'Under 10K':
+  //               return km < 10000;
+  //             case '10K-30K':
+  //               return km >= 10000 && km < 30000;
+  //             case '30K-50K':
+  //               return km >= 30000 && km < 50000;
+  //             case '50K-80K':
+  //               return km >= 50000 && km < 80000;
+  //             case 'Above 80K':
+  //               return km >= 80000;
+  //             default:
+  //               return true;
+  //           }
+  //         }).toList();
+  //   }
+
+  //   if (_selectedSoldBy != 'all') {
+  //     filtered =
+  //         filtered.where((product) {
+  //           switch (_selectedSoldBy) {
+  //             case 'Owner':
+  //               return product.byDealer == '0';
+  //             case 'Certified Dealer':
+  //               return product.byDealer == '1';
+  //             default:
+  //               return true;
+  //           }
+  //         }).toList();
+  //   }
+
+  //   return filtered;
+  // }
 }
