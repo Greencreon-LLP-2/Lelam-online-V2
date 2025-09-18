@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -1144,6 +1145,17 @@ class BidCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                height: 30,
+                                child: CallSupportButton(
+                              label: 'Call Support',
+                                 
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
