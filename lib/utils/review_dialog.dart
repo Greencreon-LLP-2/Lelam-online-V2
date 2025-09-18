@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'dart:convert';
-
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 
 class ReviewDialog extends StatefulWidget {
   final String postId;
@@ -19,11 +22,17 @@ class ReviewDialogState extends State<ReviewDialog> {
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitting = false;
   late final LoggedUserProvider _userProvider;
+  final _storage = const FlutterSecureStorage();
+  String? userId;
+  final String _token = ApiConstant.token; // Use hardcoded token from ApiConstant
 
   @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserId();
+    });
   }
 
   @override
@@ -32,72 +41,201 @@ class ReviewDialogState extends State<ReviewDialog> {
     super.dispose();
   }
 
+  Future<void> _loadUserId() async {
+    try {
+      String? providerUserId = _userProvider.userData?.userId;
+      String? storageUserId = await _storage.read(key: 'userId');
+
+      if (providerUserId != null && providerUserId.isNotEmpty && providerUserId != 'Unknown') {
+        setState(() {
+          userId = providerUserId;
+        });
+        await _storage.write(key: 'userId', value: providerUserId);
+        debugPrint('Loaded userId from provider: $userId');
+      } else if (storageUserId != null && storageUserId.isNotEmpty && storageUserId != 'Unknown') {
+        setState(() {
+          userId = storageUserId;
+        });
+        debugPrint('Loaded userId from storage: $userId');
+      } else {
+        setState(() {
+          userId = null;
+        });
+        debugPrint('No valid userId found');
+      }
+    } catch (e) {
+      debugPrint('Error loading userId: $e');
+      setState(() {
+        userId = null;
+      });
+    }
+  }
+
+  // Hide the keyboard programmatically
+  void _hideKeyboard(BuildContext context) {
+    FocusScope.of(context).unfocus();
+  }
+
+  // Clean response to remove PHP notices/warnings before JSON parsing
+  String _cleanResponse(String responseBody) {
+    // Remove any content before the first '{'
+    final jsonStartIndex = responseBody.indexOf('{');
+    if (jsonStartIndex != -1) {
+      return responseBody.substring(jsonStartIndex);
+    }
+    return responseBody; // Return as-is if no JSON found
+  }
+
   Future<bool> _submitReview() async {
-    if (token.isEmpty || token.contains('?')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid authentication token. Please log in again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (userId == null || userId == 'Unknown') {
+      if (mounted) {
+        _showLoginPromptDialog(context, 'ask a question');
+      }
       return false;
     }
 
     final url = Uri.parse(
-      '$addPostReview?token=$token&user_id=${_userProvider.userId}&post_id=${widget.postId}&rating=0&comment=${Uri.encodeComponent(_reviewController.text)}',
+      '$addPostReview?token=$_token&user_id=$userId&post_id=${widget.postId}&rateing=4&comment=${Uri.encodeComponent(_reviewController.text)}',
     );
+    final headers = {
+      'token': _token,
+      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+    };
 
-    try {
-      print('Submitting review to: $url');
+    int maxRetries = 3;
+    int attempt = 0;
 
-      final response = await http.get(url);
+    while (attempt < maxRetries) {
+      try {
+        debugPrint('Attempt ${attempt + 1}: Submitting review to: $url');
+        debugPrint('Headers: $headers');
 
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
+        final response = await http.get(url, headers: headers);
+        debugPrint('API Response Status: ${response.statusCode}');
+        debugPrint('API Response Body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final decodedBody = jsonDecode(response.body);
-        if (decodedBody['status'] == 'true') {
-          return true;
+        if (response.statusCode == 200) {
+          // Clean the response to handle PHP notices
+          final cleanedResponse = _cleanResponse(response.body);
+          final decodedBody = jsonDecode(cleanedResponse);
+          final bool isSuccess = decodedBody['status'] == true || decodedBody['status'] == 'true';
+          if (isSuccess && decodedBody['code'] == 0) {
+            return true;
+          } else {
+            debugPrint('API Error: ${decodedBody['data']}');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to submit review: ${decodedBody['data']}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return false;
+          }
+        } else if (response.statusCode == 401) {
+          debugPrint('HTTP Error: Unauthorized (401)');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Unauthorized: Invalid or expired token. Please log in again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            context.pushNamed(RouteNames.loginPage);
+          }
+          return false;
         } else {
-          print('API Error: ${decodedBody['data']}');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to submit review: ${decodedBody['data']}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          debugPrint('HTTP Error: ${response.statusCode}');
+          attempt++;
+          if (attempt == maxRetries) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to submit review after $maxRetries attempts: HTTP ${response.statusCode}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+            return false;
+          }
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+      } catch (e) {
+        debugPrint('Error submitting review: $e');
+        attempt++;
+        if (attempt == maxRetries) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error submitting review after $maxRetries attempts: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
           return false;
         }
-      } else if (response.statusCode == 401) {
-        print('HTTP Error: Unauthorized (401)');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unauthorized: Invalid or expired token. Please log in again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return false;
-      } else {
-        print('HTTP Error: ${response.statusCode}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit review: HTTP ${response.statusCode}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return false;
+        await Future.delayed(Duration(seconds: attempt * 2));
       }
-    } catch (e) {
-      print('Error submitting review: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error submitting review: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return false;
     }
+    return false;
+  }
+
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    debugPrint('Showing login prompt for action: $action, userId: $userId');
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            'Please log in to $action.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.pushNamed(RouteNames.loginPage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Log In',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
   }
 
   @override
@@ -116,6 +254,7 @@ class ReviewDialogState extends State<ReviewDialog> {
             TextField(
               controller: _reviewController,
               maxLines: 4,
+              autofillHints: null,
               decoration: InputDecoration(
                 hintText: 'Write your question here...',
                 border: OutlineInputBorder(
@@ -123,12 +262,17 @@ class ReviewDialogState extends State<ReviewDialog> {
                 ),
               ),
             ),
+            if (_isSubmitting)
+              const Padding(
+                padding: EdgeInsets.only(top: 10.0),
+                child: Center(child: CircularProgressIndicator()),
+              ),
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(), 
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
@@ -140,21 +284,29 @@ class ReviewDialogState extends State<ReviewDialog> {
                       _isSubmitting = true;
                     });
 
-                    await _submitReview(); 
+                    debugPrint('Before hiding keyboard: mounted=$mounted');
+                    _hideKeyboard(context);
+                    debugPrint('After hiding keyboard: mounted=$mounted');
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    debugPrint('After delay: mounted=$mounted');
 
-                    setState(() {
-                      _isSubmitting = false;
-                    });
+                    final success = await _submitReview();
 
-                    Navigator.of(context).pop();
+                    if (mounted) {
+                      setState(() {
+                        _isSubmitting = false;
+                      });
 
-                    if (await _submitReview()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Question submitted successfully.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                      Navigator.of(context).pop();
+
+                      if (success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Question submitted successfully.'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
                     }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +315,6 @@ class ReviewDialogState extends State<ReviewDialog> {
                         backgroundColor: Colors.red,
                       ),
                     );
-                    Navigator.of(context).pop();
                   }
                 },
           child: _isSubmitting

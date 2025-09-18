@@ -1010,7 +1010,7 @@ void _launchPhoneCall() async {
                   context: context,
                   barrierDismissible: false,
                   builder:
-                      (context) => const ReviewDialog( postId: ''),
+                      (context) => ReviewDialog(postId: id),
                 );
               },
               style: ElevatedButton.styleFrom(
