@@ -350,7 +350,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                   statusData['middle_status']?.toString() ?? 'Schedule meeting',
               'footerStatus_data':
                   statusData['Footer_status']?.toString() ??
-                  'Default footer message',
+                  'Click call support for full details',
               'timer': statusData['timer']?.toString() ?? '0',
             };
           }
@@ -364,14 +364,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       debugPrint('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Default footer message',
+        'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     } catch (e) {
       debugPrint('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Default footer message',
+        'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     }
@@ -512,7 +512,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'middleStatus_data':
                   statusData?['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  statusData?['footerStatus_data'] ?? 'Default footer message',
+                  statusData?['footerStatus_data'] ?? 'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
             debugPrint('Added meeting ${meeting['id']} to list: $meetingData');

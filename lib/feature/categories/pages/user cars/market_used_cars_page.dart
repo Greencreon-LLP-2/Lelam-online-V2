@@ -1698,7 +1698,7 @@ class _MarketPlaceProductDetailsPageState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => MyMeetingsWidget(),
+                            builder: (context) => BuyingStatusPage(),
                           ),
                         );
                       }

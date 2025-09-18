@@ -1062,7 +1062,7 @@ class _CommercialProductDetailsPageState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const MyMeetingsWidget(),
+                            builder: (context) => const BuyingStatusPage()
                           ),
                         );
                       }
