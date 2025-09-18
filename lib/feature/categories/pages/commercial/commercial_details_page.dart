@@ -2238,9 +2238,9 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                     ],
                   ),
                 ),
-                const Divider(),
+        
                 _buildBannerAd(),
-                const Divider(),
+                  const Divider(),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(

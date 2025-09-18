@@ -1863,22 +1863,39 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     return formatter.format(number);
   }
 
-  Widget _buildDetailItem(IconData icon, String text) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        Icon(icon, size: 15, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 15, color: Colors.grey[700]),
-          ),
+ Widget _buildDetailItem(IconData icon, String text) {
+    return Flexible(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ), // Compact padding
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey[700],
+            ), // Slightly smaller icon
+            const SizedBox(width: 6), // Tighter spacing
+            Expanded(
+              child: Text(
+                text,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1, // Prevent wrapping
+                style: const TextStyle(
+                  fontSize: 14, // Slightly smaller font for compactness
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+
 
   Widget _buildSellerCommentItem(String label, String value) {
     return Padding(
@@ -2418,176 +2435,189 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       ),
                     ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Details',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        if (isLoadingDetails)
-                          const Center(child: CircularProgressIndicator())
-                        else if (errorMessage.isNotEmpty)
-                          Center(
-                            child: Text(
-                              errorMessage,
-                              style: const TextStyle(color: Colors.red),
+                 child: Padding(
+                      padding: const EdgeInsets.all(
+                        12.0,
+                      ), // Reduced padding for compactness
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Details',
+                            style: TextStyle(
+                              fontSize: 18, // Slightly smaller for consistency
+                              fontWeight: FontWeight.bold,
                             ),
-                          )
-                        else if (detailComments.isEmpty)
-                          const Center(child: Text('No details available'))
-                        else
-                          Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.speed,
-                                      _formatNumber(
-                                        detailComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'km range',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'KM Range',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.local_gas_station,
-                                      detailComments
-                                          .firstWhere(
-                                            (comment) =>
-                                                comment.attributeName
-                                                    .toLowerCase()
-                                                    .trim() ==
-                                                'fuel type',
-                                            orElse:
-                                                () => SellerComment(
-                                                  attributeName: 'Fuel Type',
-                                                  attributeValue: 'N/A',
-                                                ),
-                                          )
-                                          .attributeValue,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.person,
-                                      _getOwnerText(
-                                        detailComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'no of owners',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'No of owners',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.calendar_today,
-                                      detailComments
-                                          .firstWhere(
-                                            (comment) =>
-                                                comment.attributeName
-                                                    .toLowerCase()
-                                                    .trim() ==
-                                                'year',
-                                            orElse:
-                                                () => SellerComment(
-                                                  attributeName: 'Year',
-                                                  attributeValue: 'N/A',
-                                                ),
-                                          )
-                                          .attributeValue,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.settings,
-                                      detailComments
-                                          .firstWhere(
-                                            (comment) =>
-                                                comment.attributeName
-                                                    .toLowerCase()
-                                                    .trim() ==
-                                                'transmission',
-                                            orElse:
-                                                () => SellerComment(
-                                                  attributeName: 'Transmission',
-                                                  attributeValue: 'N/A',
-                                                ),
-                                          )
-                                          .attributeValue,
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: _buildDetailItem(
-                                      Icons.build,
-                                      detailComments
-                                          .firstWhere(
-                                            (comment) =>
-                                                comment.attributeName
-                                                    .toLowerCase()
-                                                    .trim() ==
-                                                'engine condition',
-                                            orElse:
-                                                () => SellerComment(
-                                                  attributeName:
-                                                      'Engine Condition',
-                                                  attributeValue: 'N/A',
-                                                ),
-                                          )
-                                          .attributeValue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
                           ),
-                      ],
+                          const SizedBox(height: 8), // Tighter spacing
+                          if (isLoadingSellerComments)
+                            const Center(child: CircularProgressIndicator())
+                          else if (uniqueSellerComments.isEmpty)
+                            const Center(child: Text('No details available'))
+                          else
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                // Calculate max width per item based on screen width
+                                final maxItemWidth =
+                                    constraints.maxWidth /
+                                    3; // Max 3 items per row
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.calendar_today,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'year',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName: 'Year',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.person,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'no of owners',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'No of owners',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.settings,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'transmission',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'Transmission',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(
+                                      height: 6,
+                                    ), // Tighter spacing between rows
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.local_gas_station,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'fuel type',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'Fuel Type',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.speed,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'km range',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'KM Range',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        // Add empty ConstrainedBox to align with top row
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child:
+                                              const SizedBox.shrink(), // Placeholder for alignment
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
                 ),
-                const Divider(),
-                _buildBannerAd(),
-                const Divider(),
+       
+              
+            
 
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: _buildSellerCommentsSection(),
                 ),
+                  _buildBannerAd(),
                 const Divider(),
                 Padding(
                   padding: const EdgeInsets.all(16.0),

@@ -1,5 +1,5 @@
-
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Add this import
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
@@ -24,6 +24,16 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     _categoriesFuture = CategoryService().fetchCategories();
   }
 
+  // Retry function for 429 errors
+  Future<void> _retryAfterDelay(Duration delay) async {
+    await Future.delayed(delay);
+    if (mounted) {
+      setState(() {
+        _categoriesFuture = CategoryService().fetchCategories();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -42,6 +52,24 @@ class _CategoryWidgetState extends State<CategoryWidget> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return _buildShimmerCategories();
             } else if (snapshot.hasError) {
+              final error = snapshot.error.toString();
+              if (error.contains('429') || error.contains('Too Many Requests')) {
+                // Handle 429 specifically with retry
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const SizedBox(height: 8),
+                      const Text('Too many requests. Please wait...'),
+                      ElevatedButton(
+                        onPressed: () => _retryAfterDelay(const Duration(seconds: 2)),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                );
+              }
               return Center(child: Text('Error: ${snapshot.error}'));
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text('No categories found'));
@@ -55,6 +83,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               scrollDirection: Axis.horizontal,
               itemBuilder: (context, index) {
                 final category = categories[index];
+                final imageUrl = 'https://lelamonline.com/admin/${category.image}';
                 return InkWell(
                   onTap: () {
                     print(category.id);
@@ -103,27 +132,39 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(50),
-                          child: Image.network(
-                            'https://lelamonline.com/admin/${category.image}',
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: Colors.grey,
-                                ),
+                            placeholder: (context, url) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                color: Colors.grey[300],
                               ),
                             ),
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Container(
-                                  color: Colors.grey[300],
+                            errorWidget: (context, url, error) {
+                              // Handle 429 error specifically
+                              if (error.toString().contains('429') || error.toString().contains('Too Many Requests')) {
+                                return Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(
+                                    color: Colors.grey[300],
+                                  ),
+                                );
+                              }
+                              return Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  ),
                                 ),
                               );
+                            },
+                            httpHeaders: {
+                              'User-Agent': 'LelamOnlineApp/1.0', // Custom user agent to potentially bypass some limits
                             },
                           ),
                         ),

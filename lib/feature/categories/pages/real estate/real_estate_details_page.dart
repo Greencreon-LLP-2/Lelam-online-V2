@@ -2566,7 +2566,7 @@ class _RealEstateProductDetailsPageState
                     ],
                   ),
                 ),
-                const Divider(),
+              
                 _buildBannerAd(),
                 const Divider(),
                 Padding(

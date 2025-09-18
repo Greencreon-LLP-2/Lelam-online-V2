@@ -62,6 +62,10 @@ double _minBidIncrement = 1000;
 String _currentHighestBid = '0';
 bool _isMeetingDialogOpen = false;
 bool _isSchedulingMeeting = false;
+ bool _isLoadingBanner = false;
+ 
+  String? _bannerImageUrl;
+  String _bannerError = '';
 
   @override
   void initState() {
@@ -75,12 +79,99 @@ Future<void> _initialize() async {
   await Future.wait([
     _fetchLocations(),
     _fetchSellerInfo(),
+      _fetchBannerImage(),
     if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
   ]);
 }
 
 
+ Future<void> _fetchBannerImage() async {
+    try {
+      setState(() {
+        _isLoadingBanner = true;
+        _bannerError = '';
+      });
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-ads-image.php?token=$_token';
+      debugPrint('Fetching banner image: $url');
 
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Banner API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          final bannerImage = responseData['data']['inner_post_image'] ?? '';
+          setState(() {
+            _bannerImageUrl =
+                bannerImage.isNotEmpty
+                    ? 'https://lelamonline.com/admin/$bannerImage'
+                    : null;
+          });
+        } else {
+          throw Exception('Invalid banner data: ${responseData['data']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching banner image: $e');
+      setState(() {
+        _bannerError = 'Failed to load banner: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBanner = false;
+      });
+    }
+  }
+
+  Widget _buildBannerAd() {
+    if (_isLoadingBanner) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_bannerError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+
+    if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImageUrl!,
+        width: double.infinity,
+        height: 35,
+        fit: BoxFit.fill,
+        placeholder:
+            (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget:
+            (context, url, error) => const Center(
+              child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+            ),
+      ),
+    );
+  }
 
 Future<void> _loadUserId() async {
   final userData = _userProvider.userData;
