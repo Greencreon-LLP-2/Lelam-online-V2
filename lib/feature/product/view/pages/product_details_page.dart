@@ -18,6 +18,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -1111,12 +1112,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(dialogContext).pop();
+                      
                       if (mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BuyingStatusPage(),
+                            builder: (context) => MyMeetingsWidget(),
                           ),
                         );
                       }
@@ -1735,24 +1736,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              title: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Schedule Meeting',
-                    style: TextStyle(fontSize: 24),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Select date',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
+             
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(

@@ -17,6 +17,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart'
     show ChatPage;
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
@@ -775,7 +776,7 @@ void _showMeetingDialog(BuildContext context) {
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setDialogState) => AlertDialog(
-        title: const Text('Schedule Meeting'),
+        
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -867,8 +868,9 @@ Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
       actions: [
         TextButton(
           onPressed: () {
-            Navigator.of(dialogContext).pop();
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyingStatusPage()));
+       
+            Navigator.push(context, 
+            MaterialPageRoute(builder: (context) => const MyMeetingsWidget()));
           },
           child: const Text('Check Status'),
         ),
