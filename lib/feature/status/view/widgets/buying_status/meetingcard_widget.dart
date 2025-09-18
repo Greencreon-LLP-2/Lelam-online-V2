@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 
 class MeetingCard extends StatelessWidget {
   final Map<String, dynamic> meeting;
@@ -459,6 +460,17 @@ class MeetingCard extends StatelessWidget {
                                           ),
                                         ],
                                       ),
+                                      const SizedBox(height: 8),
+                                         Align(
+                                               alignment: Alignment.centerLeft,
+                                             child: SizedBox(
+                                               height: 30,
+                                             child: CallSupportButton(
+                                              label: 'Call Support',
+                                 
+                                           ),
+                                         ),
+                                     ),
                                     ],
                                   ),
                                 ),
@@ -720,6 +732,7 @@ class MeetingCard extends StatelessWidget {
                                 ),
                               ],
                             ),
+                            
                             const SizedBox(height: 16),
                             Row(
                               children: [
