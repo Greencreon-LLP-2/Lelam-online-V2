@@ -1086,7 +1086,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                           ),
                           image: DecorationImage(
                             image: NetworkImage(getImageUrl(post.image)),
-                            fit: BoxFit.fill,
+                            fit: BoxFit.cover,
                             onError: (exception, stackTrace) {
                               print(
                                 'Failed to load image: ${getImageUrl(post.image)}',

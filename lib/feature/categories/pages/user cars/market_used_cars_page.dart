@@ -610,7 +610,7 @@ class _MarketPlaceProductDetailsPageState
   Widget _buildBannerAd() {
     if (_isLoadingBanner) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -630,7 +630,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0),
       child: CachedNetworkImage(
         imageUrl: _bannerImageUrl!,
         width: double.infinity,
@@ -2656,13 +2656,14 @@ class _MarketPlaceProductDetailsPageState
                   const Divider(),
                   // Seller Comments Section
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: _buildSellerCommentsSection(),
                   ),
+                  
                   _buildBannerAd(),
-                  const Divider(),
+             
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

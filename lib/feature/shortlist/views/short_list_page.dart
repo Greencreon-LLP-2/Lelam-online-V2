@@ -7,6 +7,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart'
     show MarketplacePost;
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
@@ -33,7 +34,7 @@ class _ShortListPageState extends State<ShortListPage> {
   bool isLoading = true;
   String? errorMessage;
   String? userId;
-  final MarketplaceService _marketplaceService = MarketplaceService();
+  final MarketplaceService2 _marketplaceService = MarketplaceService2();
 
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;

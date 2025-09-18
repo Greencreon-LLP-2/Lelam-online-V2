@@ -1064,94 +1064,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                             child: _buildSearchField(),
                           ),
-                        Container(
-                          color: Colors.grey.shade200,
-                          padding: const EdgeInsets.all(10),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(() {
-                                        _listingType = 'sale';
-                                        _fetchPosts();
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            _listingType == 'sale'
-                                                ? Palette.white
-                                                : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        'Market Place',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontWeight:
-                                              _listingType == 'sale'
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                          color:
-                                              _listingType == 'sale'
-                                                  ? Colors.black
-                                                  : Colors.grey.shade600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                // Expanded(
-                                //   child: GestureDetector(
-                                //     onTap: () {
-                                //       setState(() {
-                                //         _listingType = 'auction';
-                                //         _fetchPosts();
-                                //       });
-                                //     },
-                                //     child: Container(
-                                //       padding: const EdgeInsets.symmetric(
-                                //         vertical: 12,
-                                //       ),
-                                //       decoration: BoxDecoration(
-                                //         color:
-                                //             _listingType == 'auction'
-                                //                 ? Palette.white
-                                //                 : Colors.transparent,
-                                //         borderRadius: BorderRadius.circular(10),
-                                //       ),
-                                //       child: Text(
-                                //         'Auction',
-                                //         textAlign: TextAlign.center,
-                                //         style: TextStyle(
-                                //           fontWeight:
-                                //               _listingType == 'auction'
-                                //                   ? FontWeight.w600
-                                //                   : FontWeight.normal,
-                                //           color:
-                                //               _listingType == 'auction'
-                                //                   ? Colors.black
-                                //                   : Colors.grey.shade600,
-                                //           fontSize: 12,
-                                //         ),
-                                //       ),
-                                //     ),
-                                //   ),
-                                // ),
-                              ],
-                            ),
-                          ),
-                        ),
+                       
                       ],
                     ),
           ),
@@ -1308,7 +1221,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               image: NetworkImage(getImageUrl(post.image)),
                               fit:
                                   BoxFit
-                                      .fill, // Ensures full image is visible, scaled to fit
+                                      .cover, // Ensures full image is visible, scaled to fit
                               onError: (exception, stackTrace) {
                                 print(
                                   'Failed to load image: ${getImageUrl(post.image)}',

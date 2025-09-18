@@ -158,14 +158,14 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
   Widget _buildBannerAd() {
     if (_isLoadingBanner) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_bannerError.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(0),
         child: Center(
           child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
         ),
@@ -177,7 +177,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0),
       child: CachedNetworkImage(
         imageUrl: _bannerImageUrl!,
         width: double.infinity,
@@ -692,85 +692,142 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
       _showLoginPromptDialog(context, 'schedule a meeting');
       return;
     }
-    if (_isMeetingDialogOpen) return;
-    setState(() => _isMeetingDialogOpen = true);
+
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
     DateTime selectedDate = DateTime.now();
+
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Column(
-            children: [
-              const SizedBox(height: 8),
-              const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
-              Text(
-                'Select date',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600], fontWeight: FontWeight.normal),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
-            ],
-          ),
-          content: Container(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.calendar_today, color: AppTheme.primaryColor),
-                  title: const Text('Select Date'),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                    style: const TextStyle(color: AppTheme.primaryColor),
-                  ),
-                  onTap: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: dialogContext,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
-                    );
-                    if (picked != null && picked != selectedDate) {
-                      setDialogState(() => selectedDate = picked);
-                    }
-                  },
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey[300]!)),
+              
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
                 ),
-                if (_isSchedulingMeeting) const Padding(padding: EdgeInsets.only(top: 8.0), child: Center(child: CircularProgressIndicator())),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: _isSchedulingMeeting ? null : () => Navigator.of(dialogContext).pop(),
-              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              onPressed: _isSchedulingMeeting
-                  ? null
-                  : () async {
-                      setDialogState(() => _isSchedulingMeeting = true);
-                      try {
-                        await _fixMeeting(selectedDate);
-                        Navigator.of(dialogContext).pop();
-                      } finally {
-                        setDialogState(() => _isSchedulingMeeting = false);
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Schedule Meeting', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        ),
-      ),
-    ).whenComplete(() => setState(() => _isMeetingDialogOpen = false));
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
   }
 
   Future<void> _fixMeeting(DateTime selectedDate) async {
@@ -1523,7 +1580,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                 ),
                 const Divider(),
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1536,9 +1593,10 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                     ],
                   ),
                 ),
-                const Divider(),
+                _buildBannerAd(),
+               
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

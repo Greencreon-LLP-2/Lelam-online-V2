@@ -149,14 +149,14 @@ class _CommercialProductDetailsPageState
   Widget _buildBannerAd() {
     if (_isLoadingBanner) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_bannerError.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(0),
         child: Center(
           child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
         ),
@@ -168,7 +168,7 @@ class _CommercialProductDetailsPageState
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0),
       child: CachedNetworkImage(
         imageUrl: _bannerImageUrl!,
         width: double.infinity,
@@ -2258,7 +2258,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                 ),
                 const Divider(),
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2279,9 +2279,9 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                 ),
         
                 _buildBannerAd(),
-                  const Divider(),
+                  
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
