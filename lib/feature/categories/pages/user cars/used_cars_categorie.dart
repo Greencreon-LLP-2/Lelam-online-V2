@@ -21,6 +21,160 @@ import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
 
+
+class MarketplaceService {
+  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
+
+  static final Map<String, List<MarketplacePost>> _postsCache = {};
+  static List<Attribute>? _attributesCache;
+  static List<AttributeVariation>? _attributeVariationsCache;
+
+  Future<List<MarketplacePost>> fetchPosts({
+    required String categoryId,
+    required String userZoneId,
+    required String listingType,
+    required String userId,
+  }) async {
+    final cacheKey = '$categoryId-$userZoneId-$listingType-$userId';
+
+    final endpoint =
+        listingType == 'auction'
+            ? '$baseUrl/list-category-post-auction.php'
+            : '$baseUrl/list-category-post-marketplace.php';
+
+    final url =
+        listingType == 'auction'
+            ? '$endpoint?token=$token&category_id=$categoryId&user_id=$userId&user_zone_id=$userZoneId'
+            : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+
+    try {
+      print('Fetching posts from: $url');
+      final response = await http.get(Uri.parse(url));
+      print('API Response Status: ${response.statusCode}');
+      print('API Response Body: ${response.body}');
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+
+        if (decodedBody is List) {
+          final posts =
+              decodedBody.map((json) {
+                try {
+                  return MarketplacePost.fromJson(json);
+                } catch (e) {
+                  print('Error parsing post: $e');
+                  print('Problematic JSON: $json');
+                  throw Exception('Failed to parse post: $e');
+                }
+              }).toList();
+          _postsCache[cacheKey] = posts;
+          return posts;
+        } else if (decodedBody is Map && decodedBody.containsKey('data')) {
+          if (decodedBody['data'] is List) {
+            final data = decodedBody['data'] as List;
+            final posts =
+                data.map((json) => MarketplacePost.fromJson(json)).toList();
+            _postsCache[cacheKey] = posts;
+            return posts;
+          } else if (decodedBody['data'] ==
+              'Please accept live auction terms') {
+            throw Exception('Please accept live auction terms');
+          } else if (decodedBody['data'] == 'Data not found') {
+            print('No posts found for $listingType');
+            _postsCache[cacheKey] = [];
+            return [];
+          } else {
+            throw Exception('Unexpected data format: ${decodedBody['data']}');
+          }
+        } else {
+          throw Exception('Unexpected API response format');
+        }
+      } else {
+        throw Exception('Failed to load posts: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error in fetchPosts ($listingType): $e');
+      throw Exception('Error fetching posts: $e');
+    }
+  }
+
+  Future<String> fetchAuctionTerms() async {
+    final url = '$baseUrl/live-auction-terms.php?token=$token';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody is Map &&
+            decodedBody.containsKey('data') &&
+            decodedBody['data'] is List &&
+            decodedBody['data'].isNotEmpty) {
+          final details = decodedBody['data'][0]['details']?.toString() ?? '';
+          if (details.isEmpty) {
+            throw Exception('No terms details found in response');
+          }
+          return details;
+        } else {
+          throw Exception('Unexpected terms response format');
+        }
+      } else {
+        throw Exception('Failed to load terms: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching auction terms: $e');
+      throw Exception('Error fetching terms: $e');
+    }
+  }
+
+  Future<bool> acceptAuctionTerms(String userId) async {
+    final url =
+        '$baseUrl/live-auction-terms-accept.php?token=$token&user_id=$userId';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody['status'] == 'true') {
+          return true;
+        } else {
+          throw Exception('Failed to accept terms: ${decodedBody['data']}');
+        }
+      } else {
+        throw Exception('Failed to accept terms: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error accepting auction terms: $e');
+      return false;
+    }
+  }
+
+  Future<List<Attribute>> fetchAttributes() async {
+    if (_attributesCache != null) {
+      print('Returning cached attributes');
+      return _attributesCache!;
+    }
+    _attributesCache = await TempApiService.fetchAttributes();
+    return _attributesCache!;
+  }
+
+  Future<List<AttributeVariation>> fetchAttributeVariations(
+    Map<String, String> params,
+  ) async {
+    if (_attributeVariationsCache != null) {
+      print('Returning cached attribute variations');
+      return _attributeVariationsCache!;
+    }
+    _attributeVariationsCache = await TempApiService.fetchAttributeVariations(
+      params,
+    );
+    return _attributeVariationsCache!;
+  }
+
+  static void clearCache() {
+    _postsCache.clear();
+    _attributesCache = null;
+    _attributeVariationsCache = null;
+  }
+}
+
 class UsedCarsPage extends StatefulWidget {
   final bool showAuctions;
 
@@ -370,21 +524,61 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   final List<String> _brands = [
-    'Maruti Suzuki',
-    'Hyundai',
-    'Tata',
-    'Honda',
-    'Toyota',
-    'Mahindra',
-    'BMW',
+    'Ambassador',
+    'Ashok Leyland',
+    'Aston Martin',
     'Audi',
+    'Bajaj',
+    'Bentley',
+    'BMW',
+    'Bugatti',
+    'BYD',
+    'Cadillac',
+    'Chevrolet',
+    'Chrysler',
+    'Citroen',
+    'Daewoo',
+    'Datsun',
+    'DC',
+    'Eicher Polaris',
+    'Ferrari',
+    'Fiat',
+    'Force Motors',
     'Ford',
-    'Volkswagen',
+    'Honda',
+    'Hummer',
+    'Hyundai',
+    'ICML',
+    'Isuzu',
+    'Jaguar',
+    'Jeep',
     'Kia',
-    'Skoda',
+    'Lamborghini',
+    'Land Rover',
+    'Lexus',
+    'Mahindra',
+    'Mahindra Renault',
+    'Maruti Suzuki',
+    'Maserati',
+    'Maybach',
+    'Mazda',
+    'Mercedes-Benz',
+    'MG',
+    'Mini',
+    'Mitsubishi',
     'Nissan',
+    'Opel',
+    'Porsche',
+    'Premier',
     'Renault',
-    'Mercedes',
+    'Rolls-Royce',
+    'Skoda',
+    'Ssangyong',
+    'Tata',
+    'Tesla',
+    'Toyota',
+    'Volkswagen',
+    'Volvo',
   ];
 
   final List<String> _priceRanges = [
@@ -443,154 +637,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return ['all', ..._locations.map((loc) => loc.name)];
   }
 
-  List<Product> get filteredProducts {
-    if (!_filtersChanged) return _filteredProductsCache;
-
-    final filtered = _products.where((product) {
-      final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-
-      if (_searchQuery.trim().isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final searchableText = [
-          product.title.toLowerCase(),
-          product.brand.toLowerCase(),
-          product.model.toLowerCase(),
-          product.modelVariation.toLowerCase(),
-          _getLocationName(product.parentZoneId).toLowerCase(),
-          attributeValues['Fuel Type']?.toLowerCase() ?? '',
-          attributeValues['Transmission']?.toLowerCase() ?? '',
-          attributeValues['Year']?.toLowerCase() ?? '',
-          attributeValues['Sold by']?.toLowerCase() ?? (product.byDealer == '1' ? 'dealer' : 'owner'),
-        ].join(' ');
-        if (!searchableText.contains(query)) return false;
-      }
-
-      if (_selectedLocation != 'all' && product.parentZoneId != _selectedLocation) return false;
-
-      if (_listingType == 'auction' && product.ifAuction != '1') return false;
-      if (_listingType == 'Marketplace' && product.ifAuction != '0') return false;
-
-      if (_selectedBrands.isNotEmpty && !_selectedBrands.contains(product.brand)) return false;
-
-      if (_selectedPriceRange != 'all') {
-        int price = product.ifAuction == '1'
-            ? (int.tryParse(product.auctionStartingPrice) ?? 0)
-            : (int.tryParse(product.price) ?? 0);
-        switch (_selectedPriceRange) {
-          case 'Under ₹2 Lakh':
-            if (price >= 200000) return false;
-            break;
-          case '₹2-5 Lakh':
-            if (price < 200000 || price >= 500000) return false;
-            break;
-          case '₹5-10 Lakh':
-            if (price < 500000 || price >= 1000000) return false;
-            break;
-          case '₹10-20 Lakh':
-            if (price < 1000000 || price >= 2000000) return false;
-            break;
-          case 'Above ₹20 Lakh':
-            if (price < 2000000) return false;
-            break;
-        }
-      }
-
-      final yearStr = attributeValues['Year'] ?? '0';
-      final year = int.tryParse(yearStr) ?? 0;
-      if (_selectedYearRange != 'all') {
-        switch (_selectedYearRange) {
-          case '2020 & Above':
-            if (year < 2020) return false;
-            break;
-          case '2018-2019':
-            if (year < 2018 || year > 2019) return false;
-            break;
-          case '2015-2017':
-            if (year < 2015 || year > 2017) return false;
-            break;
-          case '2010-2014':
-            if (year < 2010 || year > 2014) return false;
-            break;
-          case 'Below 2010':
-            if (year >= 2010) return false;
-            break;
-        }
-      }
-
-      final ownersStr = attributeValues['No of owners'] ?? '';
-      int owners = 0;
-      if (ownersStr.contains('1st')) owners = 1;
-      else if (ownersStr.contains('2nd')) owners = 2;
-      else if (ownersStr.contains('3rd')) owners = 3;
-      else if (ownersStr.contains('4')) owners = 4;
-      if (_selectedOwnersRange != 'all') {
-        switch (_selectedOwnersRange) {
-          case '1st Owner':
-            if (owners != 1) return false;
-            break;
-          case '2nd Owner':
-            if (owners != 2) return false;
-            break;
-          case '3rd Owner':
-            if (owners != 3) return false;
-            break;
-          case '4+ Owners':
-            if (owners < 4) return false;
-            break;
-        }
-      }
-
-      final fuel = attributeValues['Fuel Type'] ?? '';
-      if (_selectedFuelTypes.isNotEmpty && !_selectedFuelTypes.contains(fuel)) return false;
-
-      final trans = attributeValues['Transmission'] ?? '';
-      if (_selectedTransmissions.isNotEmpty && !_selectedTransmissions.contains(trans)) return false;
-
-      final kmStr = attributeValues['KM Range'] ?? '';
-      int km = 0;
-      final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
-      if (kmMatch != null) km = int.tryParse(kmMatch.group(1) ?? '0') ?? 0;
-      if (_selectedKmRange != 'all') {
-        switch (_selectedKmRange) {
-          case 'Under 10K':
-            if (km >= 10000) return false;
-            break;
-          case '10K-30K':
-            if (km < 10000 || km >= 30000) return false;
-            break;
-          case '30K-50K':
-            if (km < 30000 || km >= 50000) return false;
-            break;
-          case '50K-80K':
-            if (km < 50000 || km >= 80000) return false;
-            break;
-          case 'Above 80K':
-            if (km < 80000) return false;
-            break;
-        }
-      }
-
-      final soldBy = attributeValues['Sold by'] ?? (product.byDealer == '1' ? 'Dealer' : 'Owner');
-      if (_selectedSoldBy != 'all') {
-        switch (_selectedSoldBy) {
-          case 'Owner':
-            if (soldBy != 'Owner') return false;
-            break;
-          case 'Dealer':
-          case 'Certified Dealer':
-            if (soldBy != 'Dealer' && soldBy != 'Certified Dealer') return false;
-            break;
-        }
-      }
-
-      return true;
-    }).toList();
-
-    _filteredProductsCache = filtered;
-    _filtersChanged = false;
-    return filtered;
-  }
-
   String getImageUrl(String imagePath) {
     final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/$cleanedPath';
@@ -601,47 +647,55 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => FilterPage(
-        brands: _brands,
-        priceRanges: _priceRanges,
-        yearRanges: _yearRanges,
-        ownerRanges: _ownerRanges,
-        fuelTypes: _fuelTypes,
-        transmissions: _transmissions,
-        kmRanges: _kmRanges,
-        soldByOptions: _soldByOptions,
-        selectedBrands: _selectedBrands,
-        selectedPriceRange: _selectedPriceRange,
-        selectedYearRange: _selectedYearRange,
-        selectedOwnersRange: _selectedOwnersRange,
-        selectedFuelTypes: _selectedFuelTypes,
-        selectedTransmissions: _selectedTransmissions,
-        selectedKmRange: _selectedKmRange,
-        selectedSoldBy: _selectedSoldBy,
-        listingType: _listingType,
-        onApplyFilters: ({
-          required List<String> selectedBrands,
-          required String selectedPriceRange,
-          required String selectedYearRange,
-          required String selectedOwnersRange,
-          required List<String> selectedFuelTypes,
-          required List<String> selectedTransmissions,
-          required String selectedKmRange,
-          required String selectedSoldBy,
-        }) {
-          setState(() {
-            _selectedBrands = selectedBrands;
-            _selectedPriceRange = selectedPriceRange;
-            _selectedYearRange = selectedYearRange;
-            _selectedOwnersRange = selectedOwnersRange;
-            _selectedFuelTypes = selectedFuelTypes;
-            _selectedTransmissions = selectedTransmissions;
-            _selectedKmRange = selectedKmRange;
-            _selectedSoldBy = selectedSoldBy;
-            _filtersChanged = true;
-          });
-        },
-      ),
+
+      builder:
+          (context) => FilterPage(
+            brands: _brands,
+            priceRanges: _priceRanges,
+            yearRanges: _yearRanges,
+            ownerRanges: _ownerRanges,
+            fuelTypes: _fuelTypes,
+            transmissions: _transmissions,
+            kmRanges: _kmRanges,
+            soldByOptions: _soldByOptions,
+            selectedBrands: _selectedBrands,
+            selectedPriceRange: _selectedPriceRange,
+            selectedYearRange: _selectedYearRange,
+            selectedOwnersRange: _selectedOwnersRange,
+            selectedFuelTypes: _selectedFuelTypes,
+            selectedTransmissions: _selectedTransmissions,
+            selectedKmRange: _selectedKmRange,
+            selectedSoldBy: _selectedSoldBy,
+            listingType: _listingType,
+            onClearAll: () {
+              _fetchProducts();
+              print("works");
+            },
+            onApplyFilters: ({
+              required List<String> selectedBrands,
+              required String selectedPriceRange,
+              required String selectedYearRange,
+              required String selectedOwnersRange,
+              required List<String> selectedFuelTypes,
+              required List<String> selectedTransmissions,
+              required String selectedKmRange,
+              required String selectedSoldBy,
+            }) {
+              setState(() {
+                _selectedBrands = selectedBrands;
+                _selectedPriceRange = selectedPriceRange;
+                _selectedYearRange = selectedYearRange;
+                _selectedOwnersRange = selectedOwnersRange;
+                _selectedFuelTypes = selectedFuelTypes;
+                _selectedTransmissions = selectedTransmissions;
+                _selectedKmRange = selectedKmRange;
+                _selectedSoldBy = selectedSoldBy;
+              });
+              _fetchFilterListings();
+              Navigator.pop(context);
+            },
+          ),
+
     );
   }
 
@@ -922,6 +976,7 @@ Widget build(BuildContext context) {
                   ],
                 ),
               )
+
             : _errorMessage != null
                 ? Center(
                     child: Column(
@@ -939,6 +994,7 @@ Widget build(BuildContext context) {
                           child: const Text('Retry'),
                         ),
                       ],
+
                     ),
                   )
                 : filteredProducts.isEmpty
@@ -988,8 +1044,23 @@ Widget build(BuildContext context) {
                           },
                         ),
                       ),
-  );
-}
+
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final product = _products[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _buildProductCard(product),
+                        );
+                      }, childCount: _products.length),
+                    ),
+                  ],
+                ),
+              ),
+    );
+  }
+
 
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
@@ -1354,5 +1425,96 @@ Widget _buildFinanceExchangeInfo(bool isFinanceAvailable, bool isExchangeAvailab
       return value.replaceFirst(RegExp(r'\d+'), formattedNumber);
     }
     return value;
+  }
+
+  Future<void> _fetchFilterListings() async {
+    final Map<String, String> queryParams = {};
+    // Brands (multi-select)
+    if (_selectedBrands.isNotEmpty) {
+      queryParams['brands'] = _selectedBrands.join(',');
+    }
+
+    // Price Range
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_price'] = parts[0];
+        queryParams['max_price'] = parts[1];
+      }
+    }
+
+    // Year Range (similar to price)
+    if (_selectedYearRange != 'all') {
+      final parts = _selectedYearRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_year'] = parts[0];
+        queryParams['max_year'] = parts[1];
+      }
+    }
+
+    // Owners Range
+    if (_selectedOwnersRange != 'all') {
+      final parts = _selectedOwnersRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_owners'] = parts[0];
+        queryParams['max_owners'] = parts[1];
+      }
+    }
+
+    // Fuel Types (multi-select)
+    if (_selectedFuelTypes.isNotEmpty) {
+      queryParams['fuel_types'] = _selectedFuelTypes.join(',');
+    }
+
+    // Transmissions (multi-select)
+    if (_selectedTransmissions.isNotEmpty) {
+      queryParams['transmissions'] = _selectedTransmissions.join(',');
+    }
+
+    // KM Range
+    if (_selectedKmRange != 'all') {
+      final parts = _selectedKmRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_km'] = parts[0];
+        queryParams['max_km'] = parts[1];
+      }
+    }
+
+    // Sold By
+    if (_selectedSoldBy != 'all') {
+      queryParams['sold_by'] = _selectedSoldBy;
+    }
+
+    // Add listingType if needed
+    queryParams['listing_type'] = _listingType;
+
+    try {
+      final apiService = ApiService();
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url: "$baseUrl/filter-used-cars-listings.php",
+        fields: queryParams,
+      );
+
+      final dataList = response['data'] as List<dynamic>? ?? [];
+
+      final finalPosts =
+          dataList.map((item) {
+            final json = item as Map<String, dynamic>;
+            return MarketplacePost.fromJson(json);
+          }).toList();
+
+      final products = finalPosts.map((post) => post.toProduct()).toList();
+
+      // final attributeValuePairs =
+      //     await AttributeValueService.fetchAttributeValuePairs();
+
+      setState(() {
+        _products = products;
+        // _productAttributeValues = _mapAttributeValuePairs(attributeValuePairs);
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error while fetching filter listings: $e");
+    }
   }
 }

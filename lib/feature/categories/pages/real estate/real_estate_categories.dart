@@ -227,6 +227,7 @@ class RealEstatePage extends StatefulWidget {
 }
 
 class _RealEstatePageState extends State<RealEstatePage> {
+  final String categoryId = '2';
   String _searchQuery = '';
   String _selectedLocation = 'all';
   String _listingType = 'sale'; // Added for sale/auction toggle
@@ -374,155 +375,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return ['all', ..._locations.map((loc) => loc.name)];
   }
 
-  List<MarketplacePost> get filteredPosts {
-    List<MarketplacePost> filtered = _posts;
-
-    if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered =
-          filtered.where((post) {
-            final propertyType =
-                post.filters['propertyType']?.isNotEmpty ?? false
-                    ? post.filters['propertyType']!.first.toLowerCase()
-                    : '';
-            return post.title.toLowerCase().contains(query) ||
-                post.landMark.toLowerCase().contains(query) ||
-                propertyType.contains(query);
-          }).toList();
-    }
-
-    if (_selectedLocation != 'all') {
-      filtered =
-          filtered
-              .where(
-                (post) =>
-                    post.userZoneId == _selectedLocation ||
-                    post.parentZoneId == _selectedLocation,
-              )
-              .toList();
-    }
-
-    if (_listingType == 'auction') {
-      filtered = filtered.where((post) => post.ifAuction == '1').toList();
-    } else if (_listingType == 'sale') {
-      filtered = filtered.where((post) => post.ifAuction == '0').toList();
-    }
-
-    if (_selectedPropertyTypes.isNotEmpty) {
-      filtered =
-          filtered.where((post) {
-            final propertyType =
-                post.filters['propertyType']?.isNotEmpty ?? false
-                    ? post.filters['propertyType']!.first
-                    : '';
-            return _selectedPropertyTypes.contains(propertyType);
-          }).toList();
-    }
-
-    if (_selectedPriceRange != 'all') {
-      filtered =
-          filtered.where((post) {
-            final priceStr =
-                _listingType == 'auction'
-                    ? post.auctionStartingPrice
-                    : post.price;
-            int price = int.tryParse(priceStr) ?? 0;
-            switch (_selectedPriceRange) {
-              case 'Under 50L':
-                return price < 5000000;
-              case '50L-1Cr':
-                return price >= 5000000 && price < 10000000;
-              case '1Cr-2Cr':
-                return price >= 10000000 && price < 20000000;
-              case '2Cr-5Cr':
-                return price >= 20000000 && price < 50000000;
-              case 'Above 5Cr':
-                return price >= 50000000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedBedroomRange != 'all') {
-      filtered =
-          filtered.where((post) {
-            final bedroomsStr =
-                post.filters['bedrooms']?.isNotEmpty ?? false
-                    ? post.filters['bedrooms']!.first
-                    : '0';
-            int bedrooms = int.tryParse(bedroomsStr) ?? 0;
-            switch (_selectedBedroomRange) {
-              case '1':
-                return bedrooms == 1;
-              case '2':
-                return bedrooms == 2;
-              case '3':
-                return bedrooms == 3;
-              case '4':
-                return bedrooms == 4;
-              case '5+':
-                return bedrooms >= 5;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedAreaRange != 'all') {
-      filtered =
-          filtered.where((post) {
-            final areaStr =
-                post.filters['area']?.isNotEmpty ?? false
-                    ? post.filters['area']!.first
-                    : '0';
-            int area = int.tryParse(areaStr) ?? 0;
-            switch (_selectedAreaRange) {
-              case 'Under 500 sq ft':
-                return area < 500;
-              case '500-1000 sq ft':
-                return area >= 500 && area < 1000;
-              case '1000-1500 sq ft':
-                return area >= 1000 && area < 1500;
-              case '1500-2000 sq ft':
-                return area >= 1500 && area < 2000;
-              case 'Above 2000 sq ft':
-                return area >= 2000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedFurnishings.isNotEmpty) {
-      filtered =
-          filtered.where((post) {
-            final furnishing =
-                post.filters['furnishing']?.isNotEmpty ?? false
-                    ? post.filters['furnishing']!.first
-                    : '';
-            return _selectedFurnishings.contains(furnishing);
-          }).toList();
-    }
-
-    if (_selectedPostedBy != 'all') {
-      filtered =
-          filtered.where((post) {
-            switch (_selectedPostedBy) {
-              case 'Owner':
-                return post.byDealer == '0';
-              case 'Builder':
-              case 'Agent':
-                return post.byDealer == '1';
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    return filtered;
-  }
-
   void _showFilterBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -572,6 +424,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                   _selectedFurnishings.clear();
                                   _selectedPostedBy = 'all';
                                 });
+                                _fetchPosts();
                               },
                               child: const Text(
                                 'Clear All',
@@ -679,8 +532,136 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
+                                onPressed: () async {
+                                  final Map<String, String> queryParams = {};
+
+                                  // Property Types
+                                  if (_selectedPropertyTypes.isNotEmpty) {
+                                    queryParams['property_types'] =
+                                        _selectedPropertyTypes.join(',');
+                                  }
+
+                                  // Price Range
+                                  if (_selectedPriceRange != 'all') {
+                                    switch (_selectedPriceRange) {
+                                      case 'Under 50L':
+                                        queryParams['min_price'] = '0';
+                                        queryParams['max_price'] = '5000000';
+                                        break;
+                                      case '50L-1Cr':
+                                        queryParams['min_price'] = '5000000';
+                                        queryParams['max_price'] = '10000000';
+                                        break;
+                                      case '1Cr-2Cr':
+                                        queryParams['min_price'] = '10000000';
+                                        queryParams['max_price'] = '20000000';
+                                        break;
+                                      case '2Cr-5Cr':
+                                        queryParams['min_price'] = '20000000';
+                                        queryParams['max_price'] = '50000000';
+                                        break;
+                                      case 'Above 5Cr':
+                                        queryParams['min_price'] = '50000000';
+                                        break;
+                                    }
+                                  }
+
+                                  // Bedrooms
+                                  if (_selectedBedroomRange != 'all') {
+                                    switch (_selectedBedroomRange) {
+                                      case '1':
+                                        queryParams['bedrooms'] = '1';
+                                        break;
+                                      case '2':
+                                        queryParams['bedrooms'] = '2';
+                                        break;
+                                      case '3':
+                                        queryParams['bedrooms'] = '3';
+                                        break;
+                                      case '4':
+                                        queryParams['bedrooms'] = '4';
+                                        break;
+                                      case '5+':
+                                        queryParams['bedrooms'] = '5_plus';
+                                        break;
+                                    }
+                                  }
+
+                                  // Area
+                                  if (_selectedAreaRange != 'all') {
+                                    switch (_selectedAreaRange) {
+                                      case 'Under 500 sq ft':
+                                        queryParams['min_area'] = '0';
+                                        queryParams['max_area'] = '500';
+                                        break;
+                                      case '500-1000 sq ft':
+                                        queryParams['min_area'] = '500';
+                                        queryParams['max_area'] = '1000';
+                                        break;
+                                      case '1000-1500 sq ft':
+                                        queryParams['min_area'] = '1000';
+                                        queryParams['max_area'] = '1500';
+                                        break;
+                                      case '1500-2000 sq ft':
+                                        queryParams['min_area'] = '1500';
+                                        queryParams['max_area'] = '2000';
+                                        break;
+                                      case 'Above 2000 sq ft':
+                                        queryParams['min_area'] = '2000';
+                                        break;
+                                    }
+                                  }
+
+                                  // Furnishing
+                                  if (_selectedFurnishings.isNotEmpty) {
+                                    queryParams['furnishing'] =
+                                        _selectedFurnishings.join(',');
+                                  }
+
+                                  // Posted By
+                                  if (_selectedPostedBy != 'all') {
+                                    switch (_selectedPostedBy) {
+                                      case 'Owner':
+                                        queryParams['by_dealer'] = '0';
+                                        break;
+                                      case 'Builder':
+                                      case 'Agent':
+                                        queryParams['by_dealer'] = '1';
+                                        break;
+                                    }
+                                  }
+
+                                  // Listing type (auction / sale)
+                                  queryParams['listing_type'] = categoryId;
+
+                                  try {
+                                    setState(() => _isLoading = true);
+                                    final apiService = ApiService();
+                                    final Map<String, dynamic>
+                                    response = await apiService.postMultipart(
+                                      url:
+                                          "$baseUrl/filter-realestate-listings.php",
+                                      fields: queryParams,
+                                    );
+
+                                    final dataList =
+                                        response['data'] as List<dynamic>? ??
+                                        [];
+                                    final finalPosts =
+                                        dataList.map((item) {
+                                          final json =
+                                              item as Map<String, dynamic>;
+                                          return MarketplacePost.fromJson(json);
+                                        }).toList();
+
+                                    setState(() {
+                                      _posts = finalPosts;
+                                      _isLoading = false;
+                                    });
+                                  } catch (e) {
+                                    setState(() => _isLoading = false);
+                                  }
+
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -1101,7 +1082,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     ),
                   ),
                 )
-                : filteredPosts.isEmpty
+                : _posts.isEmpty
                 ? SliverToBoxAdapter(
                   child: Center(
                     child: Column(
@@ -1135,12 +1116,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 )
                 : SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final post = filteredPosts[index];
+                    final post = _posts[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: _buildPostCard(post),
                     );
-                  }, childCount: filteredPosts.length),
+                  }, childCount: _posts.length),
                 ),
         ],
       ),

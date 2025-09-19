@@ -221,9 +221,11 @@ class CommercialVehiclesPage extends StatefulWidget {
 
 class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   String _searchQuery = '';
+  final String categoryId = '3';
   String _selectedLocation = 'all';
   final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
+
   String _selectedCondition = 'all';
   final List<String> _selectedFuelTypes = [];
 
@@ -303,7 +305,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     });
     try {
       final posts = await _marketplaceService.fetchPosts(
-        categoryId: '3',
+        categoryId: categoryId,
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
       );
       setState(() {
@@ -319,24 +321,40 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   }
 
   final List<String> _vehicleTypes = [
-    'Mini Truck',
-    'Pickup Truck',
-    'Light Truck',
-    'Heavy Truck',
+    'Auto-rickshaw',
     'Bus',
-    'Auto Rickshaw',
-    'Tempo',
-    'Van',
+    'Truck',
+    'E-Rickshaws',
+    'Heavy Machinery',
+    'Modified Jeep',
+    'Pick-up Van',
+    'Pick-up Truck',
+    'Taxi Cab',
+    'Tractor',
+    'Other Commercial',
   ];
 
+  // Define price ranges as labels
   final List<String> _priceRanges = [
     'all',
-    'Under 5L',
-    '5L-10L',
-    '10L-20L',
-    '20L-50L',
+    '0-1L',
+    '1-3L',
+    '3-6L',
+    '6-10L',
+    '10-20L',
+    '20-50L',
     'Above 50L',
   ];
+
+  final Map<String, Map<String, int>> _priceRangeMap = {
+    '0-1L': {'min': 0, 'max': 100000}, // 1 lakh
+    '1-3L': {'min': 100000, 'max': 300000}, // 3 lakh
+    '3-6L': {'min': 300000, 'max': 600000}, // 6 lakh
+    '6-10L': {'min': 600000, 'max': 1000000}, // 10 lakh
+    '10-20L': {'min': 1000000, 'max': 2000000},
+    '20-50L': {'min': 2000000, 'max': 5000000},
+    'Above 50L': {'min': 5000000, 'max': 999999999}, // cap high
+  };
 
   final List<String> _conditions = ['all', 'New', 'Used'];
 
@@ -344,92 +362,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
-  }
-
-  List<MarketplacePost> get filteredPosts {
-    List<MarketplacePost> filtered = _posts;
-
-    if (_searchQuery.trim().isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered =
-          filtered.where((post) {
-            final vehicleType =
-                post.filters['type']?.isNotEmpty ?? false
-                    ? post.filters['type']!.first.toLowerCase()
-                    : '';
-            return post.title.toLowerCase().contains(query) ||
-                post.brand.toLowerCase().contains(query) ||
-                vehicleType.contains(query) ||
-                post.landMark.toLowerCase().contains(query);
-          }).toList();
-    }
-
-    if (_selectedLocation != 'all') {
-      filtered =
-          filtered
-              .where(
-                (post) =>
-                    post.userZoneId == _selectedLocation ||
-                    post.parentZoneId == _selectedLocation,
-              )
-              .toList();
-    }
-
-    if (_selectedVehicleTypes.isNotEmpty) {
-      filtered =
-          filtered.where((post) {
-            final vehicleType =
-                post.filters['type']?.isNotEmpty ?? false
-                    ? post.filters['type']!.first
-                    : '';
-            return _selectedVehicleTypes.contains(vehicleType);
-          }).toList();
-    }
-
-    if (_selectedPriceRange != 'all') {
-      filtered =
-          filtered.where((post) {
-            int price = int.tryParse(post.price) ?? 0;
-            switch (_selectedPriceRange) {
-              case 'Under 5L':
-                return price < 500000;
-              case '5L-10L':
-                return price >= 500000 && price < 1000000;
-              case '10L-20L':
-                return price >= 1000000 && price < 2000000;
-              case '20L-50L':
-                return price >= 2000000 && price < 5000000;
-              case 'Above 50L':
-                return price >= 5000000;
-              default:
-                return true;
-            }
-          }).toList();
-    }
-
-    if (_selectedCondition != 'all') {
-      filtered =
-          filtered.where((post) {
-            final condition =
-                post.filters['condition']?.isNotEmpty ?? false
-                    ? post.filters['condition']!.first
-                    : '';
-            return condition == _selectedCondition;
-          }).toList();
-    }
-
-    if (_selectedFuelTypes.isNotEmpty) {
-      filtered =
-          filtered.where((post) {
-            final fuel =
-                post.filters['fuel']?.isNotEmpty ?? false
-                    ? post.filters['fuel']!.first
-                    : '';
-            return _selectedFuelTypes.contains(fuel);
-          }).toList();
-    }
-
-    return filtered;
   }
 
   void _showFilterBottomSheet() {
@@ -479,6 +411,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                                   _selectedCondition = 'all';
                                   _selectedFuelTypes.clear();
                                 });
+                                _fetchPosts();
                               },
                               child: const Text(
                                 'Clear All',
@@ -544,7 +477,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                           children: [
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () async {},
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primarypink,
                                   padding: const EdgeInsets.symmetric(
@@ -567,8 +500,67 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
+                                onPressed: () async {
+                                  final Map<String, String> queryParams = {};
+                                  // Price Range
+                                  // Vehicle Type (maps to brands)
+                                  if (_selectedVehicleTypes.isNotEmpty) {
+                                    queryParams['brands'] =
+                                        _selectedVehicleTypes.join(',');
+                                  }
+                                  if (_selectedPriceRange != 'all') {
+                                    final range =
+                                        _priceRangeMap[_selectedPriceRange];
+                                    if (range != null) {
+                                      queryParams['min_price'] =
+                                          range['min'].toString();
+                                      queryParams['max_price'] =
+                                          range['max'].toString();
+                                    }
+                                  }
+                                  // Condition (maps to sold_by)
+                                  if (_selectedCondition != 'all') {
+                                    queryParams['sold_by'] =
+                                        _selectedCondition; // e.g., 'Owner', 'Dealer'
+                                  }
+                                  // Fuel Types
+                                  if (_selectedFuelTypes.isNotEmpty) {
+                                    queryParams['fuel_types'] =
+                                        _selectedFuelTypes.join(',');
+                                  }
+                                  queryParams['listing_type'] = categoryId;
+                                  try {
+                                    setState(() => _isLoading = true);
+                                    final apiService = ApiService();
+                                    final Map<String, dynamic>
+                                    response = await apiService.postMultipart(
+                                      url:
+                                          "$baseUrl/filter-comercial-cars-listings.php",
+                                      fields: queryParams,
+                                    );
+
+                                    final dataList =
+                                        response['data'] as List<dynamic>? ??
+                                        [];
+                                    final finalPosts =
+                                        dataList.map((item) {
+                                          final json =
+                                              item as Map<String, dynamic>;
+                                          return MarketplacePost.fromJson(json);
+                                        }).toList();
+
+                                    setState(() {
+                                      _posts = finalPosts;
+                                      _isLoading = false;
+                                    });
+
+                                    print('Filter applied successfully');
+                                    print(response);
+                                  } catch (e) {
+                                    print("Error while applying filters: $e");
+                                    setState(() => _isLoading = false);
+                                  }
+
                                   Navigator.pop(context);
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -987,7 +979,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                     ),
                   ),
                 )
-                : filteredPosts.isEmpty
+                : _posts.isEmpty
                 ? SliverToBoxAdapter(
                   child: Center(
                     child: Column(
@@ -1021,12 +1013,12 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                 )
                 : SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final post = filteredPosts[index];
+                    final post = _posts[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: _buildVehicleCard(post),
                     );
-                  }, childCount: filteredPosts.length),
+                  }, childCount: _posts.length),
                 ),
         ],
       ),

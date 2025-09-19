@@ -6,12 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
-import 'package:lelamonline_flutter/core/model/user_model.dart';
+
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
+
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
     hide token, baseUrl;
@@ -215,10 +215,7 @@ class _MarketPlaceProductDetailsPageState
         _galleryError = '';
       });
 
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': token};
       final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
       debugPrint('Fetching gallery: $url');
 
@@ -378,15 +375,6 @@ class _MarketPlaceProductDetailsPageState
         _isFavorited = false;
         _isCheckingShortlist = false;
       });
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text(''),
-      //     backgroundColor: Colors.red,
-      //     behavior: SnackBarBehavior.floating,
-      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      //     margin: const EdgeInsets.all(16),
-      //   ),
-      // );
     }
   }
 
@@ -490,10 +478,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     try {
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
       debugPrint('Placing bid: $url');
@@ -544,10 +529,7 @@ class _MarketPlaceProductDetailsPageState
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl',
       );
 
-      final headers = {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': token};
       final url = '$baseUrl/post-ads-image.php?token=$token';
       debugPrint(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url',
@@ -947,8 +929,10 @@ class _MarketPlaceProductDetailsPageState
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 backgroundColor: Colors.white,
+
                 titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+
                 title: Text(
                   'Place Your Bid Amount',
                   style: TextStyle(
@@ -957,6 +941,7 @@ class _MarketPlaceProductDetailsPageState
                     color: AppTheme.primaryColor,
                   ),
                 ),
+
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,6 +1027,7 @@ class _MarketPlaceProductDetailsPageState
                         ),
                       ),
                   ],
+
                 ),
                 actions: [
                   Row(
@@ -1137,6 +1123,7 @@ class _MarketPlaceProductDetailsPageState
                                       FocusScope.of(dialogContext).unfocus();
                                       final String responseMessage =
                                           await _saveBidData(bidAmount);
+
                                       // Parse current highest bid and user's bid for comparison
                                       final double currentHighest =
                                           double.tryParse(_currentHighestBid) ??
@@ -1147,12 +1134,15 @@ class _MarketPlaceProductDetailsPageState
                                         'success': true,
                                         'message': responseMessage,
                                         'isHighestBid': isHighestBid,
+
                                       });
                                     } catch (e) {
                                       Navigator.of(dialogContext).pop({
                                         'success': false,
                                         'message': 'Error placing bid: $e',
+
                                         'isHighestBid': false,
+
                                       });
                                     } finally {
                                       setDialogState(() {

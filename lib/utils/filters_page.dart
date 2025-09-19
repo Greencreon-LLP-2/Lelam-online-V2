@@ -20,6 +20,7 @@ class FilterPage extends StatefulWidget {
   final String selectedKmRange;
   final String selectedSoldBy;
   final String listingType;
+  final VoidCallback? onClearAll;
   final Function({
     required List<String> selectedBrands,
     required String selectedPriceRange,
@@ -51,6 +52,7 @@ class FilterPage extends StatefulWidget {
     required this.selectedSoldBy,
     required this.listingType,
     required this.onApplyFilters,
+    this.onClearAll,
   });
 
   @override
@@ -524,6 +526,8 @@ class _FilterPageState extends State<FilterPage> {
                         _minPriceController.clear();
                         _maxPriceController.clear();
                       });
+                      widget.onClearAll?.call();
+
                     },
                     child: const Text(
                       'Clear All',

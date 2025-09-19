@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 
 class MarketplacePost {
   final String id;
