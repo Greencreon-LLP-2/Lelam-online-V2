@@ -12,8 +12,10 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
@@ -21,6 +23,7 @@ import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/details_service.dart' show TempApiService;
 
 class MarketplaceService {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
@@ -224,7 +227,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _listingType = widget.showAuctions ? 'auction' : 'Marketplace';
     _checkLoginStatus().then((_) {
       if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-        context.push(RouteNames.loginPage, extra: {'redirectTo': 'usedCars', 'listingType': 'auction'});
+        context.push(
+          RouteNames.loginPage,
+          extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
+        );
       } else {
         _fetchProducts();
       }
@@ -314,20 +320,26 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: dialogIsAccepted && !isLoadingTerms && termsError == null
-                      ? () async {
-                          bool accepted = await _marketplaceService.acceptAuctionTerms(_userId ?? '');
-                          if (accepted) {
-                            await _storage.write(key: 'auction_terms_accepted', value: 'true');
-                            Navigator.pop(dialogContext, true);
-                          } else {
-                            setState(() {
-                              _errorMessage = 'Failed to accept terms. Please try again.';
-                            });
-                            Navigator.pop(dialogContext, false);
+                  onPressed:
+                      dialogIsAccepted && !isLoadingTerms && termsError == null
+                          ? () async {
+                            bool accepted = await _marketplaceService
+                                .acceptAuctionTerms(_userId ?? '');
+                            if (accepted) {
+                              await _storage.write(
+                                key: 'auction_terms_accepted',
+                                value: 'true',
+                              );
+                              Navigator.pop(dialogContext, true);
+                            } else {
+                              setState(() {
+                                _errorMessage =
+                                    'Failed to accept terms. Please try again.';
+                              });
+                              Navigator.pop(dialogContext, false);
+                            }
                           }
-                        }
-                      : null,
+                          : null,
                   child: const Text('Accept'),
                 ),
               ],
@@ -343,17 +355,21 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<bool> _checkAuctionTermsAcceptance() async {
-    final url = '${MarketplaceService2.baseUrl}/auction-start-checking.php?token=${MarketplaceService2.token}&cat_id=14';
+    final url =
+        '${MarketplaceService2.baseUrl}/auction-start-checking.php?token=${MarketplaceService2.token}&cat_id=14';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-        if (decodedBody['status'] == 'true' && decodedBody['data'] == 'Please accept live auction terms') {
+        if (decodedBody['status'] == 'true' &&
+            decodedBody['data'] == 'Please accept live auction terms') {
           return false;
         }
         return true;
       } else {
-        throw Exception('Failed to check auction terms: ${response.statusCode}');
+        throw Exception(
+          'Failed to check auction terms: ${response.statusCode}',
+        );
       }
     } catch (e) {
       print('Error checking auction terms: $e');
@@ -362,7 +378,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _checkLoginStatus() async {
-    final userId = _userProvider.userId ?? await _storage.read(key: 'userId') ?? '';
+    final userId =
+        _userProvider.userId ?? await _storage.read(key: 'userId') ?? '';
     if (mounted) {
       setState(() {
         _userId = userId;
@@ -379,13 +396,17 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     });
 
     try {
-      final Map<String, dynamic> response = await ApiService().get(url: locations);
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print('Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}');
+          print(
+            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+          );
         });
       } else {
         throw Exception('Invalid API response format');
@@ -400,8 +421,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-      debugPrint('Redirecting to login page: userId=$_userId, listingType=$_listingType');
-      context.push(RouteNames.loginPage, extra: {'redirectTo': 'usedCars', 'listingType': 'auction'});
+      debugPrint(
+        'Redirecting to login page: userId=$_userId, listingType=$_listingType',
+      );
+      context.push(
+        RouteNames.loginPage,
+        extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
+      );
       setState(() {
         _isLoading = false;
         _errorMessage = null;
@@ -439,11 +465,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           await _fetchProducts();
         } else {
           setState(() {
-            _errorMessage = 'You must accept the auction terms to view auctions.';
+            _errorMessage =
+                'You must accept the auction terms to view auctions.';
             _isLoading = false;
           });
         }
-      } else if (e.toString().contains('Unexpected data format: Data not found')) {
+      } else if (e.toString().contains(
+        'Unexpected data format: Data not found',
+      )) {
         setState(() {
           _products = [];
           _filteredProductsCache = [];
@@ -460,12 +489,15 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchPostAttributes(String postId) async {
-    if (_postAttributeValuesCache.containsKey(postId) || _fetchingPostIds.contains(postId)) {
+    if (_postAttributeValuesCache.containsKey(postId) ||
+        _fetchingPostIds.contains(postId)) {
       return;
     }
     _fetchingPostIds.add(postId);
     try {
-      final attributes = await _marketplaceService.fetchPostAttributeValues(postId);
+      final attributes = await _marketplaceService.fetchPostAttributeValues(
+        postId,
+      );
       if (mounted) {
         setState(() {
           _postAttributeValuesCache[postId] = attributes;
@@ -489,11 +521,17 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       final scrollOffset = _scrollController.offset;
       const itemHeight = 180.0;
       final firstVisibleIndex = (scrollOffset / itemHeight).floor();
-      final lastVisibleIndex = ((scrollOffset + screenHeight) / itemHeight).ceil();
+      final lastVisibleIndex =
+          ((scrollOffset + screenHeight) / itemHeight).ceil();
 
-      for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _filteredProductsCache.length; i++) {
+      for (
+        int i = firstVisibleIndex;
+        i <= lastVisibleIndex && i < _filteredProductsCache.length;
+        i++
+      ) {
         final product = _filteredProductsCache[i];
-        if (!_postAttributeValuesCache.containsKey(product.id) && !_fetchingPostIds.contains(product.id)) {
+        if (!_postAttributeValuesCache.containsKey(product.id) &&
+            !_fetchingPostIds.contains(product.id)) {
           _fetchPostAttributes(product.id);
         }
       }
@@ -504,21 +542,22 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -638,7 +677,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath =
+        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/$cleanedPath';
   }
 
@@ -695,7 +735,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               Navigator.pop(context);
             },
           ),
-
     );
   }
 
@@ -726,25 +765,27 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           hintText: 'Search cars...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
-        onChanged: (value) => setState(() {
-          _searchQuery = value;
-          _filtersChanged = true;
-        }),
+        onChanged:
+            (value) => setState(() {
+              _searchQuery = value;
+              _filtersChanged = true;
+            }),
       ),
     );
   }
@@ -764,18 +805,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           hintText: 'Search by brand, model, location, fuel type...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade200),
@@ -790,7 +832,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           ),
           filled: true,
           fillColor: Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -818,8 +863,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: _listingType == 'Marketplace' ? Colors.grey.shade400 : Colors.grey.shade200,
-                foregroundColor: _listingType == 'Marketplace' ? Colors.white : Colors.black87,
+                backgroundColor:
+                    _listingType == 'Marketplace'
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade200,
+                foregroundColor:
+                    _listingType == 'Marketplace'
+                        ? Colors.white
+                        : Colors.black87,
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -848,8 +899,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: _listingType == 'auction' ? Colors.grey.shade400 : Colors.grey.shade200,
-                foregroundColor: _listingType == 'auction' ? Colors.white : Colors.black87,
+                backgroundColor:
+                    _listingType == 'auction'
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade200,
+                foregroundColor:
+                    _listingType == 'auction' ? Colors.white : Colors.black87,
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -866,57 +921,65 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  debugPrint('UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage');
-  return Scaffold(
-    backgroundColor: Colors.white,
-    appBar: AppBar(
+  @override
+  Widget build(BuildContext context) {
+    debugPrint(
+      'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
+    );
+    return Scaffold(
       backgroundColor: Colors.white,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.arrow_back, color: Colors.black87),
-      ),
-      title: _showAppBarSearch ? _buildAppBarSearchField() : const Text('Used Cars'),
-      actions: [
-        Stack(
-          children: [
-            IconButton(
-              onPressed: _showFilterBottomSheet,
-              icon: const Icon(Icons.tune, color: Colors.black87),
-            ),
-            if (_getActiveFilterCount() > 0)
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '${_getActiveFilterCount()}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        ),
+        title:
+            _showAppBarSearch
+                ? _buildAppBarSearchField()
+                : const Text('Used Cars'),
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _showFilterBottomSheet,
+                icon: const Icon(Icons.tune, color: Colors.black87),
+              ),
+              if (_getActiveFilterCount() > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${_getActiveFilterCount()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        _isLoadingLocations
-            ? const CircularProgressIndicator()
-            : PopupMenuButton<String>(
+            ],
+          ),
+          _isLoadingLocations
+              ? const CircularProgressIndicator()
+              : PopupMenuButton<String>(
                 icon: const Icon(Icons.location_on, color: Colors.black87),
                 onSelected: (String value) {
                   setState(() {
-                    _selectedLocation = value == 'all'
-                        ? 'all'
-                        : _locations.firstWhere((loc) => loc.name == value).id;
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
                     _filtersChanged = true;
                     _fetchProducts();
                   });
@@ -928,10 +991,22 @@ Widget build(BuildContext context) {
                       child: Row(
                         children: [
                           if (_selectedLocation ==
-                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
-                            const Icon(Icons.check, color: Colors.blue, size: 16),
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const Icon(
+                              Icons.check,
+                              color: Colors.blue,
+                              size: 16,
+                            ),
                           if (_selectedLocation ==
-                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
                             const SizedBox(width: 8),
                           Text(city == 'all' ? 'All Kerala' : city),
                         ],
@@ -940,12 +1015,16 @@ Widget build(BuildContext context) {
                   }).toList();
                 },
               ),
-      ],
-    ),
-    body: _isLoading || _isLoadingLocations
-        ? const Center(child: CircularProgressIndicator(color: Palette.primaryblue))
-        : _listingType == 'auction' && (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
-            ? Center(
+        ],
+      ),
+      body:
+          _isLoading || _isLoadingLocations
+              ? const Center(
+                child: CircularProgressIndicator(color: Palette.primaryblue),
+              )
+              : _listingType == 'auction' &&
+                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
+              ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -959,16 +1038,24 @@ Widget build(BuildContext context) {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        debugPrint('Navigating to login page from auction prompt');
-                        context.push(RouteNames.loginPage, extra: {
-                          'redirectTo': 'usedCars',
-                          'listingType': 'auction',
-                        });
+                        debugPrint(
+                          'Navigating to login page from auction prompt',
+                        );
+                        context.push(
+                          RouteNames.loginPage,
+                          extra: {
+                            'redirectTo': 'usedCars',
+                            'listingType': 'auction',
+                          },
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Palette.primaryblue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
                         textStyle: const TextStyle(fontSize: 16),
                       ),
                       child: const Text('Log In'),
@@ -976,91 +1063,84 @@ Widget build(BuildContext context) {
                   ],
                 ),
               )
-
-            : _errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => _fetchProducts(forceRefresh: true),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-
-                    ),
-                  )
-                : filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No cars found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try adjusting your filters or search terms',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _fetchProducts(forceRefresh: true),
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          itemCount: filteredProducts.length + (_showMainSearch ? 2 : 1),
-                          itemBuilder: (context, index) {
-                            if (_showMainSearch && index == 0) {
-                              return _buildSearchField();
-                            }
-                            if (index == (_showMainSearch ? 1 : 0)) {
-                              return _buildListingTypeButtons();
-                            }
-                            final productIndex = index - (_showMainSearch ? 2 : 1);
-                            if (productIndex < filteredProducts.length) {
-                              final product = filteredProducts[productIndex];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: _buildProductCard(product),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
+              : _errorMessage != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
                       ),
-
                     ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final product = _products[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildProductCard(product),
-                        );
-                      }, childCount: _products.length),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => _fetchProducts(forceRefresh: true),
+                      child: const Text('Retry'),
                     ),
                   ],
+                ),
+              )
+              : _products.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: () => _fetchProducts(forceRefresh: true),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _products.length + (_showMainSearch ? 2 : 1),
+                  itemBuilder: (context, index) {
+                    if (_showMainSearch && index == 0) {
+                      return _buildSearchField();
+                    }
+                    if (index == (_showMainSearch ? 1 : 0)) {
+                      return _buildListingTypeButtons();
+                    }
+                    final productIndex = index - (_showMainSearch ? 2 : 1);
+                    if (productIndex < _products.length) {
+                      final product = _products[productIndex];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildProductCard(product),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ),
     );
   }
-
 
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
@@ -1083,27 +1163,27 @@ Widget build(BuildContext context) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => MarketPlaceProductDetailsPage(
-                product: product,
-                isAuction: product.ifAuction == '1',
-              ),
+              builder:
+                  (context) => MarketPlaceProductDetailsPage(
+                    product: product,
+                    isAuction: product.ifAuction == '1',
+                  ),
             ),
           );
         }
       },
       child: Container(
-
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
-           boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.30),
-                  blurRadius: 5,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 5),
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.30),
+              blurRadius: 5,
+              spreadRadius: 1,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1123,7 +1203,8 @@ Widget build(BuildContext context) {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: CachedNetworkImage(
-                          imageUrl: 'https://lelamonline.com/admin/${product.image}',
+                          imageUrl:
+                              'https://lelamonline.com/admin/${product.image}',
                           fit: BoxFit.cover,
                           width: 120,
                           height: 150,
@@ -1131,9 +1212,16 @@ Widget build(BuildContext context) {
                           // memCacheWidth: 120,
                           // maxHeightDiskCache: 120,
                           // maxWidthDiskCache: 120,
-                          placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          placeholder:
+                              (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
                           errorWidget: (context, url, error) {
-                            print('Failed to load image: https://lelamonline.com/admin/${product.image}');
+                            print(
+                              'Failed to load image: https://lelamonline.com/admin/${product.image}',
+                            );
                             print('Error: $error');
                             return Container(
                               color: Colors.grey.shade200,
@@ -1151,7 +1239,10 @@ Widget build(BuildContext context) {
                           top: 4,
                           left: 4,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red,
                               borderRadius: BorderRadius.circular(4),
@@ -1204,7 +1295,10 @@ Widget build(BuildContext context) {
                         ),
                         Text(
                           product.modelVariation,
-                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         if (isAuction)
@@ -1221,7 +1315,9 @@ Widget build(BuildContext context) {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _formatPrice(double.tryParse(product.price) ?? 0),
+                                _formatPrice(
+                                  double.tryParse(product.price) ?? 0,
+                                ),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -1229,7 +1325,9 @@ Widget build(BuildContext context) {
                                 ),
                               ),
                               Text(
-                                _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                                _formatPrice(
+                                  double.tryParse(product.offerPrice) ?? 0,
+                                ),
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -1250,29 +1348,47 @@ Widget build(BuildContext context) {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.location_on, size: 12, color: Colors.grey.shade500),
+                            Icon(
+                              Icons.location_on,
+                              size: 12,
+                              color: Colors.grey.shade500,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               _getLocationName(product.parentZoneId),
-                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Builder(
                           builder: (context) {
-                            final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-                            final isFetching = _fetchingPostIds.contains(product.id);
+                            final attributeValues =
+                                _postAttributeValuesCache[product.id] ?? {};
+                            final isFetching = _fetchingPostIds.contains(
+                              product.id,
+                            );
                             final year = attributeValues['Year'] ?? 'N/A';
-                            final owners = attributeValues['No of owners'] ?? 'N/A';
-                            final transmission = attributeValues['Transmission'] ?? 'N/A';
-                            final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
-                            final kmRange = attributeValues['KM Range'] ?? 'N/A';
+                            final owners =
+                                attributeValues['No of owners'] ?? 'N/A';
+                            final transmission =
+                                attributeValues['Transmission'] ?? 'N/A';
+                            final fuelType =
+                                attributeValues['Fuel Type'] ?? 'N/A';
+                            final kmRange =
+                                attributeValues['KM Range'] ?? 'N/A';
 
                             if (isFetching && attributeValues.isEmpty) {
                               return const SizedBox(
                                 height: 32,
-                                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                               );
                             }
 
@@ -1280,11 +1396,28 @@ Widget build(BuildContext context) {
                               spacing: 4,
                               runSpacing: 4,
                               children: [
-                                if (year != 'N/A') _buildDetailChip(Icons.calendar_today, year),
-                                if (owners != 'N/A') _buildDetailChip(Icons.person, _getOwnerText(owners)),
-                                if (kmRange != 'N/A') _buildDetailChip(Icons.speed, _formatKmRange(kmRange)),
-                                if (fuelType != 'N/A') _buildDetailChip(Icons.local_gas_station, fuelType),
-                                if (transmission != 'N/A') _buildDetailChip(Icons.settings, transmission),
+                                if (year != 'N/A')
+                                  _buildDetailChip(Icons.calendar_today, year),
+                                if (owners != 'N/A')
+                                  _buildDetailChip(
+                                    Icons.person,
+                                    _getOwnerText(owners),
+                                  ),
+                                if (kmRange != 'N/A')
+                                  _buildDetailChip(
+                                    Icons.speed,
+                                    _formatKmRange(kmRange),
+                                  ),
+                                if (fuelType != 'N/A')
+                                  _buildDetailChip(
+                                    Icons.local_gas_station,
+                                    fuelType,
+                                  ),
+                                if (transmission != 'N/A')
+                                  _buildDetailChip(
+                                    Icons.settings,
+                                    transmission,
+                                  ),
                               ],
                             );
                           },
@@ -1299,12 +1432,21 @@ Widget build(BuildContext context) {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isAuction ? Palette.primarylightblue : Colors.grey.shade50,
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                  color:
+                      isAuction
+                          ? Palette.primarylightblue
+                          : Colors.grey.shade50,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(8),
+                  ),
                 ),
-                child: isAuction
-                    ? _buildAuctionInfo(product)
-                    : _buildFinanceExchangeInfo(isFinanceAvailable, isExchangeAvailable),
+                child:
+                    isAuction
+                        ? _buildAuctionInfo(product)
+                        : _buildFinanceExchangeInfo(
+                          isFinanceAvailable,
+                          isExchangeAvailable,
+                        ),
               ),
           ],
         ),
@@ -1315,10 +1457,7 @@ Widget build(BuildContext context) {
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-    
-        borderRadius: BorderRadius.circular(8),
-      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -1350,54 +1489,60 @@ Widget build(BuildContext context) {
     );
   }
 
-Widget _buildFinanceExchangeInfo(bool isFinanceAvailable, bool isExchangeAvailable) {
-  List<Widget> children = [];
-  if (isFinanceAvailable) {
-    children.add(
-      Row(
-        children: [
-          const Icon(Icons.account_balance, size: 10, color: Colors.black),
-          const SizedBox(width: 4),
-          const Text(
-            'Finance Available',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
+  Widget _buildFinanceExchangeInfo(
+    bool isFinanceAvailable,
+    bool isExchangeAvailable,
+  ) {
+    List<Widget> children = [];
+    if (isFinanceAvailable) {
+      children.add(
+        Row(
+          children: [
+            const Icon(Icons.account_balance, size: 10, color: Colors.black),
+            const SizedBox(width: 4),
+            const Text(
+              'Finance Available',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      );
+    }
+    if (isExchangeAvailable) {
+      if (children.isNotEmpty) children.add(const SizedBox(width: 8));
+      children.add(
+        Row(
+          children: [
+            const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+            const SizedBox(width: 4),
+            const Text(
+              'Exchange Available',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color:
+            (isFinanceAvailable || isExchangeAvailable)
+                ? Palette.primarylightblue
+                : Colors.grey.shade50,
+        // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
       ),
+      child: Row(children: children),
     );
   }
-  if (isExchangeAvailable) {
-    if (children.isNotEmpty) children.add(const SizedBox(width: 8));
-    children.add(
-      Row(
-        children: [
-          const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-          const SizedBox(width: 4),
-          const Text(
-            'Exchange Available',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: (isFinanceAvailable || isExchangeAvailable) ? Palette.primarylightblue : Colors.grey.shade50,
-     // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-    ),
-    child: Row(children: children),
-  );
-}
 
   String _getOwnerText(String owners) {
     if (owners.contains('1st')) return '1st Owner';
@@ -1421,7 +1566,9 @@ Widget _buildFinanceExchangeInfo(bool isFinanceAvailable, bool isExchangeAvailab
     final kmMatch = RegExp(r'(\d+)').firstMatch(value);
     if (kmMatch != null) {
       final number = int.parse(kmMatch.group(1)!);
-      final formattedNumber = NumberFormat.decimalPattern('en_IN').format(number);
+      final formattedNumber = NumberFormat.decimalPattern(
+        'en_IN',
+      ).format(number);
       return value.replaceFirst(RegExp(r'\d+'), formattedNumber);
     }
     return value;

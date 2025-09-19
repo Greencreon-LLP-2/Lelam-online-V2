@@ -10,18 +10,17 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
+
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
     hide baseUrl, token;
-import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
+
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
-import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
-import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_meeting_seller_sidget.dart';
+
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
@@ -67,7 +66,7 @@ class _RealEstateProductDetailsPageState
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
   String? userId;
-   late LoggedUserProvider _userProvider;
+  late LoggedUserProvider _userProvider;
 
   bool _isBidDialogOpen = false;
   bool _isLoadingBid = false;
@@ -88,7 +87,7 @@ class _RealEstateProductDetailsPageState
   @override
   void initState() {
     super.initState();
-     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _initialize();
   }
 
@@ -100,7 +99,7 @@ class _RealEstateProductDetailsPageState
       _fetchSellerInfo(),
       _fetchGalleryImages(),
       _fetchBannerImage(),
-      
+
       if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
     ]);
   }
@@ -361,12 +360,11 @@ class _RealEstateProductDetailsPageState
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                     
                       if (mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const  BuyingStatusPage(),
+                            builder: (context) => const BuyingStatusPage(),
                           ),
                         );
                       }
@@ -378,7 +376,6 @@ class _RealEstateProductDetailsPageState
                         borderRadius: BorderRadius.circular(8),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      
                     ),
                     child: const Text(
                       'Check Status',
@@ -536,7 +533,7 @@ class _RealEstateProductDetailsPageState
     }
   }
 
-   void showProductBidDialog(BuildContext context) async {
+  void showProductBidDialog(BuildContext context) async {
     if (!_userProvider.isLoggedIn) {
       _showLoginPromptDialog(context, 'place a bid');
       return;
@@ -1860,7 +1857,7 @@ class _RealEstateProductDetailsPageState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-             
+
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -2075,7 +2072,6 @@ class _RealEstateProductDetailsPageState
           ),
         );
   }
-
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
     void _showLoginDialog() {
@@ -2660,9 +2656,9 @@ class _RealEstateProductDetailsPageState
                     ],
                   ),
                 ),
-              
+
                 _buildBannerAd(),
-                
+
                 Padding(
                   padding: const EdgeInsets.all(10.0),
                   child: Column(
@@ -2723,7 +2719,7 @@ class _RealEstateProductDetailsPageState
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                         showProductBidDialog(context);
+                          showProductBidDialog(context);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,
