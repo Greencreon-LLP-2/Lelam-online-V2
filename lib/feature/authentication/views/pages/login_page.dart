@@ -6,11 +6,12 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/hive_helper.dart';
 import 'package:lelamonline_flutter/core/model/user_model.dart';
-
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
+import 'dart:math';
 
 class LoginPage extends StatefulWidget {
   final Map<String, dynamic>? extra;
@@ -27,15 +28,23 @@ class _LoginPageState extends State<LoginPage> {
   final _otpController = TextEditingController();
   bool _isLoading = false;
   bool _isOtpMode = false;
-  final String _hardcodedOtp = '9021'; // Hardcoded OTP for testing
   final String _mobileCode = '91'; // Hardcoded mobile code
   final ApiService _apiService = ApiService();
   final HiveHelper _hiveHelper = HiveHelper();
+  Timer? _otpTimer;
+  int _timerSeconds = 3;
+  String? _generatedOtp;
+  bool _showOtp = false;
+  Timer? _expiryTimer;
+  int _expirySeconds = 60;
+  bool _isOtpExpired = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
     _otpController.dispose();
+    _otpTimer?.cancel();
+    _expiryTimer?.cancel();
     super.dispose();
   }
 
@@ -50,14 +59,70 @@ class _LoginPageState extends State<LoginPage> {
         .trim();
   }
 
+  // Generate a unique 4-digit OTP
+  String _generateOtp() {
+    final random = Random();
+    return (1000 + random.nextInt(9000)).toString(); // Generates a number between 1000 and 9999
+  }
+
+  // Start OTP timer
+  void _startOtpTimer() {
+    setState(() {
+      _timerSeconds = 3;
+      _showOtp = false;
+      _generatedOtp = _generateOtp(); // Generate a new OTP
+      _isOtpExpired = false;
+      _expirySeconds = 60;
+      _otpController.clear(); // Clear previous OTP input
+    });
+
+    _otpTimer?.cancel();
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timerSeconds > 0) {
+          _timerSeconds--;
+        } else {
+          _showOtp = true;
+          timer.cancel();
+          _startExpiryTimer(); // Start expiry timer after OTP is shown
+        }
+      });
+    });
+  }
+
+  // Start OTP expiry timer
+  void _startExpiryTimer() {
+    _expiryTimer?.cancel();
+    _expiryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_expirySeconds > 0) {
+          _expirySeconds--;
+        } else {
+          _isOtpExpired = true;
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  // Handle resend OTP
+  void _handleResendOtp() {
+    _startOtpTimer(); // Generate new OTP and restart timers
+    Fluttertoast.showToast(
+      msg: 'New OTP sent to +$_mobileCode${_phoneController.text}',
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+  }
+
   // Handle login or OTP verification
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       Fluttertoast.showToast(
-        msg:
-            _isOtpMode
-                ? 'Please enter a valid OTP'
-                : 'Please enter a valid phone number',
+        msg: _isOtpMode ? 'Please enter a valid OTP' : 'Please enter a valid phone number',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red.withOpacity(0.8),
@@ -80,6 +145,7 @@ class _LoginPageState extends State<LoginPage> {
         if (response['status'] == true && response['code'] == 200) {
           // User exists, proceed to OTP mode
           setState(() => _isOtpMode = true);
+          _startOtpTimer(); // Start the OTP timer
           Fluttertoast.showToast(
             msg: 'OTP sent to +$_mobileCode$mobile',
             toastLength: Toast.LENGTH_LONG,
@@ -97,6 +163,7 @@ class _LoginPageState extends State<LoginPage> {
 
           if (registerResponse['status'] == true) {
             setState(() => _isOtpMode = true);
+            _startOtpTimer(); // Start the OTP timer
             Fluttertoast.showToast(
               msg: 'OTP sent to +$_mobileCode$mobile',
               toastLength: Toast.LENGTH_LONG,
@@ -106,15 +173,24 @@ class _LoginPageState extends State<LoginPage> {
               fontSize: 16.0,
             );
           } else {
-            throw Exception(
-              'Registration failed, Somethign happen from our end}',
-            );
+            throw Exception('Registration failed, Something happened from our end');
           }
         }
       } else {
+        if (_isOtpExpired) {
+          Fluttertoast.showToast(
+            msg: 'OTP has expired. Please request a new OTP.',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.red.withOpacity(0.8),
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
+          return;
+        }
 
         final inputOtp = _otpController.text;
-        if (inputOtp == _hardcodedOtp) {
+        if (inputOtp == _generatedOtp) {
           // Fetch user data again to ensure we have the latest
           final mobile = _normalizeMobileNumber(_phoneController.text);
           final Map<String, dynamic> response = await _apiService.get(
@@ -135,7 +211,7 @@ class _LoginPageState extends State<LoginPage> {
 
             context.goNamed(RouteNames.splashPage);
             Fluttertoast.showToast(
-              msg: 'Login Sucess taking you to home page',
+              msg: 'Login Success, taking you to home page',
               toastLength: Toast.LENGTH_SHORT,
               gravity: ToastGravity.BOTTOM,
               backgroundColor: Colors.green.withOpacity(0.8),
@@ -165,7 +241,6 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e, stack) {
       print(stack);
-
       Fluttertoast.showToast(
         msg: 'Error: ${e.toString()}',
         toastLength: Toast.LENGTH_SHORT,
@@ -199,22 +274,103 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (_isOtpMode) ...[
+                    Center(
+                      child: Column(
+                        children: [
+                          if (_showOtp && _generatedOtp != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Your OTP: $_generatedOtp',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryColor,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _isOtpExpired
+                                        ? 'OTP Expired'
+                                        : 'OTP expires in $_expirySeconds seconds',
+                                    style: TextStyle(
+                                      color: _isOtpExpired
+                                          ? Colors.red
+                                          : Colors.grey[700],
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (_isOtpExpired) ...[
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      width: 160,
+                                      child: TextButton(
+                                        onPressed: _isLoading ? null : _handleResendOtp,
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          backgroundColor: AppTheme.primaryColor,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Resend OTP',
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          else if (_timerSeconds > 0)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Receiving OTP in $_timerSeconds seconds',
+                                style: TextStyle(
+                                  color: Colors.grey[700],
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 60),
                   Text(
                     _isOtpMode ? 'Verify OTP' : 'Welcome Back',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _isOtpMode
                         ? 'Enter the OTP sent to +$_mobileCode${_phoneController.text}'
                         : 'Sign in to continue',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 48),
                   if (!_isOtpMode) ...[
@@ -329,22 +485,21 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child:
-                          _isLoading
-                              ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
                                 ),
-                              )
-                              : Text(
-                                _isOtpMode ? 'Verify OTP' : 'Send OTP',
-                                style: const TextStyle(fontSize: 16),
                               ),
+                            )
+                          : Text(
+                              _isOtpMode ? 'Verify OTP' : 'Send OTP',
+                              style: const TextStyle(fontSize: 16),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -353,7 +508,9 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Text(
                           'By continuing, you agree to our Terms and Privacy Policy',
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
                               ?.copyWith(color: Colors.grey[600]),
                           textAlign: TextAlign.center,
                         ),

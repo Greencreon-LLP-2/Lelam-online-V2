@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -1144,84 +1145,21 @@ class BidCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: SizedBox(
+                                height: 30,
+                                child: CallSupportButton(
+                              label: 'Call Support',
+                                 
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.more_vert, size: 16),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onSelected: (value) {
-                        if (value == 'increase_bid') {
-                          onIncreaseBid();
-                        } else if (value == 'proceed_with_bid') {
-                          onProceedWithBid();
-                        } else if (value == 'proceed_without_bid') {
-                          onProceedWithoutBid();
-                        }
-                      },
-                      itemBuilder: (BuildContext context) {
-                        final items = <PopupMenuItem<String>>[
-                          const PopupMenuItem<String>(
-                            value: 'increase_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.trending_up,
-                                  size: 16,
-                                  color: AppTheme.primaryColor,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Increase Bid'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem<String>(
-                            value: 'proceed_without_bid',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.event,
-                                  size: 16,
-                                  color: Colors.orange,
-                                ),
-                                SizedBox(width: 8),
-                                Text('Meeting without Bid'),
-                              ],
-                            ),
-                          ),
-                        ];
-                        if (isHighBid) {
-                          items.insert(
-                            1,
-                            const PopupMenuItem<String>(
-                              value: 'proceed_with_bid',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.schedule,
-                                    size: 16,
-                                    color: Colors.blue,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Meeting with Bid'),
-                                ],
-                              ),
-                            ),
-                          );
-                        }
-                        debugPrint('BidCard - Menu items for bid ${bid['id']}: ${items.map((item) => item.value).toList()}');
-                        return items;
-                      },
-                    ),
+                    
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -1357,6 +1295,82 @@ class BidCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                PopupMenuButton<String>(
+                      icon: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                         
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.menu,
+                         size: 22),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'increase_bid') {
+                          onIncreaseBid();
+                        } else if (value == 'proceed_with_bid') {
+                          onProceedWithBid();
+                        } else if (value == 'proceed_without_bid') {
+                          onProceedWithoutBid();
+                        }
+                      },
+                      itemBuilder: (BuildContext context) {
+                        final items = <PopupMenuItem<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'increase_bid',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.trending_up,
+                                  size: 16,
+                                  color: AppTheme.primaryColor,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Increase Bid'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'proceed_without_bid',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event,
+                                  size: 16,
+                                  color: Colors.orange,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Meeting without Bid'),
+                              ],
+                            ),
+                          ),
+                        ];
+                        if (isHighBid) {
+                          items.insert(
+                            1,
+                            const PopupMenuItem<String>(
+                              value: 'proceed_with_bid',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.schedule,
+                                    size: 16,
+                                    color: Colors.blue,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('Meeting with Bid'),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        debugPrint('BidCard - Menu items for bid ${bid['id']}: ${items.map((item) => item.value).toList()}');
+                        return items;
+                      },
+                    ),
               ],
             ),
           ),

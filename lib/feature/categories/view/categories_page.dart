@@ -120,8 +120,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder:
-                                            (context) => const UsedCarsPage(),
+                                        builder: (context) =>
+                                            const UsedCarsPage(),
                                       ),
                                     );
                                     break;
@@ -129,8 +129,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder:
-                                            (context) => const RealEstatePage(),
+                                        builder: (context) =>
+                                            const RealEstatePage(),
                                       ),
                                     );
                                     break;
@@ -138,9 +138,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder:
-                                            (context) =>
-                                                const CommercialVehiclesPage(),
+                                        builder: (context) =>
+                                            const CommercialVehiclesPage(),
                                       ),
                                     );
                                     break;

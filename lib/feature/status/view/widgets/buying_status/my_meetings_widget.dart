@@ -350,7 +350,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                   statusData['middle_status']?.toString() ?? 'Schedule meeting',
               'footerStatus_data':
                   statusData['Footer_status']?.toString() ??
-                  'Default footer message',
+                  'Click call support for full details',
               'timer': statusData['timer']?.toString() ?? '0',
             };
           }
@@ -364,14 +364,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       debugPrint('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Default footer message',
+        'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     } catch (e) {
       debugPrint('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Default footer message',
+        'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     }
@@ -512,7 +512,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'middleStatus_data':
                   statusData?['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  statusData?['footerStatus_data'] ?? 'Default footer message',
+                  statusData?['footerStatus_data'] ?? 'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
             debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
@@ -621,153 +621,155 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children:
-                    statuses.map((status) {
-                      final index = statuses.indexOf(status);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: StatusPill(
-                          label: status,
-                          isActive: index == selectedIndex,
-                          activeColor: Colors.blue,
-                          onTap: () {
-                            if (mounted) {
-                              setState(() {
-                                selectedIndex = index;
-                                debugPrint('Selected tab: $status');
-                              });
-                              _loadMeetings();
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children:
+                      statuses.map((status) {
+                        final index = statuses.indexOf(status);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: StatusPill(
+                            label: status,
+                            isActive: index == selectedIndex,
+                            activeColor: Colors.blue,
+                            onTap: () {
+                              if (mounted) {
+                                setState(() {
+                                  selectedIndex = index;
+                                  debugPrint('Selected tab: $status');
+                                });
+                                _loadMeetings();
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              color: Colors.grey[50],
-              child:
-                  isLoading
-                      ? const Center(
-                        child: CircularProgressIndicator(color: Colors.blue),
-                      )
-                      : errorMessage != null
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              size: 64,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              errorMessage!,
-                              style: const TextStyle(
-                                fontSize: 16,
+            Expanded(
+              child: Container(
+                color: Colors.grey[50],
+                child:
+                    isLoading
+                        ? const Center(
+                          child: CircularProgressIndicator(color: Colors.blue),
+                        )
+                        : errorMessage != null
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 64,
                                 color: Colors.red,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadUserId,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
+                              const SizedBox(height: 16),
+                              Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
-                              child: const Text(
-                                'Retry',
-                                style: TextStyle(color: Colors.white),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadUserId,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                ),
+                                child: const Text(
+                                  'Retry',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        )
+                        : filteredMeetings.isEmpty
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.event,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No meetings found for ${statuses[selectedIndex]}',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Total meetings in system: ${meetings.length}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                        : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredMeetings.length,
+                          itemBuilder: (context, index) {
+                            final meeting = filteredMeetings[index];
+                            debugPrint('Displaying meeting: ${meeting['id']}');
+                            return MeetingCard(
+                              meeting: meeting,
+                              baseUrl: widget.baseUrl,
+                              token: widget.token,
+                              // onCancel: () {
+                              //   if (mounted) {
+                              //     setState(() {
+                              //       meetings.removeWhere(
+                              //         (m) => m['id'] == meeting['id'],
+                              //       );
+        
+                              //       _loadMeetings();
+                              //     });
+                              //   }
+                              // },
+                              onLocationRequestSent: _onLocationRequestSent,
+                              onProceedWithBid: () {
+                                debugPrint('Proceed with Bid triggered for meeting ${meeting['id']}');
+                                _proceedWithBid(context, meeting);
+                              },
+                              // onIncreaseBid: () => _increaseBid(context, meeting),
+                              onEditDate:
+                                  (meeting) => _editDate(context, meeting),
+                              onEditTime:
+                                  (meeting) => _editTime(context, meeting),
+                              // onCancelMeeting:
+                              //     (meeting) => _cancelMeeting(context, meeting),
+                              onSendLocationRequest:
+                                  (meeting) =>
+                                      _sendLocationRequest(context, meeting),
+                              onViewLocation:
+                                  (meeting) => _viewLocation(context, meeting),
+                            );
+                          },
                         ),
-                      )
-                      : filteredMeetings.isEmpty
-                      ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No meetings found for ${statuses[selectedIndex]}',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Total meetings in system: ${meetings.length}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredMeetings.length,
-                        itemBuilder: (context, index) {
-                          final meeting = filteredMeetings[index];
-                          debugPrint('Displaying meeting: ${meeting['id']}');
-                          return MeetingCard(
-                            meeting: meeting,
-                            baseUrl: widget.baseUrl,
-                            token: widget.token,
-                            // onCancel: () {
-                            //   if (mounted) {
-                            //     setState(() {
-                            //       meetings.removeWhere(
-                            //         (m) => m['id'] == meeting['id'],
-                            //       );
-
-                            //       _loadMeetings();
-                            //     });
-                            //   }
-                            // },
-                            onLocationRequestSent: _onLocationRequestSent,
-                            onProceedWithBid: () {
-                              debugPrint('Proceed with Bid triggered for meeting ${meeting['id']}');
-                              _proceedWithBid(context, meeting);
-                            },
-                            // onIncreaseBid: () => _increaseBid(context, meeting),
-                            onEditDate:
-                                (meeting) => _editDate(context, meeting),
-                            onEditTime:
-                                (meeting) => _editTime(context, meeting),
-                            // onCancelMeeting:
-                            //     (meeting) => _cancelMeeting(context, meeting),
-                            onSendLocationRequest:
-                                (meeting) =>
-                                    _sendLocationRequest(context, meeting),
-                            onViewLocation:
-                                (meeting) => _viewLocation(context, meeting),
-                          );
-                        },
-                      ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

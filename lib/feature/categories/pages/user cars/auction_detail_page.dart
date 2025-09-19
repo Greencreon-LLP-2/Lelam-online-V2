@@ -8,9 +8,10 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/auction_cars_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
+import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
@@ -563,24 +564,24 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             children: [
               const Text('Enter your bid amount in rupees'),
               const SizedBox(height: 16),
-              Text(
-                'Current Highest Bid',
-                style:
-                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _currentHighestBid.startsWith('Error')
-                    ? _currentHighestBid
-                    : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _currentHighestBid.startsWith('Error')
-                      ? Colors.red
-                      : null,
-                ),
-              ),
+              // Text(
+              //   'Current Highest Bid',
+              //   style:
+              //       const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              // ),
+              // const SizedBox(height: 4),
+              // Text(
+              //   _currentHighestBid.startsWith('Error')
+              //       ? _currentHighestBid
+              //       : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
+              //   style: TextStyle(
+              //     fontSize: 18,
+              //     fontWeight: FontWeight.bold,
+              //     color: _currentHighestBid.startsWith('Error')
+              //         ? Colors.red
+              //         : null,
+              //   ),
+              // ),
               if (isIncrease) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1134,29 +1135,42 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '#AD ID $id',
-                              style: const TextStyle(color: Colors.grey),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                // TODO: Implement call functionality
-                              },
-                              icon: const Icon(Icons.call),
-                              label: const Text('Call Support'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.zero,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                       Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  children: [
+    Text(
+      '#AD ID $id',
+      style: const TextStyle(color: Colors.grey),
+    ),
+    ElevatedButton.icon(
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (context) => ChatOptionsDialog(
+            onChatWithSupport: () {
+              // handle after support call
+              debugPrint("Support contacted");
+            },
+            onChatWithSeller: () {
+              // handle after seller chat
+              debugPrint("Chat with seller started");
+            }, baseUrl: baseUrl, token: token,
+          ),
+        );
+      },
+      icon: const Icon(Icons.support_agent),
+      label: const Text('Contact Seller'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
+    ),
+  ],
+)
+
                       ],
                     ),
                   ),

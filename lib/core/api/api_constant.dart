@@ -1,6 +1,6 @@
-//const String baseUrl = 'http://localhost:8000/admin/api/v1';
+// const String baseUrl = 'http://localhost:8000/admin/api/v1';
 //const String baseUrl = 'http://192.168.0.115:8000/admin/api/v1';
-const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+ const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
 //====================== Authentication ==============================//
@@ -18,7 +18,7 @@ const String locations = '$baseUrl/list-location.php?token=$token';
 //====================== Post details =======================//
 const String attributeValue =
     '$baseUrl//post-attribute-values.php?token=$token';
-const String addPostReview = '$baseUrl/add-post-review.php?token=$token';
+ const String addPostReview = '$baseUrl/add-post-review.php';
 
 //====================== Feature Posts ===============================//
 const String brand = '$baseUrl/list-brand.php?token=$token';
