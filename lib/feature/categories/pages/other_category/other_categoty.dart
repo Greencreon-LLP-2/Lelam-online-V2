@@ -6,7 +6,6 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_Category_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 // MarketplacePost model
@@ -176,6 +175,9 @@ class MarketplacePost {
 
 // MarketplaceService
 class MarketplaceService {
+  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
+
   Future<List<MarketplacePost>> fetchPosts({
     required String categoryId,
     required String userZoneId,
@@ -255,44 +257,44 @@ class Bike extends MarketplacePost {
     required String createdOn,
     required String updatedOn,
   }) : super(
-         id: id,
-         slug: slug,
-         title: title,
-         categoryId: categoryId,
-         image: image,
-         brand: brand,
-         model: model,
-         modelVariation: modelVariation,
-         description: description,
-         price: price,
-         auctionPriceInterval: auctionPriceInterval,
-         auctionStartingPrice: auctionStartingPrice,
-         attributeId: attributeId,
-         attributeVariationsId: attributeVariationsId,
-         filters: filters,
-         latitude: latitude,
-         longitude: longitude,
-         userZoneId: userZoneId,
-         parentZoneId: parentZoneId,
-         landMark: landMark,
-         ifAuction: ifAuction,
-         auctionStatus: auctionStatus,
-         auctionStartin: auctionStartin,
-         auctionEndin: auctionEndin,
-         auctionAttempt: auctionAttempt,
-         adminApproval: adminApproval,
-         ifFinance: ifFinance,
-         ifExchange: ifExchange,
-         feature: feature,
-         status: status,
-         visiterCount: visiterCount,
-         ifSold: ifSold,
-         ifExpired: ifExpired,
-         byDealer: byDealer,
-         createdBy: createdBy,
-         createdOn: createdOn,
-         updatedOn: updatedOn,
-       );
+          id: id,
+          slug: slug,
+          title: title,
+          categoryId: categoryId,
+          image: image,
+          brand: brand,
+          model: model,
+          modelVariation: modelVariation,
+          description: description,
+          price: price,
+          auctionPriceInterval: auctionPriceInterval,
+          auctionStartingPrice: auctionStartingPrice,
+          attributeId: attributeId,
+          attributeVariationsId: attributeVariationsId,
+          filters: filters,
+          latitude: latitude,
+          longitude: longitude,
+          userZoneId: userZoneId,
+          parentZoneId: parentZoneId,
+          landMark: landMark,
+          ifAuction: ifAuction,
+          auctionStatus: auctionStatus,
+          auctionStartin: auctionStartin,
+          auctionEndin: auctionEndin,
+          auctionAttempt: auctionAttempt,
+          adminApproval: adminApproval,
+          ifFinance: ifFinance,
+          ifExchange: ifExchange,
+          feature: feature,
+          status: status,
+          visiterCount: visiterCount,
+          ifSold: ifSold,
+          ifExpired: ifExpired,
+          byDealer: byDealer,
+          createdBy: createdBy,
+          createdOn: createdOn,
+          updatedOn: updatedOn,
+        );
 
   factory Bike.fromMarketplacePost(MarketplacePost post) {
     return Bike(
@@ -428,7 +430,7 @@ class _OthersPageState extends State<OthersPage> {
     });
     try {
       final posts = await _marketplaceService.fetchPosts(
-        categoryId: '4', // Change this to the appropriate category ID for bikes
+        categoryId: '4',
         userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
       );
       setState(() {
@@ -468,250 +470,309 @@ class _OthersPageState extends State<OthersPage> {
 
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      filtered =
-          filtered.where((bike) {
-            final vehicleType =
-                bike.filters['vehicleType']?.isNotEmpty ?? false
-                    ? bike.filters['vehicleType']!.first.toLowerCase()
-                    : '';
-            return bike.title.toLowerCase().contains(query) ||
-                bike.brand.toLowerCase().contains(query) ||
-                vehicleType.contains(query);
-          }).toList();
+      filtered = filtered.where((bike) {
+        final vehicleType =
+            bike.filters['vehicleType']?.isNotEmpty ?? false
+                ? bike.filters['vehicleType']!.first.toLowerCase()
+                : '';
+        return bike.title.toLowerCase().contains(query) ||
+            bike.brand.toLowerCase().contains(query) ||
+            vehicleType.contains(query);
+      }).toList();
     }
 
     if (_selectedLocation != 'all') {
-      filtered =
-          filtered
-              .where(
-                (bike) =>
-                    bike.userZoneId == _selectedLocation ||
-                    bike.parentZoneId == _selectedLocation,
-              )
-              .toList();
+      filtered = filtered
+          .where(
+            (bike) =>
+                bike.userZoneId == _selectedLocation ||
+                bike.parentZoneId == _selectedLocation,
+          )
+          .toList();
     }
 
     if (_selectedVehicleTypes.isNotEmpty) {
-      filtered =
-          filtered.where((bike) {
-            final vehicleType =
-                bike.filters['vehicleType']?.isNotEmpty ?? false
-                    ? bike.filters['vehicleType']!.first
-                    : '';
-            return _selectedVehicleTypes.contains(vehicleType);
-          }).toList();
+      filtered = filtered.where((bike) {
+        final vehicleType =
+            bike.filters['vehicleType']?.isNotEmpty ?? false
+                ? bike.filters['vehicleType']!.first
+                : '';
+        return _selectedVehicleTypes.contains(vehicleType);
+      }).toList();
     }
 
     if (_selectedPriceRange != 'all') {
-      filtered =
-          filtered.where((bike) {
-            final price = int.tryParse(bike.price) ?? 0;
-            switch (_selectedPriceRange) {
-              case 'Under 50K':
-                return price < 50000;
-              case '50K-1L':
-                return price >= 50000 && price < 100000;
-              case '1L-2L':
-                return price >= 100000 && price < 200000;
-              case '2L-5L':
-                return price >= 200000 && price < 500000;
-              case 'Above 5L':
-                return price >= 500000;
-              default:
-                return true;
-            }
-          }).toList();
+      filtered = filtered.where((bike) {
+        final price = int.tryParse(bike.price) ?? 0;
+        switch (_selectedPriceRange) {
+          case 'Under 50K':
+            return price < 50000;
+          case '50K-1L':
+            return price >= 50000 && price < 100000;
+          case '1L-2L':
+            return price >= 100000 && price < 200000;
+          case '2L-5L':
+            return price >= 200000 && price < 500000;
+          case 'Above 5L':
+            return price >= 500000;
+          default:
+            return true;
+        }
+      }).toList();
     }
 
     if (_selectedCondition != 'all') {
-      filtered =
-          filtered.where((bike) {
-            final condition =
-                bike.filters['condition']?.isNotEmpty ?? false
-                    ? bike.filters['condition']!.first
-                    : '';
-            return condition == _selectedCondition;
-          }).toList();
+      filtered = filtered.where((bike) {
+        final condition =
+            bike.filters['condition']?.isNotEmpty ?? false
+                ? bike.filters['condition']!.first
+                : '';
+        return condition == _selectedCondition;
+      }).toList();
     }
 
     if (_selectedFuelTypes.isNotEmpty) {
-      filtered =
-          filtered.where((bike) {
-            final fuelType =
-                bike.filters['fuelType']?.isNotEmpty ?? false
-                    ? bike.filters['fuelType']!.first
-                    : '';
-            return _selectedFuelTypes.contains(fuelType);
-          }).toList();
+      filtered = filtered.where((bike) {
+        final fuelType =
+            bike.filters['fuelType']?.isNotEmpty ?? false
+                ? bike.filters['fuelType']!.first
+                : '';
+        return _selectedFuelTypes.contains(fuelType);
+      }).toList();
     }
 
     return filtered;
   }
 
   void _showFilterBottomSheet() {
+    String selectedFilter = 'Vehicle Type'; // Default selected filter
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => StatefulBuilder(
+          builder: (context, setModalState) => Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Filter Bikes & Others',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black87),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left Panel: Filter Categories
+                    Container(
+                      width: 140,
+                      color: Colors.grey.shade50,
+                      child: ListView(
+                        controller: ScrollController(),
+                        children: [
+                          _buildFilterCategoryTile(
+                            title: 'Vehicle Type',
+                            isSelected: selectedFilter == 'Vehicle Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Vehicle Type');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Price Range',
+                            isSelected: selectedFilter == 'Price Range',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Price Range');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Condition',
+                            isSelected: selectedFilter == 'Condition',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Condition');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Fuel Type',
+                            isSelected: selectedFilter == 'Fuel Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Fuel Type');
+                            },
+                          ),
+                        ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                    // Right Panel: Filter Options
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Filter Bikes & Others',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedVehicleTypes.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedCondition = 'all';
-                                  _selectedFuelTypes.clear();
-                                });
-                              },
-                              child: const Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            if (selectedFilter == 'Vehicle Type')
                               _buildMultiSelectFilterSection(
                                 'Vehicle Type',
                                 _vehicleTypes,
                                 _selectedVehicleTypes,
                                 setModalState,
                               ),
+                            if (selectedFilter == 'Price Range')
                               _buildSingleSelectFilterSection(
                                 'Price Range',
                                 _priceRanges,
                                 _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
+                                (value) => setModalState(() => _selectedPriceRange = value),
                               ),
+                            if (selectedFilter == 'Condition')
                               _buildSingleSelectFilterSection(
                                 'Condition',
                                 _conditions,
                                 _selectedCondition,
-                                (value) => setModalState(
-                                  () => _selectedCondition = value,
-                                ),
+                                (value) => setModalState(() => _selectedCondition = value),
                               ),
+                            if (selectedFilter == 'Fuel Type')
                               _buildMultiSelectFilterSection(
                                 'Fuel Type',
                                 _fuelTypes,
                                 _selectedFuelTypes,
                                 setModalState,
                               ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            const SizedBox(height: 80),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _selectedVehicleTypes.clear();
+                            _selectedPriceRange = 'all';
+                            _selectedCondition = 'all';
+                            _selectedFuelTypes.clear();
+                          });
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Clear All',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterCategoryTile({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.grey.shade50,
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? Palette.primaryblue : Colors.transparent,
+              width: 4,
+            ),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected ? Palette.primaryblue : Colors.black87,
+          ),
+        ),
+      ),
     );
   }
 
@@ -733,48 +794,40 @@ class _OthersPageState extends State<OthersPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -798,41 +851,33 @@ class _OthersPageState extends State<OthersPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  displayText,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -861,18 +906,17 @@ class _OthersPageState extends State<OthersPage> {
           hintText: 'Search bikes...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -893,18 +937,17 @@ class _OthersPageState extends State<OthersPage> {
         hintText: 'Search by bike type, brand, location...',
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-                : null,
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200),
@@ -931,29 +974,27 @@ class _OthersPageState extends State<OthersPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath =
-        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
@@ -1016,143 +1057,131 @@ class _OthersPageState extends State<OthersPage> {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchBikes();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
-                            ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
+                  icon: const Icon(Icons.location_on, color: Colors.black87),
+                  onSelected: (String value) {
+                    setState(() {
+                      _selectedLocation = value == 'all'
+                          ? 'all'
+                          : _locations.firstWhere((loc) => loc.name == value).id;
+                      _fetchBikes();
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return _keralaCities.map((String city) {
+                      return PopupMenuItem<String>(
+                        value: city,
+                        child: Row(
+                          children: [
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const Icon(
+                                Icons.check,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const SizedBox(width: 8),
+                            Text(city == 'all' ? 'All Kerala' : city),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
         ],
       ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
-                      children: [
-                        if (!_showAppBarSearch)
-                          Container(
-                            color: Colors.white,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: _buildSearchField(),
-                          ),
-                      ],
-                    ),
+            child: _isLoadingLocations
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                    children: [
+                      if (!_showAppBarSearch)
+                        Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: _buildSearchField(),
+                        ),
+                    ],
+                  ),
           ),
           if (!_isLoadingLocations)
             _isLoading
                 ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error: $_errorMessage',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _fetchBikes,
+                                child: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchBikes,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : filteredBikes.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No bikes found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                      )
+                    : filteredBikes.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No bikes found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Try adjusting your filters or search terms',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate((context, index) {
+                              final bike = filteredBikes[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildBikeCard(bike),
+                              );
+                            }, childCount: filteredBikes.length),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final bike = filteredBikes[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildBikeCard(bike),
-                    );
-                  }, childCount: filteredBikes.length),
-                ),
         ],
       ),
     );
@@ -1219,58 +1248,47 @@ class _OthersPageState extends State<OthersPage> {
                         decoration: BoxDecoration(
                           color: Colors.grey.shade200,
                           borderRadius: const BorderRadius.all(
-                            Radius.circular(0),
+                            Radius.circular(12),
+                          ),
+                          image: DecorationImage(
+                            image: NetworkImage(getImageUrl(bike.image)),
+                            fit: BoxFit.cover,
+                            onError: (exception, stackTrace) {
+                              print(
+                                'Failed to load image: ${getImageUrl(bike.image)}',
+                              );
+                              print('Error: $exception');
+                            },
                           ),
                         ),
-                        child: Container(
-                          width: 130,
-                          height: 138,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            image: DecorationImage(
-                              image: NetworkImage(getImageUrl(bike.image)),
-                              fit: BoxFit.cover,
-                              onError: (exception, stackTrace) {
-                                print(
-                                  'Failed to load image: ${getImageUrl(bike.image)}',
-                                );
-                                print('Error: $exception');
-                              },
-                            ),
-                          ),
-                          child:
-                              isFeatured
-                                  ? Align(
-                                    alignment: Alignment.topLeft,
-                                    child: Container(
-                                      margin: const EdgeInsets.only(
-                                        top: 8,
-                                        left: 8,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Colors.white),
-                                      ),
-                                      child: const Text(
-                                        'FEATURED',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                        child: isFeatured
+                            ? Align(
+                                alignment: Alignment.topLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(
+                                    top: 8,
+                                    left: 8,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white),
+                                  ),
+                                  child: const Text(
+                                    'FEATURED',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                  )
-                                  : null,
-                        ),
+                                  ),
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                     Expanded(
@@ -1373,19 +1391,17 @@ class _OthersPageState extends State<OthersPage> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                isAuction
-                                    ? Palette.primarylightblue
-                                    : Colors.white,
+                            color: isAuction
+                                ? Palette.primarylightblue
+                                : Colors.white,
                             borderRadius: const BorderRadius.only(
                               bottomLeft: Radius.circular(12),
                               bottomRight: Radius.circular(12),
                             ),
                           ),
-                          child:
-                              isAuction
-                                  ? _buildAuctionInfo(bike)
-                                  : _buildFinanceInfo(isFinanceAvailable),
+                          child: isAuction
+                              ? _buildAuctionInfo(bike)
+                              : _buildFinanceInfo(isFinanceAvailable),
                         ),
                       ),
                     ],

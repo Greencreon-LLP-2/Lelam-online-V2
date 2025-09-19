@@ -225,7 +225,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   String _selectedLocation = 'all';
   final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
-
   String _selectedCondition = 'all';
   final List<String> _selectedFuelTypes = [];
 
@@ -334,7 +333,6 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     'Other Commercial',
   ];
 
-  // Define price ranges as labels
   final List<String> _priceRanges = [
     'all',
     '0-1L',
@@ -347,13 +345,13 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   ];
 
   final Map<String, Map<String, int>> _priceRangeMap = {
-    '0-1L': {'min': 0, 'max': 100000}, // 1 lakh
-    '1-3L': {'min': 100000, 'max': 300000}, // 3 lakh
-    '3-6L': {'min': 300000, 'max': 600000}, // 6 lakh
-    '6-10L': {'min': 600000, 'max': 1000000}, // 10 lakh
+    '0-1L': {'min': 0, 'max': 100000},
+    '1-3L': {'min': 100000, 'max': 300000},
+    '3-6L': {'min': 300000, 'max': 600000},
+    '6-10L': {'min': 600000, 'max': 1000000},
     '10-20L': {'min': 1000000, 'max': 2000000},
     '20-50L': {'min': 2000000, 'max': 5000000},
-    'Above 50L': {'min': 5000000, 'max': 999999999}, // cap high
+    'Above 50L': {'min': 5000000, 'max': 999999999},
   };
 
   final List<String> _conditions = ['all', 'New', 'Used'];
@@ -365,230 +363,278 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   }
 
   void _showFilterBottomSheet() {
+    String selectedFilter = 'Vehicle Type'; // Default selected filter
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => StatefulBuilder(
+          builder: (context, setModalState) => Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Filter Vehicles',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black87),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left Panel: Filter Categories
+                    Container(
+                      width: 140,
+                      color: Colors.grey.shade50,
+                      child: ListView(
+                        controller: ScrollController(),
+                        children: [
+                          _buildFilterCategoryTile(
+                            title: 'Vehicle Type',
+                            isSelected: selectedFilter == 'Vehicle Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Vehicle Type');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Price Range',
+                            isSelected: selectedFilter == 'Price Range',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Price Range');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Condition',
+                            isSelected: selectedFilter == 'Condition',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Condition');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Fuel Type',
+                            isSelected: selectedFilter == 'Fuel Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Fuel Type');
+                            },
+                          ),
+                        ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                    // Right Panel: Filter Options
+                    Expanded(
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Filter Vehicles',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedVehicleTypes.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedCondition = 'all';
-                                  _selectedFuelTypes.clear();
-                                });
-                                _fetchPosts();
-                              },
-                              child: const Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            if (selectedFilter == 'Vehicle Type')
                               _buildMultiSelectFilterSection(
                                 'Vehicle Type',
                                 _vehicleTypes,
                                 _selectedVehicleTypes,
                                 setModalState,
                               ),
+                            if (selectedFilter == 'Price Range')
                               _buildSingleSelectFilterSection(
                                 'Price Range',
                                 _priceRanges,
                                 _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
+                                (value) => setModalState(() => _selectedPriceRange = value),
                                 subtitle: 'Filter by sale price',
                               ),
+                            if (selectedFilter == 'Condition')
                               _buildSingleSelectFilterSection(
                                 'Condition',
                                 _conditions,
                                 _selectedCondition,
-                                (value) => setModalState(
-                                  () => _selectedCondition = value,
-                                ),
+                                (value) => setModalState(() => _selectedCondition = value),
                               ),
+                            if (selectedFilter == 'Fuel Type')
                               _buildMultiSelectFilterSection(
                                 'Fuel Type',
                                 _fuelTypes,
                                 _selectedFuelTypes,
                                 setModalState,
                               ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  final Map<String, String> queryParams = {};
-                                  // Price Range
-                                  // Vehicle Type (maps to brands)
-                                  if (_selectedVehicleTypes.isNotEmpty) {
-                                    queryParams['brands'] =
-                                        _selectedVehicleTypes.join(',');
-                                  }
-                                  if (_selectedPriceRange != 'all') {
-                                    final range =
-                                        _priceRangeMap[_selectedPriceRange];
-                                    if (range != null) {
-                                      queryParams['min_price'] =
-                                          range['min'].toString();
-                                      queryParams['max_price'] =
-                                          range['max'].toString();
-                                    }
-                                  }
-                                  // Condition (maps to sold_by)
-                                  if (_selectedCondition != 'all') {
-                                    queryParams['sold_by'] =
-                                        _selectedCondition; // e.g., 'Owner', 'Dealer'
-                                  }
-                                  // Fuel Types
-                                  if (_selectedFuelTypes.isNotEmpty) {
-                                    queryParams['fuel_types'] =
-                                        _selectedFuelTypes.join(',');
-                                  }
-                                  queryParams['listing_type'] = categoryId;
-                                  try {
-                                    setState(() => _isLoading = true);
-                                    final apiService = ApiService();
-                                    final Map<String, dynamic>
-                                    response = await apiService.postMultipart(
-                                      url:
-                                          "$baseUrl/filter-comercial-cars-listings.php",
-                                      fields: queryParams,
-                                    );
-
-                                    final dataList =
-                                        response['data'] as List<dynamic>? ??
-                                        [];
-                                    final finalPosts =
-                                        dataList.map((item) {
-                                          final json =
-                                              item as Map<String, dynamic>;
-                                          return MarketplacePost.fromJson(json);
-                                        }).toList();
-
-                                    setState(() {
-                                      _posts = finalPosts;
-                                      _isLoading = false;
-                                    });
-
-                                    print('Filter applied successfully');
-                                    print(response);
-                                  } catch (e) {
-                                    print("Error while applying filters: $e");
-                                    setState(() => _isLoading = false);
-                                  }
-
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            const SizedBox(height: 80),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _selectedVehicleTypes.clear();
+                            _selectedPriceRange = 'all';
+                            _selectedCondition = 'all';
+                            _selectedFuelTypes.clear();
+                          });
+                          _fetchPosts();
+                          Navigator.pop(context);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Clear All',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final Map<String, String> queryParams = {};
+                          if (_selectedVehicleTypes.isNotEmpty) {
+                            queryParams['brands'] = _selectedVehicleTypes.join(',');
+                          }
+                          if (_selectedPriceRange != 'all') {
+                            final range = _priceRangeMap[_selectedPriceRange];
+                            if (range != null) {
+                              queryParams['min_price'] = range['min'].toString();
+                              queryParams['max_price'] = range['max'].toString();
+                            }
+                          }
+                          if (_selectedCondition != 'all') {
+                            queryParams['sold_by'] = _selectedCondition;
+                          }
+                          if (_selectedFuelTypes.isNotEmpty) {
+                            queryParams['fuel_types'] = _selectedFuelTypes.join(',');
+                          }
+                          queryParams['listing_type'] = categoryId;
+                          try {
+                            setState(() => _isLoading = true);
+                            final apiService = ApiService();
+                            final Map<String, dynamic> response = await apiService.postMultipart(
+                              url: "$baseUrl/filter-comercial-cars-listings.php",
+                              fields: queryParams,
+                            );
+
+                            final dataList = response['data'] as List<dynamic>? ?? [];
+                            final finalPosts = dataList.map((item) {
+                              final json = item as Map<String, dynamic>;
+                              return MarketplacePost.fromJson(json);
+                            }).toList();
+
+                            setState(() {
+                              _posts = finalPosts;
+                              _isLoading = false;
+                            });
+
+                            print('Filter applied successfully');
+                            print(response);
+                          } catch (e) {
+                            print("Error while applying filters: $e");
+                            setState(() => _isLoading = false);
+                          }
+
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterCategoryTile({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.grey.shade50,
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? Palette.primaryblue : Colors.transparent,
+              width: 4,
+            ),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected ? Palette.primaryblue : Colors.black87,
+          ),
+        ),
+      ),
     );
   }
 
@@ -610,48 +656,40 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -687,41 +725,33 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+          children: options.map((option) {
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  displayText,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -750,18 +780,17 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           hintText: 'Search vehicles...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -780,18 +809,17 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         hintText: 'Search by vehicle type, brand, location...',
         hintStyle: TextStyle(color: Colors.grey.shade500),
         prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                    });
-                  },
-                )
-                : null,
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+              )
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200),
@@ -815,8 +843,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   }
 
   String getImageUrl(String imagePath) {
-    final cleanedPath =
-        imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    final cleanedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
@@ -824,22 +851,21 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -888,138 +914,126 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchPosts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
-                            ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
+                  icon: const Icon(Icons.location_on, color: Colors.black87),
+                  onSelected: (String value) {
+                    setState(() {
+                      _selectedLocation = value == 'all'
+                          ? 'all'
+                          : _locations.firstWhere((loc) => loc.name == value).id;
+                      _fetchPosts();
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return _keralaCities.map((String city) {
+                      return PopupMenuItem<String>(
+                        value: city,
+                        child: Row(
+                          children: [
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const Icon(
+                                Icons.check,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                            if (_selectedLocation ==
+                                (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              const SizedBox(width: 8),
+                            Text(city == 'all' ? 'All Kerala' : city),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
         ],
       ),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: _buildSearchField(),
-                    ),
+            child: _isLoadingLocations
+                ? const Center(child: CircularProgressIndicator())
+                : Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: _buildSearchField(),
+                  ),
           ),
           if (!_isLoadingLocations)
             _isLoading
                 ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error: $_errorMessage',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _fetchPosts,
+                                child: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchPosts,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : _posts.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No vehicles found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                      )
+                    : _posts.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No vehicles found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Try adjusting your filters or search terms',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate((context, index) {
+                              final post = _posts[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildVehicleCard(post),
+                              );
+                            }, childCount: _posts.length),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final post = _posts[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildVehicleCard(post),
-                    );
-                  }, childCount: _posts.length),
-                ),
         ],
       ),
     );
@@ -1028,10 +1042,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
   Widget _buildVehicleCard(MarketplacePost post) {
     final isFinanceAvailable = post.ifFinance == '1';
     final isFeatured = post.feature == '1';
-    final vehicleType =
-        post.filters['type']?.isNotEmpty ?? false
-            ? post.filters['type']!.first
-            : 'N/A';
+    final vehicleType = post.filters['type']?.isNotEmpty ?? false ? post.filters['type']!.first : 'N/A';
     final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
     final isVerified = post.adminApproval == '1';
 
@@ -1080,9 +1091,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             image: NetworkImage(getImageUrl(post.image)),
                             fit: BoxFit.cover,
                             onError: (exception, stackTrace) {
-                              print(
-                                'Failed to load image: ${getImageUrl(post.image)}',
-                              );
+                              print('Failed to load image: ${getImageUrl(post.image)}');
                               print('Error: $exception');
                             },
                           ),

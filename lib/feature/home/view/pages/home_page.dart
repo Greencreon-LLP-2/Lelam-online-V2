@@ -1,7 +1,9 @@
+// file: lib/feature/home/view/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
@@ -9,8 +11,8 @@ import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.da
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
 import 'package:http/http.dart' as http;
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'dart:convert';
-
 import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
@@ -26,9 +28,9 @@ class _HomePageState extends State<HomePage> {
   String? _selectedDistrict;
   String? userId;
   late final LoggedUserProvider _userProvider;
-  List<String> _districts = []; // Dynamic list for districts
-  bool _isLoading = false; // Track loading state
-  String? _errorMessage; // Track error message
+  List<String> _districts = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -37,7 +39,7 @@ class _HomePageState extends State<HomePage> {
     if (kDebugMode) {
       print('HomePage initialized, userId: ${_userProvider.userData?.userId}');
     }
-    _fetchDistricts(); // Fetch districts on initialization
+    _fetchDistricts();
   }
 
   @override
@@ -46,7 +48,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Fetch districts from API
   Future<void> _fetchDistricts() async {
     setState(() {
       _isLoading = true;
@@ -54,10 +55,8 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-   // Get token from provider or elsewhere
-
       final response = await http.get(
-        Uri.parse('$baseUrl/list-location.php?token=$token'),
+        Uri.parse('${ApiConstant.baseUrl}/list-location.php?token=${ApiConstant.token}'),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -67,7 +66,7 @@ class _HomePageState extends State<HomePage> {
           final List<dynamic> data = responseData['data'];
           setState(() {
             _districts = data
-                .where((item) => item['status'] == '1') // Only include active districts
+                .where((item) => item['status'] == '1')
                 .map((item) => item['name'].toString())
                 .toList();
             _isLoading = false;
@@ -98,7 +97,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Handle pull-to-refresh
   Future<void> _onRefresh() async {
     if (kDebugMode) {
       print(
@@ -106,12 +104,11 @@ class _HomePageState extends State<HomePage> {
       );
     }
     try {
-      // Refresh districts and other data
       await _fetchDistricts();
       setState(() {
-        _searchQuery = _searchQuery; // Trigger ProductSectionWidget refresh
+        _searchQuery = _searchQuery;
       });
-      await Future.delayed(const Duration(seconds: 1)); // Mock delay
+      await Future.delayed(const Duration(seconds: 1));
       if (kDebugMode) {
         print('Refresh completed');
       }
@@ -144,7 +141,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Top section
+                  // Top section (Location and Notification)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
@@ -197,6 +194,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   if (_userProvider.isLoggedIn) const SizedBox(height: 8),
+                  // Search Bar
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: SearchButtonWidget(
@@ -213,14 +211,19 @@ class _HomePageState extends State<HomePage> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  const BannerWidget(),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: CategoryWidget(),
-                  ),
-                  const SizedBox(height: 5),
-                  ProductSectionWidget(searchQuery: _searchQuery),
+                  // Search Results (shown below search bar)
+                  SearchResultsWidget(searchQuery: _searchQuery),
+                  // Other widgets (shown only when no search query)
+                  if (_searchQuery.isEmpty) ...[
+                    const SizedBox(height: 5),
+                    const BannerWidget(),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: CategoryWidget(),
+                    ),
+                    const SizedBox(height: 5),
+                    ProductSectionWidget(searchQuery: _searchQuery),
+                  ],
                 ],
               ),
             ),

@@ -227,7 +227,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   final String categoryId = '2';
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  String _listingType = 'sale'; // Added for sale/auction toggle
+  String _listingType = 'sale';
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
 
@@ -244,6 +244,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String _selectedAreaRange = 'all';
   List<String> _selectedFurnishings = [];
   String _selectedPostedBy = 'all';
+  String _selectedCategory = 'Property Type'; // Added for sidebar navigation
+  final TextEditingController _minPriceController = TextEditingController();
+  final TextEditingController _maxPriceController = TextEditingController();
 
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
@@ -255,6 +258,14 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _scrollController.addListener(_handleScroll);
     _fetchPosts();
     _fetchLocations();
+    // Initialize price controllers
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.split('-');
+      if (parts.length == 2) {
+        _minPriceController.text = parts[0];
+        _maxPriceController.text = parts[1];
+      }
+    }
   }
 
   @override
@@ -262,6 +273,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _searchController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
   }
 
@@ -377,316 +390,320 @@ class _RealEstatePageState extends State<RealEstatePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Filter Properties',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedPropertyTypes.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedBedroomRange = 'all';
-                                  _selectedAreaRange = 'all';
-                                  _selectedFurnishings.clear();
-                                  _selectedPostedBy = 'all';
-                                });
-                                _fetchPosts();
-                              },
-                              child: const Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildMultiSelectFilterSection(
-                                'Property Type',
-                                _propertyTypes,
-                                _selectedPropertyTypes,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Price Range',
-                                _priceRanges,
-                                _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
-                                subtitle:
-                                    _listingType == 'auction'
-                                        ? 'Filter by starting bid price'
-                                        : 'Filter by sale price',
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Bedrooms',
-                                _bedroomRanges,
-                                _selectedBedroomRange,
-                                (value) => setModalState(
-                                  () => _selectedBedroomRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Area',
-                                _areaRanges,
-                                _selectedAreaRange,
-                                (value) => setModalState(
-                                  () => _selectedAreaRange = value,
-                                ),
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Furnishing',
-                                _furnishings,
-                                _selectedFurnishings,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Posted By',
-                                _postedByOptions,
-                                _selectedPostedBy,
-                                (value) => setModalState(
-                                  () => _selectedPostedBy = value,
-                                ),
-                              ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  final Map<String, String> queryParams = {};
-
-                                  // Property Types
-                                  if (_selectedPropertyTypes.isNotEmpty) {
-                                    queryParams['property_types'] =
-                                        _selectedPropertyTypes.join(',');
-                                  }
-
-                                  // Price Range
-                                  if (_selectedPriceRange != 'all') {
-                                    switch (_selectedPriceRange) {
-                                      case 'Under 50L':
-                                        queryParams['min_price'] = '0';
-                                        queryParams['max_price'] = '5000000';
-                                        break;
-                                      case '50L-1Cr':
-                                        queryParams['min_price'] = '5000000';
-                                        queryParams['max_price'] = '10000000';
-                                        break;
-                                      case '1Cr-2Cr':
-                                        queryParams['min_price'] = '10000000';
-                                        queryParams['max_price'] = '20000000';
-                                        break;
-                                      case '2Cr-5Cr':
-                                        queryParams['min_price'] = '20000000';
-                                        queryParams['max_price'] = '50000000';
-                                        break;
-                                      case 'Above 5Cr':
-                                        queryParams['min_price'] = '50000000';
-                                        break;
-                                    }
-                                  }
-
-                                  // Bedrooms
-                                  if (_selectedBedroomRange != 'all') {
-                                    switch (_selectedBedroomRange) {
-                                      case '1':
-                                        queryParams['bedrooms'] = '1';
-                                        break;
-                                      case '2':
-                                        queryParams['bedrooms'] = '2';
-                                        break;
-                                      case '3':
-                                        queryParams['bedrooms'] = '3';
-                                        break;
-                                      case '4':
-                                        queryParams['bedrooms'] = '4';
-                                        break;
-                                      case '5+':
-                                        queryParams['bedrooms'] = '5_plus';
-                                        break;
-                                    }
-                                  }
-
-                                  // Area
-                                  if (_selectedAreaRange != 'all') {
-                                    switch (_selectedAreaRange) {
-                                      case 'Under 500 sq ft':
-                                        queryParams['min_area'] = '0';
-                                        queryParams['max_area'] = '500';
-                                        break;
-                                      case '500-1000 sq ft':
-                                        queryParams['min_area'] = '500';
-                                        queryParams['max_area'] = '1000';
-                                        break;
-                                      case '1000-1500 sq ft':
-                                        queryParams['min_area'] = '1000';
-                                        queryParams['max_area'] = '1500';
-                                        break;
-                                      case '1500-2000 sq ft':
-                                        queryParams['min_area'] = '1500';
-                                        queryParams['max_area'] = '2000';
-                                        break;
-                                      case 'Above 2000 sq ft':
-                                        queryParams['min_area'] = '2000';
-                                        break;
-                                    }
-                                  }
-
-                                  // Furnishing
-                                  if (_selectedFurnishings.isNotEmpty) {
-                                    queryParams['furnishing'] =
-                                        _selectedFurnishings.join(',');
-                                  }
-
-                                  // Posted By
-                                  if (_selectedPostedBy != 'all') {
-                                    switch (_selectedPostedBy) {
-                                      case 'Owner':
-                                        queryParams['by_dealer'] = '0';
-                                        break;
-                                      case 'Builder':
-                                      case 'Agent':
-                                        queryParams['by_dealer'] = '1';
-                                        break;
-                                    }
-                                  }
-
-                                  // Listing type (auction / sale)
-                                  queryParams['listing_type'] = categoryId;
-
-                                  try {
-                                    setState(() => _isLoading = true);
-                                    final apiService = ApiService();
-                                    final Map<String, dynamic>
-                                    response = await apiService.postMultipart(
-                                      url:
-                                          "$baseUrl/filter-realestate-listings.php",
-                                      fields: queryParams,
-                                    );
-
-                                    final dataList =
-                                        response['data'] as List<dynamic>? ??
-                                        [];
-                                    final finalPosts =
-                                        dataList.map((item) {
-                                          final json =
-                                              item as Map<String, dynamic>;
-                                          return MarketplacePost.fromJson(json);
-                                        }).toList();
-
-                                    setState(() {
-                                      _posts = finalPosts;
-                                      _isLoading = false;
-                                    });
-                                  } catch (e) {
-                                    setState(() => _isLoading = false);
-                                  }
-
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
+          child: Column(
+            children: [
+              // Top handle
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _listingType == 'auction' ? 'Filter Auction Properties' : 'Filter Properties',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setModalState(() {
+                          _selectedPropertyTypes.clear();
+                          _selectedPriceRange = 'all';
+                          _selectedBedroomRange = 'all';
+                          _selectedAreaRange = 'all';
+                          _selectedFurnishings.clear();
+                          _selectedPostedBy = 'all';
+                          _minPriceController.clear();
+                          _maxPriceController.clear();
+                        });
+                        _fetchPosts();
+                      },
+                      child: const Text(
+                        'Clear All',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Two-column layout
+              Expanded(
+                child: Row(
+                  children: [
+                    // Sidebar
+                    Container(
+                      width: 100,
+                      color: Palette.primaryblue,
+                      child: ListView.builder(
+                        itemCount: [
+                          'Property Type',
+                          'Price Range',
+                          'Bedrooms',
+                          'Area',
+                          'Furnishing',
+                          'Posted By',
+                        ].length,
+                        itemBuilder: (context, index) {
+                          final category = [
+                            'Property Type',
+                            'Price Range',
+                            'Bedrooms',
+                            'Area',
+                            'Furnishing',
+                            'Posted By',
+                          ][index];
+                          final isSelected = _selectedCategory == category;
+                          return GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                _selectedCategory = category;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.white : Colors.transparent,
+                                border: Border(
+                                  left: BorderSide(
+                                    color: isSelected ? Palette.primaryblue : Colors.transparent,
+                                    width: 4,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                category,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                  color: isSelected ? Palette.primaryblue : Colors.white,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    // Options
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildOptionsSection(setModalState),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Bottom buttons
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final Map<String, String> queryParams = {};
+
+                          // Property Types
+                          if (_selectedPropertyTypes.isNotEmpty) {
+                            queryParams['property_types'] =
+                                _selectedPropertyTypes.join(',');
+                          }
+
+                          // Price Range
+                          if (_selectedPriceRange != 'all') {
+                            switch (_selectedPriceRange) {
+                              case 'Under 50L':
+                                queryParams['min_price'] = '0';
+                                queryParams['max_price'] = '5000000';
+                                break;
+                              case '50L-1Cr':
+                                queryParams['min_price'] = '5000000';
+                                queryParams['max_price'] = '10000000';
+                                break;
+                              case '1Cr-2Cr':
+                                queryParams['min_price'] = '10000000';
+                                queryParams['max_price'] = '20000000';
+                                break;
+                              case '2Cr-5Cr':
+                                queryParams['min_price'] = '20000000';
+                                queryParams['max_price'] = '50000000';
+                                break;
+                              case 'Above 5Cr':
+                                queryParams['min_price'] = '50000000';
+                                break;
+                            }
+                          }
+
+                          // Bedrooms
+                          if (_selectedBedroomRange != 'all') {
+                            switch (_selectedBedroomRange) {
+                              case '1':
+                                queryParams['bedrooms'] = '1';
+                                break;
+                              case '2':
+                                queryParams['bedrooms'] = '2';
+                                break;
+                              case '3':
+                                queryParams['bedrooms'] = '3';
+                                break;
+                              case '4':
+                                queryParams['bedrooms'] = '4';
+                                break;
+                              case '5+':
+                                queryParams['bedrooms'] = '5_plus';
+                                break;
+                            }
+                          }
+
+                          // Area
+                          if (_selectedAreaRange != 'all') {
+                            switch (_selectedAreaRange) {
+                              case 'Under 500 sq ft':
+                                queryParams['min_area'] = '0';
+                                queryParams['max_area'] = '500';
+                                break;
+                              case '500-1000 sq ft':
+                                queryParams['min_area'] = '500';
+                                queryParams['max_area'] = '1000';
+                                break;
+                              case '1000-1500 sq ft':
+                                queryParams['min_area'] = '1000';
+                                queryParams['max_area'] = '1500';
+                                break;
+                              case '1500-2000 sq ft':
+                                queryParams['min_area'] = '1500';
+                                queryParams['max_area'] = '2000';
+                                break;
+                              case 'Above 2000 sq ft':
+                                queryParams['min_area'] = '2000';
+                                break;
+                            }
+                          }
+
+                          // Furnishing
+                          if (_selectedFurnishings.isNotEmpty) {
+                            queryParams['furnishing'] =
+                                _selectedFurnishings.join(',');
+                          }
+
+                          // Posted By
+                          if (_selectedPostedBy != 'all') {
+                            switch (_selectedPostedBy) {
+                              case 'Owner':
+                                queryParams['by_dealer'] = '0';
+                                break;
+                              case 'Builder':
+                              case 'Agent':
+                                queryParams['by_dealer'] = '1';
+                                break;
+                            }
+                          }
+
+                          // Listing type (auction / sale)
+                          queryParams['listing_type'] = categoryId;
+
+                          try {
+                            setState(() => _isLoading = true);
+                            final apiService = ApiService();
+                            final Map<String, dynamic>
+                            response = await apiService.postMultipart(
+                              url:
+                                  "$baseUrl/filter-realestate-listings.php",
+                              fields: queryParams,
+                            );
+
+                            final dataList =
+                                response['data'] as List<dynamic>? ??
+                                [];
+                            final finalPosts =
+                                dataList.map((item) {
+                                  final json =
+                                      item as Map<String, dynamic>;
+                                  return MarketplacePost.fromJson(json);
+                                }).toList();
+
+                            setState(() {
+                              _posts = finalPosts;
+                              _isLoading = false;
+                            });
+                          } catch (e) {
+                            setState(() => _isLoading = false);
+                          }
+
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -699,57 +716,74 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setModalState(() {
+                          if (value == true) {
+                            selectedValues.add(option);
+                          } else {
+                            selectedValues.remove(option);
+                          }
+                        });
+                      },
+                      activeColor: Palette.primarypink,
+                      checkColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -759,70 +793,275 @@ class _RealEstatePageState extends State<RealEstatePage> {
     String title,
     List<String> options,
     String selectedValue,
-    ValueChanged<String> onChanged, {
+    ValueChanged<String> onChanged,
+    StateSetter setModalState, {
     String? subtitle,
   }) {
+    if (title == 'Price Range') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select $title',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minPriceController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Min Price',
+                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(color: Palette.primarypink),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                  onChanged: (value) {
+                    setModalState(() {
+                      final min = _minPriceController.text;
+                      final max = _maxPriceController.text;
+                      if (min.isNotEmpty && max.isNotEmpty) {
+                        _selectedPriceRange = '$min-$max';
+                      } else {
+                        _selectedPriceRange = 'all';
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _maxPriceController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Max Price',
+                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(color: Palette.primarypink),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                  onChanged: (value) {
+                    setModalState(() {
+                      final min = _minPriceController.text;
+                      final max = _maxPriceController.text;
+                      if (min.isNotEmpty && max.isNotEmpty) {
+                        _selectedPriceRange = '$min-$max';
+                      } else {
+                        _selectedPriceRange = 'all';
+                      }
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () {
+              setModalState(() {
+                _selectedPriceRange = 'all';
+                _minPriceController.clear();
+                _maxPriceController.clear();
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _selectedPriceRange == 'all' ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _selectedPriceRange == 'all' ? Palette.primarypink : Colors.grey.shade300,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'all',
+                    groupValue: _selectedPriceRange,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setModalState(() {
+                          _selectedPriceRange = value;
+                          _minPriceController.clear();
+                          _maxPriceController.clear();
+                        });
+                      }
+                    },
+                    activeColor: Palette.primarypink,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Any Price Range',
+                      style: TextStyle(
+                        color: Palette.primarypink,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               color: Colors.grey.shade600,
               fontStyle: FontStyle.italic,
             ),
           ),
         ],
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Radio<String>(
+                      value: option,
+                      groupValue: selectedValue,
+                      onChanged: (value) {
+                        if (value != null) onChanged(value);
+                      },
+                      activeColor: Palette.primarypink,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayText,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
+  }
+
+  Widget _buildOptionsSection(StateSetter setModalState) {
+    switch (_selectedCategory) {
+      case 'Property Type':
+        return _buildMultiSelectFilterSection(
+          'Property Type',
+          _propertyTypes,
+          _selectedPropertyTypes,
+          setModalState,
+        );
+      case 'Price Range':
+        return _buildSingleSelectFilterSection(
+          'Price Range',
+          _priceRanges,
+          _selectedPriceRange,
+          (value) => setModalState(() => _selectedPriceRange = value),
+          setModalState,
+          subtitle: _listingType == 'auction' ? 'Filter by starting bid price' : 'Filter by sale price',
+        );
+      case 'Bedrooms':
+        return _buildSingleSelectFilterSection(
+          'Bedrooms',
+          _bedroomRanges,
+          _selectedBedroomRange,
+          (value) => setModalState(() => _selectedBedroomRange = value),
+          setModalState,
+        );
+      case 'Area':
+        return _buildSingleSelectFilterSection(
+          'Area',
+          _areaRanges,
+          _selectedAreaRange,
+          (value) => setModalState(() => _selectedAreaRange = value),
+          setModalState,
+        );
+      case 'Furnishing':
+        return _buildMultiSelectFilterSection(
+          'Furnishing',
+          _furnishings,
+          _selectedFurnishings,
+          setModalState,
+        );
+      case 'Posted By':
+        return _buildSingleSelectFilterSection(
+          'Posted By',
+          _postedByOptions,
+          _selectedPostedBy,
+          (value) => setModalState(() => _selectedPostedBy = value),
+          setModalState,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   int _getActiveFilterCount() {
@@ -1198,7 +1437,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               image: NetworkImage(getImageUrl(post.image)),
                               fit:
                                   BoxFit
-                                      .cover, // Ensures full image is visible, scaled to fit
+                                      .cover,
                               onError: (exception, stackTrace) {
                                 print(
                                   'Failed to load image: ${getImageUrl(post.image)}',
@@ -1255,13 +1494,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            // Text(
-                            //   propertyType,
-                            //   style: TextStyle(
-                            //     fontSize: 10,
-                            //     color: Colors.grey.shade600,
-                            //   ),
-                            // ),
                             const SizedBox(height: 8),
                             Text(
                               isAuction
