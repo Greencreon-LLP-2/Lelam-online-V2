@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -10,6 +11,7 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
@@ -20,6 +22,7 @@ import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart' show SellingStatusPage;
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
@@ -83,6 +86,7 @@ class _RealEstateProductDetailsPageState
   String? _bannerImageUrl;
   bool _isLoadingBanner = false;
   String _bannerError = '';
+ String _moveToAuctionButtonText = 'Move to Auction';
 
   @override
   void initState() {
@@ -103,6 +107,378 @@ class _RealEstateProductDetailsPageState
       if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
     ]);
   }
+
+ Future<bool> _checkAuctionTermsStatus() async {
+    if (_userProvider.userId == null) {
+      debugPrint('User not logged in, cannot check auction terms.');
+      return false;
+    }
+
+    final url =
+        '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
+    try {
+      debugPrint('Checking auction terms status: $url');
+      final response = await http.get(Uri.parse(url));
+      debugPrint(
+        'Terms check response: status=${response.statusCode}, body=${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        bool termsAccepted = decodedBody['status'] == 'true';
+        debugPrint('Terms accepted: $termsAccepted');
+
+        if (!termsAccepted) {
+          // Terms not accepted, call seller-accept-terms.php
+          final acceptUrl =
+              '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
+          debugPrint('Accepting terms: $acceptUrl');
+          final acceptResponse = await http.get(Uri.parse(acceptUrl));
+          debugPrint(
+            'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
+          );
+
+          if (acceptResponse.statusCode == 200) {
+            final acceptDecodedBody = jsonDecode(acceptResponse.body);
+            if (acceptDecodedBody['status'] == 'true' &&
+                acceptDecodedBody['data'] is List &&
+                acceptDecodedBody['data'].isNotEmpty) {
+              debugPrint('Terms accepted successfully');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    acceptDecodedBody['data'][0]['message'] ?? 'Terms accepted',
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                ),
+              );
+              return true;
+            } else {
+              debugPrint(
+                'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
+                  ),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                ),
+              );
+              return false;
+            }
+          } else {
+            debugPrint(
+              'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
+                ),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+            return false;
+          }
+        }
+        return termsAccepted;
+      } else {
+        debugPrint(
+          'Failed to check auction terms: HTTP ${response.statusCode}',
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to check auction terms: HTTP ${response.statusCode}',
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error checking auction terms: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error checking auction terms: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
+    bool isAccepted = false;
+    String termsHtml = '';
+    bool isLoadingTerms = true;
+    String? termsError;
+
+    debugPrint('Attempting to fetch auction terms');
+    try {
+      termsHtml = await MarketplaceService2().fetchAuctionTerms();
+      debugPrint('Terms fetched successfully: $termsHtml');
+      isLoadingTerms = false;
+    } catch (e) {
+      debugPrint('Error fetching auction terms: $e');
+      termsError = e.toString();
+      isLoadingTerms = false;
+    }
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool dialogIsAccepted = false;
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setDialogState) {
+            debugPrint(
+              'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
+            );
+            return AlertDialog(
+              title: const Text('Auction Terms & Conditions'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoadingTerms)
+                      const Center(child: CircularProgressIndicator())
+                    else if (termsError != null)
+                      Text(
+                        'Error loading terms: $termsError',
+                        style: const TextStyle(fontSize: 14, color: Colors.red),
+                      )
+                    else
+                      Html(
+                        data: termsHtml,
+                        style: {'body': Style(fontSize: FontSize(14))},
+                      ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      title: const Text('I accept the terms and conditions'),
+                      value: dialogIsAccepted,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          dialogIsAccepted = value ?? false;
+                          debugPrint(
+                            'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    debugPrint('Terms dialog cancelled');
+                    Navigator.pop(dialogContext, false);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      dialogIsAccepted && !isLoadingTerms && termsError == null
+                          ? () async {
+                            debugPrint('Attempting to accept terms');
+                            try {
+                              final url =
+                                  '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
+                              debugPrint('Accepting terms: $url');
+                              final response = await http.get(Uri.parse(url));
+                              debugPrint(
+                                'Accept terms response: status=${response.statusCode}, body=${response.body}',
+                              );
+
+                              if (response.statusCode == 200) {
+                                final decodedBody = jsonDecode(response.body);
+                                if (decodedBody['status'] == 'true' &&
+                                    decodedBody['data'] is List &&
+                                    decodedBody['data'].isNotEmpty) {
+                                  debugPrint('Terms accepted successfully');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        decodedBody['data'][0]['message'] ??
+                                            'Terms accepted',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      margin: const EdgeInsets.all(16),
+                                    ),
+                                  );
+                                  Navigator.pop(dialogContext, true);
+                                } else {
+                                  setDialogState(() {
+                                    termsError =
+                                        'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
+                                    debugPrint(
+                                      'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
+                                    );
+                                  });
+                                }
+                              } else {
+                                setDialogState(() {
+                                  termsError =
+                                      'Failed to accept terms: HTTP ${response.statusCode}';
+                                  debugPrint(
+                                    'Failed to accept terms: HTTP ${response.statusCode}',
+                                  );
+                                });
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                termsError = 'Error accepting terms: $e';
+                                debugPrint('Error accepting terms: $e');
+                              });
+                            }
+                          }
+                          : null,
+                  child: const Text('Accept'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((value) {
+      isAccepted = value ?? false;
+      debugPrint('Terms dialog closed, isAccepted=$isAccepted');
+    });
+
+    return isAccepted;
+  }
+
+  Future<void> _moveToAuction() async {
+    if (_userProvider.userId == null) {
+      debugPrint('User not logged in, showing login prompt');
+      _showLoginPromptDialog(context, 'move to auction');
+      return;
+    }
+
+    setState(() {
+      _isLoadingBid = true;
+    });
+
+    try {
+      debugPrint('Showing terms dialog before moving to auction');
+      final accepted = await _showTermsAndConditionsDialog(context);
+      if (!accepted) {
+        debugPrint('User did not accept terms, aborting move to auction');
+        setState(() {
+          _isLoadingBid = false;
+        });
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   const SnackBar(
+        //     content: Text('You must accept the auction terms to proceed.'),
+        //     backgroundColor: Colors.red,
+        //     behavior: SnackBarBehavior.floating,
+        //     shape: RoundedRectangleBorder(
+        //      // borderRadius: BorderRadius.circular(8),
+        //     ),
+        //     margin: EdgeInsets.all(16),
+        //   ),
+        // );
+        return;
+      }
+
+      debugPrint('Terms accepted, proceeding to move to auction');
+
+      final url =
+          '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
+      debugPrint('Moving to auction: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint(
+        'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            responseData['data'].isNotEmpty &&
+            responseData['data'][0]['check'] == 1;
+        final String message =
+            responseData['data']?[0]['message']?.toString() ?? '';
+
+        if (isSuccess) {
+          debugPrint('Successfully moved to auction');
+          setState(() {
+            _moveToAuctionButtonText = 'Auction Waiting for Approval';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                message.isNotEmpty ? message : 'Successfully moved to auction',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          throw Exception('');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error moving to auction: $e');
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Error: $e'),
+      //     backgroundColor: Colors.red,
+      //     behavior: SnackBarBehavior.floating,
+      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      //     margin: const EdgeInsets.all(16),
+      //   ),
+      // );
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
+      });
+    }
+  }
+
 
   Future<void> _fetchBannerImage() async {
     debugPrint('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
@@ -2697,14 +3073,14 @@ class _RealEstateProductDetailsPageState
               ],
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: -5,
-            child: CustomSafeArea(
+           Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: const BoxDecoration(
+                  color: Colors.white, // Prevents ParentDataWidget issues
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black26,
@@ -2716,41 +3092,90 @@ class _RealEstateProductDetailsPageState
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          showProductBidDialog(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                    if (_userProvider.userId == widget.product.createdBy) ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SellingStatusPage(),
+            ),
+          );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
                           ),
+                          child: const Text('Edit'),
                         ),
-                        child: const Text('Place Bid'),
                       ),
-                    ),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _showMeetingDialog(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoadingBid ? null : _moveToAuction,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primaryblue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
                           ),
+                          child:
+                              _isLoadingBid
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : Text(_moveToAuctionButtonText),
                         ),
-                        child: const Text('Fix Meeting'),
                       ),
-                    ),
+                    ] else ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => showProductBidDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primarypink,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                          child: const Text('Place Bid'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _showMeetingDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primaryblue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                          child: const Text('Fix Meeting'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
