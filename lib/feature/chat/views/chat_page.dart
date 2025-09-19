@@ -902,111 +902,119 @@ class ChatPage extends HookWidget {
                     : Column(
                         children: [
                           Expanded(
-                            child: messages.value.isEmpty
-                                ? Center(
-                                    child: Column(
+                            child: ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(16),
+                              itemCount: messages.value.isEmpty ? 1 : messages.value.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  // Pinned notice at the top
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.grey[300]!, width: 1),
+                                    ),
+                                    child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         Icon(
-                                          Icons.forum_outlined,
-                                          size: 64,
-                                          color: Colors.grey[400],
+                                          Icons.info_outline,
+                                          size: 20,
+                                          color: Colors.grey[700],
                                         ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'No messages yet',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey[600],
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Lelam Online is a default member in all chats. Please don’t ask or share phone numbers before fixing a meeting.',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey[800],
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          'Start the conversation with a message',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[500],
-                                          ),
-                                          textAlign: TextAlign.center,
                                         ),
                                       ],
                                     ),
-                                  )
-                                : ListView.builder(
-                                    controller: scrollController,
-                                    padding: const EdgeInsets.all(16),
-                                    itemCount: messages.value.length,
-                                    itemBuilder: (context, index) {
-                                      final message = messages.value[index];
-                                      final isMe = message.userIdFrom == userId;
-                                      final showTime = _formatTime(message.createdOn);
+                                  );
+                                }
+                                // Adjust index for messages
+                                final messageIndex = index - 1;
+                                if (messageIndex >= messages.value.length) {
+                                  return const SizedBox.shrink();
+                                }
+                                final message = messages.value[messageIndex];
+                                final isMe = message.userIdFrom == userId;
+                                final showTime = _formatTime(message.createdOn);
 
-                                      return GestureDetector(
-                                        onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
-                                        child: Align(
-                                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                          child: Container(
-                                            margin: EdgeInsets.only(
-                                              top: 4,
-                                              bottom: 4,
-                                              left: isMe ? 48 : 0,
-                                              right: isMe ? 0 : 48,
+                                return GestureDetector(
+                                  onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
+                                  child: Align(
+                                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                    child: Container(
+                                      margin: EdgeInsets.only(
+                                        top: 4,
+                                        bottom: 4,
+                                        left: isMe ? 48 : 0,
+                                        right: isMe ? 0 : 48,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
                                             ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 16,
-                                                    vertical: 12,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: isMe
-                                                        ? Theme.of(context).primaryColor
-                                                        : Colors.white,
-                                                    borderRadius: BorderRadius.only(
-                                                      topLeft: const Radius.circular(16),
-                                                      topRight: const Radius.circular(16),
-                                                      bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                                      bottomRight: Radius.circular(isMe ? 4 : 16),
-                                                    ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.black.withOpacity(0.05),
-                                                        blurRadius: 4,
-                                                        offset: const Offset(0, 1),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: Text(
-                                                    message.message,
-                                                    style: TextStyle(
-                                                      color: isMe ? Colors.white : Colors.black87,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
+                                            decoration: BoxDecoration(
+                                              color: isMe
+                                                  ? Theme.of(context).primaryColor
+                                                  : Colors.white,
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: const Radius.circular(16),
+                                                topRight: const Radius.circular(16),
+                                                bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                                bottomRight: Radius.circular(isMe ? 4 : 16),
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.05),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 1),
                                                 ),
-                                                if (showTime.isNotEmpty)
-                                                  Padding(
-                                                    padding: const EdgeInsets.only(top: 4),
-                                                    child: Text(
-                                                      showTime,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: Colors.grey[500],
-                                                      ),
-                                                    ),
-                                                  ),
                                               ],
                                             ),
+                                            child: Text(
+                                              message.message,
+                                              style: TextStyle(
+                                                color: isMe ? Colors.white : Colors.black87,
+                                                fontSize: 16,
+                                              ),
+                                            ),
                                           ),
+                                          if (showTime.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Text(
+                                                showTime,
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      );
-                                    },
-                                  ),
-                          ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(

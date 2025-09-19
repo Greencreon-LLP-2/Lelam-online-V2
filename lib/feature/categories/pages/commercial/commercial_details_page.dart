@@ -22,6 +22,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
@@ -148,14 +149,14 @@ class _CommercialProductDetailsPageState
   Widget _buildBannerAd() {
     if (_isLoadingBanner) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_bannerError.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(0),
         child: Center(
           child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
         ),
@@ -167,7 +168,7 @@ class _CommercialProductDetailsPageState
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0),
       child: CachedNetworkImage(
         imageUrl: _bannerImageUrl!,
         width: double.infinity,
@@ -239,15 +240,15 @@ class _CommercialProductDetailsPageState
         _isFavorited = false;
         _isLoadingFavorite = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to check shortlist status: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Failed to check shortlist status: $e'),
+      //     backgroundColor: Colors.red,
+      //     behavior: SnackBarBehavior.floating,
+      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      //     margin: const EdgeInsets.all(16),
+      //   ),
+      // );
     }
   }
 
@@ -1056,12 +1057,12 @@ class _CommercialProductDetailsPageState
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(dialogContext).pop();
+                    
                       if (mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const BuyingStatusPage(),
+                            builder: (context) => const BuyingStatusPage()
                           ),
                         );
                       }
@@ -1579,24 +1580,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              title: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Schedule Meeting',
-                    style: TextStyle(fontSize: 24),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Select date',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
+              
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -1812,7 +1796,49 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
         );
   }
 
-  Widget _buildQuestionsSection() {
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    void _showLoginDialog() {
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text(
+                'Login Required',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+              ),
+              content: const Text('Please log in to ask a question.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.pushNamed(RouteNames.loginPage);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  child: const Text(
+                    'Log In',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1827,26 +1853,39 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
             ),
             ElevatedButton(
               onPressed: () {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder:
-                      (context) => const ReviewDialog( postId: ''),
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
                 );
+                if (!userProvider.isLoggedIn) {
+                  _showLoginDialog();
+                } else {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
-              child: const Text('Ask a question'),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
             ),
           ],
         ),
       ],
     );
   }
-
   String _stripHtmlTags(String htmlString) {
     return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
   }
@@ -2219,7 +2258,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                 ),
                 const Divider(),
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2238,11 +2277,11 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                     ],
                   ),
                 ),
-                const Divider(),
+        
                 _buildBannerAd(),
-                const Divider(),
+                  
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2272,7 +2311,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildQuestionsSection(),
+                      _buildQuestionsSection(context, id),
                     ],
                   ),
                 ),

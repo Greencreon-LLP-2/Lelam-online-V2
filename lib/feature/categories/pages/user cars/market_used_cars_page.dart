@@ -19,6 +19,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
@@ -374,15 +375,6 @@ class _MarketPlaceProductDetailsPageState
         _isFavorited = false;
         _isCheckingShortlist = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to check shortlist status: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
     }
   }
 
@@ -598,13 +590,9 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Widget _buildBannerAd() {
-    debugPrint(
-      'Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl',
-    );
-
     if (_isLoadingBanner) {
       return const Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(0),
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -624,7 +612,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(0),
       child: CachedNetworkImage(
         imageUrl: _bannerImageUrl!,
         width: double.infinity,
@@ -708,7 +696,11 @@ class _MarketPlaceProductDetailsPageState
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
     final TextEditingController _bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(String message, bool isSuccess) async {
+    Future<void> _showResponseDialog(
+      String message,
+      bool isSuccess,
+      bool isHighestBid,
+    ) async {
       // Format the current highest bid
       final String formattedBid =
           _currentHighestBid.startsWith('Error')
@@ -727,13 +719,33 @@ class _MarketPlaceProductDetailsPageState
               borderRadius: BorderRadius.circular(16.0),
             ),
             backgroundColor: Colors.white,
-            title: Text(
-              isSuccess ? 'Thank You' : 'Error',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isSuccess ? AppTheme.primaryColor : Colors.red,
-              ),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isSuccess ? 'Thank You' : 'Error',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isSuccess ? AppTheme.primaryColor : Colors.red,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, size: 28, color: Colors.grey[700]),
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  splashRadius: 24,
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                  },
+                  tooltip: 'Close dialog',
+                ),
+              ],
             ),
             content: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -741,12 +753,27 @@ class _MarketPlaceProductDetailsPageState
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
-                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      fontSize: 16,
-                      color: Colors.grey[800],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isSuccess && isHighestBid)
+                        Text(
+                          'Congratulations, your bid is the highest bid! 🎉',
+                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                          ),
+                        ),
+                      if (isSuccess && isHighestBid) const SizedBox(height: 8),
+                      Text(
+                        '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -902,6 +929,10 @@ class _MarketPlaceProductDetailsPageState
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 backgroundColor: Colors.white,
+
+                titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+
                 title: Text(
                   'Place Your Bid Amount',
                   style: TextStyle(
@@ -910,96 +941,93 @@ class _MarketPlaceProductDetailsPageState
                     color: AppTheme.primaryColor,
                   ),
                 ),
-                content: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Bid Amount *',
-                        style: Theme.of(
-                          dialogContext,
-                        ).textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                        semanticsLabel: 'Your Bid Amount (required)',
+
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Your Bid Amount *',
+                      style: Theme.of(
+                        dialogContext,
+                      ).textTheme.bodyMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _bidController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: false,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: InputDecoration(
-                          hintText: 'Enter amount',
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 12, right: 8),
-                            child: Text(
-                              '₹',
-                              style: Theme.of(
-                                dialogContext,
-                              ).textTheme.bodyMedium?.copyWith(
-                                fontSize: 16,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 0,
-                            minHeight: 0,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                              color: AppTheme.primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2,
-                            ),
-                          ),
-                          focusedErrorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                        ),
-                        style: Theme.of(dialogContext).textTheme.bodyMedium
-                            ?.copyWith(fontSize: 16, color: Colors.grey[800]),
+                      semanticsLabel: 'Your Bid Amount (required)',
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _bidController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: false,
                       ),
-                      if (_isLoadingBid)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12.0),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.primaryColor,
-                              ),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Enter amount',
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Text(
+                            '₹',
+                            style: Theme.of(
+                              dialogContext,
+                            ).textTheme.bodyMedium?.copyWith(
+                              fontSize: 16,
+                              color: Colors.grey[800],
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 0,
+                          minHeight: 0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: Theme.of(dialogContext).textTheme.bodyMedium
+                          ?.copyWith(fontSize: 16, color: Colors.grey[800]),
+                    ),
+                    if (_isLoadingBid)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+
                 ),
                 actions: [
                   Row(
@@ -1095,14 +1123,26 @@ class _MarketPlaceProductDetailsPageState
                                       FocusScope.of(dialogContext).unfocus();
                                       final String responseMessage =
                                           await _saveBidData(bidAmount);
+
+                                      // Parse current highest bid and user's bid for comparison
+                                      final double currentHighest =
+                                          double.tryParse(_currentHighestBid) ??
+                                          0;
+                                      final bool isHighestBid =
+                                          bidAmount > currentHighest;
                                       Navigator.of(dialogContext).pop({
                                         'success': true,
                                         'message': responseMessage,
+                                        'isHighestBid': isHighestBid,
+
                                       });
                                     } catch (e) {
                                       Navigator.of(dialogContext).pop({
                                         'success': false,
                                         'message': 'Error placing bid: $e',
+
+                                        'isHighestBid': false,
+
                                       });
                                     } finally {
                                       setDialogState(() {
@@ -1156,7 +1196,8 @@ class _MarketPlaceProductDetailsPageState
       final String msg =
           result['message']?.toString() ??
           (ok ? 'Bid placed successfully' : 'Failed to place bid');
-      await _showResponseDialog(msg, ok);
+      final bool isHighestBid = result['isHighestBid'] ?? false;
+      await _showResponseDialog(msg, ok, isHighestBid);
     }
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
@@ -1642,7 +1683,7 @@ class _MarketPlaceProductDetailsPageState
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(dialogContext).pop();
+                     
                       if (mounted) {
                         Navigator.push(
                           context,
@@ -1737,24 +1778,7 @@ class _MarketPlaceProductDetailsPageState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              title: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Schedule Meeting',
-                    style: TextStyle(fontSize: 24),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Select date',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
+             
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -1876,19 +1900,35 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Widget _buildDetailItem(IconData icon, String text) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        Icon(icon, size: 15, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            text,
-            overflow: TextOverflow.fade,
-            style: TextStyle(fontSize: 15, color: Colors.grey[700]),
-          ),
+    return Flexible(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ), // Compact padding
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey[700],
+            ), // Slightly smaller icon
+            const SizedBox(width: 6), // Tighter spacing
+            Expanded(
+              child: Text(
+                text,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1, // Prevent wrapping
+                style: const TextStyle(
+                  fontSize: 14, // Slightly smaller font for compactness
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -2430,132 +2470,174 @@ class _MarketPlaceProductDetailsPageState
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(
+                        12.0,
+                      ), // Reduced padding for compactness
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
                             'Details',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 18, // Slightly smaller for consistency
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8), // Tighter spacing
                           if (isLoadingSellerComments)
                             const Center(child: CircularProgressIndicator())
                           else if (uniqueSellerComments.isEmpty)
                             const Center(child: Text('No details available'))
                           else
-                            Column(
-                              children: [
-                                Row(
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                // Calculate max width per item based on screen width
+                                final maxItemWidth =
+                                    constraints.maxWidth /
+                                    3; // Max 3 items per row
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.calendar_today,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'year',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Year',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.calendar_today,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'year',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName: 'Year',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.person,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'no of owners',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'No of owners',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.settings,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'transmission',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'Transmission',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.person,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'no of owners',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'No of owners',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.settings,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'transmission',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'Transmission',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
+                                    const SizedBox(
+                                      height: 6,
+                                    ), // Tighter spacing between rows
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: [
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.local_gas_station,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'fuel type',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'Fuel Type',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child: _buildDetailItem(
+                                            Icons.speed,
+                                            uniqueSellerComments
+                                                .firstWhere(
+                                                  (comment) =>
+                                                      comment.attributeName
+                                                          .toLowerCase()
+                                                          .trim() ==
+                                                      'km range',
+                                                  orElse:
+                                                      () => SellerComment(
+                                                        attributeName:
+                                                            'KM Range',
+                                                        attributeValue: 'N/A',
+                                                      ),
+                                                )
+                                                .attributeValue,
+                                          ),
+                                        ),
+                                        // Add empty ConstrainedBox to align with top row
+                                        ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                            maxWidth: maxItemWidth,
+                                          ),
+                                          child:
+                                              const SizedBox.shrink(), // Placeholder for alignment
+                                        ),
+                                      ],
                                     ),
                                   ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.local_gas_station,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'fuel type',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Fuel Type',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: _buildDetailItem(
-                                        Icons.speed,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'km range',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'KM Range',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                );
+                              },
                             ),
                         ],
                       ),
@@ -2564,14 +2646,14 @@ class _MarketPlaceProductDetailsPageState
                   const Divider(),
                   // Seller Comments Section
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: _buildSellerCommentsSection(),
                   ),
-                  const Divider(),
+                  
                   _buildBannerAd(),
-                  const Divider(),
+             
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

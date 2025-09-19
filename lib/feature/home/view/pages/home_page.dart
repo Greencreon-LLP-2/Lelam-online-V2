@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/core/utils/districts.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
@@ -23,6 +26,9 @@ class _HomePageState extends State<HomePage> {
   String? _selectedDistrict;
   String? userId;
   late final LoggedUserProvider _userProvider;
+  List<String> _districts = []; // Dynamic list for districts
+  bool _isLoading = false; // Track loading state
+  String? _errorMessage; // Track error message
 
   @override
   void initState() {
@@ -31,12 +37,65 @@ class _HomePageState extends State<HomePage> {
     if (kDebugMode) {
       print('HomePage initialized, userId: ${_userProvider.userData?.userId}');
     }
+    _fetchDistricts(); // Fetch districts on initialization
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Fetch districts from API
+  Future<void> _fetchDistricts() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+   // Get token from provider or elsewhere
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/list-location.php?token=$token'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final List<dynamic> data = responseData['data'];
+          setState(() {
+            _districts = data
+                .where((item) => item['status'] == '1') // Only include active districts
+                .map((item) => item['name'].toString())
+                .toList();
+            _isLoading = false;
+          });
+          if (kDebugMode) {
+            print('Districts fetched: $_districts');
+          }
+        } else {
+          throw Exception('Invalid response: ${responseData['status']}');
+        }
+      } else {
+        throw Exception('Failed to load districts: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load districts: $e';
+      });
+      if (kDebugMode) {
+        print('Error fetching districts: $e');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_errorMessage ?? 'Failed to load districts'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+        ),
+      );
+    }
   }
 
   // Handle pull-to-refresh
@@ -47,22 +106,11 @@ class _HomePageState extends State<HomePage> {
       );
     }
     try {
-      // Optionally reset search query and district for a full refresh
-      // setState(() {
-      //   _searchQuery = '';
-      //   _selectedDistrict = null;
-      //   _searchController.clear();
-      // });
-
-      // Trigger data reload for widgets
-      // Assuming ProductSectionWidget, BannerWidget, and CategoryWidget
-      // use providers or internal state to fetch data, rebuild them
+      // Refresh districts and other data
+      await _fetchDistricts();
       setState(() {
-        // Force rebuild of stateful widgets
         _searchQuery = _searchQuery; // Trigger ProductSectionWidget refresh
       });
-
-      // Simulate API call or data refresh (replace with actual logic)
       await Future.delayed(const Duration(seconds: 1)); // Mock delay
       if (kDebugMode) {
         print('Refresh completed');
@@ -92,8 +140,7 @@ class _HomePageState extends State<HomePage> {
           child: Padding(
             padding: const EdgeInsets.only(top: 16),
             child: SingleChildScrollView(
-              physics:
-                  const AlwaysScrollableScrollPhysics(), // Ensure scrollable for refresh
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -106,31 +153,34 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             const Icon(Icons.location_on),
                             const SizedBox(width: 8),
-                            DropdownButton<String>(
-                              value: _selectedDistrict,
-                              hint: const Text('All Kerala'),
-                              items:
-                                  districts.map((district) {
-                                    return DropdownMenuItem<String>(
-                                      value: district,
-                                      child: Text(district),
-                                    );
-                                  }).toList(),
-                              onChanged: (String? newValue) {
-                                if (mounted) {
-                                  setState(() {
-                                    _selectedDistrict = newValue;
-                                  });
-                                  if (kDebugMode) {
-                                    print(
-                                      'Selected district: $_selectedDistrict',
-                                    );
-                                  }
-                                }
-                              },
-                              underline: const SizedBox(),
-                              icon: const SizedBox.shrink(),
-                            ),
+                            _isLoading
+                                ? const CircularProgressIndicator()
+                                : _errorMessage != null
+                                    ? const Text('Error loading locations')
+                                    : DropdownButton<String>(
+                                        value: _selectedDistrict,
+                                        hint: const Text('All Kerala'),
+                                        items: _districts.map((district) {
+                                          return DropdownMenuItem<String>(
+                                            value: district,
+                                            child: Text(district),
+                                          );
+                                        }).toList(),
+                                        onChanged: (String? newValue) {
+                                          if (mounted) {
+                                            setState(() {
+                                              _selectedDistrict = newValue;
+                                            });
+                                            if (kDebugMode) {
+                                              print(
+                                                'Selected district: $_selectedDistrict',
+                                              );
+                                            }
+                                          }
+                                        },
+                                        underline: const SizedBox(),
+                                        icon: const SizedBox.shrink(),
+                                      ),
                           ],
                         ),
                         const Spacer(),
@@ -169,7 +219,6 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.only(left: 16),
                     child: CategoryWidget(),
                   ),
-                
                   const SizedBox(height: 5),
                   ProductSectionWidget(searchQuery: _searchQuery),
                 ],

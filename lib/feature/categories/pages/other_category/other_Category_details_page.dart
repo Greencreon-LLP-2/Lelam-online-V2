@@ -9,24 +9,25 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/categories/widgets/bid_dialog.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart'
     show ChatPage;
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BikeDetailsPage extends StatefulWidget {
-  final Bike bike;
+  final dynamic bike;
 
   const BikeDetailsPage({super.key, required this.bike});
 
@@ -37,57 +38,171 @@ class BikeDetailsPage extends StatefulWidget {
 class _BikeDetailsPageState extends State<BikeDetailsPage> {
   bool _isLoadingLocations = true;
   List<LocationData> _locations = [];
-
   final PageController _pageController = PageController();
   int _currentImageIndex = 0;
   final TransformationController _transformationController =
       TransformationController();
-  bool _isFavorited = false;
+  bool _isShortlisted = false;
+  bool _isLoadingShortlist = false;
+  String? _shortlistErrorMessage;
   final String _baseUrl = 'https://lelamonline.com/admin/api/v1';
   final String _token = '5cb2c9b569416b5db1604e0e12478ded';
-
   String sellerName = 'Unknown';
   String? sellerProfileImage;
   int sellerNoOfPosts = 0;
   String sellerActiveFrom = 'N/A';
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
-   late final LoggedUserProvider _userProvider;
-
-   String? userId;
-bool _isLoadingFavorite = false;
-bool _isBidDialogOpen = false;
-bool _isLoadingBid = false;
-double _minBidIncrement = 1000;
-String _currentHighestBid = '0';
-bool _isMeetingDialogOpen = false;
-bool _isSchedulingMeeting = false;
+  late final LoggedUserProvider _userProvider;
+  String? userId;
+  bool _isLoadingBid = false;
+  double _minBidIncrement = 1000;
+  String _currentHighestBid = '0';
+  bool _isBidDialogOpen = false;
+  bool _isMeetingDialogOpen = false;
+  bool _isSchedulingMeeting = false;
+  bool _isLoadingBanner = false;
+  String? _bannerImageUrl;
+  String _bannerError = '';
+  final _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
-_userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-_initialize();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    _initialize();
   }
 
-Future<void> _initialize() async {
-  _loadUserId();
-  await Future.wait([
-    _fetchLocations(),
-    _fetchSellerInfo(),
-    if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
-  ]);
-}
+  Future<void> _initialize() async {
+    await _loadUserId();
+    await Future.wait([
+      _fetchLocations(),
+      _fetchSellerInfo(),
+      _fetchBannerImage(),
+      if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
+    ]);
+  }
 
+  Future<void> _loadUserId() async {
+    try {
+      final userData = _userProvider.userData;
+      String? providerUserId = userData?.userId;
+      String? storageUserId = await _storage.read(key: 'userId');
 
+      if (providerUserId != null &&
+          providerUserId.isNotEmpty &&
+          providerUserId != 'Unknown') {
+        setState(() {
+          userId = providerUserId;
+        });
+        await _storage.write(key: 'userId', value: providerUserId);
+      } else if (storageUserId != null &&
+          storageUserId.isNotEmpty &&
+          storageUserId != 'Unknown') {
+        setState(() {
+          userId = storageUserId;
+        });
+        // _userProvider.userId = storageUserId;
+      } else {
+        setState(() {
+          userId = null;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        userId = null;
+      });
+    }
+  }
 
+  Future<void> _fetchBannerImage() async {
+    try {
+      setState(() {
+        _isLoadingBanner = true;
+        _bannerError = '';
+      });
+      final headers = {
+        'token': _token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      final url = '$_baseUrl/post-ads-image.php?token=$_token';
+      debugPrint('Fetching banner image: $url');
 
-Future<void> _loadUserId() async {
-  final userData = _userProvider.userData;
-  setState(() {
-    userId = userData?.userId ?? '';
-  });
-}
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Banner API response: $responseBody');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          final bannerImage = responseData['data']['inner_post_image'] ?? '';
+          setState(() {
+            _bannerImageUrl =
+                bannerImage.isNotEmpty
+                    ? 'https://lelamonline.com/admin/$bannerImage'
+                    : null;
+          });
+        } else {
+          throw Exception('Invalid banner data: ${responseData['data']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching banner image: $e');
+      setState(() {
+        _bannerError = 'Failed to load banner: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingBanner = false;
+      });
+    }
+  }
+
+  Widget _buildBannerAd() {
+    if (_isLoadingBanner) {
+      return const Padding(
+        padding: EdgeInsets.all(0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_bannerError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(0),
+        child: Center(
+          child: Text(_bannerError, style: const TextStyle(color: Colors.red)),
+        ),
+      );
+    }
+
+    if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(0),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImageUrl!,
+        width: double.infinity,
+        height: 35,
+        fit: BoxFit.fill,
+        placeholder:
+            (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget:
+            (context, url, error) => const Center(
+              child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+            ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -95,272 +210,891 @@ Future<void> _loadUserId() async {
     super.dispose();
   }
 
-Future<void> _checkShortlistStatus() async {
-  if (userId == null || userId == 'Unknown') {
-    setState(() {
-      _isFavorited = false;
-      _isLoadingFavorite = false;
-    });
-    return;
-  }
-  setState(() => _isLoadingFavorite = true);
-  try {
-    final response = await ApiService().get(
-      url: shortlist,
-      queryParams: {"user_id": userId},
-    );
-    if (response['status'] == 'true' && response['data'] is List) {
-      final List<dynamic> shortlistData = response['data'];
-      final bool isShortlisted = shortlistData.any(
-        (item) => item['post_id'].toString() == widget.bike.id,
-      );
+  Future<void> _checkShortlistStatus() async {
+    if (userId == null || userId == 'Unknown') {
       setState(() {
-        _isFavorited = isShortlisted;
-        _isLoadingFavorite = false;
+        _isShortlisted = false;
+        _isLoadingShortlist = false;
+        _shortlistErrorMessage = 'Please log in to view shortlist status';
       });
-    } else {
-      setState(() {
-        _isFavorited = false;
-        _isLoadingFavorite = false;
-      });
+      return;
     }
-  } catch (e) {
-    setState(() {
-      _isFavorited = false;
-      _isLoadingFavorite = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Failed to check shortlist: $e'), backgroundColor: Colors.red),
-    );
-  }
-}
-
-Future<void> _toggleFavorite() async {
-  if (userId == null || userId == 'Unknown') {
-    _showLoginPromptDialog(context, 'add or remove from shortlist');
-    return;
-  }
-  if (_isLoadingFavorite) return;
-  setState(() => _isLoadingFavorite = true);
-  try {
-    final headers = {'token': _token};
-    final url = '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.bike.id}';
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      if (responseData['status'] == 'true') {
-        final bool wasAdded = responseData['data'].toString().toLowerCase().contains('added') || !_isFavorited;
-        setState(() => _isFavorited = wasAdded);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(wasAdded ? 'Added to shortlist' : 'Removed from shortlist'), backgroundColor: Colors.green),
+    setState(() => _isLoadingShortlist = true);
+    try {
+      final response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": userId},
+      );
+      if (response['status'] == 'true' && response['data'] is List) {
+        final List<dynamic> shortlistData = response['data'];
+        final bool isShortlisted = shortlistData.any(
+          (item) => item['post_id'].toString() == widget.bike.id,
         );
+        setState(() {
+          _isShortlisted = isShortlisted;
+          _isLoadingShortlist = false;
+          _shortlistErrorMessage = null;
+        });
       } else {
+        setState(() {
+          _isShortlisted = false;
+          _isLoadingShortlist = false;
+          _shortlistErrorMessage = 'Invalid shortlist data';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isShortlisted = false;
+        _isLoadingShortlist = false;
+        _shortlistErrorMessage = 'Failed to check shortlist: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to check shortlist: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleShortlist() async {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'add or remove from shortlist');
+      return;
+    }
+    if (_isLoadingShortlist) return;
+    setState(() => _isLoadingShortlist = true);
+    try {
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.bike.id}';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true') {
+          final bool wasAdded =
+              responseData['data'].toString().toLowerCase().contains('added') ||
+              !_isShortlisted;
+          setState(() {
+            _isShortlisted = wasAdded;
+            _shortlistErrorMessage = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                wasAdded ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          );
+        } else {
+          setState(() {
+            _shortlistErrorMessage = 'Failed to update shortlist';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update shortlist'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _shortlistErrorMessage = 'Error: ${response.reasonPhrase}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update shortlist'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-    } else {
+    } catch (e) {
+      setState(() {
+        _shortlistErrorMessage = 'Error: $e';
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${response.reasonPhrase}'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
+    } finally {
+      setState(() => _isLoadingShortlist = false);
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-    );
-  } finally {
-    setState(() => _isLoadingFavorite = false);
   }
-}
 
-void _showLoginPromptDialog(BuildContext context, String action) {
-  showDialog(
-    context: context,
-    builder: (dialogContext) {
-      return AlertDialog(
-        title: const Text('Login Required'),
-        content: Text('Please log in to $action.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              context.pushNamed(RouteNames.loginPage);
-            },
-            child: const Text('Log In'),
+          title: const Text(
+            'Login Required',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
-        ],
-      );
-    },
-  );
-}
+          content: Text(
+            'Please log in to $action.',
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.pushNamed(RouteNames.loginPage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Log In',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
+    );
+  }
 
-Future<void> _fetchCurrentHighestBid() async {
-  setState(() => _isLoadingBid = true);
-  try {
-    final headers = {'token': _token};
-    final url = '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.bike.id}';
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      if (responseData['status'] == 'true') {
-        setState(() => _currentHighestBid = responseData['data'].toString());
+  Future<void> _fetchCurrentHighestBid() async {
+    setState(() => _isLoadingBid = true);
+    try {
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.bike.id}';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true') {
+          setState(() => _currentHighestBid = responseData['data'].toString());
+        } else {
+          setState(() => _currentHighestBid = '0');
+        }
       } else {
         setState(() => _currentHighestBid = '0');
       }
-    } else {
+    } catch (e) {
       setState(() => _currentHighestBid = '0');
+    } finally {
+      setState(() => _isLoadingBid = false);
     }
-  } catch (e) {
-    setState(() => _currentHighestBid = '0');
-  } finally {
-    setState(() => _isLoadingBid = false);
   }
-}
 
-Future<String> _saveBidData(int bidAmount) async {
-  if (userId == null || userId == 'Unknown') {
-    throw Exception('Please log in to place a bid');
-  }
-  try {
-    final headers = {'token': _token};
-    final url = '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&bidamt=$bidAmount';
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      if (responseData['status'] == 'true') {
-        return responseData['data'] ?? 'Bid placed successfully';
+  Future<String> _saveBidData(int bidAmount) async {
+    if (userId == null || userId == 'Unknown') {
+      throw Exception('Please log in to place a bid');
+    }
+    try {
+      final headers = {'token': _token};
+      final url =
+          '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&bidamt=$bidAmount';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true') {
+          return responseData['data'] ?? 'Bid placed successfully';
+        } else {
+          throw Exception('Failed to place bid: ${responseData['data']}');
+        }
       } else {
-        throw Exception('Failed to place bid: ${responseData['data']}');
+        throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
-    } else {
-      throw Exception('Failed to place bid: ${response.reasonPhrase}');
+    } catch (e) {
+      throw Exception('Error placing bid: $e');
     }
-  } catch (e) {
-    throw Exception('Error placing bid: $e');
   }
-}
 
-void showProductBidDialog(BuildContext context) async {
-  if (userId == null || userId == 'Unknown') {
-    _showLoginPromptDialog(context, 'place a bid');
-    return;
+  void showProductBidDialog(BuildContext context) async {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'place a bid');
+      return;
+    }
+
+    setState(() => _isBidDialogOpen = true);
+    await _fetchCurrentHighestBid();
+    final TextEditingController _bidController = TextEditingController();
+
+    Future<void> _showResponseDialog(
+      String message,
+      bool isSuccess,
+      bool isHighestBid,
+    ) async {
+      final String formattedBid =
+          _currentHighestBid == '0'
+              ? 'No bids yet'
+              : '₹${NumberFormat('#,##0').format(double.parse(_currentHighestBid))}';
+      return showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isSuccess ? 'Thank You' : 'Error',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isSuccess ? AppTheme.primaryColor : Colors.red,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, size: 28, color: Colors.grey[700]),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isSuccess && isHighestBid)
+                  Text(
+                    'Congratulations, your bid is the highest bid! 🎉',
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[800],
+                    ),
+                  ),
+                if (isSuccess && isHighestBid) const SizedBox(height: 8),
+                Text(
+                  '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Last Highest Bid:',
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red
+                              : Colors.grey[300]!,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color:
+                        _currentHighestBid.startsWith('Error')
+                            ? Colors.red[50]
+                            : Colors.green[50],
+                  ),
+                  child: Text(
+                    formattedBid,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red[800]
+                              : Colors.green[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        if (isSuccess) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const BuyingStatusPage(),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _launchPhoneCall,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Call Support',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            actionsPadding: const EdgeInsets.all(16),
+          );
+        },
+      );
+    }
+
+    final Map<String, dynamic>? result = await showDialog(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            title: Text(
+              'Place Your Bid Amount',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Bid Amount *',
+                  style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _bidController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                  ),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    hintText: 'Enter amount',
+                    prefixText: '₹',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: AppTheme.primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                if (_isLoadingBid)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(null),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed:
+                          _isLoadingBid
+                              ? null
+                              : () async {
+                                final amount = _bidController.text;
+                                if (amount.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Enter a bid amount'),
+                                      backgroundColor: Colors.red,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final bidAmount = int.tryParse(amount) ?? 0;
+                                if (bidAmount < _minBidIncrement) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Minimum bid is ₹$_minBidIncrement',
+                                      ),
+                                      backgroundColor: Colors.red,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                setState(() => _isLoadingBid = true);
+                                try {
+                                  final message = await _saveBidData(bidAmount);
+                                  final double currentHighest =
+                                      double.tryParse(_currentHighestBid) ?? 0;
+                                  final bool isHighestBid =
+                                      bidAmount > currentHighest;
+                                  Navigator.of(dialogContext).pop({
+                                    'success': true,
+                                    'message': message,
+                                    'isHighestBid': isHighestBid,
+                                  });
+                                } catch (e) {
+                                  Navigator.of(dialogContext).pop({
+                                    'success': false,
+                                    'message': e.toString(),
+                                    'isHighestBid': false,
+                                  });
+                                } finally {
+                                  setState(() => _isLoadingBid = false);
+                                }
+                              },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Text(
+                        'Submit',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            actionsPadding: const EdgeInsets.all(16),
+          ),
+    );
+
+    _bidController.dispose();
+    if (result != null) {
+      await _showResponseDialog(
+        result['message'],
+        result['success'],
+        result['isHighestBid'],
+      );
+    }
+    setState(() => _isBidDialogOpen = false);
   }
-  setState(() => _isBidDialogOpen = true);
-  await _fetchCurrentHighestBid();
-  final TextEditingController _bidController = TextEditingController();
 
-  Future<void> _showResponseDialog(String message, bool isSuccess) async {
-    final String formattedBid = _currentHighestBid == '0'
-        ? 'No bids yet'
-        : '₹${NumberFormat('#,##0').format(double.parse(_currentHighestBid))}';
-    return showDialog(
+  void _showMeetingDialog(BuildContext context) {
+    if (userId == null || userId == 'Unknown') {
+      _showLoginPromptDialog(context, 'schedule a meeting');
+      return;
+    }
+
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(isSuccess ? 'Thank You' : 'Error'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('$message\n\nFor further proceedings, call support.'),
-            const SizedBox(height: 16),
-            Text('Last Highest Bid: $formattedBid'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              if (isSuccess) {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyingStatusPage()));
-              }
-            },
-            child: const Text('OK'),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _fixMeeting(DateTime selectedDate) async {
+    setState(() => _isSchedulingMeeting = true);
+    try {
+      final headers = {'token': _token};
+      final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+      final url =
+          '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&meeting_date=$formattedDate';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        if (responseData['status'] == 'true') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['data'] ?? 'Meeting scheduled'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await _showMeetingConfirmationDialog(selectedDate);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to schedule meeting'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
           ),
-          ElevatedButton(
-            onPressed: _launchPhoneCall,
-            child: const Text('Call Support'),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() => _isSchedulingMeeting = false);
+    }
+  }
+
+  Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
+    await showDialog(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            backgroundColor: Colors.white,
+            title: Text(
+              'Meeting Scheduled',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            content: Text(
+              'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}.\n\n'
+              'For further information, check My Bids in Status or call support.',
+              style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                fontSize: 16,
+                color: Colors.grey[800],
+              ),
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BuyingStatusPage(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Check Status',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _launchPhoneCall,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.phone, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Call Support',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           ),
-        ],
-      ),
     );
   }
-
-  final Map<String, dynamic>? result = await showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Place Your Bid'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _bidController,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(hintText: 'Enter amount', prefixText: '₹'),
-          ),
-          if (_isLoadingBid) const CircularProgressIndicator(),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(null),
-          child: const Text('Close'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoadingBid
-              ? null
-              : () async {
-                  final amount = _bidController.text;
-                  if (amount.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Enter a bid amount')),
-                    );
-                    return;
-                  }
-                  final bidAmount = int.tryParse(amount) ?? 0;
-                  if (bidAmount < _minBidIncrement) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Minimum bid is ₹$_minBidIncrement')),
-                    );
-                    return;
-                  }
-                  setState(() => _isLoadingBid = true);
-                  try {
-                    final message = await _saveBidData(bidAmount);
-                    Navigator.of(dialogContext).pop({'success': true, 'message': message});
-                  } catch (e) {
-                    Navigator.of(dialogContext).pop({'success': false, 'message': e.toString()});
-                  } finally {
-                    setState(() => _isLoadingBid = false);
-                  }
-                },
-          child: const Text('Submit'),
-        ),
-      ],
-    ),
-  );
-
-  _bidController.dispose();
-  if (result != null) {
-    await _showResponseDialog(result['message'], result['success']);
-  }
-  setState(() => _isBidDialogOpen = false);
-}
-
-
 
   Future<void> _fetchSellerInfo() async {
     try {
@@ -409,33 +1143,61 @@ void showProductBidDialog(BuildContext context) async {
     });
 
     try {
-      final Map<String, dynamic> response = await ApiService().get(
-        url: locations,
+      final url = '$_baseUrl/list-location.php?token=$_token';
+      debugPrint('Fetching locations from: $url');
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'token': _token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
       );
 
-      if (response['status'].toString() == 'true' && response['data'] is List) {
-        final locationResponse = LocationResponse.fromJson(response);
+      debugPrint(
+        'Locations API response (status: ${response.statusCode}): ${response.body}',
+      );
 
-        setState(() {
-          _locations = locationResponse.data;
-          _isLoadingLocations = false;
-          print(
-            'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final locationResponse = LocationResponse.fromJson(responseData);
+          setState(() {
+            _locations = locationResponse.data;
+            _isLoadingLocations = false;
+            debugPrint(
+              'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
+            );
+          });
+        } else {
+          throw Exception(
+            'Invalid API response format: ${responseData['data']}',
           );
-        });
+        }
       } else {
-        throw Exception('Invalid API response format');
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
     } catch (e) {
+      debugPrint('Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load locations: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
     }
   }
 
-  String _getLocationName(String zoneId) {
-    if (zoneId == 'all') return 'All Kerala';
-    if (zoneId == '0') return 'All Kerala';
+  String _getLocationName() {
+    final zoneId = widget.bike.parentZoneId;
+    if (zoneId == 'all' || zoneId == '0') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
       orElse:
@@ -443,7 +1205,7 @@ void showProductBidDialog(BuildContext context) async {
             id: '',
             slug: '',
             parentId: '',
-            name: zoneId,
+            name: 'Unknown Location',
             image: '',
             description: '',
             latitude: '',
@@ -455,14 +1217,15 @@ void showProductBidDialog(BuildContext context) async {
             updatedOn: '',
           ),
     );
-    return location.name;
+    return location.name.isNotEmpty ? location.name : 'Unknown Location';
   }
 
   String get id => widget.bike.id;
   String get title => widget.bike.title;
   String get image => widget.bike.image;
   String get price => widget.bike.price;
-  String get landMark => widget.bike.landMark;
+  String get locationName => _getLocationName();
+  //String get landMark => widget.bike.landMark;
   String get createdOn => widget.bike.createdOn.split(' ')[0];
   String get createdBy => widget.bike.createdBy;
   bool get isFinanceAvailable => widget.bike.ifFinance == '1';
@@ -672,134 +1435,20 @@ void showProductBidDialog(BuildContext context) async {
     );
   }
 
-void _showMeetingDialog(BuildContext context) {
-  if (userId == null || userId == 'Unknown') {
-    _showLoginPromptDialog(context, 'schedule a meeting');
-    return;
-  }
-  if (_isMeetingDialogOpen) return;
-  setState(() => _isMeetingDialogOpen = true);
-  DateTime selectedDate = DateTime.now();
-  showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (dialogContext, setDialogState) => AlertDialog(
-        title: const Text('Schedule Meeting'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: Text(DateFormat('dd/MM/yyyy').format(selectedDate)),
-              onTap: () async {
-                final DateTime? picked = await showDatePicker(
-                  context: dialogContext,
-                  initialDate: selectedDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 30)),
-                );
-                if (picked != null && picked != selectedDate) {
-                  setDialogState(() => selectedDate = picked);
-                }
-              },
-            ),
-            if (_isSchedulingMeeting) const CircularProgressIndicator(),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isSchedulingMeeting ? null : () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _isSchedulingMeeting
-                ? null
-                : () async {
-                    setDialogState(() => _isSchedulingMeeting = true);
-                    try {
-                      await _fixMeeting(selectedDate);
-                      Navigator.of(dialogContext).pop();
-                    } finally {
-                      setDialogState(() => _isSchedulingMeeting = false);
-                    }
-                  },
-            child: const Text('Schedule'),
-          ),
-        ],
-      ),
-    ),
-  ).whenComplete(() => setState(() => _isMeetingDialogOpen = false));
-}
-
-Future<void> _fixMeeting(DateTime selectedDate) async {
-  setState(() => _isSchedulingMeeting = true);
-  try {
-    final headers = {'token': _token};
-    final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-    final url = '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.bike.id}&user_id=$userId&meeting_date=$formattedDate';
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      if (responseData['status'] == 'true') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(responseData['data'] ?? 'Meeting scheduled')),
-        );
-        await _showMeetingConfirmationDialog(selectedDate);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to schedule meeting'), backgroundColor: Colors.red),
-        );
-      }
+  void _launchPhoneCall() async {
+    const phoneNumber = 'tel:+919626040738';
+    if (await canLaunchUrl(Uri.parse(phoneNumber))) {
+      await launchUrl(Uri.parse(phoneNumber));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${response.reasonPhrase}'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Could not launch phone call'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-    );
-  } finally {
-    setState(() => _isSchedulingMeeting = false);
   }
-}
 
-Future<void> _showMeetingConfirmationDialog(DateTime selectedDate) async {
-  await showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Meeting Scheduled'),
-      content: Text('Scheduled for ${DateFormat('dd/MM/yyyy').format(selectedDate)}. Check status or call support.'),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const BuyingStatusPage()));
-          },
-          child: const Text('Check Status'),
-        ),
-        ElevatedButton(
-          onPressed: _launchPhoneCall,
-          child: const Text('Call Support'),
-        ),
-      ],
-    ),
-  );
-}
-
-void _launchPhoneCall() async {
-  const phoneNumber = 'tel:+919626040738';
-  if (await canLaunchUrl(Uri.parse(phoneNumber))) {
-    await launchUrl(Uri.parse(phoneNumber));
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not launch phone call'), backgroundColor: Colors.red),
-    );
-  }
-}
   String formatPriceInt(double price) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(price.round());
@@ -914,12 +1563,16 @@ void _launchPhoneCall() async {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                final userId = await _storage.read(key: 'userId');
+                if (userId == null || userId == 'Unknown') {
+                  _showLoginPromptDialog(context, 'ask a question');
+                  return;
+                }
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder:
-                      (context) => const ReviewDialog( postId: ''),
+                  builder: (context) => ReviewDialog(postId: id),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -935,7 +1588,6 @@ void _launchPhoneCall() async {
     );
   }
 
-  // Parse filters from the API response
   Map<String, dynamic> _parseFilters(String filtersJson) {
     try {
       if (filtersJson == 'null' || filtersJson.isEmpty) {
@@ -950,8 +1602,6 @@ void _launchPhoneCall() async {
 
   @override
   Widget build(BuildContext context) {
-    // final filters = _parseFilters(widget.bike.filters);
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -1053,27 +1703,37 @@ void _launchPhoneCall() async {
                             ),
                           ),
                           const Spacer(),
-_isLoadingFavorite
-    ? const SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-        ),
-      )
-    : IconButton(
-        tooltip: _isFavorited ? 'Remove from Shortlist' : 'Add to Shortlist',
-        icon: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: Icon(
-            _isFavorited ? Icons.favorite : Icons.favorite_border,
-            key: ValueKey<bool>(_isFavorited),
-            color: _isFavorited ? Colors.red : Colors.white,
-          ),
-        ),
-        onPressed: _toggleFavorite,
-      ),
+                          _isLoadingShortlist
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                              : IconButton(
+                                tooltip:
+                                    _isShortlisted
+                                        ? 'Remove from Shortlist'
+                                        : 'Add to Shortlist',
+                                icon: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Icon(
+                                    _isShortlisted
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    key: ValueKey<bool>(_isShortlisted),
+                                    color:
+                                        _isShortlisted
+                                            ? Colors.red
+                                            : Colors.white,
+                                  ),
+                                ),
+                                onPressed: _toggleShortlist,
+                              ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             onPressed: () {
@@ -1115,7 +1775,7 @@ _isLoadingFavorite
                                 ),
                               )
                               : Text(
-                                landMark,
+                                locationName, // Changed from landMark
                                 style: const TextStyle(color: Colors.grey),
                               ),
                           const Spacer(),
@@ -1131,6 +1791,24 @@ _isLoadingFavorite
                           ),
                         ],
                       ),
+                      // Optional: Display landMark separately if not empty
+                      // if (landMark.isNotEmpty)
+                      //   Padding(
+                      //     padding: const EdgeInsets.only(top: 8),
+                      //     child: Row(
+                      //       children: [
+                      //         const Icon(Icons.place, size: 16, color: Colors.grey),
+                      //         const SizedBox(width: 4),
+                      //         Flexible(
+                      //           child: Text(
+                      //             landMark,
+                      //             style: const TextStyle(color: Colors.grey),
+                      //             overflow: TextOverflow.ellipsis,
+                      //           ),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   ),
                       const SizedBox(height: 16),
                       Text(
                         '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
@@ -1148,41 +1826,51 @@ _isLoadingFavorite
                             '#AD ID $id',
                             style: const TextStyle(color: Colors.grey),
                           ),
-                       ElevatedButton.icon(
-  onPressed: () {
-    if (userId == null || userId == 'Unknown') {
-      _showLoginPromptDialog(context, 'contact the seller');
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (context) => ChatOptionsDialog(
-        onChatWithSupport: _launchPhoneCall,
-        onChatWithSeller: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatPage(
-                listenerId: widget.bike.createdBy,
-                listenerName: sellerName,
-                listenerImage: sellerProfileImage ?? 'seller.jpg',
-              ),
-            ),
-          );
-        },
-        baseUrl: _baseUrl,
-        token: _token,
-      ),
-    );
-  },
-  icon: const Icon(Icons.call),
-  label: const Text('Contact Seller'),
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.green,
-    foregroundColor: Colors.white,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-  ),
-),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              if (userId == null || userId == 'Unknown') {
+                                _showLoginPromptDialog(
+                                  context,
+                                  'contact the seller',
+                                );
+                                return;
+                              }
+                              showDialog(
+                                context: context,
+                                builder:
+                                    (context) => ChatOptionsDialog(
+                                      onChatWithSupport: _launchPhoneCall,
+                                      onChatWithSeller: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChatPage(
+                                                  listenerId:
+                                                      widget.bike.createdBy,
+                                                  listenerName: sellerName,
+                                                  listenerImage:
+                                                      sellerProfileImage ??
+                                                      'seller.jpg',
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      baseUrl: _baseUrl,
+                                      token: _token,
+                                    ),
+                              );
+                            },
+                            icon: const Icon(Icons.call),
+                            label: const Text('Contact Seller'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       if (isFinanceAvailable)
@@ -1253,11 +1941,6 @@ _isLoadingFavorite
                                 Icons.directions_bike,
                                 'Model: ${widget.bike.model}',
                               ),
-                            // if (filters.isNotEmpty)
-                            //   ...filters.entries.map((entry) => _buildDetailItem(
-                            //         Icons.info,
-                            //         '${entry.key}: ${entry.value}',
-                            //       )),
                           ],
                         ),
                       ],
@@ -1266,7 +1949,7 @@ _isLoadingFavorite
                 ),
                 const Divider(),
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1287,9 +1970,10 @@ _isLoadingFavorite
                     ],
                   ),
                 ),
-                const Divider(),
+                _buildBannerAd(),
+
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1348,15 +2032,17 @@ _isLoadingFavorite
                   children: [
                     Expanded(
                       child: ElevatedButton(
-  onPressed: () => showProductBidDialog(context),
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Palette.primarypink,
-    foregroundColor: Colors.white,
-    padding: const EdgeInsets.symmetric(vertical: 0),
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-  ),
-  child: const Text('Place Bid'),
-),
+                        onPressed: () => showProductBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
                     ),
                     Expanded(
                       child: ElevatedButton(

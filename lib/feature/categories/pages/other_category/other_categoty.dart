@@ -1232,7 +1232,7 @@ class _OthersPageState extends State<OthersPage> {
                             ),
                             image: DecorationImage(
                               image: NetworkImage(getImageUrl(bike.image)),
-                              fit: BoxFit.fill,
+                              fit: BoxFit.cover,
                               onError: (exception, stackTrace) {
                                 print(
                                   'Failed to load image: ${getImageUrl(bike.image)}',
