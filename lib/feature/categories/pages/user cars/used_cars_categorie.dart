@@ -675,9 +675,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
-  }
-
-  List<Product> get filteredProducts {
+  } 
+   List<Product> get filteredProducts {
     if (!_filtersChanged) return _filteredProductsCache;
     final filtered = _products.where((product) {
       final attributeValues = _postAttributeValuesCache[product.id] ?? {};
@@ -1221,53 +1220,60 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ],
                 ),
               )
-               : filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No cars found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try adjusting your filters or search terms',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _fetchProducts(forceRefresh: true),
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          itemCount: filteredProducts.length + (_showMainSearch ? 2 : 1),
-                          itemBuilder: (context, index) {
-                            if (_showMainSearch && index == 0) {
-                              return _buildSearchField();
-                            }
-                            if (index == (_showMainSearch ? 1 : 0)) {
-                              return _buildListingTypeButtons();
-                            }
-                            final productIndex = index - (_showMainSearch ? 2 : 1);
-                            if (productIndex < filteredProducts.length) {
-                              final product = filteredProducts[productIndex];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: _buildProductCard(product),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
+              : filteredProducts.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: () => _fetchProducts(forceRefresh: true),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _products.length + (_showMainSearch ? 2 : 1),
+                  itemBuilder: (context, index) {
+                    if (_showMainSearch && index == 0) {
+                      return _buildSearchField();
+                    }
+                    if (index == (_showMainSearch ? 1 : 0)) {
+                      return _buildListingTypeButtons();
+                    }
+                    final productIndex = index - (_showMainSearch ? 2 : 1);
+                    if (productIndex < _products.length) {
+                      final product = _products[productIndex];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildProductCard(product),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
     );
   }
 
