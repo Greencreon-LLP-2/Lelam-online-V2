@@ -6,11 +6,11 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
-
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
@@ -472,8 +472,7 @@ class AttributeValueService {
 }
 
 class AdPostPage extends StatefulWidget {
-  final Map<String, dynamic>? extra; // Contains categoryId, userId, and adData
-
+  final Map<String, dynamic>? extra;
   const AdPostPage({super.key, this.extra});
 
   @override
@@ -484,50 +483,36 @@ class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
   String? _categoryId;
   Map<String, dynamic>? _adData;
-    late final LoggedUserProvider _userProvider;
-
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-    }
-  }
+  late final LoggedUserProvider _userProvider;
 
   @override
   void initState() {
     super.initState();
-    print('Received extra: ${widget.extra}');
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     if (widget.extra != null) {
       _categoryId = widget.extra!['categoryId']?.toString();
-      _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
       _adData = widget.extra!['adData'] as Map<String, dynamic>?;
       if (_categoryId == null) {
-        print(
-          'Error: categoryId is missing or invalid in extra: ${widget.extra}',
-        );
-        Fluttertoast.showToast(
-          msg: 'Invalid category ID',
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.red.withOpacity(0.8),
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-      }
-      if (_adData != null) {
-        print('Editing ad: ${_adData!['appId']}');
+        showToast('Invalid category ID', Colors.red);
       }
     } else {
-      print('Error: extra is null');
-      _categoryId = null;
-      Fluttertoast.showToast(
-        msg: 'No category or user ID provided',
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+      showToast('No category or user ID provided', Colors.red);
     }
+  }
+
+  void showToast(String msg, Color color) {
+    Fluttertoast.showToast(
+      msg: msg,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: color.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16,
+    );
+  }
+
+  void _submitForm() {
+    if (_formKey.currentState!.validate()) _formKey.currentState!.save();
   }
 
   @override
@@ -546,24 +531,12 @@ class _AdPostPageState extends State<AdPostPage> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _submitForm,
-            child: Text(
-              _adData != null ? 'Update' : 'Post',
-              style: TextStyle(
-                color: AppTheme.primaryColor,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+       
       ),
       body: AdPostForm(
         formKey: _formKey,
         categoryId: _categoryId ?? '',
-        userId: _userProvider.userId,
+        userId: _userProvider.userId!,
         adData: _adData,
         onSubmit: _submitForm,
       ),
@@ -573,8 +546,7 @@ class _AdPostPageState extends State<AdPostPage> {
 
 class AdPostForm extends StatefulWidget {
   final GlobalKey<FormState> formKey;
-  final String categoryId;
-  final String? userId;
+  final String categoryId, userId;
   final Map<String, dynamic>? adData;
   final VoidCallback onSubmit;
 
@@ -582,7 +554,7 @@ class AdPostForm extends StatefulWidget {
     super.key,
     required this.formKey,
     required this.categoryId,
-    this.userId,
+    required this.userId,
     this.adData,
     required this.onSubmit,
   });
@@ -593,6 +565,7 @@ class AdPostForm extends StatefulWidget {
 
 class _AdPostFormState extends State<AdPostForm>
     with SingleTickerProviderStateMixin {
+  bool isSaving = false;
   List<Brand> _brands = [];
   List<BrandModel> _brandModels = [];
   List<ModelVariation> _modelVariations = [];
@@ -601,18 +574,19 @@ class _AdPostFormState extends State<AdPostForm>
   BrandModel? _selectedBrandModel;
   ModelVariation? _selectedModelVariation;
   Map<String, String?> _selectedAttributes = {};
-  final _descriptionController = TextEditingController();
-  final _listPriceController = TextEditingController();
-  final _offerPriceController = TextEditingController();
-  final _districtController = TextEditingController();
-  final _landMarkController = TextEditingController();
-  final _registrationValidTillController = TextEditingController();
-  final _insuranceUptoController = TextEditingController();
+  final _controllers = {
+    'description': TextEditingController(),
+    'listPrice': TextEditingController(),
+    'district': TextEditingController(),
+    'landMark': TextEditingController(),
+    'registration': TextEditingController(),
+    'insurance': TextEditingController(),
+  };
   final Map<String, List<AttributeVariation>> _attributeVariations = {};
   Map<String, String> _attributeIdMap = {};
   List<Attribute> _attributes = [];
   final List<XFile> _selectedImages = [];
-  final ImagePicker _imagePicker = ImagePicker();
+  final _imagePicker = ImagePicker();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _imageError = false;
@@ -621,47 +595,34 @@ class _AdPostFormState extends State<AdPostForm>
   final Map<String, TextEditingController> _attributeControllers = {};
   String? _selectedDistrict;
 
-  List<String> _getRequiredAttributes(String categoryId) {
-    switch (categoryId) {
-      case '1':
-        return [
-          'Year',
-          'No of owners',
-          'Fuel Type',
-          'Transmission',
-          'KM Range',
-          'Sold by',
-        ];
-      case '2':
-        return ['Property Type', 'Area', 'Location'];
-      case '3':
-        return ['Vehicle Type', 'Year', 'Fuel Type'];
-      case '4':
-        return ['Item Type', 'Condition'];
-      default:
-        return [];
-    }
+  List<String> _getRequiredAttributes() => switch (widget.categoryId) {
+    '1' => [
+      'Year',
+      'No of owners',
+      'Fuel Type',
+      'Transmission',
+      'KM Range',
+      'Sold by',
+    ],
+    '2' => ['Plot Area', 'Facing', 'Project Name', 'Listed By'],
+    // '3' => ['Vehicle Type', 'Year', 'Fuel Type'],
+    // '4' => ['Item Type', 'Condition'],
+    _ => [],
+  };
+  void _showToast(String msg, Color color) {
+    Fluttertoast.showToast(
+      msg: msg,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: color.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16,
+    );
   }
 
-  void _updateModelVariations(List<ModelVariation> modelVariations) {
-    setState(() {
-      _modelVariations = modelVariations;
-      if (_selectedModelVariation != null &&
-          !modelVariations.any(
-            (item) => item.id == _selectedModelVariation!.id,
-          )) {
-        _selectedModelVariation = null;
-      }
-      print(
-        'Updated model variations: ${modelVariations.map((v) => v.name).toList()}',
-      );
-    });
-  }
-
-  String _generateTitle() {
-    return '${_selectedBrand?.name ?? 'Unknown Brand'} ${_selectedBrandModel?.name ?? 'Unknown Model'}'
-        .trim();
-  }
+  String _generateTitle() =>
+      '${_selectedBrand?.name ?? 'Unknown Brand'} ${_selectedBrandModel?.name ?? 'Unknown Model'}'
+          .trim();
 
   @override
   void initState() {
@@ -671,64 +632,16 @@ class _AdPostFormState extends State<AdPostForm>
       duration: const Duration(milliseconds: 300),
     );
     _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
+      begin: 0,
+      end: 1,
     ).animate(_animationController);
     _animationController.forward();
-
     _fetchInitialData();
-  }
-
-  Future<void> _convertBase64ToFiles(List base64Images) async {
-    final tempDir = await getTemporaryDirectory();
-    final List<XFile> files = [];
-    for (int i = 0; i < base64Images.length; i++) {
-      try {
-        final bytes = base64Decode(base64Images[i] as String);
-        final fileName = 'ad_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
-        final file = File('${tempDir.path}/$fileName');
-        await file.writeAsBytes(bytes);
-        files.add(XFile(file.path));
-      } catch (e) {
-        print('Error converting base64 image $i: $e');
-      }
-    }
-    setState(() {
-      _selectedImages.addAll(files);
-      if (_coverImageIndex >= _selectedImages.length) {
-        _coverImageIndex = 0;
-      }
-    });
-  }
-
-  Future<void> _convertBase64ToFile(String base64Image) async {
-    try {
-      final bytes = base64Decode(base64Image);
-      final tempDir = await getTemporaryDirectory();
-      final fileName = 'ad_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final file = File('${tempDir.path}/$fileName');
-      await file.writeAsBytes(bytes);
-      setState(() {
-        _selectedImages.add(XFile(file.path));
-        if (_coverImageIndex >= _selectedImages.length) {
-          _coverImageIndex = 0;
-        }
-      });
-    } catch (e) {
-      print('Error converting single base64 image: $e');
-    }
   }
 
   Future<void> _fetchInitialData() async {
     if (widget.categoryId.isEmpty) {
-      Fluttertoast.showToast(
-        msg: 'Error: No category selected',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+      _showToast('Error: No category selected', Colors.red);
       return;
     }
 
@@ -737,67 +650,37 @@ class _AdPostFormState extends State<AdPostForm>
       _brandModels = [];
       _modelVariations = [];
       _districts = [];
-      _selectedBrand = null;
-      _selectedBrandModel = null;
-      _selectedModelVariation = null;
+      _selectedBrand = _selectedBrandModel = _selectedModelVariation = null;
       _attributes = [];
       _attributeVariations.clear();
       _attributeIdMap = {};
       _selectedAttributes = {};
-      _attributeControllers.forEach((_, controller) => controller.dispose());
       _attributeControllers.clear();
     });
 
-    // Pre-fill form with adData if provided
+    // Pre-fill form
     if (widget.adData != null) {
       final ad = widget.adData!;
-      _listPriceController.text = ad['price'] ?? '';
-      _descriptionController.text = ad['description'] ?? '';
-      _landMarkController.text = ad['land_mark'] ?? '';
-      _registrationValidTillController.text =
-          ad['registration_valid_till'] ?? '';
-      _insuranceUptoController.text = ad['insurance_upto'] ?? '';
-      _selectedDistrict = ad['district'] ?? null;
+      _controllers['listPrice']!.text = ad['price'] ?? '';
+      _controllers['description']!.text = ad['description'] ?? '';
+      _controllers['landMark']!.text = ad['land_mark'] ?? '';
+      _controllers['registration']!.text = ad['registration_valid_till'] ?? '';
+      _controllers['insurance']!.text = ad['insurance_upto'] ?? '';
+      _selectedDistrict =
+          ad['district'] ??
+          (_districts.isNotEmpty ? _districts[0]['name'] : null);
       _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
-      // Load images
-      if (ad['imagePathList'] != null &&
-          (ad['imagePathList'] as List).isNotEmpty) {
-        _selectedImages.addAll(
-          (ad['imagePathList'] as List).map((path) => XFile(path as String)),
-        );
-      } else if (ad['imageBase64List'] != null &&
-          (ad['imageBase64List'] as List).isNotEmpty) {
-        await _convertBase64ToFiles(ad['imageBase64List'] as List);
-      } else if (ad['imagePath'] != null &&
-          (ad['imagePath'] as String).isNotEmpty) {
-        _selectedImages.add(XFile(ad['imagePath'] as String));
-      } else if (ad['imageBase64'] != null &&
-          (ad['imageBase64'] as String).isNotEmpty) {
-        await _convertBase64ToFile(ad['imageBase64'] as String);
-      }
-      print('Pre-filled form with adData: ${ad['appId']}');
+      await _loadImages(ad);
     }
 
-    // Fetch districts
-    final districts = await AttributeValueService.fetchDistricts();
+    // Fetch districts and brands
+    _districts = await AttributeValueService.fetchDistricts();
+    _brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
-      _districts = districts;
-      _selectedDistrict =
-          _selectedDistrict ??
-          (districts.isNotEmpty ? districts[0]['name'] : null);
-      print('Loaded districts: ${districts.map((d) => d['name']).toList()}');
-    });
-
-    // Fetch brands
-    final brands = await AttributeValueService.fetchBrands(widget.categoryId);
-    setState(() {
-      _brands = brands;
-      print(
-        'Loaded brands for category ${widget.categoryId}: ${brands.map((b) => b.name).toList()}',
-      );
-      // Set selected brand from adData
-      if (widget.adData != null && widget.adData!['brand'] != null) {
-        _selectedBrand = brands.firstWhere(
+      _selectedDistrict ??=
+          _districts.isNotEmpty ? _districts[0]['name'] : null;
+      if (widget.adData?['brand'] != null) {
+        _selectedBrand = _brands.firstWhere(
           (b) => b.id == widget.adData!['brand'],
           orElse:
               () => Brand(
@@ -815,20 +698,15 @@ class _AdPostFormState extends State<AdPostForm>
       }
     });
 
-    // Fetch brand models if brand is selected
+    // Fetch brand models
     if (_selectedBrand != null) {
-      final brandModels = await AttributeValueService.fetchBrandModels(
+      _brandModels = await AttributeValueService.fetchBrandModels(
         _selectedBrand!.id,
         widget.categoryId,
       );
       setState(() {
-        _brandModels = brandModels;
-        print(
-          'Loaded brand models for brand ${_selectedBrand!.name}: ${brandModels.map((m) => m.name).toList()}',
-        );
-        // Set selected brand model from adData
-        if (widget.adData != null && widget.adData!['model'] != null) {
-          _selectedBrandModel = brandModels.firstWhere(
+        if (widget.adData?['model'] != null) {
+          _selectedBrandModel = _brandModels.firstWhere(
             (m) => m.id == widget.adData!['model'],
             orElse:
                 () => BrandModel(
@@ -846,31 +724,16 @@ class _AdPostFormState extends State<AdPostForm>
         }
       });
 
-      // Fetch model variations if brand model is selected
+      // Fetch model variations
       if (_selectedBrandModel != null) {
-        final modelVariations =
-            await AttributeValueService.fetchModelVariations(
-              _selectedBrandModel!.id,
-              widget.categoryId,
-            );
-        final uniqueModelVariations = modelVariations
-            .asMap()
-            .entries
-            .fold<List<ModelVariation>>([], (uniqueList, entry) {
-              if (!uniqueList.any((item) => item.id == entry.value.id)) {
-                uniqueList.add(entry.value);
-              }
-              return uniqueList;
-            });
+        final variations = await AttributeValueService.fetchModelVariations(
+          _selectedBrandModel!.id,
+          widget.categoryId,
+        );
+        _modelVariations = variations.toSet().toList();
         setState(() {
-          _modelVariations = uniqueModelVariations;
-          print(
-            'Loaded model variations: ${uniqueModelVariations.map((v) => v.name).toList()}',
-          );
-          // Set selected model variation from adData
-          if (widget.adData != null &&
-              widget.adData!['model_variation'] != null) {
-            _selectedModelVariation = uniqueModelVariations.firstWhere(
+          if (widget.adData?['model_variation'] != null) {
+            _selectedModelVariation = _modelVariations.firstWhere(
               (v) => v.id == widget.adData!['model_variation'],
               orElse:
                   () => ModelVariation(
@@ -885,119 +748,110 @@ class _AdPostFormState extends State<AdPostForm>
                     updatedOn: '',
                   ),
             );
-            if (_selectedModelVariation!.id.isEmpty)
+            if (_selectedModelVariation!.id.isEmpty) {
               _selectedModelVariation = null;
+            }
           }
         });
       }
     }
 
     // Fetch attributes
-    final attributes = await AttributeValueService.fetchAttributes(
+    _attributes = await AttributeValueService.fetchAttributes(
       widget.categoryId,
     );
     setState(() {
-      _attributes = attributes;
-      _attributeIdMap = {for (var attr in attributes) attr.name: attr.id};
-      _selectedAttributes = {for (var attr in attributes) attr.name: null};
-      for (var attr in attributes) {
-        _attributeControllers[attr.name] = TextEditingController();
-      }
-      print(
-        'Loaded attributes for category ${widget.categoryId}: ${attributes.map((a) => a.name).toList()}',
-      );
-      // Set selected attributes from adData.filters
-      if (widget.adData != null && widget.adData!['filters'] != null) {
+      _attributeIdMap = {for (var attr in _attributes) attr.name: attr.id};
+      _selectedAttributes = {for (var attr in _attributes) attr.name: null};
+      _attributeControllers.addAll({
+        for (var attr in _attributes) attr.name: TextEditingController(),
+      });
+      if (widget.adData?['filters'] != null) {
         try {
           final filters =
               jsonDecode(widget.adData!['filters'] as String)
                   as Map<String, dynamic>;
-          for (var attr in attributes) {
-            final attrId = attr.id;
-            if (filters.containsKey(attrId) &&
-                filters[attrId] is List &&
-                (filters[attrId] as List).isNotEmpty) {
-              final variationId = filters[attrId][0].toString();
-              _selectedAttributes[attr.name] =
-                  variationId; // Will be updated to name after fetching variations
+          for (var attr in _attributes) {
+            if (filters[attr.id]?.isNotEmpty ?? false) {
+              _selectedAttributes[attr.name] = filters[attr.id][0].toString();
             }
           }
         } catch (e) {
-          print('Error parsing filters from adData: $e');
+          print(e);
         }
       }
     });
 
-    // Fetch attribute variations and update selected attributes
-    for (var attr in attributes) {
+    // Fetch attribute variations
+    for (var attr in _attributes) {
       final variations = await AttributeValueService.fetchAttributeVariations(
         attr.id,
       );
       setState(() {
         _attributeVariations[attr.name] = variations;
-        print(
-          'Loaded variations for attribute ${attr.name} (ID: ${attr.id}): ${variations.map((v) => v.name).toList()}',
-        );
-        // Update selected attributes with variation names
         if (_selectedAttributes[attr.name] != null) {
-          final variationId = _selectedAttributes[attr.name];
           final variation = variations.firstWhere(
-            (v) => v.id == variationId,
+            (v) => v.id == _selectedAttributes[attr.name],
             orElse:
                 () => AttributeVariation(
                   id: '',
-                  attributeId: '',
-                  name: variationId ?? '',
+                  attributeId: attr.id,
+                  name: _selectedAttributes[attr.name] ?? '',
                   status: '',
                   createdOn: '',
                   updatedOn: '',
                 ),
           );
           _selectedAttributes[attr.name] =
-              variation.name.isNotEmpty ? variation.name : variationId;
-          if (_attributeControllers[attr.name] != null) {
-            _attributeControllers[attr.name]!.text =
-                variation.name.isNotEmpty ? variation.name : variationId ?? '';
-          }
+              variation.name.isNotEmpty
+                  ? variation.name
+                  : _selectedAttributes[attr.name];
+          _attributeControllers[attr.name]?.text =
+              _selectedAttributes[attr.name] ?? '';
         }
       });
     }
   }
 
-  Future<void> _fetchModelVariations(String brandModelId) async {
-    final modelVariations = await AttributeValueService.fetchModelVariations(
-      brandModelId,
-      widget.categoryId,
-    );
-    final uniqueModelVariations = modelVariations
-        .asMap()
-        .entries
-        .fold<List<ModelVariation>>([], (uniqueList, entry) {
-          if (!uniqueList.any((item) => item.id == entry.value.id)) {
-            uniqueList.add(entry.value);
-          }
-          return uniqueList;
-        });
-    _updateModelVariations(uniqueModelVariations);
+  Future<void> _loadImages(Map<String, dynamic> ad) async {
+    if (ad['imagePathList']?.isNotEmpty ?? false) {
+      _selectedImages.addAll(
+        (ad['imagePathList'] as List).map((path) => XFile(path)),
+      );
+    } else if (ad['imageBase64List']?.isNotEmpty ?? false) {
+      final tempDir = await getTemporaryDirectory();
+      for (var img in ad['imageBase64List']) {
+        final bytes = base64Decode(img);
+        final file = File(
+          '${tempDir.path}/ad_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+        await file.writeAsBytes(bytes);
+        _selectedImages.add(XFile(file.path));
+      }
+    } else if (ad['imagePath']?.isNotEmpty ?? false) {
+      _selectedImages.add(XFile(ad['imagePath']));
+    } else if (ad['imageBase64']?.isNotEmpty ?? false) {
+      final tempDir = await getTemporaryDirectory();
+      final bytes = base64Decode(ad['imageBase64']);
+      final file = File(
+        '${tempDir.path}/ad_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await file.writeAsBytes(bytes);
+      _selectedImages.add(XFile(file.path));
+    }
+    setState(() {
+      if (_coverImageIndex >= _selectedImages.length) _coverImageIndex = 0;
+    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
     if (_selectedImages.length >= _maxImages) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Maximum $_maxImages images allowed'),
-          backgroundColor: Colors.red.withOpacity(0.9),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showSnackBar('Maximum $_maxImages images allowed', Colors.red);
       return;
     }
     try {
       if (source == ImageSource.camera) {
-        final XFile? image = await _imagePicker.pickImage(
+        final image = await _imagePicker.pickImage(
           source: source,
           imageQuality: 80,
         );
@@ -1005,43 +859,35 @@ class _AdPostFormState extends State<AdPostForm>
           setState(() {
             _selectedImages.add(image);
             _imageError = false;
-            if (_selectedImages.length == 1) {
-              _coverImageIndex = 0;
-            }
-            print('Added camera image: ${image.path}');
+            if (_selectedImages.length == 1) _coverImageIndex = 0;
           });
         }
       } else {
-        final List<XFile>? images = await _imagePicker.pickMultiImage(
-          imageQuality: 80,
-        );
-        if (images != null && images.isNotEmpty) {
+        final images = await _imagePicker.pickMultiImage(imageQuality: 80);
+        if (images.isNotEmpty) {
           setState(() {
-            final newImages =
-                images.take(_maxImages - _selectedImages.length).toList();
-            _selectedImages.addAll(newImages);
-            _imageError = false;
-            if (_selectedImages.length == newImages.length) {
-              _coverImageIndex = 0;
-            }
-            print(
-              'Added gallery images: ${newImages.map((img) => img.path).toList()}',
+            _selectedImages.addAll(
+              images.take(_maxImages - _selectedImages.length),
             );
+            _imageError = false;
+            if (_selectedImages.length == images.length) _coverImageIndex = 0;
           });
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error picking image: $e'),
-          backgroundColor: Colors.red.withOpacity(0.9),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showSnackBar('Error picking image: $e', Colors.red);
     }
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color.withOpacity(0.9),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   void _showImageSourceBottomSheet() {
@@ -1050,150 +896,145 @@ class _AdPostFormState extends State<AdPostForm>
       backgroundColor: Colors.transparent,
       builder:
           (context) => ImageSourceBottomSheetWidget(
-            onCameraTap: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.camera);
-            },
-            onGalleryTap: () {
-              Navigator.pop(context);
-              _pickImage(ImageSource.gallery);
-            },
+            onCameraTap: () => _pickImage(ImageSource.camera),
+            onGalleryTap: () => _pickImage(ImageSource.gallery),
           ),
     );
   }
 
   Map<String, List<String>> getFilters() {
     final filters = <String, List<String>>{};
-    _selectedAttributes.forEach((attrName, selectedValue) {
-      if (selectedValue != null && selectedValue.isNotEmpty) {
+    _selectedAttributes.forEach((attrName, value) {
+      if (value != null && value.isNotEmpty) {
         final variations = _attributeVariations[attrName];
-        if (variations != null && variations.isNotEmpty) {
+        final variation =
+            variations?.firstWhere(
+              (v) => v.name == value,
+              orElse:
+                  () => AttributeVariation(
+                    id: '',
+                    attributeId: _attributeIdMap[attrName] ?? '',
+                    name: value,
+                    status: '',
+                    createdOn: '',
+                    updatedOn: '',
+                  ),
+            ) ??
+            AttributeVariation(
+              id: '',
+              attributeId: '',
+              name: value,
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            );
+        filters[_attributeIdMap[attrName] ?? ''] = [
+          variation.id.isNotEmpty ? variation.id : value,
+        ];
+      }
+    });
+    if (widget.categoryId == '1') {
+      if (_controllers['registration']!.text.isNotEmpty) {
+        filters[_attributeIdMap['Registration valid till'] ?? '27'] = [
+          _controllers['registration']!.text,
+        ];
+      }
+      if (_controllers['insurance']!.text.isNotEmpty) {
+        filters[_attributeIdMap['Insurance Upto'] ?? '28'] = [
+          _controllers['insurance']!.text,
+        ];
+      }
+    }
+    return filters;
+  }
+
+  Future<void> _submitForm() async {
+    // Brand/model validations
+    if (widget.categoryId == '1' || widget.categoryId == '2') {
+      if (_selectedBrand == null || _selectedBrandModel == null) {
+        _showSnackBar('Category/Brand', Colors.red);
+        return;
+      }
+    }
+    if (widget.categoryId == '3') {
+      if (_selectedBrandModel == null) {
+        _showSnackBar('Please select a Brand Type', Colors.red);
+        return;
+      }
+      if (_selectedBrand == null) {
+        _showSnackBar('Please select Sale/rent type from Brand', Colors.red);
+        return;
+      }
+    }
+    if (widget.categoryId == '4' && _selectedBrand == null) {
+      _showSnackBar('Please select Sale/rent type from Brand', Colors.red);
+      return;
+    }
+
+    // Validate attributes
+    final requiredAttributes = _getRequiredAttributes();
+    final missingAttributes =
+        requiredAttributes
+            .where((attr) => _selectedAttributes[attr]?.isEmpty ?? true)
+            .toList();
+
+    if (missingAttributes.isNotEmpty) {
+      _showSnackBar(
+        'Please provide values for: ${missingAttributes.join(", ")}',
+        Colors.red,
+      );
+      return;
+    }
+
+    // Build filters properly (attributeId -> variationId/value)
+    final filters = <String, List<String>>{};
+    _selectedAttributes.forEach((attrName, value) {
+      if (value != null && value.isNotEmpty) {
+        final attrId = _attributeIdMap[attrName];
+        if (attrId != null && attrId.isNotEmpty) {
+          final variations = _attributeVariations[attrName] ?? [];
           final variation = variations.firstWhere(
-            (v) => v.name == selectedValue,
+            (v) => v.name == value,
             orElse:
                 () => AttributeVariation(
                   id: '',
-                  attributeId: _attributeIdMap[attrName] ?? '',
-                  name: '',
+                  attributeId: attrId,
+                  name: value,
                   status: '',
                   createdOn: '',
                   updatedOn: '',
                 ),
           );
-          if (variation.id.isNotEmpty) {
-            filters[_attributeIdMap[attrName] ?? ''] = [variation.id];
-          } else {
-            filters[_attributeIdMap[attrName] ?? ''] = [selectedValue];
-          }
-        } else {
-          filters[_attributeIdMap[attrName] ?? ''] = [selectedValue];
+          filters[attrId] = [variation.id.isNotEmpty ? variation.id : value];
         }
       }
     });
-    if (widget.categoryId == '1' &&
-        _registrationValidTillController.text.isNotEmpty) {
-      final regId = _attributeIdMap['Registration valid till'] ?? '27';
-      filters[regId] = [_registrationValidTillController.text];
-    }
-    if (widget.categoryId == '1' && _insuranceUptoController.text.isNotEmpty) {
-      final insId = _attributeIdMap['Insurance Upto'] ?? '28';
-      filters[insId] = [_insuranceUptoController.text];
-    }
-    print('Filters: $filters');
-    return filters;
-  }
 
-  Future<void> _submitForm() async {
-    setState(() {
-      _imageError = _selectedImages.isEmpty;
-    });
-    if (_imageError || !widget.formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _imageError
-                ? 'Please add at least one photo'
-                : 'Please fill all required fields',
-          ),
-          backgroundColor: Colors.red.withOpacity(0.8),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
+    // Special cases for category 1
+    if (widget.categoryId == '1') {
+      if (_controllers['registration']!.text.isNotEmpty) {
+        filters[_attributeIdMap['Registration valid till'] ?? '27'] = [
+          _controllers['registration']!.text,
+        ];
+      }
+      if (_controllers['insurance']!.text.isNotEmpty) {
+        filters[_attributeIdMap['Insurance Upto'] ?? '28'] = [
+          _controllers['insurance']!.text,
+        ];
+      }
     }
 
-    if (widget.categoryId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Category ID is missing'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (_selectedBrand == null || _selectedBrandModel == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please select both brand and model'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
-    }
-
-    final requiredAttributes = _getRequiredAttributes(widget.categoryId);
-    final missingAttributes =
-        requiredAttributes
-            .where(
-              (attr) =>
-                  _selectedAttributes[attr] == null ||
-                  _selectedAttributes[attr]!.isEmpty,
-            )
-            .toList();
-    if (missingAttributes.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please select: ${missingAttributes.join(", ")}'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Generate title from brand and model
-    final generatedTitle = _generateTitle();
-
-    // Prepare filters
-    final filters = getFilters();
-
-    // Prepare form data for API
     final formData = {
-      'user_id': widget.userId ?? '4',
-      'title': generatedTitle,
+      'user_id': widget.userId,
+      'title': _generateTitle(),
       'category_id': widget.categoryId,
-      'brand': _selectedBrand!.id,
-      'brand_name': _selectedBrand!.name,
-      'model': _selectedBrandModel!.id,
-      'model_name': _selectedBrandModel!.name,
+      'brand': _selectedBrand?.id,
+      'brand_name': _selectedBrand?.name,
+      'model': _selectedBrandModel?.id,
+      'model_name': _selectedBrandModel?.name,
       'model_variation': _selectedModelVariation?.id ?? '',
-      'description': _descriptionController.text,
-      'price': _listPriceController.text,
+      'description': _controllers['description']?.text,
+      'price': _controllers['listPrice']!.text,
       'filters': jsonEncode(filters),
       'parent_zone_id':
           _districts
@@ -1201,348 +1042,248 @@ class _AdPostFormState extends State<AdPostForm>
                 (d) => d['name'] == _selectedDistrict,
                 orElse: () => {'id': ''},
               )['id']
-              ?.toString(),
-      'land_mark': _landMarkController.text,
+              ?.toString() ??
+          '',
+      'land_mark': _controllers['landMark']!.text,
+      if (widget.categoryId == '1') ...{
+        'registration_valid_till': _controllers['registration']!.text,
+        'insurance_upto': _controllers['insurance']!.text,
+      },
+      'if_offer_price': '0',
+      'offer_price': '0.00',
+      'auction_price_intervel': '0.00',
+      'auction_starting_price': '0.00',
+      'latitude': '',
+      'longitude': '',
+      'user_zone_id': '0',
+      'zone_id': '0',
+      'if_auction': '0',
+      'auction_status': '0',
+      'auction_startin': '0000-00-00 00:00:00',
+      'auction_endin': '0000-00-00 00:00:00',
+      'auction_attempt': '0',
+      'if_finance': '0',
+      'if_exchange': '0',
+      'feature': '0',
+      'status': '1',
+      'visiter_count': '0',
+      'if_sold': '0',
+      'if_expired': '0',
+      'if_verifyed': '0',
+      'by_dealer': '0',
     };
 
-    // Add registration and insurance fields for category '1' (Used Cars)
-    if (widget.categoryId == '1') {
-      formData['registration_valid_till'] =
-          _registrationValidTillController.text;
-      formData['insurance_upto'] = _insuranceUptoController.text;
-    }
-
-    // Log form data for debugging
-    print('Submitting form data: $formData');
-    print('Number of images: ${_selectedImages.length}');
-    print('Cover image index: $_coverImageIndex');
-
-    // Submit ad post
     try {
-      final adPostRequest = http.MultipartRequest(
-        'POST',
-        Uri.parse(
-          '${AttributeValueService.baseUrl}/add-post.php?token=${AttributeValueService.token}&user_id=${widget.userId ?? '4'}&title=$generatedTitle&category_id=${widget.categoryId}&brand=${_selectedBrand!.id}&model=${_selectedBrandModel!.id}&model_variation=${_selectedModelVariation?.id ?? ''}&description=${_descriptionController.text}&price=${_listPriceController.text}&filters=${jsonEncode(filters)}&parent_zone_id=${_districts.firstWhere((d) => d['name'] == _selectedDistrict, orElse: () => {'id': ''})['id']?.toString()}&land_mark=${_landMarkController.text}',
-        ),
-      );
-      adPostRequest.headers.addAll({
-        'token': AttributeValueService.token,
-        'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
+      setState(() {
+        isSaving = true;
       });
+      final apiService = ApiService();
+      final response = await apiService.postInfinityMultipart(
+        url: "$baseUrl/flutter-add-post.php",
+        fields: formData,
+        mainImagePath: _selectedImages[_coverImageIndex].path,
+        galleryImagePaths:
+            _selectedImages
+                .asMap()
+                .entries
+                .where((e) => e.key != _coverImageIndex)
+                .map((e) => e.value.path)
+                .toList(),
+      );
 
-      final adPostResponse = await adPostRequest.send();
-      final adPostResponseBody = await adPostResponse.stream.bytesToString();
-      print('Ad post response status: ${adPostResponse.statusCode}');
-      print('Ad post response body: $adPostResponseBody');
-
-      final responseData = jsonDecode(adPostResponseBody);
-      if (adPostResponse.statusCode == 200 &&
-          responseData['status'] == 'true') {
+      if (response['status'] == 'true') {
         final postId =
-            responseData['data'] is List && responseData['data'].isNotEmpty
-                ? responseData['data'][0]['id']?.toString() ??
-                    'new_${DateTime.now().millisecondsSinceEpoch}'
-                : 'new_${DateTime.now().millisecondsSinceEpoch}';
+            response['data']?[0]['id']?.toString() ??
+            'new_${DateTime.now().millisecondsSinceEpoch}';
 
-        // Upload main image
-        String? mainImageUrl;
-        if (_selectedImages.isNotEmpty) {
-          final mainImage = _selectedImages[_coverImageIndex];
-          final mainImageRequest = http.MultipartRequest(
-            'POST',
-            Uri.parse(
-              '${AttributeValueService.baseUrl}/add-post-main-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${mainImage.name}',
-            ),
-          );
-          mainImageRequest.headers.addAll({
-            'token': AttributeValueService.token,
-            'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
-          });
-          mainImageRequest.files.add(
-            await http.MultipartFile.fromPath('image', mainImage.path),
-          );
-          final mainImageResponse = await mainImageRequest.send();
-          final mainImageResponseBody =
-              await mainImageResponse.stream.bytesToString();
-          print('Main image response status: ${mainImageResponse.statusCode}');
-          print('Main image response body: $mainImageResponseBody');
-
-          // Parse the response to get the image URL
-          final mainImageData = jsonDecode(mainImageResponseBody);
-          if (mainImageResponse.statusCode == 200 &&
-              mainImageData['status'] == 'true') {
-            mainImageUrl = mainImageData['image_url'] ?? '';
-            if (mainImageUrl!.isEmpty) {
-              print('Warning: Main image URL not returned by the server');
-            }
-          } else {
-            throw Exception(
-              'Failed to upload main image: $mainImageResponseBody',
-            );
-          }
-
-          // Upload gallery images
-          for (var i = 0; i < _selectedImages.length; i++) {
-            if (i != _coverImageIndex) {
-              final galleryImage = _selectedImages[i];
-              final galleryImageRequest = http.MultipartRequest(
-                'POST',
-                Uri.parse(
-                  '${AttributeValueService.baseUrl}/add-post-gallery-image.php?token=${AttributeValueService.token}&post_id=$postId&image=${galleryImage.name}',
-                ),
-              );
-              galleryImageRequest.headers.addAll({
-                'token': AttributeValueService.token,
-                'Cookie': 'PHPSESSID=sgju9bt1ljebrc8sbca4bcn64a',
-              });
-              galleryImageRequest.files.add(
-                await http.MultipartFile.fromPath('image', galleryImage.path),
-              );
-              final galleryImageResponse = await galleryImageRequest.send();
-              final galleryImageResponseBody =
-                  await galleryImageResponse.stream.bytesToString();
-              print(
-                'Gallery image $i response status: ${galleryImageResponse.statusCode}',
-              );
-              print(
-                'Gallery image $i response body: $galleryImageResponseBody',
-              );
-            }
-          }
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.adData != null
-                  ? 'Ad updated successfully'
-                  : 'Ad posted successfully',
-            ),
-            backgroundColor: Colors.green.withOpacity(0.8),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
+        _showSnackBar(
+          widget.adData != null
+              ? 'Ad updated successfully'
+              : 'Ad posted successfully',
+          Colors.green,
         );
-
-        // Construct adData for navigation
-        Map<String, dynamic> adData = Map<String, dynamic>.from(formData);
-        adData['id'] = postId;
-        adData['created_on'] = DateTime.now().toIso8601String();
-        adData['updated_on'] = DateTime.now().toIso8601String();
-        adData['image'] =
-            mainImageUrl!.isNotEmpty
-                ? mainImageUrl
-                : (_selectedImages.isNotEmpty
-                    ? _selectedImages[_coverImageIndex].path
-                    : '');
-        print('Constructed adData: $adData');
-        // Navigate to SellingStatusPage
         context.pushNamed(
           RouteNames.sellingstatuspage,
-          extra: {'userId': widget.userId ?? '', 'adData': adData},
+          extra: {
+            'userId': widget.userId,
+            'adData': {
+              ...formData,
+              'id': postId,
+              'created_on': DateTime.now().toIso8601String(),
+              'updated_on': DateTime.now().toIso8601String(),
+              'image': _selectedImages[_coverImageIndex].path,
+            },
+          },
         );
       } else {
-        throw Exception(
-          responseData['message'] ??
-              'Failed to save ad (Status: ${adPostResponse.statusCode})',
-        );
+        throw Exception(response['message'] ?? 'Failed to save ad');
       }
     } catch (e) {
-      print('Error submitting ad: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving ad: $e'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showSnackBar('Error saving ad: $e', Colors.red);
+    } finally {
+      setState(() {
+        isSaving = false;
+      });
     }
   }
 
-  String _getCategoryName(String categoryId) {
-    const categoryMap = {
-      '1': 'Used Cars',
-      '2': 'Real Estate',
-      '3': 'Commercial Vehicles',
-      '4': 'Other',
-    };
-    return categoryMap[categoryId] ?? 'Unknown';
-  }
-
-  Widget _buildImagePicker() {
-    return Center(
-      child: Column(
-        children: [
-          Container(
-            width: 120,
-            height: 150,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  spreadRadius: 1,
+  Widget _buildImagePicker() => Column(
+    children: [
+      Container(
+        width: 120,
+        height: 150,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: _showImageSourceBottomSheet,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add_photo_alternate_outlined,
+                  size: 36,
+                  color: AppTheme.primaryColor,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add Photo (${_selectedImages.length}/$_maxImages)',
+                  style: TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: _showImageSourceBottomSheet,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 36,
-                      color: AppTheme.primaryColor,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Add Photo (${_selectedImages.length}/$_maxImages)',
-                      style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+          ),
+        ),
+      ),
+      if (_selectedImages.isNotEmpty)
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.8,
+          ),
+          itemCount: _selectedImages.length,
+          itemBuilder:
+              (context, index) => Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      spreadRadius: 1,
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-          if (_selectedImages.isNotEmpty)
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: _selectedImages.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        spreadRadius: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    children: [
+                      Image.file(
+                        File(_selectedImages[index].path),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
                       ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Stack(
-                      children: [
-                        Image.file(
-                          File(_selectedImages[index].path),
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                        if (index == _coverImageIndex)
-                          Positioned(
-                            bottom: 8,
-                            left: 8,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: 10.0,
-                                  sigmaY: 10.0,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'Cover Photo',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                      if (index == _coverImageIndex)
                         Positioned(
-                          top: 8,
+                          bottom: 8,
                           left: 8,
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(12),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: 10.0,
-                                sigmaY: 10.0,
-                              ),
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                               child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(20),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
-                                child: IconButton(
-                                  icon: Icon(
-                                    Icons.star,
-                                    size: 20,
-                                    color:
-                                        index == _coverImageIndex
-                                            ? Colors.yellow
-                                            : Colors.white,
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Cover Photo',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _coverImageIndex = index;
-                                      print('Set cover image to index: $index');
-                                    });
-                                  },
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(
-                                sigmaX: 10.0,
-                                sigmaY: 10.0,
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.3),
-                                  borderRadius: BorderRadius.circular(20),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.star,
+                                  size: 20,
+                                  color:
+                                      index == _coverImageIndex
+                                          ? Colors.yellow
+                                          : Colors.white,
                                 ),
-                                child: IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    size: 20,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
+                                onPressed:
+                                    () => setState(
+                                      () => _coverImageIndex = index,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 20,
+                                  color: Colors.white,
+                                ),
+                                onPressed:
+                                    () => setState(() {
                                       _selectedImages.removeAt(index);
                                       if (_selectedImages.isNotEmpty) {
                                         if (index < _coverImageIndex) {
@@ -1553,385 +1294,348 @@ class _AdPostFormState extends State<AdPostForm>
                                       } else {
                                         _coverImageIndex = 0;
                                       }
-                                      print(
-                                        'Removed image at index: $index, new cover index: $_coverImageIndex',
-                                      );
-                                    });
-                                  },
-                                ),
+                                    }),
                               ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
-          if (_imageError)
-            Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Text(
-                'Please add at least one photo',
-                style: TextStyle(color: Colors.red[700], fontSize: 12),
+                ),
               ),
-            ),
-        ],
+        ),
+      if (_imageError)
+        Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Text(
+            'Please add at least one photo',
+            style: TextStyle(color: Colors.red[700], fontSize: 12),
+          ),
+        ),
+    ],
+  );
+
+  Widget _buildImageSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Add Photos',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
       ),
-    );
-  }
+      const SizedBox(height: 16),
+      _selectedImages.isEmpty
+          ? Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [_buildImagePicker()],
+          )
+          : _buildImagePicker(),
+      const SizedBox(height: 24),
+    ],
+  );
 
-  Widget _buildImageSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Add Photos',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
+  Widget _buildKeyInfoSection() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Key Information',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
         ),
-        const SizedBox(height: 16),
-        _selectedImages.isEmpty
-            ? Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [_buildImagePicker()],
-            )
-            : _buildImagePicker(),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  Widget _buildKeyInfoSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Key Information',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 16),
-        CustomDropdownWidget<Brand>(
-          label: widget.categoryId == '2' ? 'Property Developer' : 'Brand',
-          value: _selectedBrand,
-          items: _brands,
-          onChanged: (Brand? newValue) async {
-            setState(() {
-              _selectedBrand = newValue;
-              _selectedBrandModel = null;
-              _selectedModelVariation = null;
-              _brandModels = [];
-              _modelVariations = [];
-              print('Selected brand: ${newValue?.name} (ID: ${newValue?.id})');
-            });
-            if (newValue != null) {
-              final brandModels = await AttributeValueService.fetchBrandModels(
-                newValue.id,
-                widget.categoryId,
-              );
-              setState(() {
-                _brandModels = brandModels;
-                print(
-                  'Loaded brand models for brand ${newValue.name}: ${brandModels.map((m) => m.name).toList()}',
-                );
-              });
-            }
-          },
-          isRequired: true,
-          itemToString: (Brand item) => item.name,
-          validator:
-              (Brand? value) =>
-                  value == null
-                      ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
-                      : null,
-          hintText: '',
-        ),
-        const SizedBox(height: 12),
-        if (_brandModels.isNotEmpty)
-          CustomDropdownWidget<BrandModel>(
-            label: widget.categoryId == '2' ? 'Project' : 'Model',
-            value: _selectedBrandModel,
-            items: _brandModels,
-            onChanged: (BrandModel? newValue) async {
-              setState(() {
-                _selectedBrandModel = newValue;
-                _selectedModelVariation = null;
-                _modelVariations = [];
-                print(
-                  'Selected brand model: ${newValue?.name} (ID: ${newValue?.id})',
-                );
-              });
-              if (newValue != null) {
-                await _fetchModelVariations(newValue.id);
-              }
-            },
-            isRequired: true,
-            itemToString: (BrandModel item) => item.name,
-            validator:
-                (BrandModel? value) =>
-                    value == null
-                        ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
-                        : null,
-            hintText: '',
-          ),
-        if (_brandModels.isNotEmpty) const SizedBox(height: 12),
-        if (_modelVariations.isNotEmpty)
-          CustomDropdownWidget<ModelVariation>(
-            label: 'Model Variation',
-            value: _selectedModelVariation,
-            items: _modelVariations,
-            onChanged: (ModelVariation? newValue) {
-              setState(() {
-                _selectedModelVariation = newValue;
-                print(
-                  'Selected model variation: ${newValue?.name} (ID: ${newValue?.id})',
-                );
-              });
-            },
-            isRequired: false,
-            itemToString: (ModelVariation item) => item.name,
-            validator: null,
-            hintText: 'Select a variation',
-          ),
-        if (_modelVariations.isNotEmpty) const SizedBox(height: 12),
-        CustomFormField(
-          controller: _listPriceController,
-          label: 'List Price',
-          isNumberInput: true,
-          isRequired: true,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter the list price';
-            }
-            final listPrice = double.tryParse(value);
-            if (listPrice == null) {
-              return 'Please enter a valid number';
-            }
-            if (_offerPriceController.text.isNotEmpty) {
-              final offerPrice = double.tryParse(_offerPriceController.text);
-              if (offerPrice != null && offerPrice > listPrice) {
-                return 'List price must be greater than or equal to offer price';
-              }
-            }
-            return null;
-          },
-          onChanged: (value) {},
-        ),
-        const SizedBox(height: 12),
-        CustomDropdownWidget<String>(
-          label: 'District',
-          value: _selectedDistrict,
-          items:
-              _districts.isNotEmpty
-                  ? _districts.map((d) => d['name'] as String).toList()
-                  : ['No districts available'],
-          onChanged: (String? newValue) {
-            if (newValue != null && newValue != 'No districts available') {
-              setState(() {
-                _selectedDistrict = newValue;
-                print('Selected district: $newValue');
-              });
-            }
-          },
-          isRequired: true,
-          itemToString: (String item) => item,
-          validator:
-              (String? value) =>
-                  value == null || value == 'No districts available'
-                      ? 'Please select a district'
-                      : null,
-          hintText: '',
-        ),
-        const SizedBox(height: 12),
-        CustomFormField(
-          controller: _landMarkController,
-          label: 'Landmark',
-          alignLabelWithHint: true,
-          onChanged: (value) {},
-        ),
-        const SizedBox(height: 12),
-        if (widget.categoryId == '1') ...[
-          CustomFormField(
-            controller: _registrationValidTillController,
-            label: 'Registration Valid Till',
-            onChanged: (value) {},
-          ),
-          const SizedBox(height: 12),
-          CustomFormField(
-            controller: _insuranceUptoController,
-            label: 'Insurance Upto',
-            onChanged: (value) {},
-          ),
-          const SizedBox(height: 12),
-        ],
-        CustomFormField(
-          controller: _descriptionController,
-          label: 'Description',
-          alignLabelWithHint: true,
-          maxLines: 5,
-          onChanged: (value) {},
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMoreInfoSection() {
-    if (_attributes.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        const Text(
-          'More Info',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 16),
-        ..._attributes.map((attr) {
-          final isRequired = _getRequiredAttributes(
-            widget.categoryId,
-          ).contains(attr.name);
-          final hasVariations =
-              _attributeVariations[attr.name]?.isNotEmpty ?? false;
-
-          if (hasVariations) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: CustomDropdownWidget<String>(
-                label: attr.name,
-                value: _selectedAttributes[attr.name],
-                items:
-                    _attributeVariations[attr.name]
-                        ?.map((v) => v.name)
-                        .toList() ??
-                    ['No options available'],
-                onChanged: (String? newValue) {
-                  if (newValue != null && newValue != 'No options available') {
-                    setState(() {
-                      _selectedAttributes[attr.name] = newValue;
-                      print('Selected ${attr.name}: $newValue');
-                    });
-                  }
-                },
-                isRequired: isRequired,
-                itemToString: (String item) => item,
-                validator:
-                    isRequired
-                        ? (value) {
-                          if (value == null ||
-                              value.isEmpty ||
-                              value == 'No options available') {
-                            return 'Please select ${attr.name}';
-                          }
-                          return null;
-                        }
-                        : null,
-                hintText: '',
-              ),
-            );
-          } else {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: CustomFormField(
-                controller: _attributeControllers[attr.name]!,
-                label: attr.name,
-                isRequired: isRequired,
-                validator:
-                    isRequired
-                        ? (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter ${attr.name}';
-                          }
-                          return null;
-                        }
-                        : null,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedAttributes[attr.name] = value;
-                    print('Entered ${attr.name}: $value');
-                  });
-                },
-              ),
+      ),
+      const SizedBox(height: 16),
+      CustomDropdownWidget<Brand>(
+        label: widget.categoryId == '2' ? 'Property Developer' : 'Brand',
+        value: _selectedBrand,
+        items: _brands,
+        onChanged: (newValue) async {
+          setState(() {
+            _selectedBrand = newValue;
+            _selectedBrandModel = _selectedModelVariation = null;
+            _brandModels = [];
+          });
+          if (newValue != null) {
+            setState(
+              () async =>
+                  _brandModels = await AttributeValueService.fetchBrandModels(
+                    newValue.id,
+                    widget.categoryId,
+                  ),
             );
           }
-        }),
-      ],
-    );
-  }
-
-  Widget _buildSubmitButton() {
-    return Column(
-      children: [
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _submitForm,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(),
-            ),
-            child: Text(
-              widget.adData != null ? 'Update Ad' : 'Post Ad',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ),
+        },
+        isRequired: true,
+        itemToString: (item) => item.name,
+        validator:
+            (value) =>
+                value == null
+                    ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
+                    : null,
+        hintText: '',
+      ),
+      if (_brandModels.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        CustomDropdownWidget<BrandModel>(
+          label: widget.categoryId == '2' ? 'Project' : 'Model',
+          value: _selectedBrandModel,
+          items: _brandModels,
+          onChanged: (newValue) async {
+            setState(() {
+              _selectedBrandModel = newValue;
+              _selectedModelVariation = null;
+              _modelVariations = [];
+            });
+            if (newValue != null) {
+              setState(
+                () async =>
+                    _modelVariations =
+                        (await AttributeValueService.fetchModelVariations(
+                          newValue.id,
+                          widget.categoryId,
+                        )).toSet().toList(),
+              );
+            }
+          },
+          isRequired: true,
+          itemToString: (item) => item.name,
+          validator:
+              (value) =>
+                  value == null
+                      ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
+                      : null,
+          hintText: '',
         ),
-        const SizedBox(height: 24),
       ],
-    );
-  }
-
-  Widget _buildFormFields() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _buildImageSection(),
-        _buildKeyInfoSection(),
-        _buildMoreInfoSection(),
-        _buildSubmitButton(),
+      if (_modelVariations.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        CustomDropdownWidget<ModelVariation>(
+          label: 'Model Variation',
+          value: _selectedModelVariation,
+          items: _modelVariations,
+          onChanged:
+              (newValue) => setState(() => _selectedModelVariation = newValue),
+          isRequired: false,
+          itemToString: (item) => item.name,
+          hintText: 'Select a variation',
+        ),
       ],
-    );
-  }
+      const SizedBox(height: 12),
+      CustomFormField(
+        controller: _controllers['listPrice']!,
+        label: 'List Price',
+        isNumberInput: true,
+        isRequired: true,
+        validator: (value) {
+          if (value?.isEmpty ?? true) return 'Please enter the list price';
+          final listPrice = double.tryParse(value!);
+          if (listPrice == null) return 'Please enter a valid number';
+          final offerPrice = double.tryParse(
+            _controllers['offerPrice']?.text ?? '',
+          );
+          if (offerPrice != null && offerPrice > listPrice) {
+            return 'List price must be greater than or equal to offer price';
+          }
+          return null;
+        },
+      ),
+      const SizedBox(height: 12),
+      CustomDropdownWidget<String>(
+        label: 'District',
+        value: _selectedDistrict,
+        items:
+            _districts.isNotEmpty
+                ? _districts.map((d) => d['name'] as String).toList()
+                : ['No districts available'],
+        onChanged: (newValue) {
+          if (newValue != null && newValue != 'No districts available') {
+            setState(() => _selectedDistrict = newValue);
+          }
+        },
+        isRequired: true,
+        itemToString: (item) => item,
+        validator:
+            (value) =>
+                value == null || value == 'No districts available'
+                    ? 'Please select a district'
+                    : null,
+        hintText: '',
+      ),
+      const SizedBox(height: 12),
+      CustomFormField(
+        controller: _controllers['landMark']!,
+        label: 'Landmark',
+        alignLabelWithHint: true,
+      ),
+      if (widget.categoryId == '1') ...[
+        const SizedBox(height: 12),
+        CustomFormField(
+          controller: _controllers['registration']!,
+          label: 'Registration Valid Till',
+        ),
+        const SizedBox(height: 12),
+        CustomFormField(
+          controller: _controllers['insurance']!,
+          label: 'Insurance Upto',
+        ),
+      ],
+      const SizedBox(height: 12),
+      CustomFormField(
+        controller: _controllers['description']!,
+        label: 'Description',
+        alignLabelWithHint: true,
+        maxLines: 5,
+      ),
+    ],
+  );
 
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(key: widget.formKey, child: _buildFormFields()),
+  Widget _buildMoreInfoSection() =>
+      _attributes.isEmpty
+          ? const SizedBox.shrink()
+          : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+              const Text(
+                'More Info',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._attributes.map((attr) {
+                final isRequired = _getRequiredAttributes().contains(attr.name);
+                final hasVariations =
+                    _attributeVariations[attr.name]?.isNotEmpty ?? false;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child:
+                      hasVariations
+                          ? CustomDropdownWidget<String>(
+                            label: attr.name,
+                            value: _selectedAttributes[attr.name],
+                            items:
+                                _attributeVariations[attr.name]
+                                    ?.map((v) => v.name)
+                                    .toList() ??
+                                ['No options available'],
+                            onChanged: (newValue) {
+                              if (newValue != null &&
+                                  newValue != 'No options available') {
+                                setState(
+                                  () =>
+                                      _selectedAttributes[attr.name] = newValue,
+                                );
+                              }
+                            },
+                            isRequired: isRequired,
+                            itemToString: (item) => item,
+                            validator:
+                                isRequired
+                                    ? (value) =>
+                                        value == null ||
+                                                value.isEmpty ||
+                                                value == 'No options available'
+                                            ? 'Please select ${attr.name}'
+                                            : null
+                                    : null,
+                            hintText: '',
+                          )
+                          : CustomFormField(
+                            controller: _attributeControllers[attr.name]!,
+                            label: attr.name,
+                            isRequired: isRequired,
+                            validator:
+                                isRequired
+                                    ? (value) =>
+                                        value?.isEmpty ?? true
+                                            ? 'Please enter ${attr.name}'
+                                            : null
+                                    : null,
+                            onChanged:
+                                (value) => setState(
+                                  () => _selectedAttributes[attr.name] = value,
+                                ),
+                          ),
+                );
+              }),
+            ],
+          );
+
+  Widget _buildSubmitButton() => Column(
+    children: [
+      const SizedBox(height: 24),
+      SizedBox(
+        width: double.infinity,
+        height: 56,
+        child: ElevatedButton(
+          onPressed: isSaving ? null : _submitForm, // disable while saving
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: const RoundedRectangleBorder(),
+          ),
+          child:
+              isSaving
+                  ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                  : Text(
+                    widget.adData != null ? 'Update Ad' : 'Post Ad',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
         ),
       ),
-    );
-  }
+      const SizedBox(height: 24),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _fadeAnimation,
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: widget.formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _buildImageSection(),
+              _buildKeyInfoSection(),
+              _buildMoreInfoSection(),
+              _buildSubmitButton(),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 
   @override
   void dispose() {
-    _descriptionController.dispose();
-    _listPriceController.dispose();
-    _offerPriceController.dispose();
-    _districtController.dispose();
-    _landMarkController.dispose();
-    _registrationValidTillController.dispose();
-    _insuranceUptoController.dispose();
-    _attributeControllers.forEach((_, controller) => controller.dispose());
+    for (var c in _controllers.values) {
+      c.dispose();
+    }
+    for (var c in _attributeControllers.values) {
+      c.dispose();
+    }
     _animationController.dispose();
     super.dispose();
   }
