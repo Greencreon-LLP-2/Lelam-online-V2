@@ -15,7 +15,8 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
+import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
+
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
@@ -330,13 +331,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 key: 'auction_terms_accepted',
                                 value: 'true',
                               );
-                              Navigator.pop(dialogContext, true);
+                            context.pop();
                             } else {
                               setState(() {
                                 _errorMessage =
                                     'Failed to accept terms. Please try again.';
                               });
-                              Navigator.pop(dialogContext, false);
+                            context.pop();
                             }
                           }
                           : null,
@@ -732,7 +733,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 _selectedSoldBy = selectedSoldBy;
               });
               _fetchFilterListings();
-              Navigator.pop(context);
+             
             },
           ),
     );
@@ -1650,7 +1651,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             return MarketplacePost.fromJson(json);
           }).toList();
 
-      final products = finalPosts.map((post) => post.toProduct()).toList();
+      final List<Product> products =
+          finalPosts.map((post) => post.toProduct()).toList();
 
       // final attributeValuePairs =
       //     await AttributeValueService.fetchAttributeValuePairs();
