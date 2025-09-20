@@ -682,15 +682,6 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
                             ],
                           ),
                         )

@@ -738,15 +738,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                               ),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'You have no ${selectedBidType?.toLowerCase()} at this time',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
                           ],
                         ),
                       )
@@ -768,15 +759,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                 fontWeight: FontWeight.w500,
                                 color: Colors.grey[600],
                               ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'You have no ${selectedBidType?.toLowerCase()} at this time',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
                             ),
                           ],
                         ),

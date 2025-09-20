@@ -150,12 +150,6 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
                         color: Colors.grey[600],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'You have no expired meetings at this time',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                      textAlign: TextAlign.center,
-                    ),
                   ],
                 ),
               )

@@ -948,11 +948,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'You have no ads at this time',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
           ],
         ),
       );
@@ -972,11 +967,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 fontWeight: FontWeight.w500,
                 color: Colors.grey[600],
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You have no ads at this time',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
           ],
         ),

@@ -101,11 +101,6 @@ class SoldPage extends StatelessWidget {
                       color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You have no sold items at this time',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
                 ],
               ),
             );
@@ -123,11 +118,6 @@ class SoldPage extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                       color: Colors.grey[600],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You have no sold items at this time',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
                 ],
               ),
