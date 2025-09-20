@@ -19,7 +19,7 @@ const String locations = '$baseUrl/list-location.php?token=$token';
 //====================== Post details =======================//
 const String attributeValue =
     '$baseUrl//post-attribute-values.php?token=$token';
- const String addPostReview = '$baseUrl/add-post-review.php';
+const String addPostReview = '$baseUrl/add-post-review.php';
 
 //====================== Feature Posts ===============================//
 const String brand = '$baseUrl/list-brand.php?token=$token';
@@ -37,6 +37,7 @@ const String getImagePostImageUrl = '$simpleBaseUrl/admin/';
 const String faqUrl = '$baseUrl/list-faq.php';
 const String allusers = '$baseUrl/index.php';
 const String userDetails = '$baseUrl/user-details.php';
+const String otpSendUrl = '$baseUrl/otp-send.php';
 const String userRegister = '$baseUrl/register.php';
 const String userProfileUpdate = '$baseUrl/user-profile-update.php';
 const String shortlist = '$baseUrl/list-shortlist.php';

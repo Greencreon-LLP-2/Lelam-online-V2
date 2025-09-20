@@ -604,7 +604,7 @@ class _AdPostFormState extends State<AdPostForm>
       'KM Range',
       'Sold by',
     ],
-    '2' => ['Plot Area', 'Facing', 'Project Name', 'Listed By'],
+    '2' => ['Plot Area', 'Facing',  'Listed By'],
     // '3' => ['Vehicle Type', 'Year', 'Fuel Type'],
     // '4' => ['Item Type', 'Condition'],
     _ => [],
