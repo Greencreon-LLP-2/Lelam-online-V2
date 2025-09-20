@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as developer;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +9,10 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart' hide baseUrl, token;
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
+import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
+    hide baseUrl, token;
 import 'package:lelamonline_flutter/feature/categories/services/auction_cars_service.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
@@ -42,6 +46,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   List<SellerComment> uniqueSellerComments = [];
   List<SellerComment> detailComments = [];
 
+  bool _isLoadingContainerInfo = false;
+  List<ContainerInfo> _containerInfo = [];
+  String _containerInfoError = '';
+
   final AuctionService _auctionService = AuctionService();
   List<Map<String, dynamic>> _bidHistory = [];
   int _currentBid = 0;
@@ -52,7 +60,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String sellerActiveFrom = '';
   String? userId;
   String _currentHighestBid = '0';
-bool isLoadingSellerComments = false;
+  bool isLoadingSellerComments = false;
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
   String get image => _getProperty('image') ?? '';
@@ -101,8 +109,20 @@ bool isLoadingSellerComments = false;
   void initState() {
     super.initState();
     _loadUserId();
-    _fetchData();
-    _fetchSellerInfo();
+    _fetchAllData();
+  }
+
+  Future<void> _fetchAllData() async {
+    await _fetchLocations();
+
+    await Future.delayed(Duration(milliseconds: 500));
+    await _fetchSellerInfo();
+
+    await Future.delayed(Duration(milliseconds: 200));
+
+    await _fetchData();
+
+    await _fetchContainerInfo();
   }
 
   Future<void> _loadUserId() async {
@@ -115,6 +135,157 @@ bool isLoadingSellerComments = false;
       userId = userData?.userId ?? '';
     });
     debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
+  }
+  Future<void> _fetchContainerInfo() async {
+    setState(() {
+      _isLoadingContainerInfo = true;
+      _containerInfoError = '';
+    });
+
+    try {
+      final response = await MarketplaceService2.fetchContainerInfo(id);
+      setState(() {
+        _containerInfo = response.data;
+        _isLoadingContainerInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _containerInfoError = 'Failed to load details: $e';
+        _isLoadingContainerInfo = false;
+      });
+    }
+  }
+
+Widget _buildContainerInfo() {
+  if (_isLoadingContainerInfo) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_containerInfoError.isNotEmpty) {
+    return Center(
+      child: Text(
+        _containerInfoError,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (_containerInfo.isEmpty) {
+    return const Center(child: Text('Loading.......'));
+  }
+
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.30),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(1, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Details',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // First row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 0)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[0].icon),
+                          _containerInfo[0].value,
+                        ),
+                      if (_containerInfo.length > 1)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[1].icon),
+                          _containerInfo[1].value,
+                        ),
+                      if (_containerInfo.length > 2)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[2].icon),
+                          _containerInfo[2].value,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Second row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 3)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[3].icon),
+                          _containerInfo[3].value,
+                        ),
+                      if (_containerInfo.length > 4)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[4].icon),
+                          _containerInfo[4].value,
+                        ),
+                      if (_containerInfo.length <= 4)
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildContainerDetailItem(IconData icon, String text) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  IconData _getIconFromBootstrap(String bootstrapIcon) {
+    final iconMap = {
+      'bi-calendar-minus-fill': Icons.calendar_today,
+      'bi-person-fill': Icons.person,
+      'bi-speedometer': Icons.speed,
+      'bi-fuel-pump-fill': Icons.local_gas_station,
+      'bi-gear-fill': Icons.settings,
+      // Add more mappings as needed
+    };
+
+    return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
   Future<void> _fetchLocations() async {
@@ -176,9 +347,10 @@ bool isLoadingSellerComments = false;
 
         // Process attributes for uniqueness
         for (var comment in sellerComments.data) {
-          final key = comment.attributeName
-              .toLowerCase()
-              .replaceAll(RegExp(r'\s+'), '');
+          final key = comment.attributeName.toLowerCase().replaceAll(
+            RegExp(r'\s+'),
+            '',
+          );
           if (!uniqueAttributes.containsKey(key)) {
             uniqueAttributes[key] = comment;
             orderedComments.add(comment);
@@ -189,16 +361,17 @@ bool isLoadingSellerComments = false;
           uniqueSellerComments = orderedComments;
 
           // Filter for Details section
-          detailComments = uniqueSellerComments.where((comment) {
-            final name = comment.attributeName.toLowerCase().trim();
-            return [
-              'year',
-              'no of owners',
-              'fuel type',
-              'transmission',
-              'km range'
-            ].contains(name);
-          }).toList();
+          detailComments =
+              uniqueSellerComments.where((comment) {
+                final name = comment.attributeName.toLowerCase().trim();
+                return [
+                  'year',
+                  'no of owners',
+                  'fuel type',
+                  'transmission',
+                  'km range',
+                ].contains(name);
+              }).toList();
 
           debugPrint(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
@@ -241,7 +414,8 @@ bool isLoadingSellerComments = false;
       // Set _currentHighestBid and _currentBid
       setState(() {
         if (_bidHistory.isNotEmpty) {
-          _currentHighestBid = _bidHistory[0]['amount']
+          _currentHighestBid =
+              _bidHistory[0]['amount']
                   ?.replaceAll('₹', '')
                   .replaceAll(',', '') ??
               '0';
@@ -308,21 +482,22 @@ bool isLoadingSellerComments = false;
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -409,19 +584,21 @@ bool isLoadingSellerComments = false;
                               child: CachedNetworkImage(
                                 imageUrl: _images[index],
                                 fit: BoxFit.contain,
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.error_outline,
-                                      size: 50,
-                                      color: Colors.red,
+                                placeholder:
+                                    (context, url) => const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  ),
-                                ),
+                                errorWidget:
+                                    (context, url, error) => Container(
+                                      color: Colors.grey[200],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.error_outline,
+                                          size: 50,
+                                          color: Colors.red,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
@@ -448,7 +625,8 @@ bool isLoadingSellerComments = false;
                                       Icons.close,
                                       color: Colors.white,
                                     ),
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed:
+                                        () => Navigator.of(context).pop(),
                                   ),
                                 ),
                                 const Spacer(),
@@ -488,7 +666,9 @@ bool isLoadingSellerComments = false;
                                   onTap: () {
                                     fullScreenController.animateToPage(
                                       index,
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       curve: Curves.easeInOut,
                                     );
                                   },
@@ -497,9 +677,10 @@ bool isLoadingSellerComments = false;
                                     margin: const EdgeInsets.only(right: 8),
                                     decoration: BoxDecoration(
                                       border: Border.all(
-                                        color: _currentImageIndex == index
-                                            ? Colors.blue
-                                            : Colors.transparent,
+                                        color:
+                                            _currentImageIndex == index
+                                                ? Colors.blue
+                                                : Colors.transparent,
                                         width: 2,
                                       ),
                                       borderRadius: BorderRadius.circular(8),
@@ -510,21 +691,22 @@ bool isLoadingSellerComments = false;
                                       child: CachedNetworkImage(
                                         imageUrl: _images[index],
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) =>
-                                            const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
+                                        placeholder:
+                                            (context, url) => const Center(
+                                              child: SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        errorWidget: (context, url, error) =>
-                                            const Icon(
-                                          Icons.error,
-                                          size: 20,
-                                        ),
+                                        errorWidget:
+                                            (context, url, error) => const Icon(
+                                              Icons.error,
+                                              size: 20,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -586,15 +768,18 @@ bool isLoadingSellerComments = false;
                 const SizedBox(height: 8),
                 Text(
                   'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
-                  style:
-                      const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
               TextField(
                 controller: bidAmountController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: false),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: false,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
                   prefixText: '₹',
@@ -904,11 +1089,13 @@ bool isLoadingSellerComments = false;
                                     width: double.infinity,
                                     height: 400,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        const Icon(Icons.error),
+                                    placeholder:
+                                        (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                    errorWidget:
+                                        (context, url, error) =>
+                                            const Icon(Icons.error),
                                   ),
                                 );
                               },
@@ -1000,9 +1187,10 @@ bool isLoadingSellerComments = false;
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: _currentHighestBid.startsWith('Error')
-                                    ? Colors.red
-                                    : Colors.black,
+                                color:
+                                    _currentHighestBid.startsWith('Error')
+                                        ? Colors.red
+                                        : Colors.black,
                               ),
                             ),
                           ],
@@ -1062,16 +1250,16 @@ bool isLoadingSellerComments = false;
                             const SizedBox(width: 4),
                             _isLoadingLocations
                                 ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    landMark,
-                                    style: const TextStyle(color: Colors.grey),
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
+                                )
+                                : Text(
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                             const Spacer(),
                             // const Icon(
                             //   Icons.access_time,
@@ -1135,196 +1323,51 @@ bool isLoadingSellerComments = false;
                           ],
                         ),
                         const SizedBox(height: 8),
-                       Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  children: [
-    Text(
-      '#AD ID $id',
-      style: const TextStyle(color: Colors.grey),
-    ),
-    ElevatedButton.icon(
-      onPressed: () {
-        showDialog(
-          context: context,
-          builder: (context) => ChatOptionsDialog(
-            onChatWithSupport: () {
-              // handle after support call
-              debugPrint("Support contacted");
-            },
-            onChatWithSeller: () {
-              // handle after seller chat
-              debugPrint("Chat with seller started");
-            }, baseUrl: baseUrl, token: token,
-          ),
-        );
-      },
-      icon: const Icon(Icons.support_agent),
-      label: const Text('Contact Seller'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.zero,
-        ),
-      ),
-    ),
-  ],
-)
-
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '#AD ID $id',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => ChatOptionsDialog(
+                                        onChatWithSupport: () {
+                                          // handle after support call
+                                          debugPrint("Support contacted");
+                                        },
+                                        onChatWithSeller: () {
+                                          // handle after seller chat
+                                          debugPrint(
+                                            "Chat with seller started",
+                                          );
+                                        },
+                                        baseUrl: baseUrl,
+                                        token: token,
+                                      ),
+                                );
+                              },
+                              icon: const Icon(Icons.support_agent),
+                              label: const Text('Contact Seller'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                   const Divider(),
-                 Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.30),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                          offset: const Offset(1, 1),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(
-                        12.0,
-                      ), // Reduced padding for compactness
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Details',
-                            style: TextStyle(
-                              fontSize: 18, // Slightly smaller for consistency
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8), // Tighter spacing
-                          if (isLoadingSellerComments)
-                            const Center(child: CircularProgressIndicator())
-                          else if (uniqueSellerComments.isEmpty)
-                            const Center(child: Text('No details available'))
-                          else
-                            LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      _buildDetailItem(
-                                        Icons.calendar_today,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'year',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Year',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'year',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.person,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'no of owners',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'No of owners',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'no_of_owners',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.settings,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'transmission',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'Transmission',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'transmission',
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      _buildDetailItem(
-                                        Icons.local_gas_station,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'fuel type',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Fuel Type',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'fuel_type',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.speed,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'km range',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'KM Range',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'km_range',
-                                      ),
-                                      const Expanded(
-                                        child: SizedBox.shrink(),
-                                      ), // Placeholder for third column
-                                    ],
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildContainerInfo(),
                   const Divider(),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -1349,23 +1392,34 @@ bool isLoadingSellerComments = false;
                             ),
                           )
                         else if (uniqueSellerComments.isEmpty)
-                          const Center(child: Text('No seller comments available'))
+                          const Center(
+                            child: Text('No seller comments available'),
+                          )
                         else
                           Column(
-                            children: uniqueSellerComments
-                                .where((comment) =>
-                                    comment.attributeName.toLowerCase().trim() !=
-                                    'co driver side rear tyre')
-                                .map(
-                                  (comment) => _buildSellerCommentItem(
-                                    comment.attributeName,
-                                    comment.attributeName.toLowerCase().trim() ==
-                                            'no of owners'
-                                        ? _getOwnerText(comment.attributeValue)
-                                        : comment.attributeValue,
-                                  ),
-                                )
-                                .toList(),
+                            children:
+                                uniqueSellerComments
+                                    .where(
+                                      (comment) =>
+                                          comment.attributeName
+                                              .toLowerCase()
+                                              .trim() !=
+                                          'co driver side rear tyre',
+                                    )
+                                    .map(
+                                      (comment) => _buildSellerCommentItem(
+                                        comment.attributeName,
+                                        comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'no of owners'
+                                            ? _getOwnerText(
+                                              comment.attributeValue,
+                                            )
+                                            : comment.attributeValue,
+                                      ),
+                                    )
+                                    .toList(),
                           ),
                       ],
                     ),
@@ -1411,15 +1465,15 @@ bool isLoadingSellerComments = false;
                           )
                         else
                           Column(
-                            children: _bidHistory
-                                .map(
-                                  (bid) => _buildBidHistoryItem(
-                                    bid['bidder'] ?? 'Guest User',
-                                    bid['amount'] ?? 'N/A',
-                               
-                                  ),
-                                )
-                                .toList(),
+                            children:
+                                _bidHistory
+                                    .map(
+                                      (bid) => _buildBidHistoryItem(
+                                        bid['bidder'] ?? 'Guest User',
+                                        bid['amount'] ?? 'N/A',
+                                      ),
+                                    )
+                                    .toList(),
                           ),
                       ],
                     ),
@@ -1462,8 +1516,8 @@ bool isLoadingSellerComments = false;
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () =>
-                            _showBidDialog(context, isIncrease: true),
+                        onPressed:
+                            () => _showBidDialog(context, isIncrease: true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,
@@ -1485,26 +1539,36 @@ bool isLoadingSellerComments = false;
     );
   }
 
-Widget _buildDetailItem(IconData icon, String text, String key) {
-    return Expanded(
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Flexible(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ), // Compact padding
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(icon, size: 14, color: Colors.grey[700]),
-            const SizedBox(width: 6),
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey[700],
+            ), // Slightly smaller icon
+            const SizedBox(width: 6), // Tighter spacing
             Expanded(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
+                maxLines: 2, // Prevent wrapping
+                style: const TextStyle(
+                  fontSize: 14, // Slightly smaller font for compactness
+                  color: Colors.black,
+                ),
               ),
             ),
           ],
         ),
       ),
-      key: ValueKey(key), // Ensure unique key for each item
     );
   }
 
@@ -1518,16 +1582,13 @@ Widget _buildDetailItem(IconData icon, String text, String key) {
             label,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16),
-          ),
+          Text(value, style: const TextStyle(fontSize: 16)),
         ],
       ),
     );
   }
 
-  Widget _buildBidHistoryItem(String bidder, String amount, ) {
+  Widget _buildBidHistoryItem(String bidder, String amount) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1551,7 +1612,6 @@ Widget _buildDetailItem(IconData icon, String text, String key) {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-               
               ],
             ),
           ),
@@ -1572,63 +1632,59 @@ Widget _buildDetailItem(IconData icon, String text, String key) {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-            ? Center(
-                child: Text(
-                  sellerErrorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              )
-            : GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          SellerInformationPage(userId: createdBy),
-                    ),
-                  );
-                },
-                child: Row(
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SellerInformationPage(userId: createdBy),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundImage:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? CachedNetworkImageProvider(sellerProfileImage!)
+                        : const AssetImage('assets/images/avatar.gif')
+                            as ImageProvider,
+                radius: 30,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage: sellerProfileImage != null &&
-                              sellerProfileImage!.isNotEmpty
-                          ? CachedNetworkImageProvider(sellerProfileImage!)
-                          : const AssetImage('assets/images/avatar.gif')
-                              as ImageProvider,
-                      radius: 30,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sellerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Member Since $sellerActiveFrom',
-                            style:
-                                TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Posts: $sellerNoOfPosts',
-                            style:
-                                TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                        ],
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios,
-                        size: 16, color: Colors.grey),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
                   ],
                 ),
-              );
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
   }
 }

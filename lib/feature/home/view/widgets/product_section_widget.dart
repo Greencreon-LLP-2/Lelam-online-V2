@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
@@ -174,10 +175,17 @@ class ProductSectionWidget extends StatelessWidget {
     );
   }
 
+  String _formatPrice(double price) {
+    final formatter = NumberFormat.currency(
+      locale: 'en_IN',
+      decimalDigits: 0,
+    );
+    return formatter.format(price.round());
+  }
   Widget _buildProductCard(BuildContext context, FeatureListModel product) {
     final isAuction = product.ifAuction == "1";
     final formattedPrice =
-        double.tryParse(product.price)?.toStringAsFixed(0) ?? '0';
+         '${_formatPrice(double.tryParse(product.price) ?? 0)}';
     final formattedAuctionPrice =
         double.tryParse(product.auctionStartingPrice)?.toStringAsFixed(0) ??
         '0';
@@ -275,7 +283,7 @@ class ProductSectionWidget extends StatelessWidget {
                           children: [
                             if (isAuction) ...[
                               Text(
-                                '₹$formattedPrice',
+                                '$formattedPrice',
                                 style: TextStyle(
                                   color: Colors.grey[600],
                                   fontSize: 12,

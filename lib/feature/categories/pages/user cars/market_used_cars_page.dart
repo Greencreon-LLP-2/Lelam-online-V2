@@ -31,6 +31,41 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer' as developer;
 
+// Add this to your models section
+class ContainerInfo {
+  final String icon;
+  final String value;
+
+  ContainerInfo({required this.icon, required this.value});
+
+  factory ContainerInfo.fromJson(Map<String, dynamic> json) {
+    return ContainerInfo(icon: json['icon'] ?? '', value: json['value'] ?? '');
+  }
+}
+
+class ContainerInfoResponse {
+  final bool status;
+  final List<ContainerInfo> data;
+  final String code;
+
+  ContainerInfoResponse({
+    required this.status,
+    required this.data,
+    required this.code,
+  });
+
+  factory ContainerInfoResponse.fromJson(Map<String, dynamic> json) {
+    return ContainerInfoResponse(
+      status: json['status'] == 'true',
+      data:
+          (json['data'] as List)
+              .map((item) => ContainerInfo.fromJson(item))
+              .toList(),
+      code: json['code'] ?? '0',
+    );
+  }
+}
+
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
@@ -91,25 +126,188 @@ class _MarketPlaceProductDetailsPageState
   String _moveToAuctionButtonText = 'Move to Auction';
   bool _isWaitingForApproval = false;
 
+  bool _isLoadingContainerInfo = false;
+  List<ContainerInfo> _containerInfo = [];
+  String _containerInfoError = '';
+
   @override
   void initState() {
     super.initState();
 
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
 
-    _fetchLocations();
-
-    _fetchSellerComments();
-
-    _fetchSellerInfo();
-
-    _checkShortlistStatus();
-
-    _fetchGalleryImages();
-
-    _fetchBannerImage();
+    _fetchAllData();
 
     _isCheckingShortlist = true;
+  }
+
+  Future<void> _fetchAllData() async {
+    await _fetchLocations();
+    await Future.delayed(Duration(milliseconds: 100)); // Add delay
+    await _fetchSellerComments();
+    await Future.delayed(Duration(milliseconds: 500));
+    await _fetchSellerInfo();
+    await Future.delayed(Duration(milliseconds: 400));
+    await _checkShortlistStatus();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchGalleryImages();
+    await Future.delayed(Duration(milliseconds: 300));
+    await _fetchBannerImage();
+
+    await _fetchContainerInfo();
+  }
+
+  // Add this method to your MarketplaceService2 class
+  Future<void> _fetchContainerInfo() async {
+    setState(() {
+      _isLoadingContainerInfo = true;
+      _containerInfoError = '';
+    });
+
+    try {
+      final response = await MarketplaceService2.fetchContainerInfo(id);
+      setState(() {
+        _containerInfo = response.data;
+        _isLoadingContainerInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _containerInfoError = 'Failed to load details: $e';
+        _isLoadingContainerInfo = false;
+      });
+    }
+  }
+
+Widget _buildContainerInfo() {
+  if (_isLoadingContainerInfo) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_containerInfoError.isNotEmpty) {
+    return Center(
+      child: Text(
+        _containerInfoError,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (_containerInfo.isEmpty) {
+    return const Center(child: Text('Loading.......'));
+  }
+
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.30),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(1, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Details',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // First row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 0)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[0].icon),
+                          _containerInfo[0].value,
+                        ),
+                      if (_containerInfo.length > 1)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[1].icon),
+                          _containerInfo[1].value,
+                        ),
+                      if (_containerInfo.length > 2)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[2].icon),
+                          _containerInfo[2].value,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Second row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 3)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[3].icon),
+                          _containerInfo[3].value,
+                        ),
+                      if (_containerInfo.length > 4)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[4].icon),
+                          _containerInfo[4].value,
+                        ),
+                      if (_containerInfo.length <= 4)
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildContainerDetailItem(IconData icon, String text) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  IconData _getIconFromBootstrap(String bootstrapIcon) {
+    final iconMap = {
+      'bi-calendar-minus-fill': Icons.calendar_today,
+      'bi-person-fill': Icons.person,
+      'bi-speedometer': Icons.speed,
+      'bi-fuel-pump-fill': Icons.local_gas_station,
+      'bi-gear-fill': Icons.settings,
+      // Add more mappings as needed
+    };
+
+    return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
   Future<bool> _checkAuctionTermsStatus() async {
@@ -815,6 +1013,7 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
+      developer.log('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -2230,26 +2429,36 @@ class _MarketPlaceProductDetailsPageState
     return formatter.format(price.round());
   }
 
-  Widget _buildDetailItem(IconData icon, String text, String key) {
-    return Expanded(
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Flexible(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ), // Compact padding
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(icon, size: 14, color: Colors.grey[700]),
-            const SizedBox(width: 6),
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey[700],
+            ), // Slightly smaller icon
+            const SizedBox(width: 6), // Tighter spacing
             Expanded(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
+                maxLines: 2, // Prevent wrapping
+                style: const TextStyle(
+                  fontSize: 14, // Slightly smaller font for compactness
+                  color: Colors.black,
+                ),
               ),
             ),
           ],
         ),
       ),
-      key: ValueKey(key), // Ensure unique key for each item
     );
   }
 
@@ -2777,102 +2986,7 @@ class _MarketPlaceProductDetailsPageState
                     ),
                   ),
                   const Divider(),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.30),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                          offset: const Offset(1, 1),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(
-                        12.0,
-                      ), // Reduced padding for compactness
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Details',
-                            style: TextStyle(
-                              fontSize: 18, // Slightly smaller for consistency
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8), // Tighter spacing
-                          if (isLoadingSellerComments)
-                            const Center(child: CircularProgressIndicator())
-                          else if (uniqueSellerComments.isEmpty)
-                            const Center(child: Text('No details available'))
-                          else
-                          LayoutBuilder(
-  builder: (context, constraints) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _buildDetailItem(
-              Icons.calendar_today,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'year',
-                orElse: () => SellerComment(attributeName: 'Year', attributeValue: 'N/A'),
-              ).attributeValue,
-              'year',
-            ),
-            _buildDetailItem(
-              Icons.person,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'no of owners',
-                orElse: () => SellerComment(attributeName: 'No of owners', attributeValue: 'N/A'),
-              ).attributeValue,
-              'no_of_owners',
-            ),
-            _buildDetailItem(
-              Icons.settings,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'transmission',
-                orElse: () => SellerComment(attributeName: 'Transmission', attributeValue: 'N/A'),
-              ).attributeValue,
-              'transmission',
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            _buildDetailItem(
-              Icons.local_gas_station,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'fuel type',
-                orElse: () => SellerComment(attributeName: 'Fuel Type', attributeValue: 'N/A'),
-              ).attributeValue,
-              'fuel_type',
-            ),
-            _buildDetailItem(
-              Icons.speed,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'km range',
-                orElse: () => SellerComment(attributeName: 'KM Range', attributeValue: 'N/A'),
-              ).attributeValue,
-              'km_range',
-            ),
-            const Expanded(child: SizedBox.shrink()), // Placeholder for third column
-          ],
-        ),
-      ],
-    );
-  },
-)
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildContainerInfo(),
                   const Divider(),
                   // Seller Comments Section
                   Padding(
@@ -2927,17 +3041,7 @@ class _MarketPlaceProductDetailsPageState
               bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: Offset(1, 3),
-                    ),
-                  ],
-                ),
+                
                 child: Row(
                   children: [
                     if (_userProvider.userId == widget.product.createdBy) ...[

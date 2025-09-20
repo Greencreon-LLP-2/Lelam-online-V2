@@ -1122,11 +1122,7 @@ class _AdPostFormState extends State<AdPostForm>
           extra: {
             'userId': widget.userId,
             'adData': {
-              ...formData,
               'id': postId,
-              'created_on': DateTime.now().toIso8601String(),
-              'updated_on': DateTime.now().toIso8601String(),
-              'image': _selectedImages[_coverImageIndex].path,
             },
           },
         );
@@ -1487,18 +1483,18 @@ class _AdPostFormState extends State<AdPostForm>
         label: 'Landmark',
         alignLabelWithHint: true,
       ),
-      if (widget.categoryId == '1') ...[
-        const SizedBox(height: 12),
-        CustomFormField(
-          controller: _controllers['registration']!,
-          label: 'Registration Valid Till',
-        ),
-        const SizedBox(height: 12),
-        CustomFormField(
-          controller: _controllers['insurance']!,
-          label: 'Insurance Upto',
-        ),
-      ],
+      // if (widget.categoryId == '1') ...[
+      //   const SizedBox(height: 12),
+      //   CustomFormField(
+      //     controller: _controllers['registration']!,
+      //     label: 'Registration Valid Till',
+      //   ),
+      //   const SizedBox(height: 12),
+      //   CustomFormField(
+      //     controller: _controllers['insurance']!,
+      //     label: 'Insurance Upto',
+      //   ),
+      // ],
       const SizedBox(height: 12),
       CustomFormField(
         controller: _controllers['description']!,

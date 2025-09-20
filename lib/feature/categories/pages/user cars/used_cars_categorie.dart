@@ -487,7 +487,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
     _fetchingPostIds.add(postId);
     try {
-      final attributes = await _marketplaceService.fetchPostAttributeValues(
+      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(
         postId,
       );
       if (mounted) {
@@ -935,59 +935,60 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
- Widget _buildSearchField() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-    child: TextField(
-      controller: _searchController,
-      onChanged: (value) {
-        setState(() {
-          _searchQuery = value;
-          _filtersChanged = true;
-        });
-      },
-      // Add these lines
-      autofillHints: null,  // Disable autofill entirely
-      enableSuggestions: false,  // Optional: Disable suggestions/autocomplete
-      enableInteractiveSelection: true,  // Keep selection enabled
-      decoration: InputDecoration(
-        hintText: 'Search by brand, model, location, fuel type...',
-        hintStyle: TextStyle(color: Colors.grey.shade500),
-        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon: _searchQuery.isNotEmpty
-            ? IconButton(
-                icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                onPressed: () {
-                  setState(() {
-                    _searchQuery = '';
-                    _searchController.clear();
-                    _filtersChanged = true;
-                  });
-                },
-              )
-            : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blue),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+  Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+            _filtersChanged = true;
+          });
+        },
+        // Add these lines
+        autofillHints: null, // Disable autofill entirely
+        enableSuggestions: false, // Optional: Disable suggestions/autocomplete
+        enableInteractiveSelection: true, // Keep selection enabled
+        decoration: InputDecoration(
+          hintText: 'Search by brand, model, location, fuel type...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.blue),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildListingTypeButtons() {
     return Padding(
@@ -1069,7 +1070,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     developer.log(
       'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
@@ -1083,9 +1084,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
-        title: _showAppBarSearch
-            ? _buildAppBarSearchField()
-            : const Text('Used Cars'),
+        title:
+            _showAppBarSearch
+                ? _buildAppBarSearchField()
+                : const Text('Used Cars'),
         actions: [
           Stack(
             children: [
@@ -1118,178 +1120,186 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                  icon: const Icon(Icons.location_on, color: Colors.black87),
-                  onSelected: (String value) {
-                    setState(() {
-                      _selectedLocation = value == 'all'
-                          ? 'all'
-                          : _locations.firstWhere((loc) => loc.name == value).id;
-                      _filtersChanged = true;
-                      _fetchProducts();
-                    });
-                  },
-                  itemBuilder: (BuildContext context) {
-                    return _keralaCities.map((String city) {
-                      return PopupMenuItem<String>(
-                        value: city,
-                        child: Row(
-                          children: [
-                            if (_selectedLocation ==
-                                (city == 'all'
-                                    ? 'all'
-                                    : _locations
-                                        .firstWhere((loc) => loc.name == city)
-                                        .id))
-                              const Icon(
-                                Icons.check,
-                                color: Colors.blue,
-                                size: 16,
-                              ),
-                            if (_selectedLocation ==
-                                (city == 'all'
-                                    ? 'all'
-                                    : _locations
-                                        .firstWhere((loc) => loc.name == city)
-                                        .id))
-                              const SizedBox(width: 8),
-                            Text(city == 'all' ? 'All Kerala' : city),
-                          ],
-                        ),
-                      );
-                    }).toList();
-                  },
-                ),
-        ],
-      ),
-      body: _isLoading || _isLoadingLocations
-          ? const Center(
-              child: CircularProgressIndicator(color: Palette.primaryblue),
-            )
-          : _listingType == 'auction' &&
-                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.lock_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Please log in to view auction listings',
-                        style: TextStyle(fontSize: 16, color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          developer.log(
-                            'Navigating to login page from auction prompt',
-                          );
-                          context.push(
-                            RouteNames.loginPage,
-                            extra: {
-                              'redirectTo': 'usedCars',
-                              'listingType': 'auction',
-                            },
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          textStyle: const TextStyle(fontSize: 16),
-                        ),
-                        child: const Text('Log In'),
-                      ),
-                    ],
-                  ),
-                )
-              : _errorMessage != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                icon: const Icon(Icons.location_on, color: Colors.black87),
+                onSelected: (String value) {
+                  setState(() {
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
+                    _filtersChanged = true;
+                    _fetchProducts();
+                  });
+                },
+                itemBuilder: (BuildContext context) {
+                  return _keralaCities.map((String city) {
+                    return PopupMenuItem<String>(
+                      value: city,
+                      child: Row(
                         children: [
-                          Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                          const SizedBox(height: 16),
-                          Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const Icon(
+                              Icons.check,
+                              color: Colors.blue,
+                              size: 16,
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _fetchProducts(forceRefresh: true),
-                            child: const Text('Retry'),
-                          ),
+                          if (_selectedLocation ==
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
+                            const SizedBox(width: 8),
+                          Text(city == 'all' ? 'All Kerala' : city),
                         ],
                       ),
-                    )
-                  : filteredProducts.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.search_off,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No cars found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Try adjusting your filters or search terms',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () => _fetchProducts(forceRefresh: true),
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            itemCount: _products.length +
-                                (_showMainSearch ? 3 : 1), // Adjusted for SearchResultsWidget
-                            itemBuilder: (context, index) {
-                              if (_showMainSearch && index == 0) {
-                                return _buildSearchField();
-                              }
-                              if (_showMainSearch && index == 1) {
-                                return SearchResultsWidget(
-                                  searchQuery: _searchQuery,
-                                ); // Add SearchResultsWidget
-                              }
-                              if (index == (_showMainSearch ? 2 : 0)) {
-                                return _buildListingTypeButtons();
-                              }
-                              final productIndex = index - (_showMainSearch ? 3 : 1);
-                              if (productIndex < _products.length) {
-                                final product = _products[productIndex];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _buildProductCard(product),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
+                    );
+                  }).toList();
+                },
+              ),
+        ],
+      ),
+      body:
+          _isLoading || _isLoadingLocations
+              ? const Center(
+                child: CircularProgressIndicator(color: Palette.primaryblue),
+              )
+              : _listingType == 'auction' &&
+                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Please log in to view auction listings',
+                      style: TextStyle(fontSize: 16, color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        developer.log(
+                          'Navigating to login page from auction prompt',
+                        );
+                        context.push(
+                          RouteNames.loginPage,
+                          extra: {
+                            'redirectTo': 'usedCars',
+                            'listingType': 'auction',
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Palette.primaryblue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
                         ),
+                        textStyle: const TextStyle(fontSize: 16),
+                      ),
+                      child: const Text('Log In'),
+                    ),
+                  ],
+                ),
+              )
+              : _errorMessage != null
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => _fetchProducts(forceRefresh: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+              : filteredProducts.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: () => _fetchProducts(forceRefresh: true),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount:
+                      _products.length +
+                      (_showMainSearch
+                          ? 3
+                          : 1), // Adjusted for SearchResultsWidget
+                  itemBuilder: (context, index) {
+                    if (_showMainSearch && index == 0) {
+                      return _buildSearchField();
+                    }
+                    if (_showMainSearch && index == 1) {
+                      return SearchResultsWidget(
+                        searchQuery: _searchQuery,
+                      ); // Add SearchResultsWidget
+                    }
+                    if (index == (_showMainSearch ? 2 : 0)) {
+                      return _buildListingTypeButtons();
+                    }
+                    final productIndex = index - (_showMainSearch ? 3 : 1);
+                    if (productIndex < _products.length) {
+                      final product = _products[productIndex];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildProductCard(product),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
     );
   }
+
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
@@ -1407,22 +1417,38 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           ),
                         ),
                       if (isVerified || isFeatured)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.verified,
-                              size: 12,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
+  Positioned(
+    top: 4,
+    left: 4,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.blue,
+        borderRadius: BorderRadius.circular(12), // rounded pill shape
+      ),
+      child: Row(
+    
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(
+            Icons.verified,
+            size: 12,
+            color: Colors.white,
+          ),
+          SizedBox(width: 4),
+          Text(
+            "Verified",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+
                     ],
                   ),
                 ),
@@ -1460,7 +1486,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                             ),
                           )
                         else if (hasOffer)
-                          Column(
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -1473,6 +1499,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   decoration: TextDecoration.lineThrough,
                                 ),
                               ),
+                              SizedBox(width: 10),
                               Text(
                                 _formatPrice(
                                   double.tryParse(product.offerPrice) ?? 0,
@@ -1579,10 +1606,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             ),
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
               Container(
+
                 // make finance/exchange strip flush and remove extra vertical spacing
                 width: double.infinity,
                 padding: EdgeInsets.zero,
-
                 decoration: BoxDecoration(
                   color:
                       (isAuction || isFinanceAvailable || isExchangeAvailable)
@@ -1615,13 +1642,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: Colors.grey.shade700),
-          const SizedBox(width: 3),
+          Icon(icon, size: 12, color: Colors.grey.shade700),
+          const SizedBox(width: 4),
           Text(
             label,
             style: const TextStyle(fontSize: 10, color: Colors.black87),
