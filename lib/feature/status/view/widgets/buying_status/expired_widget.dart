@@ -30,7 +30,7 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   Future<void> _loadConfigAndFetchMeetings() async {
     final userData = userProvider.userData;
     setState(() {
-      userId = userData?.userId ?? 'Unknown'; 
+      userId = userData?.userId ?? 'Unknown';
       isLoading = true;
     });
 
@@ -48,9 +48,9 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
 
     if (userId == null || userId == 'Unknown') {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User ID is required')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('User ID is required')));
       }
       setState(() => isLoading = false);
       return;
@@ -60,12 +60,16 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   }
 
   List<dynamic> _parseJsonSafely(String body) {
-    String cleanBody = body
-        .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
-        .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
-        .replaceAll(RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'), '')
-        .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
-        .trim();
+    String cleanBody =
+        body
+            .replaceAll(RegExp(r'<br\s*/?>', multiLine: true), '')
+            .replaceAll(RegExp(r'<b>|</b>', multiLine: true), '')
+            .replaceAll(
+              RegExp(r'Warning:\s*mysqli_num_rows\(\).*?on line\s*\d+'),
+              '',
+            )
+            .replaceAll(RegExp(r'Notice:\s*[^<]+on line\s*\d+'), '')
+            .trim();
     if (kDebugMode) print('Cleaned Body (Meetings): $cleanBody');
     try {
       final parsed = jsonDecode(cleanBody);
@@ -117,9 +121,9 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
     } catch (e) {
       if (kDebugMode) print('Error fetching meetings: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching meetings: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error fetching meetings: $e')));
       }
       setState(() => isLoading = false);
     }
@@ -128,105 +132,99 @@ class _ExpiredMeetingsPageState extends State<ExpiredMeetingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : meetings.isEmpty
+      body:
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : meetings.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.event_busy,
-                        size: 64,
-                        color: Colors.grey[400],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.schedule, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No expired meetings found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No expired meetings found',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'You have no expired meetings at this time.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: meetings.length,
-                  itemBuilder: (context, index) {
-                    final meeting = meetings[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12.0),
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    meeting['meeting_id']?.toString() ?? 'No ID',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Text(
-                                    'Expired',
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Title: ${meeting['title'] ?? 'No Title'}',
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Date: ${meeting['date']?.split(' ')[0] ?? 'N/A'}',
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'You have no expired meetings at this time',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: meetings.length,
+                itemBuilder: (context, index) {
+                  final meeting = meetings[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12.0),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  meeting['meeting_id']?.toString() ?? 'No ID',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  'Expired',
+                                  style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Title: ${meeting['title'] ?? 'No Title'}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Date: ${meeting['date']?.split(' ')[0] ?? 'N/A'}',
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -512,7 +511,8 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'middleStatus_data':
                   statusData?['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  statusData?['footerStatus_data'] ?? 'Click call support for full details',
+                  statusData?['footerStatus_data'] ??
+                  'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
             debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
@@ -668,29 +668,28 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.error_outline,
+                                Icons.handshake,
                                 size: 64,
-                                color: Colors.red,
+                                color: Colors.grey,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                errorMessage!,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.red,
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadUserId,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
+                              const SizedBox(height: 8),
+                              Text(
+                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
                                 ),
-                                child: const Text(
-                                  'Retry',
-                                  style: TextStyle(color: Colors.white),
-                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -700,14 +699,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.event,
+                              const Icon(
+                                Icons.handshake,
                                 size: 64,
-                                color: Colors.grey[400],
+                                color: Colors.grey,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No meetings found for ${statuses[selectedIndex]}',
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
@@ -716,7 +715,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Total meetings in system: ${meetings.length}',
+                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[500],
@@ -741,14 +740,16 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                               //       meetings.removeWhere(
                               //         (m) => m['id'] == meeting['id'],
                               //       );
-        
+
                               //       _loadMeetings();
                               //     });
                               //   }
                               // },
                               onLocationRequestSent: _onLocationRequestSent,
                               onProceedWithBid: () {
-                                debugPrint('Proceed with Bid triggered for meeting ${meeting['id']}');
+                                debugPrint(
+                                  'Proceed with Bid triggered for meeting ${meeting['id']}',
+                                );
                                 _proceedWithBid(context, meeting);
                               },
                               // onIncreaseBid: () => _increaseBid(context, meeting),
@@ -792,24 +793,27 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       debugPrint(
         'Proceed with Bid failed: bid_amount=${meeting['bid_amount']}, bid_id=${meeting['bid_id']}',
       );
-      final bool? placeBid = await showDialog<bool>(
+      await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Bid Found'),
-          content: const Text('No valid bid exists for this meeting. Would you like to place a bid?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+        builder:
+            (context) => AlertDialog(
+              title: const Text('No Bid Found'),
+              content: const Text(
+                'No valid bid exists for this meeting. Would you like to place a bid?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Place Bid'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Place Bid'),
-            ),
-          ],
-        ),
       );
-      // if (placeBid == true) {
+      // if (_ignorePlaceBid == true) {
       //   await _increaseBid(context, meeting);
       // }
       return;
