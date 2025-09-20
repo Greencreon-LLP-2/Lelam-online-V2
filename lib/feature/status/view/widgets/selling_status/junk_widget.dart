@@ -292,7 +292,7 @@ class _JunkWidgetState extends State<JunkWidget> {
                           msg: 'Failed to load image for item ${item['id']}',
                           toastLength: Toast.LENGTH_SHORT,
                           gravity: ToastGravity.BOTTOM,
-                          backgroundColor: Colors.red,
+                          backgroundColor: Colors.grey.shade800,
                           textColor: Colors.white,
                         );
                         return Image.asset(
@@ -335,7 +335,7 @@ class _JunkWidgetState extends State<JunkWidget> {
               Center(
                 child: Text(
                   item['rejectionMsg'] as String,
-                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -454,11 +454,7 @@ class _JunkWidgetState extends State<JunkWidget> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  size: 48,
-                                  color: Colors.red,
-                                ),
+                                
                                 const SizedBox(height: 12),
                                 Text(
                                   errorMessage!,

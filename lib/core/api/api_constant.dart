@@ -1,7 +1,7 @@
 // const String baseUrl = 'http://localhost:8000/admin/api/v1';
-const String baseUrl = 'http://192.168.0.115:8000/admin/api/v1';
-const String simpleBaseUrl = 'http://192.168.0.115:8000';
-//  const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+//const String baseUrl = 'http://192.168.0.115:8000/admin/api/v1';
+const String simpleBaseUrl = 'https://lelamonline.com';
+  const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
 //====================== Authentication ==============================//

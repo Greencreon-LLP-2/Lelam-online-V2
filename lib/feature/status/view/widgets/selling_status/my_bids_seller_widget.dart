@@ -74,7 +74,7 @@ class _MyBidsSellerWidget extends State<MyBidsSellerWidget> {
               padding: const EdgeInsets.all(10),
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : Text(bidsText.isEmpty ? 'No bids found' : bidsText,style: TextStyle(color: Colors.red),),
+                  : Text(bidsText.isEmpty ? 'No bids found' : bidsText,style: TextStyle(color: Colors.grey),),
             ),
           ),
         ],

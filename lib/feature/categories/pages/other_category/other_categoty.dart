@@ -6,6 +6,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_Category_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'dart:developer' as developer;
 import 'package:lelamonline_flutter/utils/palette.dart';
 
@@ -1071,59 +1072,57 @@ class _OthersPageState extends State<OthersPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
+    backgroundColor: Colors.white,
+    appBar: AppBar(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _showFilterBottomSheet,
-                icon: const Icon(Icons.tune, color: Colors.black87),
-              ),
-              if (_getActiveFilterCount() > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${_getActiveFilterCount()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+      elevation: 0,
+      leading: IconButton(
+        onPressed: () => Navigator.pop(context),
+        icon: const Icon(Icons.arrow_back, color: Colors.black87),
+      ),
+      title: _showAppBarSearch ? _buildAppBarSearchField() : const Text('Bikes & Others'),
+      actions: [
+        Stack(
+          children: [
+            IconButton(
+              onPressed: _showFilterBottomSheet,
+              icon: const Icon(Icons.tune, color: Colors.black87),
+            ),
+            if (_getActiveFilterCount() > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${_getActiveFilterCount()}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-            ],
-          ),
-          _isLoadingLocations
-              ? const CircularProgressIndicator()
-              : PopupMenuButton<String>(
+              ),
+          ],
+        ),
+        _isLoadingLocations
+            ? const CircularProgressIndicator()
+            : PopupMenuButton<String>(
                 icon: const Icon(Icons.location_on, color: Colors.black87),
                 onSelected: (String value) {
                   setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
+                    _selectedLocation = value == 'all'
+                        ? 'all'
+                        : _locations.firstWhere((loc) => loc.name == value).id;
                     _fetchBikes();
                   });
                 },
@@ -1134,22 +1133,14 @@ class _OthersPageState extends State<OthersPage> {
                       child: Row(
                         children: [
                           if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
                             const Icon(
                               Icons.check,
                               color: Colors.blue,
                               size: 16,
                             ),
                           if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
                             const SizedBox(width: 8),
                           Text(city == 'all' ? 'All Kerala' : city),
                         ],
@@ -1158,105 +1149,110 @@ class _OthersPageState extends State<OthersPage> {
                   }).toList();
                 },
               ),
-        ],
-      ),
-      body: CustomScrollView(
+      ],
+    ),
+    body: GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
+      child: CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
+            child: _isLoadingLocations
+                ? const Center(child: CircularProgressIndicator())
+                : Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Column(
                       children: [
-                        if (!_showAppBarSearch)
-                          Container(
-                            color: Colors.white,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: _buildSearchField(),
-                          ),
+                        if (!_showAppBarSearch) _buildSearchField(),
+                        if (_searchQuery.isNotEmpty) // Show SearchResultsWidget when typing
+                          SearchResultsWidget(searchQuery: _searchQuery),
                       ],
                     ),
+                  ),
           ),
-          if (!_isLoadingLocations)
+          if (!_isLoadingLocations && _searchQuery.isEmpty) // Hide posts when searching
             _isLoading
                 ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                 : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
+                    ? SliverToBoxAdapter(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error: $_errorMessage',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _fetchBikes,
+                                child: const Text('Retry'),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchBikes,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : filteredBikes.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No bikes found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
+                      )
+                    : filteredBikes.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.search_off,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No bikes found',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Try adjusting your filters or search terms',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                final bike = filteredBikes[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _buildBikeCard(bike),
+                                );
+                              },
+                              childCount: filteredBikes.length,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final bike = filteredBikes[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildBikeCard(bike),
-                    );
-                  }, childCount: filteredBikes.length),
-                ),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
   }

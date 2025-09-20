@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'dart:developer' as developer;
@@ -227,7 +228,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   final String categoryId = '2';
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  String _listingType = 'sale'; // Added for sale/auction toggle
+  String _listingType = 'sale';
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
 
@@ -260,7 +261,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _fetchPosts();
     _fetchLocations();
 
-    // Initialize price text fields if selectedPriceRange is not 'all'
     if (_selectedPriceRange != 'all') {
       final parts = _selectedPriceRange.split('-');
       if (parts.length == 2) {
@@ -301,7 +301,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
@@ -341,6 +340,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
       });
     }
   }
+
 
   final List<String> _propertyTypes = [
     'Apartment',
@@ -1092,7 +1092,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return count;
   }
 
-  Widget _buildAppBarSearchField() {
+ Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -1102,43 +1102,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
       child: TextField(
         controller: _searchController,
         autofocus: false,
+        autofillHints: null, // Disable autofill
+        enableSuggestions: false, // Disable suggestions
+        enableInteractiveSelection: true,
+        onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
           hintText: 'Search properties...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.only(top: 10),
-        ),
-        onChanged: (value) => setState(() => _searchQuery = value),
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchController,
-      onChanged: (value) {
-        setState(() => _searchQuery = value);
-      },
-      decoration: InputDecoration(
-        hintText: 'Search by property type, location, features...',
-        hintStyle: TextStyle(color: Colors.grey.shade500),
-        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
                   icon: Icon(Icons.clear, color: Colors.grey.shade400),
                   onPressed: () {
                     setState(() {
@@ -1147,24 +1120,59 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     });
                   },
                 )
-                : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(top: 10),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blue),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+      ),
+    );
+  }
+
+
+ Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() => _searchQuery = value);
+        },
+        autofillHints: null, // Disable autofill to prevent keyboard dismissal
+        enableSuggestions: false, // Disable suggestions to reduce IME interference
+        enableInteractiveSelection: true, // Keep selection enabled
+        decoration: InputDecoration(
+          hintText: 'Search by property type, location, features...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.blue),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -1193,193 +1201,197 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
     return location.name;
   }
-
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _showFilterBottomSheet,
-                icon: const Icon(Icons.tune, color: Colors.black87),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverAppBar(
+              expandedHeight: _showAppBarSearch ? 80 : 56,
+              floating: true,
+              pinned: true,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
               ),
-              if (_getActiveFilterCount() > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+              title: _showAppBarSearch
+                  ? _buildAppBarSearchField()
+                  : const Text('Real Estate'),
+              actions: [
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: _showFilterBottomSheet,
+                      icon: const Icon(Icons.tune, color: Colors.black87),
                     ),
-                    child: Text(
-                      '${_getActiveFilterCount()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          _isLoadingLocations
-              ? const CircularProgressIndicator()
-              : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchPosts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
+                    if (_getActiveFilterCount() > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${_getActiveFilterCount()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
+                          ),
+                        ),
                       ),
-                    );
-                  }).toList();
-                },
-              ),
-        ],
-      ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
-                      children: [
-                        if (!_showAppBarSearch)
-                          Container(
-                            color: Colors.white,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: _buildSearchField(),
-                          ),
-                      ],
-                    ),
-          ),
-          if (!_isLoadingLocations)
-            _isLoading
-                ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-                : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchPosts,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : _posts.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No properties found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final post = _posts[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildPostCard(post),
-                    );
-                  }, childCount: _posts.length),
+                  ],
                 ),
-        ],
+                _isLoadingLocations
+                    ? const CircularProgressIndicator()
+                    : PopupMenuButton<String>(
+                        icon: const Icon(Icons.location_on, color: Colors.black87),
+                        onSelected: (String value) {
+                          setState(() {
+                            _selectedLocation = value == 'all'
+                                ? 'all'
+                                : _locations.firstWhere((loc) => loc.name == value).id;
+                            _fetchPosts();
+                          });
+                        },
+                        itemBuilder: (BuildContext context) {
+                          return _keralaCities.map((String city) {
+                            return PopupMenuItem<String>(
+                              value: city,
+                              child: Row(
+                                children: [
+                                  if (_selectedLocation ==
+                                      (city == 'all'
+                                          ? 'all'
+                                          : _locations
+                                              .firstWhere((loc) => loc.name == city)
+                                              .id))
+                                    const Icon(
+                                      Icons.check,
+                                      color: Colors.blue,
+                                      size: 16,
+                                    ),
+                                  if (_selectedLocation ==
+                                      (city == 'all'
+                                          ? 'all'
+                                          : _locations
+                                              .firstWhere((loc) => loc.name == city)
+                                              .id))
+                                    const SizedBox(width: 8),
+                                  Text(city == 'all' ? 'All Kerala' : city),
+                                ],
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: _isLoadingLocations
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                      children: [
+                        if (!_showAppBarSearch) ...[
+                          _buildSearchField(),
+                          SearchResultsWidget(searchQuery: _searchQuery), // Add SearchResultsWidget
+                        ],
+                      ],
+                    ),
+            ),
+            if (!_isLoadingLocations && _searchQuery.isEmpty) // Hide posts when searching
+              _isLoading
+                  ? const SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _errorMessage != null
+                      ? SliverToBoxAdapter(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Error: $_errorMessage',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _fetchPosts,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : _posts.isEmpty
+                          ? SliverToBoxAdapter(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No properties found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Try adjusting your filters or search terms',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final post = _posts[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildPostCard(post),
+                                  );
+                                },
+                                childCount: _posts.length,
+                              ),
+                            ),
+          ],
+        ),
       ),
     );
   }
-
   String getImageUrl(String imagePath) {
     final cleanedPath =
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
