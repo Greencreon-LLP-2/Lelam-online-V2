@@ -8,6 +8,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:developer' as developer;
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -45,12 +46,12 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     setState(() {
       _userId = userProvider.userData?.userId ?? "";
     });
-    debugPrint(
+    developer.log(
       'MyBidsWidget - Loaded userId: $_userId (fallback from widget: ${widget.userId})',
     );
 
     if (_userId == 'Unknown') {
-      debugPrint('MyBidsWidget - User ID unknown; prompting login');
+      developer.log('MyBidsWidget - User ID unknown; prompting login');
       if (mounted) {
         error = 'Please log in to view your bids';
         setState(() => isLoading = false);
@@ -73,7 +74,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         },
       );
 
-      debugPrint(
+      developer.log(
         'post-details.php response for post_id $postId: ${response.body}',
       );
 
@@ -125,10 +126,10 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           }
         }
       }
-      debugPrint('No valid post data for post_id $postId');
+      developer.log('No valid post data for post_id $postId');
       return null;
     } catch (e) {
-      debugPrint('Error fetching post details for post_id $postId: $e');
+      developer.log('Error fetching post details for post_id $postId: $e');
       return null;
     }
   }
@@ -144,7 +145,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
       );
-      debugPrint(
+      developer.log(
         'my-meeting-request.php response for bid_id $bidId: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -161,16 +162,16 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
             meetings
                 .where((m) => m['bid_id'] == bidId && m['status'] == '1')
                 .length;
-        debugPrint('Meeting attempts for bid_id $bidId: $count');
+        developer.log('Meeting attempts for bid_id $bidId: $count');
         return count;
       } else {
-        debugPrint(
+        developer.log(
           'my-meeting-request.php failed with status ${response.statusCode} for bid_id $bidId',
         );
       }
       return 0;
     } catch (e) {
-      debugPrint('Error fetching meeting attempts for bid_id $bidId: $e');
+      developer.log('Error fetching meeting attempts for bid_id $bidId: $e');
       return 0;
     }
   }
@@ -184,7 +185,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
         },
       );
-      debugPrint('meeting-times.php response: ${response.body}');
+      developer.log('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -199,15 +200,15 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
             );
           }
         }
-        debugPrint('Invalid meeting times data: ${data.toString()}');
+        developer.log('Invalid meeting times data: ${data.toString()}');
       } else {
-        debugPrint(
+        developer.log(
           'meeting-times.php failed with status ${response.statusCode}',
         );
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching meeting times: $e');
+      developer.log('Error fetching meeting times: $e');
       return [];
     }
   }
@@ -217,14 +218,14 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     String bidId,
     String postId,
   ) async {
-    debugPrint('Opening time dialog for bid_id: $bidId, post_id: $postId');
+    developer.log('Opening time dialog for bid_id: $bidId, post_id: $postId');
 
     final bid = bids.firstWhere(
       (b) => b['id'] == bidId && b['post_id'] == postId,
       orElse: () => {},
     );
     if (bid.isEmpty) {
-      debugPrint(
+      developer.log(
         'Invalid bid: bid_id=$bidId, post_id=$postId not found in bids list',
       );
       ScaffoldMessenger.of(context).showSnackBar(
@@ -232,13 +233,13 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       );
       return;
     }
-    debugPrint(
+    developer.log(
       'Bid details: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, bid_amount=${bid['my_bid_amount']}, target_price=${bid['targetPrice']}',
     );
 
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
-      debugPrint('No meeting times available');
+      developer.log('No meeting times available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No meeting times available')),
       );
@@ -277,7 +278,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                   (time) => time['value'] == value,
                                   orElse: () => {'name': ''},
                                 )['name'];
-                            debugPrint(
+                            developer.log(
                               'Selected time: $selectedTimeName ($selectedTimeValue)',
                             );
                           });
@@ -288,7 +289,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                   actions: [
                     TextButton(
                       onPressed: () {
-                        debugPrint('Time dialog cancelled');
+                        developer.log('Time dialog cancelled');
                         Navigator.pop(dialogContext);
                       },
                       child: const Text('Cancel'),
@@ -298,14 +299,14 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                           selectedTimeValue == null
                               ? null
                               : () async {
-                                debugPrint(
+                                developer.log(
                                   'Submitting meeting time: $selectedTimeValue for bid_id: $bidId',
                                 );
                                 try {
                                   final userIdToUse = widget.userId ?? _userId;
                                   final requestUrl =
                                       '${widget.baseUrl}/procced-meeting-with-bid.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId&customerbid_id=$bidId&meeting_times=$selectedTimeValue';
-                                  debugPrint('Request URL: $requestUrl');
+                                  developer.log('Request URL: $requestUrl');
                                   final response = await http.get(
                                     Uri.parse(requestUrl),
                                     headers: {
@@ -314,7 +315,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                           'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
                                     },
                                   );
-                                  debugPrint(
+                                  developer.log(
                                     'procced-meeting-with-bid.php response: ${response.body}',
                                   );
                                   if (response.statusCode == 200) {
@@ -322,7 +323,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                     if (data['status'] == true ||
                                         data['status'] == 'true') {
                                       if (data['code'] == 2) {
-                                        debugPrint(
+                                        developer.log(
                                           'Bid not found for bid_id: $bidId',
                                         );
                                         ScaffoldMessenger.of(
@@ -335,7 +336,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                           ),
                                         );
                                       } else if (data['code'] == 1) {
-                                        debugPrint(
+                                        developer.log(
                                           'Post not found for post_id: $postId',
                                         );
                                         ScaffoldMessenger.of(
@@ -358,7 +359,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                           ),
                                         );
                                         await _loadBids();
-                                        debugPrint(
+                                        developer.log(
                                           'Meeting scheduled, refreshing meetings recommended',
                                         );
                                       }
@@ -374,7 +375,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                       );
                                     }
                                   } else {
-                                    debugPrint(
+                                    developer.log(
                                       'procced-meeting-with-bid.php failed with status ${response.statusCode}',
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -386,7 +387,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                     );
                                   }
                                 } catch (e) {
-                                  debugPrint(
+                                  developer.log(
                                     'Error scheduling meeting with bid: $e',
                                   );
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -417,7 +418,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
         },
       );
-      debugPrint('procced-meeting-without-bid.php response: ${response.body}');
+      developer.log('procced-meeting-without-bid.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true) {
@@ -436,7 +437,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         }
       }
     } catch (e) {
-      debugPrint('Error scheduling meeting without bid: $e');
+      developer.log('Error scheduling meeting without bid: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error scheduling meeting')),
       );
@@ -484,7 +485,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
                         },
                       );
-                      debugPrint('increase-bid.php response: ${response.body}');
+                      developer.log('increase-bid.php response: ${response.body}');
                       if (response.statusCode == 200) {
                         final data = jsonDecode(response.body);
                         if (data['status'] == true) {
@@ -505,7 +506,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                         }
                       }
                     } catch (e) {
-                      debugPrint('Error increasing bid: $e');
+                      developer.log('Error increasing bid: $e');
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Error increasing bid')),
                       );
@@ -555,8 +556,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         headers: headers,
       );
 
-      debugPrint('my-bids-low.php status: ${lowBidsResponse.statusCode}');
-      debugPrint('my-bids-low.php response: ${lowBidsResponse.body}');
+      developer.log('my-bids-low.php status: ${lowBidsResponse.statusCode}');
+      developer.log('my-bids-low.php response: ${lowBidsResponse.body}');
 
       if (lowBidsResponse.statusCode == 200) {
         final lowBidsData = jsonDecode(lowBidsResponse.body);
@@ -567,7 +568,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
             bid['fromHighBids'] = false;
             allBids.add(bid);
           }
-          debugPrint(
+          developer.log(
             'Low bids fetched: ${lowBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
           );
         }
@@ -580,8 +581,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         headers: headers,
       );
 
-      debugPrint('my-bids-high.php status: ${highBidsResponse.statusCode}');
-      debugPrint('my-bids-high.php response: ${highBidsResponse.body}');
+      developer.log('my-bids-high.php status: ${highBidsResponse.statusCode}');
+      developer.log('my-bids-high.php response: ${highBidsResponse.body}');
 
       if (highBidsResponse.statusCode == 200) {
         final highBidsData = jsonDecode(highBidsResponse.body);
@@ -593,24 +594,24 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
             bid['fromHighBids'] = true;
             bid['fromLowBids'] = false;
             allBids.add(bid);
-            debugPrint(
+            developer.log(
               'High bid: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, my_bid_amount=${bid['my_bid_amount']}, exp_date=${bid['exp_date']}',
             );
           }
-          debugPrint(
+          developer.log(
             'High bids fetched: ${highBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
           );
         }
       }
 
-      debugPrint('Total bids fetched: ${allBids.length}');
+      developer.log('Total bids fetched: ${allBids.length}');
 
       for (var bid in allBids) {
-        debugPrint('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
+        developer.log('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
 
         final postDetails = await _fetchPostDetails(bid['post_id']);
         if (postDetails == null) {
-          debugPrint('Skipping bid ${bid['id']} due to missing post details');
+          developer.log('Skipping bid ${bid['id']} due to missing post details');
           continue;
         }
 
@@ -626,7 +627,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
         bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
 
-        debugPrint(
+        developer.log(
           'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}, fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}',
         );
       }
@@ -636,9 +637,9 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         isLoading = false;
       });
 
-      debugPrint('Bids loaded successfully: ${bids.length} items');
+      developer.log('Bids loaded successfully: ${bids.length} items');
     } catch (e) {
-      debugPrint('Error loading bids: $e');
+      developer.log('Error loading bids: $e');
       setState(() {
         isLoading = false;
         error = 'Error loading bids: $e';
@@ -648,7 +649,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
 
   List<Map<String, dynamic>> _getFilteredBids() {
     final filtered = bids.where((bid) {
-      debugPrint(
+      developer.log(
         'Filtering bid ${bid['id']}: fromLowBids=${bid['fromLowBids']}, fromHighBids=${bid['fromHighBids']}, bidPrice=${bid['bidPrice']}, targetPrice=${bid['targetPrice']}');
       if (selectedBidType == 'Low Bids') {
         return bid['fromLowBids'] == true;
@@ -657,7 +658,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
     }).toList();
 
-    debugPrint('Filtered ${selectedBidType}: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
+    developer.log('Filtered ${selectedBidType}: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
     return filtered;
   }
 
@@ -1014,10 +1015,10 @@ class BidCard extends StatelessWidget {
     final bool isHighBid = bid['fromHighBids'] == true;
 
     // Debug logging to verify bid classification
-    debugPrint('BidCard - Bid ID: ${bid['id']}, Post ID: ${bid['post_id']}');
-    debugPrint('BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
-    debugPrint('BidCard - bidPrice: ${bid['bidPrice']}, targetPrice: ${bid['targetPrice']}');
-    debugPrint('BidCard - isHighBid: $isHighBid');
+    developer.log('BidCard - Bid ID: ${bid['id']}, Post ID: ${bid['post_id']}');
+    developer.log('BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
+    developer.log('BidCard - bidPrice: ${bid['bidPrice']}, targetPrice: ${bid['targetPrice']}');
+    developer.log('BidCard - isHighBid: $isHighBid');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1061,7 +1062,7 @@ class BidCard extends StatelessWidget {
                           ),
                         ),
                         errorWidget: (context, url, error) {
-                          debugPrint('Image load error: $error for URL: $url');
+                          developer.log('Image load error: $error for URL: $url');
                           return Container(
                             width: 90,
                             height: 90,
@@ -1367,7 +1368,7 @@ class BidCard extends StatelessWidget {
                             ),
                           );
                         }
-                        debugPrint('BidCard - Menu items for bid ${bid['id']}: ${items.map((item) => item.value).toList()}');
+                        developer.log('BidCard - Menu items for bid ${bid['id']}: ${items.map((item) => item.value).toList()}');
                         return items;
                       },
                     ),

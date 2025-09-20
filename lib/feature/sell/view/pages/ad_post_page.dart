@@ -16,6 +16,7 @@ import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_botto
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'dart:developer' as developer;
 
 class Brand {
   final String id;
@@ -214,11 +215,11 @@ class AttributeValueService {
       final responseBody = await response.stream.bytesToString();
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
-        print('Districts API response: $data');
+        developer.log('Districts API response: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           return List<Map<String, dynamic>>.from(data['data']);
         }
-        print('No districts found');
+        developer.log('No districts found');
         return [
           {
             "id": "1",
@@ -237,7 +238,7 @@ class AttributeValueService {
           },
         ];
       }
-      print('Failed to fetch districts: ${response.statusCode} $responseBody');
+      developer.log('Failed to fetch districts: ${response.statusCode} $responseBody');
       return [
         {
           "id": "1",
@@ -256,7 +257,7 @@ class AttributeValueService {
         },
       ];
     } catch (e) {
-      print('Error fetching districts: $e');
+      developer.log('Error fetching districts: $e');
       return [
         {
           "id": "1",
@@ -290,25 +291,25 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Brands API response for category_id $categoryId: $data');
+        developer.log('Brands API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           final brands =
               (data['data'] as List)
                   .map((e) => Brand.fromJson(e))
                   .where((brand) => brand.categoryId == categoryId)
                   .toList();
-          print(
+          developer.log(
             'Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}',
           );
           return brands;
         }
-        print('No brands found for category_id: $categoryId');
+        developer.log('No brands found for category_id: $categoryId');
         return [];
       }
-      print('Failed to fetch brands: ${response.statusCode} ${response.body}');
+      developer.log('Failed to fetch brands: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
-      print('Error fetching brands: $e');
+      developer.log('Error fetching brands: $e');
       return [];
     }
   }
@@ -329,7 +330,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
+        developer.log(
           'Brand models API response for brand_id $brandId, category_id $categoryId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -337,20 +338,20 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => BrandModel.fromJson(e))
                   .toList();
-          print('Fetched brand models: ${models.map((m) => m.name).toList()}');
+          developer.log('Fetched brand models: ${models.map((m) => m.name).toList()}');
           return models;
         }
-        print(
+        developer.log(
           'No brand models found for brand_id: $brandId, category_id: $categoryId',
         );
         return [];
       }
-      print(
+      developer.log(
         'Failed to fetch brand models: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      print('Error fetching brand models: $e');
+      developer.log('Error fetching brand models: $e');
       return [];
     }
   }
@@ -371,7 +372,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
+        developer.log(
           'Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -379,23 +380,23 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => ModelVariation.fromJson(e))
                   .toList();
-          print('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
-          print(
+          developer.log('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
+          developer.log(
             'Model variations names: ${variations.map((v) => v.name).toSet()}',
           );
           return variations;
         }
-        print(
+        developer.log(
           'No model variations found for brands_model_id: $brandModelId, category_id: $categoryId',
         );
         return [];
       }
-      print(
+      developer.log(
         'Failed to fetch model variations: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      print('Error fetching model variations: $e');
+      developer.log('Error fetching model variations: $e');
       return [];
     }
   }
@@ -413,21 +414,21 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Attributes API response for category_id $categoryId: $data');
+        developer.log('Attributes API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           return (data['data'] as List)
               .map((e) => Attribute.fromJson(e))
               .toList();
         }
-        print('No attributes found for category_id: $categoryId');
+        developer.log('No attributes found for category_id: $categoryId');
         return [];
       }
-      print(
+      developer.log(
         'Failed to fetch attributes: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      print('Error fetching attributes: $e');
+      developer.log('Error fetching attributes: $e');
       return [];
     }
   }
@@ -447,7 +448,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
+        developer.log(
           'Attribute variations API response for attribute_id $attributeId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -455,15 +456,15 @@ class AttributeValueService {
               .map((e) => AttributeVariation.fromJson(e))
               .toList();
         }
-        print('No variations found for attribute_id: $attributeId');
+        developer.log('No variations found for attribute_id: $attributeId');
         return [];
       }
-      print(
+      developer.log(
         'Failed to fetch attribute variations: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      print(
+      developer.log(
         'Error fetching attribute variations for attribute_id $attributeId: $e',
       );
       return [];
@@ -777,7 +778,7 @@ class _AdPostFormState extends State<AdPostForm>
             }
           }
         } catch (e) {
-          print(e);
+          developer.log(e.toString());
         }
       }
     });
