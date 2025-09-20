@@ -32,6 +32,7 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:developer' as developer;
 
 class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
@@ -95,31 +96,31 @@ class _CommercialProductDetailsPageState
 
 Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
-      debugPrint('User not logged in, cannot check auction terms.');
+      developer.log('User not logged in, cannot check auction terms.');
       return false;
     }
 
     final url =
         '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
     try {
-      debugPrint('Checking auction terms status: $url');
+      developer.log('Checking auction terms status: $url');
       final response = await http.get(Uri.parse(url));
-      debugPrint(
+      developer.log(
         'Terms check response: status=${response.statusCode}, body=${response.body}',
       );
 
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
         bool termsAccepted = decodedBody['status'] == 'true';
-        debugPrint('Terms accepted: $termsAccepted');
+        developer.log('Terms accepted: $termsAccepted');
 
         if (!termsAccepted) {
           // Terms not accepted, call seller-accept-terms.php
           final acceptUrl =
               '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-          debugPrint('Accepting terms: $acceptUrl');
+          developer.log('Accepting terms: $acceptUrl');
           final acceptResponse = await http.get(Uri.parse(acceptUrl));
-          debugPrint(
+          developer.log(
             'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
           );
 
@@ -128,7 +129,7 @@ Future<bool> _checkAuctionTermsStatus() async {
             if (acceptDecodedBody['status'] == 'true' &&
                 acceptDecodedBody['data'] is List &&
                 acceptDecodedBody['data'].isNotEmpty) {
-              debugPrint('Terms accepted successfully');
+              developer.log('Terms accepted successfully');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -144,7 +145,7 @@ Future<bool> _checkAuctionTermsStatus() async {
               );
               return true;
             } else {
-              debugPrint(
+              developer.log(
                 'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
               );
               ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +164,7 @@ Future<bool> _checkAuctionTermsStatus() async {
               return false;
             }
           } else {
-            debugPrint(
+            developer.log(
               'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
             );
             ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +185,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         }
         return termsAccepted;
       } else {
-        debugPrint(
+        developer.log(
           'Failed to check auction terms: HTTP ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -203,7 +204,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         return false;
       }
     } catch (e) {
-      debugPrint('Error checking auction terms: $e');
+      developer.log('Error checking auction terms: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error checking auction terms: $e'),
@@ -223,13 +224,13 @@ Future<bool> _checkAuctionTermsStatus() async {
     bool isLoadingTerms = true;
     String? termsError;
 
-    debugPrint('Attempting to fetch auction terms');
+    developer.log('Attempting to fetch auction terms');
     try {
       termsHtml = await MarketplaceService2().fetchAuctionTerms();
-      debugPrint('Terms fetched successfully: $termsHtml');
+      developer.log('Terms fetched successfully: $termsHtml');
       isLoadingTerms = false;
     } catch (e) {
-      debugPrint('Error fetching auction terms: $e');
+      developer.log('Error fetching auction terms: $e');
       termsError = e.toString();
       isLoadingTerms = false;
     }
@@ -241,7 +242,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         bool dialogIsAccepted = false;
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            debugPrint(
+            developer.log(
               'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
             );
             return AlertDialog(
@@ -269,7 +270,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                       onChanged: (bool? value) {
                         setDialogState(() {
                           dialogIsAccepted = value ?? false;
-                          debugPrint(
+                          developer.log(
                             'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
                           );
                         });
@@ -281,7 +282,7 @@ Future<bool> _checkAuctionTermsStatus() async {
               actions: [
                 TextButton(
                   onPressed: () {
-                    debugPrint('Terms dialog cancelled');
+                    developer.log('Terms dialog cancelled');
                     Navigator.pop(dialogContext, false);
                   },
                   child: const Text('Cancel'),
@@ -290,13 +291,13 @@ Future<bool> _checkAuctionTermsStatus() async {
                   onPressed:
                       dialogIsAccepted && !isLoadingTerms && termsError == null
                           ? () async {
-                            debugPrint('Attempting to accept terms');
+                            developer.log('Attempting to accept terms');
                             try {
                               final url =
                                   '${baseUrl}/seller-accept-terms.php?token=${token}&post_id=$id&user_id=${_userProvider.userId}';
-                              debugPrint('Accepting terms: $url');
+                              developer.log('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
-                              debugPrint(
+                              developer.log(
                                 'Accept terms response: status=${response.statusCode}, body=${response.body}',
                               );
 
@@ -305,7 +306,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                                 if (decodedBody['status'] == 'true' &&
                                     decodedBody['data'] is List &&
                                     decodedBody['data'].isNotEmpty) {
-                                  debugPrint('Terms accepted successfully');
+                                  developer.log('Terms accepted successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -325,7 +326,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                                   setDialogState(() {
                                     termsError =
                                         'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
-                                    debugPrint(
+                                    developer.log(
                                       'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
                                     );
                                   });
@@ -334,7 +335,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                                 setDialogState(() {
                                   termsError =
                                       'Failed to accept terms: HTTP ${response.statusCode}';
-                                  debugPrint(
+                                  developer.log(
                                     'Failed to accept terms: HTTP ${response.statusCode}',
                                   );
                                 });
@@ -342,7 +343,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                             } catch (e) {
                               setDialogState(() {
                                 termsError = 'Error accepting terms: $e';
-                                debugPrint('Error accepting terms: $e');
+                                developer.log('Error accepting terms: $e');
                               });
                             }
                           }
@@ -356,7 +357,7 @@ Future<bool> _checkAuctionTermsStatus() async {
       },
     ).then((value) {
       isAccepted = value ?? false;
-      debugPrint('Terms dialog closed, isAccepted=$isAccepted');
+      developer.log('Terms dialog closed, isAccepted=$isAccepted');
     });
 
     return isAccepted;
@@ -364,7 +365,7 @@ Future<bool> _checkAuctionTermsStatus() async {
 
   Future<void> _moveToAuction() async {
     if (_userProvider.userId == null) {
-      debugPrint('User not logged in, showing login prompt');
+      developer.log('User not logged in, showing login prompt');
       _showLoginPromptDialog(context, 'move to auction');
       return;
     }
@@ -374,10 +375,10 @@ Future<bool> _checkAuctionTermsStatus() async {
     });
 
     try {
-      debugPrint('Showing terms dialog before moving to auction');
+      developer.log('Showing terms dialog before moving to auction');
       final accepted = await _showTermsAndConditionsDialog(context);
       if (!accepted) {
-        debugPrint('User did not accept terms, aborting move to auction');
+        developer.log('User did not accept terms, aborting move to auction');
         setState(() {
           _isLoadingBid = false;
         });
@@ -395,17 +396,17 @@ Future<bool> _checkAuctionTermsStatus() async {
         return;
       }
 
-      debugPrint('Terms accepted, proceeding to move to auction');
+      developer.log('Terms accepted, proceeding to move to auction');
 
       final url =
           '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
-      debugPrint('Moving to auction: $url');
+      developer.log('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint(
+      developer.log(
         'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
       );
 
@@ -420,7 +421,7 @@ Future<bool> _checkAuctionTermsStatus() async {
             responseData['data']?[0]['message']?.toString() ?? '';
 
         if (isSuccess) {
-          debugPrint('Successfully moved to auction');
+          developer.log('Successfully moved to auction');
           setState(() {
             _moveToAuctionButtonText = 'Auction Waiting for Approval';
           });
@@ -447,7 +448,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         );
       }
     } catch (e) {
-      debugPrint('Error moving to auction: $e');
+      developer.log('Error moving to auction: $e');
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(
       //     content: Text('Error: $e'),
@@ -487,14 +488,14 @@ Future<bool> _checkAuctionTermsStatus() async {
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url = '$_baseUrl/post-ads-image.php?token=$_token';
-      debugPrint('Fetching banner image: $url');
+      developer.log('Fetching banner image: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Banner API response: $responseBody');
+      developer.log('Banner API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -515,7 +516,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         );
       }
     } catch (e) {
-      debugPrint('Error fetching banner image: $e');
+      developer.log('Error fetching banner image: $e');
       setState(() {
         _bannerError = 'Failed to load banner: $e';
       });
@@ -573,7 +574,7 @@ Future<bool> _checkAuctionTermsStatus() async {
     setState(() {
       userId = userData?.userId ?? '';
     });
-    debugPrint('CommercialProductDetailsPage - Loaded userId: $userId');
+    developer.log('CommercialProductDetailsPage - Loaded userId: $userId');
   }
 
   Future<void> _checkShortlistStatus() async {
@@ -595,7 +596,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         queryParams: {"user_id": userId},
       );
 
-      debugPrint('Shortlist API response: $response');
+      developer.log('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -606,16 +607,16 @@ Future<bool> _checkAuctionTermsStatus() async {
           _isFavorited = isShortlisted;
           _isLoadingFavorite = false;
         });
-        debugPrint('Product ${widget.post.id} isShortlisted: $isShortlisted');
+        developer.log('Product ${widget.post.id} isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isLoadingFavorite = false;
         });
-        debugPrint('Invalid shortlist data: ${response['data']}');
+        developer.log('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      debugPrint('Error checking shortlist status: $e');
+      developer.log('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isLoadingFavorite = false;
@@ -648,13 +649,13 @@ Future<bool> _checkAuctionTermsStatus() async {
       final headers = {'token': _token};
       final url =
           '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.post.id}';
-      debugPrint('Toggling shortlist: $url');
+      developer.log('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('add-to-shortlist.php response: $responseBody');
+      developer.log('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -702,7 +703,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         );
       }
     } catch (e) {
-      debugPrint('Error toggling shortlist: $e');
+      developer.log('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -786,18 +787,18 @@ Future<bool> _checkAuctionTermsStatus() async {
       final headers = {'token': _token};
       final url =
           '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.post.id}';
-      debugPrint('Fetching highest bid: $url');
+      developer.log('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Full API response body: $responseBody');
-      debugPrint('Response status code: ${response.statusCode}');
+      developer.log('Full API response body: $responseBody');
+      developer.log('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response data: $responseData');
+        developer.log('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -806,21 +807,21 @@ Future<bool> _checkAuctionTermsStatus() async {
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            debugPrint('Successfully fetched highest bid: $dataValue');
+            developer.log('Successfully fetched highest bid: $dataValue');
           } else {
-            debugPrint('API returned non-numeric data: $dataValue');
+            developer.log('API returned non-numeric data: $dataValue');
             setState(() {
               _currentHighestBid = 'Error: $dataValue';
             });
           }
         } else {
-          debugPrint('API status false: ${responseData['data']}');
+          developer.log('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        debugPrint(
+        developer.log(
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
@@ -828,7 +829,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         });
       }
     } catch (e) {
-      debugPrint('Exception in fetch highest bid: $e');
+      developer.log('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -851,17 +852,17 @@ Future<bool> _checkAuctionTermsStatus() async {
       };
       final url =
           '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.post.id}&user_id=$userId&bidamt=$bidAmount';
-      debugPrint('Placing bid: $url');
+      developer.log('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('place-bid.php response: $responseBody');
+      developer.log('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed place-bid response: $responseData');
+        developer.log('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -879,7 +880,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      debugPrint('Error placing bid: $e');
+      developer.log('Error placing bid: $e');
       throw e;
     }
   }
@@ -1331,18 +1332,18 @@ Future<bool> _checkAuctionTermsStatus() async {
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.post.id}&user_id=$userId&meeting_date=$formattedDate';
-      debugPrint('Scheduling meeting: $url');
+      developer.log('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('post-fix-meeting.php response: $responseBody');
+      developer.log('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response: $responseData');
+        developer.log('Parsed response: $responseData');
         if (responseData['status'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1378,7 +1379,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         }
       }
     } catch (e) {
-      debugPrint('Error scheduling meeting: $e');
+      developer.log('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -1573,7 +1574,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -1635,7 +1636,7 @@ Future<void> _fetchDetailsData() async {
       _isLoadingLocations = false;
     });
   } catch (e) {
-    print('Error fetching details: $e');
+    developer.log('Error fetching details: $e');
     setState(() {
       isLoadingDetails = false;
       _isLoadingLocations = false;
@@ -1647,9 +1648,9 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   attributeValues.clear();
   orderedAttributeValues.clear();
 
-  print('Attribute Value Pairs: $attributeValuePairs');
-  print('Attribute Variations: $attributeVariations');
-  print('Filters: $filters');
+  developer.log('Attribute Value Pairs: $attributeValuePairs');
+  developer.log('Attribute Variations: $attributeVariations');
+  developer.log('Filters: $filters');
 
   // Use a Map to filter duplicates by attribute name
   final Map<String, String> uniqueAttributes = {};
@@ -1696,7 +1697,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   // Update attributeValues for use in Details section
   attributeValues.addAll(uniqueAttributes);
 
-  print('Filtered Attributes: $attributeValues');
+  developer.log('Filtered Attributes: $attributeValues');
 }
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
@@ -1940,7 +1941,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
     }
 
     if (_isMeetingDialogOpen) {
-      debugPrint('Meeting dialog already open');
+      developer.log('Meeting dialog already open');
       return;
     }
 

@@ -29,6 +29,7 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:developer' as developer;
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -88,101 +89,57 @@ class _MarketPlaceProductDetailsPageState
   bool _isTogglingFavorite = false;
 
   String _moveToAuctionButtonText = 'Move to Auction';
+  bool _isWaitingForApproval = false;
 
   @override
   void initState() {
     super.initState();
-    debugPrint(
-      'MarketPlaceProductDetailsPage - initState: Starting initialization',
-    );
+
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    debugPrint(
-      'MarketPlaceProductDetailsPage - initState: userProvider initialized, userId=${_userProvider.userId}',
-    );
 
-    try {
-      _fetchLocations();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _fetchLocations completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _fetchLocations: $e\n$stackTrace');
-    }
+    _fetchLocations();
 
-    try {
-      _fetchSellerComments();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _fetchSellerComments completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _fetchSellerComments: $e\n$stackTrace');
-    }
+    _fetchSellerComments();
 
-    try {
-      _fetchSellerInfo();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _fetchSellerInfo completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _fetchSellerInfo: $e\n$stackTrace');
-    }
+    _fetchSellerInfo();
 
-    try {
-      _checkShortlistStatus();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _checkShortlistStatus completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _checkShortlistStatus: $e\n$stackTrace');
-    }
+    _checkShortlistStatus();
 
-    try {
-      _fetchGalleryImages();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _fetchGalleryImages completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _fetchGalleryImages: $e\n$stackTrace');
-    }
+    _fetchGalleryImages();
 
-    try {
-      _fetchBannerImage();
-      debugPrint(
-        'MarketPlaceProductDetailsPage - initState: _fetchBannerImage completed',
-      );
-    } catch (e, stackTrace) {
-      debugPrint('Error in _fetchBannerImage: $e\n$stackTrace');
-    }
+    _fetchBannerImage();
+    
+
     _isCheckingShortlist = true;
   }
 
   Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
-      debugPrint('User not logged in, cannot check auction terms.');
+      developer.log('User not logged in, cannot check auction terms.');
       return false;
     }
 
     final url =
         '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
     try {
-      debugPrint('Checking auction terms status: $url');
+      developer.log('Checking auction terms status: $url');
       final response = await http.get(Uri.parse(url));
-      debugPrint(
+      developer.log(
         'Terms check response: status=${response.statusCode}, body=${response.body}',
       );
 
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
         bool termsAccepted = decodedBody['status'] == 'true';
-        debugPrint('Terms accepted: $termsAccepted');
+        developer.log('Terms accepted: $termsAccepted');
 
         if (!termsAccepted) {
           // Terms not accepted, call seller-accept-terms.php
           final acceptUrl =
               '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-          debugPrint('Accepting terms: $acceptUrl');
+          developer.log('Accepting terms: $acceptUrl');
           final acceptResponse = await http.get(Uri.parse(acceptUrl));
-          debugPrint(
+          developer.log(
             'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
           );
 
@@ -191,7 +148,7 @@ class _MarketPlaceProductDetailsPageState
             if (acceptDecodedBody['status'] == 'true' &&
                 acceptDecodedBody['data'] is List &&
                 acceptDecodedBody['data'].isNotEmpty) {
-              debugPrint('Terms accepted successfully');
+              developer.log('Terms accepted successfully');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -207,7 +164,7 @@ class _MarketPlaceProductDetailsPageState
               );
               return true;
             } else {
-              debugPrint(
+              developer.log(
                 'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
               );
               ScaffoldMessenger.of(context).showSnackBar(
@@ -226,7 +183,7 @@ class _MarketPlaceProductDetailsPageState
               return false;
             }
           } else {
-            debugPrint(
+            developer.log(
               'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
             );
             ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +204,7 @@ class _MarketPlaceProductDetailsPageState
         }
         return termsAccepted;
       } else {
-        debugPrint(
+        developer.log(
           'Failed to check auction terms: HTTP ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -266,7 +223,7 @@ class _MarketPlaceProductDetailsPageState
         return false;
       }
     } catch (e) {
-      debugPrint('Error checking auction terms: $e');
+      developer.log('Error checking auction terms: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error checking auction terms: $e'),
@@ -286,13 +243,13 @@ class _MarketPlaceProductDetailsPageState
     bool isLoadingTerms = true;
     String? termsError;
 
-    debugPrint('Attempting to fetch auction terms');
+    developer.log('Attempting to fetch auction terms');
     try {
       termsHtml = await MarketplaceService2().fetchAuctionTerms();
-      debugPrint('Terms fetched successfully: $termsHtml');
+      developer.log('Terms fetched successfully: $termsHtml');
       isLoadingTerms = false;
     } catch (e) {
-      debugPrint('Error fetching auction terms: $e');
+      developer.log('Error fetching auction terms: $e');
       termsError = e.toString();
       isLoadingTerms = false;
     }
@@ -304,7 +261,7 @@ class _MarketPlaceProductDetailsPageState
         bool dialogIsAccepted = false;
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            debugPrint(
+            developer.log(
               'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
             );
             return AlertDialog(
@@ -332,7 +289,7 @@ class _MarketPlaceProductDetailsPageState
                       onChanged: (bool? value) {
                         setDialogState(() {
                           dialogIsAccepted = value ?? false;
-                          debugPrint(
+                          developer.log(
                             'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
                           );
                         });
@@ -344,7 +301,7 @@ class _MarketPlaceProductDetailsPageState
               actions: [
                 TextButton(
                   onPressed: () {
-                    debugPrint('Terms dialog cancelled');
+                    developer.log('Terms dialog cancelled');
                     Navigator.pop(dialogContext, false);
                   },
                   child: const Text('Cancel'),
@@ -353,13 +310,13 @@ class _MarketPlaceProductDetailsPageState
                   onPressed:
                       dialogIsAccepted && !isLoadingTerms && termsError == null
                           ? () async {
-                            debugPrint('Attempting to accept terms');
+                            developer.log('Attempting to accept terms');
                             try {
                               final url =
                                   '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-                              debugPrint('Accepting terms: $url');
+                              developer.log('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
-                              debugPrint(
+                              developer.log(
                                 'Accept terms response: status=${response.statusCode}, body=${response.body}',
                               );
 
@@ -368,7 +325,7 @@ class _MarketPlaceProductDetailsPageState
                                 if (decodedBody['status'] == 'true' &&
                                     decodedBody['data'] is List &&
                                     decodedBody['data'].isNotEmpty) {
-                                  debugPrint('Terms accepted successfully');
+                                  developer.log('Terms accepted successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -388,7 +345,7 @@ class _MarketPlaceProductDetailsPageState
                                   setDialogState(() {
                                     termsError =
                                         'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
-                                    debugPrint(
+                                    developer.log(
                                       'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
                                     );
                                   });
@@ -397,7 +354,7 @@ class _MarketPlaceProductDetailsPageState
                                 setDialogState(() {
                                   termsError =
                                       'Failed to accept terms: HTTP ${response.statusCode}';
-                                  debugPrint(
+                                  developer.log(
                                     'Failed to accept terms: HTTP ${response.statusCode}',
                                   );
                                 });
@@ -405,7 +362,7 @@ class _MarketPlaceProductDetailsPageState
                             } catch (e) {
                               setDialogState(() {
                                 termsError = 'Error accepting terms: $e';
-                                debugPrint('Error accepting terms: $e');
+                                developer.log('Error accepting terms: $e');
                               });
                             }
                           }
@@ -419,7 +376,7 @@ class _MarketPlaceProductDetailsPageState
       },
     ).then((value) {
       isAccepted = value ?? false;
-      debugPrint('Terms dialog closed, isAccepted=$isAccepted');
+      developer.log('Terms dialog closed, isAccepted=$isAccepted');
     });
 
     return isAccepted;
@@ -427,7 +384,7 @@ class _MarketPlaceProductDetailsPageState
 
   Future<void> _moveToAuction() async {
     if (_userProvider.userId == null) {
-      debugPrint('User not logged in, showing login prompt');
+      developer.log('User not logged in, showing login prompt');
       _showLoginPromptDialog(context, 'move to auction');
       return;
     }
@@ -437,10 +394,10 @@ class _MarketPlaceProductDetailsPageState
     });
 
     try {
-      debugPrint('Showing terms dialog before moving to auction');
+      developer.log('Showing terms dialog before moving to auction');
       final accepted = await _showTermsAndConditionsDialog(context);
       if (!accepted) {
-        debugPrint('User did not accept terms, aborting move to auction');
+        developer.log('User did not accept terms, aborting move to auction');
         setState(() {
           _isLoadingBid = false;
         });
@@ -458,18 +415,18 @@ class _MarketPlaceProductDetailsPageState
         return;
       }
 
-      debugPrint('Terms accepted, proceeding to move to auction');
+      developer.log('Terms accepted, proceeding to move to auction');
       final headers = {'token': MarketplaceService2.token};
       final url =
           '${MarketplaceService2.baseUrl}/sell-move-to-auction.php?token=${MarketplaceService2.token}&post_id=$id';
-      debugPrint('Moving to auction: $url');
+      developer.log('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint(
+      developer.log(
         'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
       );
 
@@ -484,7 +441,7 @@ class _MarketPlaceProductDetailsPageState
             responseData['data']?[0]['message']?.toString() ?? '';
 
         if (isSuccess) {
-          debugPrint('Successfully moved to auction');
+          developer.log('Successfully moved to auction');
           setState(() {
             _moveToAuctionButtonText = 'Auction Waiting for Approval';
           });
@@ -511,7 +468,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error moving to auction: $e');
+      developer.log('Error moving to auction: $e');
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(
       //     content: Text('Error: $e'),
@@ -537,14 +494,14 @@ class _MarketPlaceProductDetailsPageState
     try {
       final headers = {'token': token};
       final url = '$baseUrl/post-attribute-values.php?token=$token&post_id=$id';
-      debugPrint('Fetching seller comments: $url');
+      developer.log('Fetching seller comments: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Seller comments API response: $responseBody');
+      developer.log('Seller comments API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -566,7 +523,7 @@ class _MarketPlaceProductDetailsPageState
           }
 
           uniqueSellerComments = orderedComments;
-          debugPrint(
+          developer.log(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
 
@@ -578,7 +535,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error fetching seller comments: $e');
+      developer.log('Error fetching seller comments: $e');
       setState(() {
         sellerCommentsError = 'Failed to load seller comments: $e';
         isLoadingSellerComments = false;
@@ -595,18 +552,18 @@ class _MarketPlaceProductDetailsPageState
 
       final headers = {'token': token};
       final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
-      debugPrint('Fetching gallery: $url');
+      developer.log('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Gallery API response: $responseBody');
+      developer.log('Gallery API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed responseData type: ${responseData.runtimeType}');
+        developer.log('Parsed responseData type: ${responseData.runtimeType}');
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -619,7 +576,7 @@ class _MarketPlaceProductDetailsPageState
                   )
                   .where((img) => img.isNotEmpty && img.contains('uploads/'))
                   .toList();
-          debugPrint(
+          developer.log(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
           );
         } else {
@@ -633,7 +590,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error fetching gallery: $e');
+      developer.log('Error fetching gallery: $e');
       setState(() {
         _galleryError = 'Failed to load gallery: $e';
       });
@@ -653,18 +610,18 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-      debugPrint('Fetching highest bid: $url');
+      developer.log('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Full API response body: $responseBody');
-      debugPrint('Response status code: ${response.statusCode}');
+      developer.log('Full API response body: $responseBody');
+      developer.log('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response data: $responseData');
+        developer.log('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -673,9 +630,9 @@ class _MarketPlaceProductDetailsPageState
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            debugPrint('Successfully fetched highest bid: $dataValue');
+            developer.log('Successfully fetched highest bid: $dataValue');
           } else {
-            debugPrint(
+            developer.log(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
@@ -683,13 +640,13 @@ class _MarketPlaceProductDetailsPageState
             });
           }
         } else {
-          debugPrint('API status false: ${responseData['data']}');
+          developer.log('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        debugPrint(
+        developer.log(
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
@@ -697,7 +654,7 @@ class _MarketPlaceProductDetailsPageState
         });
       }
     } catch (e) {
-      debugPrint('Exception in fetch highest bid: $e');
+      developer.log('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -727,7 +684,7 @@ class _MarketPlaceProductDetailsPageState
         queryParams: {"user_id": _userProvider.userId},
       );
 
-      debugPrint('Shortlist API response: $response');
+      developer.log('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -739,16 +696,16 @@ class _MarketPlaceProductDetailsPageState
           _isFavorited = isShortlisted;
           _isCheckingShortlist = false;
         });
-        debugPrint('Product $id isShortlisted: $isShortlisted');
+        developer.log('Product $id isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isCheckingShortlist = false;
         });
-        debugPrint('Invalid shortlist data: ${response['data']}');
+        developer.log('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      debugPrint('Error checking shortlist status: $e');
+      developer.log('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isCheckingShortlist = false;
@@ -772,13 +729,13 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
-      debugPrint('Toggling shortlist: $url');
+      developer.log('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('add-to-shortlist.php response: $responseBody');
+      developer.log('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -833,7 +790,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error toggling shortlist: $e');
+      developer.log('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -859,17 +816,17 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
-      debugPrint('Placing bid: $url');
+      developer.log('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('place-bid.php response: $responseBody');
+      developer.log('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed place-bid response: $responseData');
+        developer.log('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -887,7 +844,7 @@ class _MarketPlaceProductDetailsPageState
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      debugPrint('Error placing bid: $e');
+      developer.log('Error placing bid: $e');
       throw e;
     } finally {
       setState(() {
@@ -897,19 +854,21 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<void> _fetchBannerImage() async {
-    debugPrint('MarketPlaceProductDetailsPage - _fetchBannerImage: Starting');
+    developer.log(
+      'MarketPlaceProductDetailsPage - _fetchBannerImage: Starting',
+    );
     try {
       setState(() {
         _isLoadingBanner = true;
         _bannerError = '';
       });
-      debugPrint(
+      developer.log(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl',
       );
 
       final headers = {'token': token};
       final url = '$baseUrl/post-ads-image.php?token=$token';
-      debugPrint(
+      developer.log(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url',
       );
 
@@ -918,19 +877,19 @@ class _MarketPlaceProductDetailsPageState
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint(
+      developer.log(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody',
       );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint(
+        developer.log(
           'MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData',
         );
 
         if (responseData['status'] == 'true' && responseData['data'] != null) {
           final bannerImage = responseData['data']['inner_post_image'] ?? '';
-          debugPrint(
+          developer.log(
             'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage',
           );
           setState(() {
@@ -938,7 +897,7 @@ class _MarketPlaceProductDetailsPageState
                 bannerImage.isNotEmpty
                     ? 'https://lelamonline.com/admin/$bannerImage'
                     : null;
-            debugPrint(
+            developer.log(
               'MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl',
             );
           });
@@ -951,7 +910,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e, stackTrace) {
-      debugPrint(
+      developer.log(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace',
       );
       setState(() {
@@ -961,7 +920,7 @@ class _MarketPlaceProductDetailsPageState
       setState(() {
         _isLoadingBanner = false;
       });
-      debugPrint(
+      developer.log(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Completed',
       );
     }
@@ -985,7 +944,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
-      debugPrint('No banner image available');
+      developer.log('No banner image available');
       return const SizedBox.shrink();
     }
 
@@ -1641,7 +1600,7 @@ class _MarketPlaceProductDetailsPageState
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -1938,8 +1897,8 @@ class _MarketPlaceProductDetailsPageState
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-      debugPrint('Scheduling meeting: $url');
-      debugPrint(
+      developer.log('Scheduling meeting: $url');
+      developer.log(
         'User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
 
@@ -1948,11 +1907,11 @@ class _MarketPlaceProductDetailsPageState
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('post-fix-meeting.php response: $responseBody');
+      developer.log('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response: $responseData');
+        developer.log('Parsed response: $responseData');
         if (responseData['status'] == true) {
           // Show success snackbar
           if (mounted) {
@@ -1993,7 +1952,7 @@ class _MarketPlaceProductDetailsPageState
         }
       }
     } catch (e) {
-      debugPrint('Error scheduling meeting: $e');
+      developer.log('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -2005,7 +1964,7 @@ class _MarketPlaceProductDetailsPageState
           _isSchedulingMeeting = false;
         });
       }
-      debugPrint(
+      developer.log(
         'User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
     }
@@ -2132,7 +2091,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     if (_isMeetingDialogOpen) {
-      debugPrint('Meeting dialog already open');
+      developer.log('Meeting dialog already open');
       return;
     }
 
@@ -3065,14 +3024,14 @@ class _MarketPlaceProductDetailsPageState
                 ],
               ),
             ),
-            Positioned(
+          Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: const BoxDecoration(
-                  color: Colors.white, // Prevents ParentDataWidget issues
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black26,
@@ -3089,11 +3048,11 @@ class _MarketPlaceProductDetailsPageState
                         child: ElevatedButton(
                           onPressed: () {
                             Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SellingStatusPage(),
-            ),
-          );
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => SellingStatusPage(),
+                              ),
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
@@ -3109,31 +3068,44 @@ class _MarketPlaceProductDetailsPageState
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isLoadingBid ? null : _moveToAuction,
+                          onPressed: _isWaitingForApproval ? null : _moveToAuction,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
+                            backgroundColor: _isWaitingForApproval 
+                                ? Colors.white // White background when waiting
+                                : Palette.primaryblue, // Original blue when active
+                            foregroundColor: _isWaitingForApproval 
+                                ? Colors.black // Black text when waiting
+                                : Colors.white, // White text when active
+                            side: _isWaitingForApproval
+                                ? const BorderSide(color: Colors.black, width: 1) // Black border when waiting
+                                : BorderSide.none, // No border when active
                             padding: const EdgeInsets.symmetric(vertical: 0),
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.zero,
                             ),
                           ),
-                          child:
-                              _isLoadingBid
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
+                          child: _isLoadingBid
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
                                     ),
-                                  )
-                                  : Text(_moveToAuctionButtonText),
+                                  ),
+                                )
+                              : Text(
+                                  _moveToAuctionButtonText,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: _isWaitingForApproval 
+                                        ? Colors.black // Black text when waiting
+                                        : Colors.white, // White text when active
+                                  ),
+                                ),
                         ),
-                      ),
-                    ] else ...[
+                      )] else ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => showProductBidDialog(context),
