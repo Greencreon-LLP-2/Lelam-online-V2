@@ -162,33 +162,76 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.logout,
             title: 'Logout',
             textColor: Colors.red,
-            onTap: () {
+           onTap: () {
+              final userProvider = context.read<LoggedUserProvider>();
+              final outerContext = context;
               showDialog(
-                context: context,
-                builder:
-                    (context) => AlertDialog(
-                      title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.pop(context);
-
-                            if (userProvider.isLoggedIn) {
-                              await userProvider.clearUser();
-                            }
-                          },
-                          child: const Text(
-                            'Logout',
-                            style: TextStyle(color: Colors.red),
+                context: outerContext,
+                builder: (dialogContext) => Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 8,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            shape: BoxShape.circle,
                           ),
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(Icons.logout, size: 36, color: Colors.red.shade700),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Logout',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Are you sure you want to logout? You will need to login again to access your account.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.of(dialogContext).pop(),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: const Text('Cancel', style: TextStyle(color: Colors.black87)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.of(dialogContext).pop();
+                                  await userProvider.clearUser(); // clear tokens/hive
+                                  outerContext.goNamed(RouteNames.loginPage); // navigate to login
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade700,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: const Text('Logout', style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
+                  ),
+                ),
               );
             },
           ),
@@ -218,10 +261,10 @@ class SettingsPage extends StatelessWidget {
                           child: const Text(
                             'Delete',
                             style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
+                       ),
+                     ),
+                   ],
+                 ),
               );
             },
           ),
