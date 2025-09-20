@@ -27,9 +27,6 @@ import 'dart:developer' as developer;
 import '../../services/details_service.dart' show TempApiService;
 
 class MarketplaceService {
-  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
-
   static final Map<String, List<MarketplacePost>> _postsCache = {};
   static List<Attribute>? _attributesCache;
   static List<AttributeVariation>? _attributeVariationsCache;
@@ -41,25 +38,18 @@ class MarketplaceService {
     required String userId,
   }) async {
     final cacheKey = '$categoryId-$userZoneId-$listingType-$userId';
-
     final endpoint =
         listingType == 'auction'
             ? '$baseUrl/list-category-post-auction.php'
             : '$baseUrl/list-category-post-marketplace.php';
-
     final url =
         listingType == 'auction'
             ? '$endpoint?token=$token&category_id=$categoryId&user_id=$userId&user_zone_id=$userZoneId'
             : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
-
     try {
-      developer.log('Fetching posts from: $url');
       final response = await http.get(Uri.parse(url));
-      developer.log('API Response Status: ${response.statusCode}');
-      developer.log('API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-
         if (decodedBody is List) {
           final posts =
               decodedBody.map((json) {
@@ -331,13 +321,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 key: 'auction_terms_accepted',
                                 value: 'true',
                               );
-                            context.pop();
+                              context.pop();
                             } else {
                               setState(() {
                                 _errorMessage =
                                     'Failed to accept terms. Please try again.';
                               });
-                            context.pop();
+                              context.pop();
                             }
                           }
                           : null,
@@ -675,141 +665,161 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
-  } 
-   List<Product> get filteredProducts {
+  }
+
+  List<Product> get filteredProducts {
     if (!_filtersChanged) return _filteredProductsCache;
-    final filtered = _products.where((product) {
-      final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-      if (_searchQuery.trim().isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final searchableText = [
-          product.title.toLowerCase(),
-          product.brand.toLowerCase(),
-          product.model.toLowerCase(),
-          product.modelVariation.toLowerCase(),
-          _getLocationName(product.parentZoneId).toLowerCase(),
-          attributeValues['Fuel Type']?.toLowerCase() ?? '',
-          attributeValues['Transmission']?.toLowerCase() ?? '',
-          attributeValues['Year']?.toLowerCase() ?? '',
-          attributeValues['Sold by']?.toLowerCase() ?? (product.byDealer == '1' ? 'dealer' : 'owner'),
-        ].join(' ');
-        if (!searchableText.contains(query)) return false;
-      }
-      if (_selectedLocation != 'all' && product.parentZoneId != _selectedLocation) return false;
-      if (_listingType == 'auction' && product.ifAuction != '1') return false;
-      if (_listingType == 'Marketplace' && product.ifAuction != '0') return false;
-      if (_selectedBrands.isNotEmpty && !_selectedBrands.contains(product.brand)) return false;
-      if (_selectedPriceRange != 'all') {
-        int price = product.ifAuction == '1'
-            ? (int.tryParse(product.auctionStartingPrice) ?? 0)
-            : (int.tryParse(product.price) ?? 0);
-        switch (_selectedPriceRange) {
-          case 'Under ₹2 Lakh':
-            if (price >= 200000) return false;
-            break;
-          case '₹2-5 Lakh':
-            if (price < 200000 || price >= 500000) return false;
-            break;
-          case '₹5-10 Lakh':
-            if (price < 500000 || price >= 1000000) return false;
-            break;
-          case '₹10-20 Lakh':
-            if (price < 1000000 || price >= 2000000) return false;
-            break;
-          case 'Above ₹20 Lakh':
-            if (price < 2000000) return false;
-            break;
-        }
-      }
-      final yearStr = attributeValues['Year'] ?? '0';
-      final year = int.tryParse(yearStr) ?? 0;
-      if (_selectedYearRange != 'all') {
-        switch (_selectedYearRange) {
-          case '2020 & Above':
-            if (year < 2020) return false;
-            break;
-          case '2018-2019':
-            if (year < 2018 || year > 2019) return false;
-            break;
-          case '2015-2017':
-            if (year < 2015 || year > 2017) return false;
-            break;
-          case '2010-2014':
-            if (year < 2010 || year > 2014) return false;
-            break;
-          case 'Below 2010':
-            if (year >= 2010) return false;
-            break;
-        }
-      }
-      final ownersStr = attributeValues['No of owners'] ?? '';
-      int owners = 0;
-      if (ownersStr.contains('1st')) owners = 1;
-      else if (ownersStr.contains('2nd')) owners = 2;
-      else if (ownersStr.contains('3rd')) owners = 3;
-      else if (ownersStr.contains('4')) owners = 4;
-      if (_selectedOwnersRange != 'all') {
-        switch (_selectedOwnersRange) {
-          case '1st Owner':
-            if (owners != 1) return false;
-            break;
-          case '2nd Owner':
-            if (owners != 2) return false;
-            break;
-          case '3rd Owner':
-            if (owners != 3) return false;
-            break;
-          case '4+ Owners':
-            if (owners < 4) return false;
-            break;
-        }
-      }
-      final fuel = attributeValues['Fuel Type'] ?? '';
-      if (_selectedFuelTypes.isNotEmpty && !_selectedFuelTypes.contains(fuel)) return false;
-      final trans = attributeValues['Transmission'] ?? '';
-      if (_selectedTransmissions.isNotEmpty && !_selectedTransmissions.contains(trans)) return false;
-      final kmStr = attributeValues['KM Range'] ?? '';
-      int km = 0;
-      final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
-      if (kmMatch != null) km = int.tryParse(kmMatch.group(1) ?? '0') ?? 0;
-      if (_selectedKmRange != 'all') {
-        switch (_selectedKmRange) {
-          case 'Under 10K':
-            if (km >= 10000) return false;
-            break;
-          case '10K-30K':
-            if (km < 10000 || km >= 30000) return false;
-            break;
-          case '30K-50K':
-            if (km < 30000 || km >= 50000) return false;
-            break;
-          case '50K-80K':
-            if (km < 50000 || km >= 80000) return false;
-            break;
-          case 'Above 80K':
-            if (km < 80000) return false;
-            break;
-        }
-      }
-      final soldBy = attributeValues['Sold by'] ?? (product.byDealer == '1' ? 'Dealer' : 'Owner');
-      if (_selectedSoldBy != 'all') {
-        switch (_selectedSoldBy) {
-          case 'Owner':
-            if (soldBy != 'Owner') return false;
-            break;
-          case 'Dealer':
-          case 'Certified Dealer':
-            if (soldBy != 'Dealer' && soldBy != 'Certified Dealer') return false;
-            break;
-        }
-      }
-      return true;
-    }).toList();
+    final filtered =
+        _products.where((product) {
+          final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+          if (_searchQuery.trim().isNotEmpty) {
+            final query = _searchQuery.toLowerCase().trim();
+            final searchableText = [
+              product.title.toLowerCase(),
+              product.brand.toLowerCase(),
+              product.model.toLowerCase(),
+              product.modelVariation.toLowerCase(),
+              _getLocationName(product.parentZoneId).toLowerCase(),
+              attributeValues['Fuel Type']?.toLowerCase() ?? '',
+              attributeValues['Transmission']?.toLowerCase() ?? '',
+              attributeValues['Year']?.toLowerCase() ?? '',
+              attributeValues['Sold by']?.toLowerCase() ??
+                  (product.byDealer == '1' ? 'dealer' : 'owner'),
+            ].join(' ');
+            if (!searchableText.contains(query)) return false;
+          }
+          if (_selectedLocation != 'all' &&
+              product.parentZoneId != _selectedLocation)
+            return false;
+          if (_listingType == 'auction' && product.ifAuction != '1')
+            return false;
+          if (_listingType == 'Marketplace' && product.ifAuction != '0')
+            return false;
+          if (_selectedBrands.isNotEmpty &&
+              !_selectedBrands.contains(product.brand))
+            return false;
+          if (_selectedPriceRange != 'all') {
+            int price =
+                product.ifAuction == '1'
+                    ? (int.tryParse(product.auctionStartingPrice) ?? 0)
+                    : (int.tryParse(product.price) ?? 0);
+            switch (_selectedPriceRange) {
+              case 'Under ₹2 Lakh':
+                if (price >= 200000) return false;
+                break;
+              case '₹2-5 Lakh':
+                if (price < 200000 || price >= 500000) return false;
+                break;
+              case '₹5-10 Lakh':
+                if (price < 500000 || price >= 1000000) return false;
+                break;
+              case '₹10-20 Lakh':
+                if (price < 1000000 || price >= 2000000) return false;
+                break;
+              case 'Above ₹20 Lakh':
+                if (price < 2000000) return false;
+                break;
+            }
+          }
+          final yearStr = attributeValues['Year'] ?? '0';
+          final year = int.tryParse(yearStr) ?? 0;
+          if (_selectedYearRange != 'all') {
+            switch (_selectedYearRange) {
+              case '2020 & Above':
+                if (year < 2020) return false;
+                break;
+              case '2018-2019':
+                if (year < 2018 || year > 2019) return false;
+                break;
+              case '2015-2017':
+                if (year < 2015 || year > 2017) return false;
+                break;
+              case '2010-2014':
+                if (year < 2010 || year > 2014) return false;
+                break;
+              case 'Below 2010':
+                if (year >= 2010) return false;
+                break;
+            }
+          }
+          final ownersStr = attributeValues['No of owners'] ?? '';
+          int owners = 0;
+          if (ownersStr.contains('1st'))
+            owners = 1;
+          else if (ownersStr.contains('2nd'))
+            owners = 2;
+          else if (ownersStr.contains('3rd'))
+            owners = 3;
+          else if (ownersStr.contains('4'))
+            owners = 4;
+          if (_selectedOwnersRange != 'all') {
+            switch (_selectedOwnersRange) {
+              case '1st Owner':
+                if (owners != 1) return false;
+                break;
+              case '2nd Owner':
+                if (owners != 2) return false;
+                break;
+              case '3rd Owner':
+                if (owners != 3) return false;
+                break;
+              case '4+ Owners':
+                if (owners < 4) return false;
+                break;
+            }
+          }
+          final fuel = attributeValues['Fuel Type'] ?? '';
+          if (_selectedFuelTypes.isNotEmpty &&
+              !_selectedFuelTypes.contains(fuel))
+            return false;
+          final trans = attributeValues['Transmission'] ?? '';
+          if (_selectedTransmissions.isNotEmpty &&
+              !_selectedTransmissions.contains(trans))
+            return false;
+          final kmStr = attributeValues['KM Range'] ?? '';
+          int km = 0;
+          final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
+          if (kmMatch != null) km = int.tryParse(kmMatch.group(1) ?? '0') ?? 0;
+          if (_selectedKmRange != 'all') {
+            switch (_selectedKmRange) {
+              case 'Under 10K':
+                if (km >= 10000) return false;
+                break;
+              case '10K-30K':
+                if (km < 10000 || km >= 30000) return false;
+                break;
+              case '30K-50K':
+                if (km < 30000 || km >= 50000) return false;
+                break;
+              case '50K-80K':
+                if (km < 50000 || km >= 80000) return false;
+                break;
+              case 'Above 80K':
+                if (km < 80000) return false;
+                break;
+            }
+          }
+          final soldBy =
+              attributeValues['Sold by'] ??
+              (product.byDealer == '1' ? 'Dealer' : 'Owner');
+          if (_selectedSoldBy != 'all') {
+            switch (_selectedSoldBy) {
+              case 'Owner':
+                if (soldBy != 'Owner') return false;
+                break;
+              case 'Dealer':
+              case 'Certified Dealer':
+                if (soldBy != 'Dealer' && soldBy != 'Certified Dealer')
+                  return false;
+                break;
+            }
+          }
+          return true;
+        }).toList();
     _filteredProductsCache = filtered;
     _filtersChanged = false;
     return filtered;
   }
-
 
   String getImageUrl(String imagePath) {
     final cleanedPath =
@@ -867,7 +877,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 _selectedSoldBy = selectedSoldBy;
               });
               _fetchFilterListings();
-             
             },
           ),
     );
