@@ -38,6 +38,7 @@ class _LoginPageState extends State<LoginPage> {
   Timer? _expiryTimer;
   int _expirySeconds = 60;
   bool _isOtpExpired = false;
+  final String _countryCode = '91';
 
   @override
   void dispose() {
@@ -60,34 +61,62 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // Generate a unique 4-digit OTP
-  String _generateOtp() {
+  Future<String> _generateOtp() async {
     final random = Random();
-    return (1000 + random.nextInt(9000)).toString(); // Generates a number between 1000 and 9999
+    final otp = (1000 + random.nextInt(9000)).toString();
+    final Map<String, dynamic> response = await _apiService.get(
+      url: otpSendUrl,
+      queryParams: {
+        'country_code': _countryCode,
+        'mobile': _phoneController.text.trim(),
+        'otp': otp,
+      },
+    );
+    // Check if mobile is verified or just existence
+    if (response['status'] == 'true') {
+      // User exists, proceed to OTP mode
+      return otp;
+    } else {
+      return '';
+    }
+    // Generates a number between 1000 and 9999
   }
 
   // Start OTP timer
-  void _startOtpTimer() {
-    setState(() {
-      _timerSeconds = 3;
-      _showOtp = false;
-      _generatedOtp = _generateOtp(); // Generate a new OTP
-      _isOtpExpired = false;
-      _expirySeconds = 60;
-      _otpController.clear(); // Clear previous OTP input
-    });
-
-    _otpTimer?.cancel();
-    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+  void _startOtpTimer() async {
+    final otp = await _generateOtp();
+    if (otp.isNotEmpty) {
       setState(() {
-        if (_timerSeconds > 0) {
-          _timerSeconds--;
-        } else {
-          _showOtp = true;
-          timer.cancel();
-          _startExpiryTimer(); // Start expiry timer after OTP is shown
-        }
+        _timerSeconds = 3;
+        _showOtp = false;
+        _generatedOtp = otp; // Generate a new OTP
+        _isOtpExpired = false;
+        _expirySeconds = 60;
+        _otpController.clear(); // Clear previous OTP input
       });
-    });
+
+      _otpTimer?.cancel();
+      _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          if (_timerSeconds > 0) {
+            _timerSeconds--;
+          } else {
+            _showOtp = true;
+            timer.cancel();
+            _startExpiryTimer(); // Start expiry timer after OTP is shown
+          }
+        });
+      });
+    } else {
+      Fluttertoast.showToast(
+        msg: 'Failed to generate OTP. Please try again.',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    }
   }
 
   // Start OTP expiry timer
@@ -122,7 +151,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
       Fluttertoast.showToast(
-        msg: _isOtpMode ? 'Please enter a valid OTP' : 'Please enter a valid phone number',
+        msg:
+            _isOtpMode
+                ? 'Please enter a valid OTP'
+                : 'Please enter a valid phone number',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red.withOpacity(0.8),
@@ -173,7 +205,9 @@ class _LoginPageState extends State<LoginPage> {
               fontSize: 16.0,
             );
           } else {
-            throw Exception('Registration failed, Something happened from our end');
+            throw Exception(
+              'Registration failed, Something happened from our end',
+            );
           }
         }
       } else {
@@ -302,9 +336,10 @@ class _LoginPageState extends State<LoginPage> {
                                         ? 'OTP Expired'
                                         : 'OTP expires in $_expirySeconds seconds',
                                     style: TextStyle(
-                                      color: _isOtpExpired
-                                          ? Colors.red
-                                          : Colors.grey[700],
+                                      color:
+                                          _isOtpExpired
+                                              ? Colors.red
+                                              : Colors.grey[700],
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -314,13 +349,21 @@ class _LoginPageState extends State<LoginPage> {
                                     SizedBox(
                                       width: 160,
                                       child: TextButton(
-                                        onPressed: _isLoading ? null : _handleResendOtp,
+                                        onPressed:
+                                            _isLoading
+                                                ? null
+                                                : _handleResendOtp,
                                         style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
-                                          backgroundColor: AppTheme.primaryColor,
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
+                                          backgroundColor:
+                                              AppTheme.primaryColor,
                                           foregroundColor: Colors.white,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
                                         ),
                                         child: const Text(
@@ -356,21 +399,20 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                   const SizedBox(height: 60),
                   Text(
-                    _isOtpMode ? 'Verify OTP' : 'Welcome Back',
+                    _isOtpMode ? 'Verify OTP' : 'Welcome',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _isOtpMode
                         ? 'Enter the OTP sent to +$_mobileCode${_phoneController.text}'
                         : 'Sign in to continue',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyLarge
-                        ?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 48),
                   if (!_isOtpMode) ...[
@@ -485,21 +527,22 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
+                              )
+                              : Text(
+                                _isOtpMode ? 'Verify OTP' : 'Send OTP',
+                                style: const TextStyle(fontSize: 16),
                               ),
-                            )
-                          : Text(
-                              _isOtpMode ? 'Verify OTP' : 'Send OTP',
-                              style: const TextStyle(fontSize: 16),
-                            ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -508,9 +551,7 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Text(
                           'By continuing, you agree to our Terms and Privacy Policy',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
+                          style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: Colors.grey[600]),
                           textAlign: TextAlign.center,
                         ),

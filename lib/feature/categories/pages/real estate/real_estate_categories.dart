@@ -5,9 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
+import 'dart:developer' as developer;
 // MarketplacePost model (unchanged)
 class MarketplacePost {
   final String id;
@@ -195,8 +196,8 @@ class MarketplaceService {
             try {
               return MarketplacePost.fromJson(json);
             } catch (e) {
-              print('Error parsing post: $e');
-              print('Problematic JSON: $json');
+              developer.log('Error parsing post: $e');
+              developer.log('Problematic JSON: $json');
               throw Exception('Failed to parse post: $e');
             }
           }).toList();
@@ -210,7 +211,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts: $e');
+      developer.log('Error in fetchPosts: $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -244,7 +245,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String _selectedAreaRange = 'all';
   List<String> _selectedFurnishings = [];
   String _selectedPostedBy = 'all';
-  String _selectedCategory = 'Property Type'; // Added for sidebar navigation
+  String _selectedCategory = 'Property Type';
+
   final TextEditingController _minPriceController = TextEditingController();
   final TextEditingController _maxPriceController = TextEditingController();
 
@@ -258,7 +260,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _scrollController.addListener(_handleScroll);
     _fetchPosts();
     _fetchLocations();
-    // Initialize price controllers
+
     if (_selectedPriceRange != 'all') {
       final parts = _selectedPriceRange.split('-');
       if (parts.length == 2) {
@@ -299,11 +301,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -339,6 +340,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
       });
     }
   }
+
 
   final List<String> _propertyTypes = [
     'Apartment',
@@ -390,320 +392,338 @@ class _RealEstatePageState extends State<RealEstatePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          height: MediaQuery.of(context).size.height * 0.85,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // Top handle
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _listingType == 'auction' ? 'Filter Auction Properties' : 'Filter Properties',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setModalState) => Container(
+                  height: MediaQuery.of(context).size.height * 0.85,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          _selectedPropertyTypes.clear();
-                          _selectedPriceRange = 'all';
-                          _selectedBedroomRange = 'all';
-                          _selectedAreaRange = 'all';
-                          _selectedFurnishings.clear();
-                          _selectedPostedBy = 'all';
-                          _minPriceController.clear();
-                          _maxPriceController.clear();
-                        });
-                        _fetchPosts();
-                      },
-                      child: const Text(
-                        'Clear All',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                  ),
+                  child: Column(
+                    children: [
+                      // Top handle and title
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // Two-column layout
-              Expanded(
-                child: Row(
-                  children: [
-                    // Sidebar
-                    Container(
-                      width: 100,
-                      color: Palette.primaryblue,
-                      child: ListView.builder(
-                        itemCount: [
-                          'Property Type',
-                          'Price Range',
-                          'Bedrooms',
-                          'Area',
-                          'Furnishing',
-                          'Posted By',
-                        ].length,
-                        itemBuilder: (context, index) {
-                          final category = [
-                            'Property Type',
-                            'Price Range',
-                            'Bedrooms',
-                            'Area',
-                            'Furnishing',
-                            'Posted By',
-                          ][index];
-                          final isSelected = _selectedCategory == category;
-                          return GestureDetector(
-                            onTap: () {
-                              setModalState(() {
-                                _selectedCategory = category;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: isSelected ? Colors.white : Colors.transparent,
-                                border: Border(
-                                  left: BorderSide(
-                                    color: isSelected ? Palette.primaryblue : Colors.transparent,
-                                    width: 4,
-                                  ),
-                                ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _listingType == 'auction'
+                                  ? 'Filter Auction Properties'
+                                  : 'Filter Properties',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              child: Text(
-                                category,
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  _selectedPropertyTypes.clear();
+                                  _selectedPriceRange = 'all';
+                                  _selectedBedroomRange = 'all';
+                                  _selectedAreaRange = 'all';
+                                  _selectedFurnishings.clear();
+                                  _selectedPostedBy = 'all';
+                                  _minPriceController.clear();
+                                  _maxPriceController.clear();
+                                });
+                                _fetchPosts();
+                              },
+                              child: const Text(
+                                'Clear All',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                  color: isSelected ? Palette.primaryblue : Colors.white,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                    // Options
-                    Expanded(
-                      child: SingleChildScrollView(
+                      const Divider(height: 1),
+                      // Two-column layout
+                      Expanded(
+                        child: Row(
+                          children: [
+                            // Left: Category list
+                            Container(
+                              width: 100,
+                              color: Palette.primaryblue,
+                              child: ListView.builder(
+                                itemCount: [
+                                  'Property Type',
+                                  'Price Range',
+                                  'Bedrooms',
+                                  'Area',
+                                  'Furnishing',
+                                  'Posted By'
+                                ].length,
+                                itemBuilder: (context, index) {
+                                  final category = [
+                                    'Property Type',
+                                    'Price Range',
+                                    'Bedrooms',
+                                    'Area',
+                                    'Furnishing',
+                                    'Posted By'
+                                  ][index];
+                                  final isSelected = _selectedCategory == category;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        _selectedCategory = category;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.transparent,
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isSelected
+                                                ? Palette.primaryblue
+                                                : Colors.transparent,
+                                            width: 4,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        category,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          color: isSelected
+                                              ? Palette.primaryblue
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            // Right: Options for selected category
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: _buildOptionsSection(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Bottom buttons
+                      Container(
                         padding: const EdgeInsets.all(16),
-                        child: _buildOptionsSection(setModalState),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Bottom buttons
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            top: BorderSide(color: Colors.grey.shade200),
                           ),
                         ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final Map<String, String> queryParams = {};
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primarypink,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final Map<String, String> queryParams = {};
 
-                          // Property Types
-                          if (_selectedPropertyTypes.isNotEmpty) {
-                            queryParams['property_types'] =
-                                _selectedPropertyTypes.join(',');
-                          }
+                                  // Property Types
+                                  if (_selectedPropertyTypes.isNotEmpty) {
+                                    queryParams['property_types'] =
+                                        _selectedPropertyTypes.join(',');
+                                  }
 
-                          // Price Range
-                          if (_selectedPriceRange != 'all') {
-                            switch (_selectedPriceRange) {
-                              case 'Under 50L':
-                                queryParams['min_price'] = '0';
-                                queryParams['max_price'] = '5000000';
-                                break;
-                              case '50L-1Cr':
-                                queryParams['min_price'] = '5000000';
-                                queryParams['max_price'] = '10000000';
-                                break;
-                              case '1Cr-2Cr':
-                                queryParams['min_price'] = '10000000';
-                                queryParams['max_price'] = '20000000';
-                                break;
-                              case '2Cr-5Cr':
-                                queryParams['min_price'] = '20000000';
-                                queryParams['max_price'] = '50000000';
-                                break;
-                              case 'Above 5Cr':
-                                queryParams['min_price'] = '50000000';
-                                break;
-                            }
-                          }
+                                  // Price Range
+                                  if (_selectedPriceRange != 'all') {
+                                    switch (_selectedPriceRange) {
+                                      case 'Under 50L':
+                                        queryParams['min_price'] = '0';
+                                        queryParams['max_price'] = '5000000';
+                                        break;
+                                      case '50L-1Cr':
+                                        queryParams['min_price'] = '5000000';
+                                        queryParams['max_price'] = '10000000';
+                                        break;
+                                      case '1Cr-2Cr':
+                                        queryParams['min_price'] = '10000000';
+                                        queryParams['max_price'] = '20000000';
+                                        break;
+                                      case '2Cr-5Cr':
+                                        queryParams['min_price'] = '20000000';
+                                        queryParams['max_price'] = '50000000';
+                                        break;
+                                      case 'Above 5Cr':
+                                        queryParams['min_price'] = '50000000';
+                                        break;
+                                    }
+                                  }
 
-                          // Bedrooms
-                          if (_selectedBedroomRange != 'all') {
-                            switch (_selectedBedroomRange) {
-                              case '1':
-                                queryParams['bedrooms'] = '1';
-                                break;
-                              case '2':
-                                queryParams['bedrooms'] = '2';
-                                break;
-                              case '3':
-                                queryParams['bedrooms'] = '3';
-                                break;
-                              case '4':
-                                queryParams['bedrooms'] = '4';
-                                break;
-                              case '5+':
-                                queryParams['bedrooms'] = '5_plus';
-                                break;
-                            }
-                          }
+                                  // Bedrooms
+                                  if (_selectedBedroomRange != 'all') {
+                                    switch (_selectedBedroomRange) {
+                                      case '1':
+                                        queryParams['bedrooms'] = '1';
+                                        break;
+                                      case '2':
+                                        queryParams['bedrooms'] = '2';
+                                        break;
+                                      case '3':
+                                        queryParams['bedrooms'] = '3';
+                                        break;
+                                      case '4':
+                                        queryParams['bedrooms'] = '4';
+                                        break;
+                                      case '5+':
+                                        queryParams['bedrooms'] = '5_plus';
+                                        break;
+                                    }
+                                  }
 
-                          // Area
-                          if (_selectedAreaRange != 'all') {
-                            switch (_selectedAreaRange) {
-                              case 'Under 500 sq ft':
-                                queryParams['min_area'] = '0';
-                                queryParams['max_area'] = '500';
-                                break;
-                              case '500-1000 sq ft':
-                                queryParams['min_area'] = '500';
-                                queryParams['max_area'] = '1000';
-                                break;
-                              case '1000-1500 sq ft':
-                                queryParams['min_area'] = '1000';
-                                queryParams['max_area'] = '1500';
-                                break;
-                              case '1500-2000 sq ft':
-                                queryParams['min_area'] = '1500';
-                                queryParams['max_area'] = '2000';
-                                break;
-                              case 'Above 2000 sq ft':
-                                queryParams['min_area'] = '2000';
-                                break;
-                            }
-                          }
+                                  // Area
+                                  if (_selectedAreaRange != 'all') {
+                                    switch (_selectedAreaRange) {
+                                      case 'Under 500 sq ft':
+                                        queryParams['min_area'] = '0';
+                                        queryParams['max_area'] = '500';
+                                        break;
+                                      case '500-1000 sq ft':
+                                        queryParams['min_area'] = '500';
+                                        queryParams['max_area'] = '1000';
+                                        break;
+                                      case '1000-1500 sq ft':
+                                        queryParams['min_area'] = '1000';
+                                        queryParams['max_area'] = '1500';
+                                        break;
+                                      case '1500-2000 sq ft':
+                                        queryParams['min_area'] = '1500';
+                                        queryParams['max_area'] = '2000';
+                                        break;
+                                      case 'Above 2000 sq ft':
+                                        queryParams['min_area'] = '2000';
+                                        break;
+                                    }
+                                  }
 
-                          // Furnishing
-                          if (_selectedFurnishings.isNotEmpty) {
-                            queryParams['furnishing'] =
-                                _selectedFurnishings.join(',');
-                          }
+                                  // Furnishing
+                                  if (_selectedFurnishings.isNotEmpty) {
+                                    queryParams['furnishing'] =
+                                        _selectedFurnishings.join(',');
+                                  }
 
-                          // Posted By
-                          if (_selectedPostedBy != 'all') {
-                            switch (_selectedPostedBy) {
-                              case 'Owner':
-                                queryParams['by_dealer'] = '0';
-                                break;
-                              case 'Builder':
-                              case 'Agent':
-                                queryParams['by_dealer'] = '1';
-                                break;
-                            }
-                          }
+                                  // Posted By
+                                  if (_selectedPostedBy != 'all') {
+                                    switch (_selectedPostedBy) {
+                                      case 'Owner':
+                                        queryParams['by_dealer'] = '0';
+                                        break;
+                                      case 'Builder':
+                                      case 'Agent':
+                                        queryParams['by_dealer'] = '1';
+                                        break;
+                                    }
+                                  }
 
-                          // Listing type (auction / sale)
-                          queryParams['listing_type'] = categoryId;
+                                  // Listing type (auction / sale)
+                                  queryParams['listing_type'] = categoryId;
 
-                          try {
-                            setState(() => _isLoading = true);
-                            final apiService = ApiService();
-                            final Map<String, dynamic>
-                            response = await apiService.postMultipart(
-                              url:
-                                  "$baseUrl/filter-realestate-listings.php",
-                              fields: queryParams,
-                            );
+                                  try {
+                                    setState(() => _isLoading = true);
+                                    final apiService = ApiService();
+                                    final Map<String, dynamic>
+                                    response = await apiService.postMultipart(
+                                      url:
+                                          "$baseUrl/filter-realestate-listings.php",
+                                      fields: queryParams,
+                                    );
 
-                            final dataList =
-                                response['data'] as List<dynamic>? ??
-                                [];
-                            final finalPosts =
-                                dataList.map((item) {
-                                  final json =
-                                      item as Map<String, dynamic>;
-                                  return MarketplacePost.fromJson(json);
-                                }).toList();
+                                    final dataList =
+                                        response['data'] as List<dynamic>? ??
+                                        [];
+                                    final finalPosts =
+                                        dataList.map((item) {
+                                          final json =
+                                              item as Map<String, dynamic>;
+                                          return MarketplacePost.fromJson(json);
+                                        }).toList();
 
-                            setState(() {
-                              _posts = finalPosts;
-                              _isLoading = false;
-                            });
-                          } catch (e) {
-                            setState(() => _isLoading = false);
-                          }
+                                    setState(() {
+                                      _posts = finalPosts;
+                                      _isLoading = false;
+                                    });
+                                  } catch (e) {
+                                    setState(() => _isLoading = false);
+                                  }
 
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primaryblue,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Apply Filters',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
           ),
-        ),
-      ),
     );
   }
 
@@ -793,8 +813,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     String title,
     List<String> options,
     String selectedValue,
-    ValueChanged<String> onChanged,
-    StateSetter setModalState, {
+    ValueChanged<String> onChanged, {
     String? subtitle,
   }) {
     if (title == 'Price Range') {
@@ -838,7 +857,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
-                    setModalState(() {
+                    setState(() {
                       final min = _minPriceController.text;
                       final max = _maxPriceController.text;
                       if (min.isNotEmpty && max.isNotEmpty) {
@@ -870,7 +889,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
-                    setModalState(() {
+                    setState(() {
                       final min = _minPriceController.text;
                       final max = _maxPriceController.text;
                       if (min.isNotEmpty && max.isNotEmpty) {
@@ -887,7 +906,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () {
-              setModalState(() {
+              setState(() {
                 _selectedPriceRange = 'all';
                 _minPriceController.clear();
                 _maxPriceController.clear();
@@ -911,7 +930,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     groupValue: _selectedPriceRange,
                     onChanged: (value) {
                       if (value != null) {
-                        setModalState(() {
+                        setState(() {
                           _selectedPriceRange = value;
                           _minPriceController.clear();
                           _maxPriceController.clear();
@@ -1010,54 +1029,52 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
-  Widget _buildOptionsSection(StateSetter setModalState) {
+  Widget _buildOptionsSection() {
     switch (_selectedCategory) {
       case 'Property Type':
         return _buildMultiSelectFilterSection(
           'Property Type',
           _propertyTypes,
           _selectedPropertyTypes,
-          setModalState,
+          setState,
         );
       case 'Price Range':
         return _buildSingleSelectFilterSection(
           'Price Range',
           _priceRanges,
           _selectedPriceRange,
-          (value) => setModalState(() => _selectedPriceRange = value),
-          setModalState,
-          subtitle: _listingType == 'auction' ? 'Filter by starting bid price' : 'Filter by sale price',
+          (value) => setState(() => _selectedPriceRange = value),
+          subtitle: _listingType == 'auction'
+              ? 'Filter by starting bid price'
+              : 'Filter by sale price',
         );
       case 'Bedrooms':
         return _buildSingleSelectFilterSection(
           'Bedrooms',
           _bedroomRanges,
           _selectedBedroomRange,
-          (value) => setModalState(() => _selectedBedroomRange = value),
-          setModalState,
+          (value) => setState(() => _selectedBedroomRange = value),
         );
       case 'Area':
         return _buildSingleSelectFilterSection(
           'Area',
           _areaRanges,
           _selectedAreaRange,
-          (value) => setModalState(() => _selectedAreaRange = value),
-          setModalState,
+          (value) => setState(() => _selectedAreaRange = value),
         );
       case 'Furnishing':
         return _buildMultiSelectFilterSection(
           'Furnishing',
           _furnishings,
           _selectedFurnishings,
-          setModalState,
+          setState,
         );
       case 'Posted By':
         return _buildSingleSelectFilterSection(
           'Posted By',
           _postedByOptions,
           _selectedPostedBy,
-          (value) => setModalState(() => _selectedPostedBy = value),
-          setModalState,
+          (value) => setState(() => _selectedPostedBy = value),
         );
       default:
         return const SizedBox.shrink();
@@ -1075,7 +1092,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return count;
   }
 
-  Widget _buildAppBarSearchField() {
+ Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -1085,43 +1102,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
       child: TextField(
         controller: _searchController,
         autofocus: false,
+        autofillHints: null, // Disable autofill
+        enableSuggestions: false, // Disable suggestions
+        enableInteractiveSelection: true,
+        onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
           hintText: 'Search properties...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.only(top: 10),
-        ),
-        onChanged: (value) => setState(() => _searchQuery = value),
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchController,
-      onChanged: (value) {
-        setState(() => _searchQuery = value);
-      },
-      decoration: InputDecoration(
-        hintText: 'Search by property type, location, features...',
-        hintStyle: TextStyle(color: Colors.grey.shade500),
-        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
                   icon: Icon(Icons.clear, color: Colors.grey.shade400),
                   onPressed: () {
                     setState(() {
@@ -1130,24 +1120,59 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     });
                   },
                 )
-                : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(top: 10),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blue),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+      ),
+    );
+  }
+
+
+ Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() => _searchQuery = value);
+        },
+        autofillHints: null, // Disable autofill to prevent keyboard dismissal
+        enableSuggestions: false, // Disable suggestions to reduce IME interference
+        enableInteractiveSelection: true, // Keep selection enabled
+        decoration: InputDecoration(
+          hintText: 'Search by property type, location, features...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.blue),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -1176,193 +1201,197 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
     return location.name;
   }
-
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title: _showAppBarSearch ? _buildAppBarSearchField() : null,
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _showFilterBottomSheet,
-                icon: const Icon(Icons.tune, color: Colors.black87),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverAppBar(
+              expandedHeight: _showAppBarSearch ? 80 : 56,
+              floating: true,
+              pinned: true,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
               ),
-              if (_getActiveFilterCount() > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+              title: _showAppBarSearch
+                  ? _buildAppBarSearchField()
+                  : const Text('Real Estate'),
+              actions: [
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: _showFilterBottomSheet,
+                      icon: const Icon(Icons.tune, color: Colors.black87),
                     ),
-                    child: Text(
-                      '${_getActiveFilterCount()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          _isLoadingLocations
-              ? const CircularProgressIndicator()
-              : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchPosts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
+                    if (_getActiveFilterCount() > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${_getActiveFilterCount()}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
+                          ),
+                        ),
                       ),
-                    );
-                  }).toList();
-                },
-              ),
-        ],
-      ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child:
-                _isLoadingLocations
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(
-                      children: [
-                        if (!_showAppBarSearch)
-                          Container(
-                            color: Colors.white,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: _buildSearchField(),
-                          ),
-                      ],
-                    ),
-          ),
-          if (!_isLoadingLocations)
-            _isLoading
-                ? const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-                : _errorMessage != null
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error: $_errorMessage',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _fetchPosts,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : _posts.isEmpty
-                ? SliverToBoxAdapter(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No properties found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-                : SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final post = _posts[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildPostCard(post),
-                    );
-                  }, childCount: _posts.length),
+                  ],
                 ),
-        ],
+                _isLoadingLocations
+                    ? const CircularProgressIndicator()
+                    : PopupMenuButton<String>(
+                        icon: const Icon(Icons.location_on, color: Colors.black87),
+                        onSelected: (String value) {
+                          setState(() {
+                            _selectedLocation = value == 'all'
+                                ? 'all'
+                                : _locations.firstWhere((loc) => loc.name == value).id;
+                            _fetchPosts();
+                          });
+                        },
+                        itemBuilder: (BuildContext context) {
+                          return _keralaCities.map((String city) {
+                            return PopupMenuItem<String>(
+                              value: city,
+                              child: Row(
+                                children: [
+                                  if (_selectedLocation ==
+                                      (city == 'all'
+                                          ? 'all'
+                                          : _locations
+                                              .firstWhere((loc) => loc.name == city)
+                                              .id))
+                                    const Icon(
+                                      Icons.check,
+                                      color: Colors.blue,
+                                      size: 16,
+                                    ),
+                                  if (_selectedLocation ==
+                                      (city == 'all'
+                                          ? 'all'
+                                          : _locations
+                                              .firstWhere((loc) => loc.name == city)
+                                              .id))
+                                    const SizedBox(width: 8),
+                                  Text(city == 'all' ? 'All Kerala' : city),
+                                ],
+                              ),
+                            );
+                          }).toList();
+                        },
+                      ),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: _isLoadingLocations
+                  ? const Center(child: CircularProgressIndicator())
+                  : Column(
+                      children: [
+                        if (!_showAppBarSearch) ...[
+                          _buildSearchField(),
+                          SearchResultsWidget(searchQuery: _searchQuery), // Add SearchResultsWidget
+                        ],
+                      ],
+                    ),
+            ),
+            if (!_isLoadingLocations && _searchQuery.isEmpty) // Hide posts when searching
+              _isLoading
+                  ? const SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _errorMessage != null
+                      ? SliverToBoxAdapter(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error,
+                                  size: 64,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Error: $_errorMessage',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _fetchPosts,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : _posts.isEmpty
+                          ? SliverToBoxAdapter(
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off,
+                                      size: 64,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No properties found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Try adjusting your filters or search terms',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final post = _posts[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildPostCard(post),
+                                  );
+                                },
+                                childCount: _posts.length,
+                              ),
+                            ),
+          ],
+        ),
       ),
     );
   }
-
   String getImageUrl(String imagePath) {
     final cleanedPath =
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
@@ -1435,14 +1464,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             ),
                             image: DecorationImage(
                               image: NetworkImage(getImageUrl(post.image)),
-                              fit:
-                                  BoxFit
-                                      .cover,
+                              fit: BoxFit.cover,
                               onError: (exception, stackTrace) {
-                                print(
+                                developer.log(
                                   'Failed to load image: ${getImageUrl(post.image)}',
                                 );
-                                print('Error: $exception');
+                                developer.log('Error: $exception');
                               },
                             ),
                           ),

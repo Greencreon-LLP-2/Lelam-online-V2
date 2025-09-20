@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -12,6 +13,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/Support/views/support_page.dart';
 import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
     hide baseUrl, token;
@@ -22,6 +24,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
+import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
@@ -29,6 +32,7 @@ import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:developer' as developer;
 
 class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
@@ -79,12 +83,389 @@ class _CommercialProductDetailsPageState
  bool _isLoadingBanner = false;
   String? _bannerImageUrl;
   String _bannerError = '';
+   late LoggedUserProvider _userProvider;
+
+ String _moveToAuctionButtonText = 'Move to Auction';
 
   @override
   void initState() {
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     super.initState();
     _initialize();
   }
+
+Future<bool> _checkAuctionTermsStatus() async {
+    if (_userProvider.userId == null) {
+      developer.log('User not logged in, cannot check auction terms.');
+      return false;
+    }
+
+    final url =
+        '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
+    try {
+      developer.log('Checking auction terms status: $url');
+      final response = await http.get(Uri.parse(url));
+      developer.log(
+        'Terms check response: status=${response.statusCode}, body=${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        bool termsAccepted = decodedBody['status'] == 'true';
+        developer.log('Terms accepted: $termsAccepted');
+
+        if (!termsAccepted) {
+          // Terms not accepted, call seller-accept-terms.php
+          final acceptUrl =
+              '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
+          developer.log('Accepting terms: $acceptUrl');
+          final acceptResponse = await http.get(Uri.parse(acceptUrl));
+          developer.log(
+            'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
+          );
+
+          if (acceptResponse.statusCode == 200) {
+            final acceptDecodedBody = jsonDecode(acceptResponse.body);
+            if (acceptDecodedBody['status'] == 'true' &&
+                acceptDecodedBody['data'] is List &&
+                acceptDecodedBody['data'].isNotEmpty) {
+              developer.log('Terms accepted successfully');
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    acceptDecodedBody['data'][0]['message'] ?? 'Terms accepted',
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                ),
+              );
+              return true;
+            } else {
+              developer.log(
+                'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
+                  ),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  margin: const EdgeInsets.all(16),
+                ),
+              );
+              return false;
+            }
+          } else {
+            developer.log(
+              'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
+                ),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
+              ),
+            );
+            return false;
+          }
+        }
+        return termsAccepted;
+      } else {
+        developer.log(
+          'Failed to check auction terms: HTTP ${response.statusCode}',
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to check auction terms: HTTP ${response.statusCode}',
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      developer.log('Error checking auction terms: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error checking auction terms: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return false;
+    }
+  }
+
+  Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
+    bool isAccepted = false;
+    String termsHtml = '';
+    bool isLoadingTerms = true;
+    String? termsError;
+
+    developer.log('Attempting to fetch auction terms');
+    try {
+      termsHtml = await MarketplaceService2().fetchAuctionTerms();
+      developer.log('Terms fetched successfully: $termsHtml');
+      isLoadingTerms = false;
+    } catch (e) {
+      developer.log('Error fetching auction terms: $e');
+      termsError = e.toString();
+      isLoadingTerms = false;
+    }
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool dialogIsAccepted = false;
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setDialogState) {
+            developer.log(
+              'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
+            );
+            return AlertDialog(
+              title: const Text('Auction Terms & Conditions'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLoadingTerms)
+                      const Center(child: CircularProgressIndicator())
+                    else if (termsError != null)
+                      Text(
+                        'Error loading terms: $termsError',
+                        style: const TextStyle(fontSize: 14, color: Colors.red),
+                      )
+                    else
+                      Html(
+                        data: termsHtml,
+                        style: {'body': Style(fontSize: FontSize(14))},
+                      ),
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      title: const Text('I accept the terms and conditions'),
+                      value: dialogIsAccepted,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          dialogIsAccepted = value ?? false;
+                          developer.log(
+                            'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    developer.log('Terms dialog cancelled');
+                    Navigator.pop(dialogContext, false);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      dialogIsAccepted && !isLoadingTerms && termsError == null
+                          ? () async {
+                            developer.log('Attempting to accept terms');
+                            try {
+                              final url =
+                                  '${baseUrl}/seller-accept-terms.php?token=${token}&post_id=$id&user_id=${_userProvider.userId}';
+                              developer.log('Accepting terms: $url');
+                              final response = await http.get(Uri.parse(url));
+                              developer.log(
+                                'Accept terms response: status=${response.statusCode}, body=${response.body}',
+                              );
+
+                              if (response.statusCode == 200) {
+                                final decodedBody = jsonDecode(response.body);
+                                if (decodedBody['status'] == 'true' &&
+                                    decodedBody['data'] is List &&
+                                    decodedBody['data'].isNotEmpty) {
+                                  developer.log('Terms accepted successfully');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        decodedBody['data'][0]['message'] ??
+                                            'Terms accepted',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      margin: const EdgeInsets.all(16),
+                                    ),
+                                  );
+                                  Navigator.pop(dialogContext, true);
+                                } else {
+                                  setDialogState(() {
+                                    termsError =
+                                        'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
+                                    developer.log(
+                                      'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
+                                    );
+                                  });
+                                }
+                              } else {
+                                setDialogState(() {
+                                  termsError =
+                                      'Failed to accept terms: HTTP ${response.statusCode}';
+                                  developer.log(
+                                    'Failed to accept terms: HTTP ${response.statusCode}',
+                                  );
+                                });
+                              }
+                            } catch (e) {
+                              setDialogState(() {
+                                termsError = 'Error accepting terms: $e';
+                                developer.log('Error accepting terms: $e');
+                              });
+                            }
+                          }
+                          : null,
+                  child: const Text('Accept'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((value) {
+      isAccepted = value ?? false;
+      developer.log('Terms dialog closed, isAccepted=$isAccepted');
+    });
+
+    return isAccepted;
+  }
+
+  Future<void> _moveToAuction() async {
+    if (_userProvider.userId == null) {
+      developer.log('User not logged in, showing login prompt');
+      _showLoginPromptDialog(context, 'move to auction');
+      return;
+    }
+
+    setState(() {
+      _isLoadingBid = true;
+    });
+
+    try {
+      developer.log('Showing terms dialog before moving to auction');
+      final accepted = await _showTermsAndConditionsDialog(context);
+      if (!accepted) {
+        developer.log('User did not accept terms, aborting move to auction');
+        setState(() {
+          _isLoadingBid = false;
+        });
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   const SnackBar(
+        //     content: Text('You must accept the auction terms to proceed.'),
+        //     backgroundColor: Colors.red,
+        //     behavior: SnackBarBehavior.floating,
+        //     shape: RoundedRectangleBorder(
+        //      // borderRadius: BorderRadius.circular(8),
+        //     ),
+        //     margin: EdgeInsets.all(16),
+        //   ),
+        // );
+        return;
+      }
+
+      developer.log('Terms accepted, proceeding to move to auction');
+
+      final url =
+          '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
+      developer.log('Moving to auction: $url');
+
+      final request = http.Request('GET', Uri.parse(url));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      developer.log(
+        'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == 'true' &&
+            responseData['data'] is List &&
+            responseData['data'].isNotEmpty &&
+            responseData['data'][0]['check'] == 1;
+        final String message =
+            responseData['data']?[0]['message']?.toString() ?? '';
+
+        if (isSuccess) {
+          developer.log('Successfully moved to auction');
+          setState(() {
+            _moveToAuctionButtonText = 'Auction Waiting for Approval';
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                message.isNotEmpty ? message : 'Successfully moved to auction',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          throw Exception('');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      developer.log('Error moving to auction: $e');
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('Error: $e'),
+      //     backgroundColor: Colors.red,
+      //     behavior: SnackBarBehavior.floating,
+      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      //     margin: const EdgeInsets.all(16),
+      //   ),
+      // );
+    } finally {
+      setState(() {
+        _isLoadingBid = false;
+      });
+    }
+  }
+
+
 
   Future<void> _initialize() async {
     _loadUserId();
@@ -107,14 +488,14 @@ class _CommercialProductDetailsPageState
         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
       };
       final url = '$_baseUrl/post-ads-image.php?token=$_token';
-      debugPrint('Fetching banner image: $url');
+      developer.log('Fetching banner image: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Banner API response: $responseBody');
+      developer.log('Banner API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -135,7 +516,7 @@ class _CommercialProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error fetching banner image: $e');
+      developer.log('Error fetching banner image: $e');
       setState(() {
         _bannerError = 'Failed to load banner: $e';
       });
@@ -193,7 +574,7 @@ class _CommercialProductDetailsPageState
     setState(() {
       userId = userData?.userId ?? '';
     });
-    debugPrint('CommercialProductDetailsPage - Loaded userId: $userId');
+    developer.log('CommercialProductDetailsPage - Loaded userId: $userId');
   }
 
   Future<void> _checkShortlistStatus() async {
@@ -215,7 +596,7 @@ class _CommercialProductDetailsPageState
         queryParams: {"user_id": userId},
       );
 
-      debugPrint('Shortlist API response: $response');
+      developer.log('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -226,16 +607,16 @@ class _CommercialProductDetailsPageState
           _isFavorited = isShortlisted;
           _isLoadingFavorite = false;
         });
-        debugPrint('Product ${widget.post.id} isShortlisted: $isShortlisted');
+        developer.log('Product ${widget.post.id} isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isLoadingFavorite = false;
         });
-        debugPrint('Invalid shortlist data: ${response['data']}');
+        developer.log('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      debugPrint('Error checking shortlist status: $e');
+      developer.log('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isLoadingFavorite = false;
@@ -268,13 +649,13 @@ class _CommercialProductDetailsPageState
       final headers = {'token': _token};
       final url =
           '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.post.id}';
-      debugPrint('Toggling shortlist: $url');
+      developer.log('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('add-to-shortlist.php response: $responseBody');
+      developer.log('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -322,7 +703,7 @@ class _CommercialProductDetailsPageState
         );
       }
     } catch (e) {
-      debugPrint('Error toggling shortlist: $e');
+      developer.log('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -406,18 +787,18 @@ class _CommercialProductDetailsPageState
       final headers = {'token': _token};
       final url =
           '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.post.id}';
-      debugPrint('Fetching highest bid: $url');
+      developer.log('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('Full API response body: $responseBody');
-      debugPrint('Response status code: ${response.statusCode}');
+      developer.log('Full API response body: $responseBody');
+      developer.log('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response data: $responseData');
+        developer.log('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -426,21 +807,21 @@ class _CommercialProductDetailsPageState
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            debugPrint('Successfully fetched highest bid: $dataValue');
+            developer.log('Successfully fetched highest bid: $dataValue');
           } else {
-            debugPrint('API returned non-numeric data: $dataValue');
+            developer.log('API returned non-numeric data: $dataValue');
             setState(() {
               _currentHighestBid = 'Error: $dataValue';
             });
           }
         } else {
-          debugPrint('API status false: ${responseData['data']}');
+          developer.log('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        debugPrint(
+        developer.log(
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
@@ -448,7 +829,7 @@ class _CommercialProductDetailsPageState
         });
       }
     } catch (e) {
-      debugPrint('Exception in fetch highest bid: $e');
+      developer.log('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -471,17 +852,17 @@ class _CommercialProductDetailsPageState
       };
       final url =
           '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.post.id}&user_id=$userId&bidamt=$bidAmount';
-      debugPrint('Placing bid: $url');
+      developer.log('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('place-bid.php response: $responseBody');
+      developer.log('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed place-bid response: $responseData');
+        developer.log('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -499,7 +880,7 @@ class _CommercialProductDetailsPageState
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      debugPrint('Error placing bid: $e');
+      developer.log('Error placing bid: $e');
       throw e;
     }
   }
@@ -951,18 +1332,18 @@ class _CommercialProductDetailsPageState
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.post.id}&user_id=$userId&meeting_date=$formattedDate';
-      debugPrint('Scheduling meeting: $url');
+      developer.log('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      debugPrint('post-fix-meeting.php response: $responseBody');
+      developer.log('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        debugPrint('Parsed response: $responseData');
+        developer.log('Parsed response: $responseData');
         if (responseData['status'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -998,7 +1379,7 @@ class _CommercialProductDetailsPageState
         }
       }
     } catch (e) {
-      debugPrint('Error scheduling meeting: $e');
+      developer.log('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -1193,7 +1574,7 @@ class _CommercialProductDetailsPageState
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -1255,7 +1636,7 @@ Future<void> _fetchDetailsData() async {
       _isLoadingLocations = false;
     });
   } catch (e) {
-    print('Error fetching details: $e');
+    developer.log('Error fetching details: $e');
     setState(() {
       isLoadingDetails = false;
       _isLoadingLocations = false;
@@ -1267,9 +1648,9 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   attributeValues.clear();
   orderedAttributeValues.clear();
 
-  print('Attribute Value Pairs: $attributeValuePairs');
-  print('Attribute Variations: $attributeVariations');
-  print('Filters: $filters');
+  developer.log('Attribute Value Pairs: $attributeValuePairs');
+  developer.log('Attribute Variations: $attributeVariations');
+  developer.log('Filters: $filters');
 
   // Use a Map to filter duplicates by attribute name
   final Map<String, String> uniqueAttributes = {};
@@ -1316,7 +1697,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   // Update attributeValues for use in Details section
   attributeValues.addAll(uniqueAttributes);
 
-  print('Filtered Attributes: $attributeValues');
+  developer.log('Filtered Attributes: $attributeValues');
 }
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
@@ -1560,7 +1941,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
     }
 
     if (_isMeetingDialogOpen) {
-      debugPrint('Meeting dialog already open');
+      developer.log('Meeting dialog already open');
       return;
     }
 
@@ -2318,14 +2699,14 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
               ],
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: -5,
-            child: CustomSafeArea(
+           Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: const BoxDecoration(
+                  color: Colors.white, // Prevents ParentDataWidget issues
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black26,
@@ -2337,41 +2718,90 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          showProductBidDialog(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                    if (_userProvider.userId == widget.post.createdBy) ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SellingStatusPage(),
+            ),
+          );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
                           ),
+                          child: const Text('Edit'),
                         ),
-                        child: const Text('Place Bid'),
                       ),
-                    ),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _showMeetingDialog(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoadingBid ? null : _moveToAuction,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primaryblue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
                           ),
+                          child:
+                              _isLoadingBid
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : Text(_moveToAuctionButtonText),
                         ),
-                        child: const Text('Fix Meeting'),
                       ),
-                    ),
+                    ] else ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => showProductBidDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primarypink,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                          child: const Text('Place Bid'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _showMeetingDialog(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primaryblue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                          ),
+                          child: const Text('Fix Meeting'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

@@ -1,6 +1,7 @@
 // const String baseUrl = 'http://localhost:8000/admin/api/v1';
 //const String baseUrl = 'http://192.168.0.115:8000/admin/api/v1';
- const String baseUrl = 'https://lelamonline.com/admin/api/v1';
+const String simpleBaseUrl = 'https://lelamonline.com';
+  const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
 //====================== Authentication ==============================//
@@ -18,7 +19,7 @@ const String locations = '$baseUrl/list-location.php?token=$token';
 //====================== Post details =======================//
 const String attributeValue =
     '$baseUrl//post-attribute-values.php?token=$token';
- const String addPostReview = '$baseUrl/add-post-review.php';
+const String addPostReview = '$baseUrl/add-post-review.php';
 
 //====================== Feature Posts ===============================//
 const String brand = '$baseUrl/list-brand.php?token=$token';
@@ -32,9 +33,13 @@ const String attributeVariations =
 
 //others
 const String getImageFromServer = '$baseUrl/get-image.php?file=';
+const String getImagePostImageUrl = '$simpleBaseUrl/admin/';
 const String faqUrl = '$baseUrl/list-faq.php';
+const String searchAnyProduct = '$baseUrl/search-post.php';
+const String notifications = '$baseUrl/fetch-notifications.php';
 const String allusers = '$baseUrl/index.php';
 const String userDetails = '$baseUrl/user-details.php';
+const String otpSendUrl = '$baseUrl/otp-send.php';
 const String userRegister = '$baseUrl/register.php';
 const String userProfileUpdate = '$baseUrl/user-profile-update.php';
 const String shortlist = '$baseUrl/list-shortlist.php';

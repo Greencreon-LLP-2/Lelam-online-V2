@@ -20,16 +20,14 @@ import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.da
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
-
+import 'dart:developer' as developer;
 import '../../services/details_service.dart' show TempApiService;
 
 class MarketplaceService {
-  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
-
   static final Map<String, List<MarketplacePost>> _postsCache = {};
   static List<Attribute>? _attributesCache;
   static List<AttributeVariation>? _attributeVariationsCache;
@@ -41,33 +39,26 @@ class MarketplaceService {
     required String userId,
   }) async {
     final cacheKey = '$categoryId-$userZoneId-$listingType-$userId';
-
     final endpoint =
         listingType == 'auction'
             ? '$baseUrl/list-category-post-auction.php'
             : '$baseUrl/list-category-post-marketplace.php';
-
     final url =
         listingType == 'auction'
             ? '$endpoint?token=$token&category_id=$categoryId&user_id=$userId&user_zone_id=$userZoneId'
             : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
-
     try {
-      print('Fetching posts from: $url');
       final response = await http.get(Uri.parse(url));
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-
         if (decodedBody is List) {
           final posts =
               decodedBody.map((json) {
                 try {
                   return MarketplacePost.fromJson(json);
                 } catch (e) {
-                  print('Error parsing post: $e');
-                  print('Problematic JSON: $json');
+                  developer.log('Error parsing post: $e');
+                  developer.log('Problematic JSON: $json');
                   throw Exception('Failed to parse post: $e');
                 }
               }).toList();
@@ -84,7 +75,7 @@ class MarketplaceService {
               'Please accept live auction terms') {
             throw Exception('Please accept live auction terms');
           } else if (decodedBody['data'] == 'Data not found') {
-            print('No posts found for $listingType');
+            developer.log('No posts found for $listingType');
             _postsCache[cacheKey] = [];
             return [];
           } else {
@@ -97,7 +88,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts ($listingType): $e');
+      developer.log('Error in fetchPosts ($listingType): $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -124,7 +115,7 @@ class MarketplaceService {
         throw Exception('Failed to load terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching auction terms: $e');
+      developer.log('Error fetching auction terms: $e');
       throw Exception('Error fetching terms: $e');
     }
   }
@@ -145,14 +136,14 @@ class MarketplaceService {
         throw Exception('Failed to accept terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error accepting auction terms: $e');
+      developer.log('Error accepting auction terms: $e');
       return false;
     }
   }
 
   Future<List<Attribute>> fetchAttributes() async {
     if (_attributesCache != null) {
-      print('Returning cached attributes');
+      developer.log('Returning cached attributes');
       return _attributesCache!;
     }
     _attributesCache = await TempApiService.fetchAttributes();
@@ -163,7 +154,7 @@ class MarketplaceService {
     Map<String, String> params,
   ) async {
     if (_attributeVariationsCache != null) {
-      print('Returning cached attribute variations');
+      developer.log('Returning cached attribute variations');
       return _attributeVariationsCache!;
     }
     _attributeVariationsCache = await TempApiService.fetchAttributeVariations(
@@ -373,7 +364,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         );
       }
     } catch (e) {
-      print('Error checking auction terms: $e');
+      developer.log('Error checking auction terms: $e');
       return false;
     }
   }
@@ -386,7 +377,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _userId = userId;
       });
       if (kDebugMode) {
-        print('Checked login status: userId = $_userId');
+        developer.log('Checked login status: userId = $_userId');
       }
     }
   }
@@ -405,7 +396,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -416,13 +407,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       setState(() {
         _isLoadingLocations = false;
       });
-      print('Error fetching locations: $e');
+      developer.log('Error fetching locations: $e');
     }
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-      debugPrint(
+      developer.log(
         'Redirecting to login page: userId=$_userId, listingType=$_listingType',
       );
       context.push(
@@ -864,7 +855,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             listingType: _listingType,
             onClearAll: () {
               _fetchProducts();
-              print("works");
+              developer.log("works");
             },
             onApplyFilters: ({
               required List<String> selectedBrands,
@@ -944,56 +935,59 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-  Widget _buildSearchField() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-            _filtersChanged = true;
-          });
-        },
-        decoration: InputDecoration(
-          hintText: 'Search by brand, model, location, fuel type...',
-          hintStyle: TextStyle(color: Colors.grey.shade500),
-          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                        _filtersChanged = true;
-                      });
-                    },
-                  )
-                  : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.blue),
-          ),
-          filled: true,
-          fillColor: Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
+ Widget _buildSearchField() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+    child: TextField(
+      controller: _searchController,
+      onChanged: (value) {
+        setState(() {
+          _searchQuery = value;
+          _filtersChanged = true;
+        });
+      },
+      // Add these lines
+      autofillHints: null,  // Disable autofill entirely
+      enableSuggestions: false,  // Optional: Disable suggestions/autocomplete
+      enableInteractiveSelection: true,  // Keep selection enabled
+      decoration: InputDecoration(
+        hintText: 'Search by brand, model, location, fuel type...',
+        hintStyle: TextStyle(color: Colors.grey.shade500),
+        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                onPressed: () {
+                  setState(() {
+                    _searchQuery = '';
+                    _searchController.clear();
+                    _filtersChanged = true;
+                  });
+                },
+              )
+            : null,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.blue),
+        ),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildListingTypeButtons() {
     return Padding(
@@ -1075,9 +1069,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     );
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
-    debugPrint(
+    developer.log(
       'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
     );
     return Scaffold(
@@ -1089,10 +1083,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
-        title:
-            _showAppBarSearch
-                ? _buildAppBarSearchField()
-                : const Text('Used Cars'),
+        title: _showAppBarSearch
+            ? _buildAppBarSearchField()
+            : const Text('Used Cars'),
         actions: [
           Stack(
             children: [
@@ -1125,178 +1118,178 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           _isLoadingLocations
               ? const CircularProgressIndicator()
               : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _filtersChanged = true;
-                    _fetchProducts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
-                            ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
-        ],
-      ),
-      body:
-          _isLoading || _isLoadingLocations
-              ? const Center(
-                child: CircularProgressIndicator(color: Palette.primaryblue),
-              )
-              : _listingType == 'auction' &&
-                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.lock_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Please log in to view auction listings',
-                      style: TextStyle(fontSize: 16, color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        debugPrint(
-                          'Navigating to login page from auction prompt',
-                        );
-                        context.push(
-                          RouteNames.loginPage,
-                          extra: {
-                            'redirectTo': 'usedCars',
-                            'listingType': 'auction',
-                          },
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+                  icon: const Icon(Icons.location_on, color: Colors.black87),
+                  onSelected: (String value) {
+                    setState(() {
+                      _selectedLocation = value == 'all'
+                          ? 'all'
+                          : _locations.firstWhere((loc) => loc.name == value).id;
+                      _filtersChanged = true;
+                      _fetchProducts();
+                    });
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return _keralaCities.map((String city) {
+                      return PopupMenuItem<String>(
+                        value: city,
+                        child: Row(
+                          children: [
+                            if (_selectedLocation ==
+                                (city == 'all'
+                                    ? 'all'
+                                    : _locations
+                                        .firstWhere((loc) => loc.name == city)
+                                        .id))
+                              const Icon(
+                                Icons.check,
+                                color: Colors.blue,
+                                size: 16,
+                              ),
+                            if (_selectedLocation ==
+                                (city == 'all'
+                                    ? 'all'
+                                    : _locations
+                                        .firstWhere((loc) => loc.name == city)
+                                        .id))
+                              const SizedBox(width: 8),
+                            Text(city == 'all' ? 'All Kerala' : city),
+                          ],
                         ),
-                        textStyle: const TextStyle(fontSize: 16),
-                      ),
-                      child: const Text('Log In'),
-                    ),
-                  ],
-                ),
-              )
-              : _errorMessage != null
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => _fetchProducts(forceRefresh: true),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
-              : filteredProducts.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_off,
-                      size: 64,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No cars found',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try adjusting your filters or search terms',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-              : RefreshIndicator(
-                onRefresh: () => _fetchProducts(forceRefresh: true),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount:
-                      filteredProducts.length + (_showMainSearch ? 2 : 1),
-                  itemBuilder: (context, index) {
-                    if (_showMainSearch && index == 0) {
-                      return _buildSearchField();
-                    }
-                    if (index == (_showMainSearch ? 1 : 0)) {
-                      return _buildListingTypeButtons();
-                    }
-                    final productIndex = index - (_showMainSearch ? 2 : 1);
-                    if (productIndex < filteredProducts.length) {
-                      final product = filteredProducts[productIndex];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildProductCard(product),
                       );
-                    }
-                    return const SizedBox.shrink();
+                    }).toList();
                   },
                 ),
-              ),
+        ],
+      ),
+      body: _isLoading || _isLoadingLocations
+          ? const Center(
+              child: CircularProgressIndicator(color: Palette.primaryblue),
+            )
+          : _listingType == 'auction' &&
+                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.lock_outline, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Please log in to view auction listings',
+                        style: TextStyle(fontSize: 16, color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          developer.log(
+                            'Navigating to login page from auction prompt',
+                          );
+                          context.push(
+                            RouteNames.loginPage,
+                            extra: {
+                              'redirectTo': 'usedCars',
+                              'listingType': 'auction',
+                            },
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          textStyle: const TextStyle(fontSize: 16),
+                        ),
+                        child: const Text('Log In'),
+                      ),
+                    ],
+                  ),
+                )
+              : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => _fetchProducts(forceRefresh: true),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : filteredProducts.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No cars found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Try adjusting your filters or search terms',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () => _fetchProducts(forceRefresh: true),
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            itemCount: _products.length +
+                                (_showMainSearch ? 3 : 1), // Adjusted for SearchResultsWidget
+                            itemBuilder: (context, index) {
+                              if (_showMainSearch && index == 0) {
+                                return _buildSearchField();
+                              }
+                              if (_showMainSearch && index == 1) {
+                                return SearchResultsWidget(
+                                  searchQuery: _searchQuery,
+                                ); // Add SearchResultsWidget
+                              }
+                              if (index == (_showMainSearch ? 2 : 0)) {
+                                return _buildListingTypeButtons();
+                              }
+                              final productIndex = index - (_showMainSearch ? 3 : 1);
+                              if (productIndex < _products.length) {
+                                final product = _products[productIndex];
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _buildProductCard(product),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
     );
   }
-
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
@@ -1375,10 +1368,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 ),
                               ),
                           errorWidget: (context, url, error) {
-                            print(
+                            developer.log(
                               'Failed to load image: https://lelamonline.com/admin/${product.image}',
                             );
-                            print('Error: $error');
+                            developer.log('Error: $error');
                             return Container(
                               color: Colors.grey.shade200,
                               child: Icon(
@@ -1589,6 +1582,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 // make finance/exchange strip flush and remove extra vertical spacing
                 width: double.infinity,
                 padding: EdgeInsets.zero,
+
                 decoration: BoxDecoration(
                   color:
                       (isAuction || isFinanceAvailable || isExchangeAvailable)
@@ -1596,7 +1590,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           : Colors.grey.shade50,
                   // keep bottom radius to match card but no extra gap
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(8),
+                    bottom: Radius.circular(0),
                   ),
                 ),
                 child: Padding(
@@ -1828,7 +1822,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      print("Error while fetching filter listings: $e");
+      developer.log("Error while fetching filter listings: $e");
     }
   }
 }

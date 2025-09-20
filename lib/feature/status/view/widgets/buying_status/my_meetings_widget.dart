@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -8,7 +7,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/meetingcard_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:retry/retry.dart';
-
+import 'dart:developer' as developer;
 import 'package:url_launcher/url_launcher.dart';
 
 class StatusPill extends StatelessWidget {
@@ -147,7 +146,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       final userData = userProvider.userData;
       setState(() {
         _userId = userData?.userId ?? 'Unknown';
-        debugPrint('Loaded userId: $_userId');
+        developer.log('Loaded userId: $_userId');
         if (_userId == 'Unknown') {
           errorMessage = 'User ID not found. Please log in again.';
           isLoading = false;
@@ -157,7 +156,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         await _loadMeetings();
       }
     } catch (e) {
-      debugPrint('Error loading userId: $e');
+      developer.log('Error loading userId: $e');
       setState(() {
         errorMessage = 'Error loading user ID: $e';
         isLoading = false;
@@ -167,7 +166,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
 
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     if (_postDetailsCache.containsKey(postId)) {
-      debugPrint('Returning cached post details for post_id $postId');
+      developer.log('Returning cached post details for post_id $postId');
       return _postDetailsCache[postId];
     }
 
@@ -186,10 +185,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying post-details for post_id $postId: $e');
+          developer.log('Retrying post-details for post_id $postId: $e');
         },
       );
-      debugPrint(
+      developer.log(
         'post-details.php response for post_id $postId: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -224,22 +223,22 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for post-details.php');
+        developer.log('Rate limit exceeded for post-details.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-      debugPrint('No valid post data for post_id $postId');
+      developer.log('No valid post data for post_id $postId');
       return null;
     } catch (e) {
-      debugPrint('Error fetching post details for post_id $postId: $e');
+      developer.log('Error fetching post details for post_id $postId: $e');
       return null;
     }
   }
 
   Future<List<Map<String, String>>> _fetchMeetingTimes() async {
     if (_meetingTimesCache.isNotEmpty) {
-      debugPrint('Returning cached meeting times');
+      developer.log('Returning cached meeting times');
       return _meetingTimesCache;
     }
 
@@ -258,10 +257,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying meeting-times: $e');
+          developer.log('Retrying meeting-times: $e');
         },
       );
-      debugPrint('meeting-times.php response: ${response.body}');
+      developer.log('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -279,14 +278,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for meeting-times.php');
+        developer.log('Rate limit exceeded for meeting-times.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching meeting times: $e');
+      developer.log('Error fetching meeting times: $e');
       return [];
     }
   }
@@ -329,10 +328,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying $endpoint for meeting_id $meetingId: $e');
+          developer.log('Retrying $endpoint for meeting_id $meetingId: $e');
         },
       );
-      debugPrint(
+      developer.log(
         '$endpoint response for meeting_id $meetingId: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -356,19 +355,19 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for $endpoint');
+        developer.log('Rate limit exceeded for $endpoint');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-      debugPrint('No valid status data for meeting_id $meetingId');
+      developer.log('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     } catch (e) {
-      debugPrint('Error fetching meeting status for meeting_id $meetingId: $e');
+      developer.log('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
@@ -420,17 +419,17 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
-      debugPrint('Fetching meetings from: $url');
+      developer.log('Fetching meetings from: $url');
       final response = await retry(
         () => http.get(Uri.parse(url), headers: headers),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying meetings fetch: $e');
+          developer.log('Retrying meetings fetch: $e');
         },
       );
-      debugPrint('Raw response body: ${response.body}');
+      developer.log('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -439,15 +438,15 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                 responseData['status'] == 'true') &&
             responseData['data'] is List) {
           final List<dynamic> meetingData = responseData['data'];
-          debugPrint('Found ${meetingData.length} meetings in API response');
+          developer.log('Found ${meetingData.length} meetings in API response');
 
           for (var meeting in meetingData) {
-            debugPrint(
+            developer.log(
               'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
             );
             final postDetails = await _fetchPostDetails(meeting['post_id']);
             if (postDetails == null) {
-              debugPrint(
+              developer.log(
                 'Skipping meeting ${meeting['id']} due to missing post details',
               );
               continue;
@@ -512,31 +511,32 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'middleStatus_data':
                   statusData?['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  statusData?['footerStatus_data'] ?? 'Click call support for full details',
+                  statusData?['footerStatus_data'] ??
+                  'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
-            debugPrint('Added meeting ${meeting['id']} to list: $meetingData');
-            debugPrint(
+            developer.log('Added meeting ${meeting['id']} to list: $meetingData');
+            developer.log(
               'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
             );
             meetings.add(meetingData);
             await Future.delayed(const Duration(milliseconds: 200));
           }
         } else {
-          debugPrint('Unexpected response format: ${responseData.toString()}');
-          errorMessage = 'Currently No data';
+          developer.log('Unexpected response format: ${responseData.toString()}');
+          errorMessage = 'Currently No Meeting';
         }
 
-        debugPrint('Total meetings loaded: ${meetings.length}');
+        developer.log('Total meetings loaded: ${meetings.length}');
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for meetings fetch');
+        developer.log('Rate limit exceeded for meetings fetch');
         errorMessage = 'Too many requests. Please try again later.';
       } else {
-        debugPrint('Failed to fetch meetings: ${response.reasonPhrase}');
+        developer.log('Failed to fetch meetings: ${response.reasonPhrase}');
         errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
       }
     } catch (e) {
-      debugPrint('Error loading meetings: $e');
+      developer.log('Error loading meetings: $e');
       errorMessage = 'Error loading meetings: $e';
     }
 
@@ -551,7 +551,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     if (mounted) {
       setState(() {
         selectedIndex = 2;
-        debugPrint('Switched to Awaiting Location tab for meeting $meetingId');
+        developer.log('Switched to Awaiting Location tab for meeting $meetingId');
       });
       _loadMeetings();
     }
@@ -559,10 +559,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
 
   List<Map<String, dynamic>> _getFilteredMeetings() {
     final status = statuses[selectedIndex];
-    debugPrint('Filtering for status: $status');
+    developer.log('Filtering for status: $status');
 
     return meetings.where((meeting) {
-      debugPrint(
+      developer.log(
         'Meeting ${meeting['id']} - status: ${meeting['status']}, '
         'seller_approvel: ${meeting['seller_approvel']}, '
         'admin_approvel: ${meeting['admin_approvel']}, '
@@ -607,11 +607,11 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   @override
   Widget build(BuildContext context) {
     final filteredMeetings = _getFilteredMeetings();
-    debugPrint(
+    developer.log(
       'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
     );
     for (var meeting in filteredMeetings) {
-      debugPrint(
+      developer.log(
         'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
         'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
         'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
@@ -643,7 +643,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                               if (mounted) {
                                 setState(() {
                                   selectedIndex = index;
-                                  debugPrint('Selected tab: $status');
+                                  developer.log('Selected tab: $status');
                                 });
                                 _loadMeetings();
                               }
@@ -668,29 +668,19 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.error_outline,
+                                Icons.handshake,
                                 size: 64,
-                                color: Colors.red,
+                                color: Colors.grey,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                errorMessage!,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.red,
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
                                 ),
                                 textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadUserId,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
-                                ),
-                                child: const Text(
-                                  'Retry',
-                                  style: TextStyle(color: Colors.white),
-                                ),
                               ),
                             ],
                           ),
@@ -700,14 +690,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.event,
+                              const Icon(
+                                Icons.handshake,
                                 size: 64,
-                                color: Colors.grey[400],
+                                color: Colors.grey,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No meetings found for ${statuses[selectedIndex]}',
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w500,
@@ -716,7 +706,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Total meetings in system: ${meetings.length}',
+                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[500],
@@ -730,7 +720,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                           itemCount: filteredMeetings.length,
                           itemBuilder: (context, index) {
                             final meeting = filteredMeetings[index];
-                            debugPrint('Displaying meeting: ${meeting['id']}');
+                            developer.log('Displaying meeting: ${meeting['id']}');
                             return MeetingCard(
                               meeting: meeting,
                               baseUrl: widget.baseUrl,
@@ -741,14 +731,15 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                               //       meetings.removeWhere(
                               //         (m) => m['id'] == meeting['id'],
                               //       );
-        
+
                               //       _loadMeetings();
                               //     });
                               //   }
                               // },
                               onLocationRequestSent: _onLocationRequestSent,
                               onProceedWithBid: () {
-                                debugPrint('Proceed with Bid triggered for meeting ${meeting['id']}');
+
+                                developer.log('Proceed with Bid triggered for meeting ${meeting['id']}');
                                 _proceedWithBid(context, meeting);
                               },
                               // onIncreaseBid: () => _increaseBid(context, meeting),
@@ -778,9 +769,9 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
-    debugPrint('Proceed with Bid called for meeting ${meeting['id']}');
+    developer.log('Proceed with Bid called for meeting ${meeting['id']}');
     if (_userId == null || _userId == 'Unknown') {
-      debugPrint('Invalid user ID');
+      developer.log('Invalid user ID');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
       );
@@ -789,27 +780,30 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     if (meeting['bid_amount'] == null ||
         meeting['bid_amount'] == '0.00' ||
         meeting['bid_id'] == '0') {
-      debugPrint(
+      developer.log(
         'Proceed with Bid failed: bid_amount=${meeting['bid_amount']}, bid_id=${meeting['bid_id']}',
       );
-      final bool? placeBid = await showDialog<bool>(
+      await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('No Bid Found'),
-          content: const Text('No valid bid exists for this meeting. Would you like to place a bid?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+        builder:
+            (context) => AlertDialog(
+              title: const Text('No Bid Found'),
+              content: const Text(
+                'No valid bid exists for this meeting. Would you like to place a bid?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Place Bid'),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Place Bid'),
-            ),
-          ],
-        ),
       );
-      // if (placeBid == true) {
+      // if (_ignorePlaceBid == true) {
       //   await _increaseBid(context, meeting);
       // }
       return;
@@ -840,7 +834,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     );
 
     if (confirmed != true) {
-      debugPrint('Bid confirmation cancelled by user');
+      developer.log('Bid confirmation cancelled by user');
       return;
     }
 
@@ -859,10 +853,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying proceed with bid: $e');
+          developer.log('Retrying proceed with bid: $e');
         },
       );
-      debugPrint('my-meeting-proceed-with-bid.php response: ${response.body}');
+      developer.log('my-meeting-proceed-with-bid.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -882,14 +876,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for proceed with bid');
+        developer.log('Rate limit exceeded for proceed with bid');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-        debugPrint(
+        developer.log(
           'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -897,7 +891,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         );
       }
     } catch (e) {
-      debugPrint('Error proceeding with bid: $e');
+      developer.log('Error proceeding with bid: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error proceeding with bid')),
       );
@@ -969,10 +963,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                     delayFactor: const Duration(seconds: 2),
   //                     randomizationFactor: 0.25,
   //                     onRetry: (e) {
-  //                       debugPrint('Retrying increase bid: $e');
+  //                       developer.log('Retrying increase bid: $e');
   //                     },
   //                   );
-  //                   debugPrint(
+  //                   developer.log(
   //                     'my-meeting-increase-bid.php response: ${response.body}',
   //                   );
   //                   if (response.statusCode == 200) {
@@ -996,7 +990,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                       );
   //                     }
   //                   } else if (response.statusCode == 429) {
-  //                     debugPrint('Rate limit exceeded for increase bid');
+  //                     developer.log('Rate limit exceeded for increase bid');
   //                     ScaffoldMessenger.of(context).showSnackBar(
   //                       const SnackBar(
   //                         content: Text(
@@ -1005,7 +999,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                       ),
   //                     );
   //                   } else {
-  //                     debugPrint(
+  //                     developer.log(
   //                       'my-meeting-increase-bid.php failed with status ${response.statusCode}',
   //                     );
   //                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1013,7 +1007,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                     );
   //                   }
   //                 } catch (e) {
-  //                   debugPrint('Error increasing bid: $e');
+  //                   developer.log('Error increasing bid: $e');
   //                   ScaffoldMessenger.of(context).showSnackBar(
   //                     const SnackBar(content: Text('Error increasing bid')),
   //                   );
@@ -1039,7 +1033,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
-      debugPrint('No meeting times available');
+      developer.log('No meeting times available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No meeting times available')),
       );
@@ -1080,7 +1074,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                   (time) => time['value'] == value,
                                   orElse: () => {'name': ''},
                                 )['name'];
-                            debugPrint(
+                            developer.log(
                               'Selected time: $selectedTimeName ($selectedTimeValue)',
                             );
                           });
@@ -1098,7 +1092,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                           selectedTimeValue == null
                               ? null
                               : () async {
-                                debugPrint(
+                                developer.log(
                                   'Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}',
                                 );
                                 try {
@@ -1112,7 +1106,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                           'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
                                     },
                                   );
-                                  debugPrint(
+                                  developer.log(
                                     'my-meeting-fix-time.php response: ${response.body}',
                                   );
                                   if (response.statusCode == 200) {
@@ -1143,7 +1137,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                       );
                                     }
                                   } else {
-                                    debugPrint(
+                                    developer.log(
                                       'my-meeting-fix-time.php failed with status ${response.statusCode}',
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1153,7 +1147,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                     );
                                   }
                                 } catch (e) {
-                                  debugPrint('Error updating meeting time: $e');
+                                  developer.log('Error updating meeting time: $e');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -1207,10 +1201,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           delayFactor: const Duration(seconds: 2),
           randomizationFactor: 0.25,
           onRetry: (e) {
-            debugPrint('Retrying edit date: $e');
+            developer.log('Retrying edit date: $e');
           },
         );
-        debugPrint('my-meeting-edit-date.php response: ${response.body}');
+        developer.log('my-meeting-edit-date.php response: ${response.body}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == true || data['status'] == 'true') {
@@ -1230,14 +1224,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
             );
           }
         } else if (response.statusCode == 429) {
-          debugPrint('Rate limit exceeded for edit date');
+          developer.log('Rate limit exceeded for edit date');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Too many requests. Please try again later.'),
             ),
           );
         } else {
-          debugPrint(
+          developer.log(
             'my-meeting-edit-date.php failed with status ${response.statusCode}',
           );
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1245,7 +1239,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } catch (e) {
-        debugPrint('Error updating meeting date: $e');
+        developer.log('Error updating meeting date: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error updating meeting date')),
         );
@@ -1278,10 +1272,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          debugPrint('Retrying send location request: $e');
+          developer.log('Retrying send location request: $e');
         },
       );
-      debugPrint(
+      developer.log(
         'my-meeting-send-location-request.php response: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -1310,14 +1304,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } else if (response.statusCode == 429) {
-        debugPrint('Rate limit exceeded for send location request');
+        developer.log('Rate limit exceeded for send location request');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-        debugPrint(
+        developer.log(
           'my-meeting-send-location-request.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1325,7 +1319,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         );
       }
     } catch (e) {
-      debugPrint('Error sending location request: $e');
+      developer.log('Error sending location request: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error sending location request')),
       );
@@ -1352,7 +1346,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
   //       },
   //     );
-  //     debugPrint('my-meeting-cancel.php response: ${response.body}');
+  //     developer.log('my-meeting-cancel.php response: ${response.body}');
   //     if (response.statusCode == 200) {
   //       final data = jsonDecode(response.body);
   //       if (data['status'] == true || data['status'] == 'true') {
@@ -1372,7 +1366,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //         );
   //       }
   //     } else {
-  //       debugPrint(
+  //       developer.log(
   //         'my-meeting-cancel.php failed with status ${response.statusCode}',
   //       );
   //       ScaffoldMessenger.of(context).showSnackBar(
@@ -1380,7 +1374,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //       );
   //     }
   //   } catch (e) {
-  //     debugPrint('Error cancelling meeting: $e');
+  //     developer.log('Error cancelling meeting: $e');
   //     ScaffoldMessenger.of(
   //       context,
   //     ).showSnackBar(const SnackBar(content: Text('Error cancelling meeting')));

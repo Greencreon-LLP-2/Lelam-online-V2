@@ -156,46 +156,70 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return changedFields;
   }
 
-  Future<void> _saveChanges({required int saveType}) async {
-    if (!_formKey.currentState!.validate()) {
-      Fluttertoast.showToast(
-        msg: "Please fill in all required fields correctly",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.orange.withOpacity(0.8),
-        textColor: Colors.white,
-        fontSize: 16.0,
+Future<void> _saveChanges({required int saveType}) async {
+  if (!_formKey.currentState!.validate()) {
+    Fluttertoast.showToast(
+      msg: "Please fill in all required fields correctly",
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.orange.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+    return;
+  }
+
+  try {
+    final changedFields = _getChangedFields(saveType: saveType);
+    final isImageUpdated = _selectedImagePath != null;
+
+    // Only make API call if there are changes or a new image is selected
+    if (changedFields.isNotEmpty || isImageUpdated) {
+      changedFields['user_id'] = _userProvider.userData?.userId ?? '';
+
+      // Call the profile update API
+      final response = await ApiService().postMultipart(
+        url: userProfileUpdate,
+        fields: changedFields,
+        fileField: "image",
+        filePath: _selectedImagePath,
       );
-      return;
-    }
 
-    try {
-      final changedFields = _getChangedFields(saveType: saveType);
-      final isImageUpdated = _selectedImagePath != null;
-
-      // Only make API call if there are changes or a new image is selected
-      if (changedFields.isNotEmpty || isImageUpdated) {
-        changedFields['user_id'] =
-            _userProvider.userData?.userId ?? '';
-
-        final response = await ApiService().postMultipart(
-          url: userProfileUpdate,
-          fields: changedFields,
-          fileField: "image",
-          filePath: _selectedImagePath,
+      if (response["status"] == true && response["code"] == 200) {
+        // Re-fetch the full updated user data (same as MainScaffold)
+        final updatedResponse = await ApiService().get(
+          url: userDetails,
+          queryParams: {"user_id": _userProvider.userData?.userId ?? ''},
         );
 
-        if (response["status"] == true && response["code"] == 200) {
-          final responseData = response["data"];
-
-          // API already returns merged user + profile → use it directly
-          final updatedUserData = UserData.fromJson(responseData);
+        if (updatedResponse['status'] == true && updatedResponse['code'] == 200) {
+          final updatedUserData = UserData.fromJson(
+            updatedResponse['data'][0] as Map<String, dynamic>,
+          );
 
           // Update Hive via provider
           await Provider.of<LoggedUserProvider>(
             context,
             listen: false,
           ).setUser(updatedUserData);
+
+          // Update local state with new data
+          setState(() {
+            _originalData = updatedUserData.toJson();
+            _nameController.text = updatedUserData.name;
+            _emailController.text = updatedUserData.username;
+            _phoneController.text = updatedUserData.mobile;
+            _address1Controller.text = updatedUserData.address1;
+            _address2Controller.text = updatedUserData.address2;
+            _stateController.text = updatedUserData.state;
+            _pincodeController.text = ''; // Update if pincode is added to UserData
+            _cityController.text = updatedUserData.state; // Update if city is added
+            _countryController.text = updatedUserData.country;
+            _originalImageUrl = (updatedUserData.image?.isNotEmpty ?? false)
+                ? "$getImageFromServer${updatedUserData.image}"
+                : null;
+            _selectedImagePath = null; // Clear selected image after update
+          });
 
           // Clear password field if password update was successful
           if (saveType == 1) {
@@ -221,41 +245,35 @@ class _EditProfilePageState extends State<EditProfilePage> {
             fontSize: 16.0,
           );
         } else {
-          Fluttertoast.showToast(
-            msg: response["data"].toString(),
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.red.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-          Navigator.pop(context);
+          throw Exception('Failed to fetch updated user data');
         }
       } else {
-        Fluttertoast.showToast(
-          msg: "No changes detected",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.orange.withOpacity(0.8),
-          textColor: Colors.white,
-          fontSize: 16.0,
-        );
-        Navigator.pop(context);
+        throw Exception(response["data"]?.toString() ?? 'Update failed');
       }
-    } catch (e, stack) {
-      print(e);
-      print(stack);
+    } else {
       Fluttertoast.showToast(
-        msg: "Error: $e",
+        msg: "No changes detected",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red.withOpacity(0.8),
+        backgroundColor: Colors.orange.withOpacity(0.8),
         textColor: Colors.white,
         fontSize: 16.0,
       );
-      Navigator.pop(context);
     }
+  } catch (e, stack) {
+    print('Error in _saveChanges: $e');
+    print(stack);
+    Fluttertoast.showToast(
+      msg: "Error: $e",
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.red.withOpacity(0.8),
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
+    // Do NOT call Navigator.pop(context) here to avoid unintended navigation
   }
+}
 
   @override
   Widget build(BuildContext context) {
