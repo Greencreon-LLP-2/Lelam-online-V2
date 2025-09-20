@@ -1578,14 +1578,15 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             ),
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin:  const EdgeInsets.all(0),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                 decoration: BoxDecoration(
                   color:
                       isAuction
                           ? Palette.primarylightblue
                           : Colors.grey.shade50,
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(8),
+                    bottom: Radius.circular(0),
                   ),
                 ),
                 child:

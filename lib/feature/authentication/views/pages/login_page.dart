@@ -399,7 +399,7 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                   const SizedBox(height: 60),
                   Text(
-                    _isOtpMode ? 'Verify OTP' : 'Welcome Back',
+                    _isOtpMode ? 'Verify OTP' : 'Welcome',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.w600,

@@ -108,7 +108,6 @@ class _MarketPlaceProductDetailsPageState
     _fetchGalleryImages();
 
     _fetchBannerImage();
-    
 
     _isCheckingShortlist = true;
   }
@@ -816,7 +815,6 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
-      developer.log('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
@@ -2232,36 +2230,26 @@ class _MarketPlaceProductDetailsPageState
     return formatter.format(price.round());
   }
 
-  Widget _buildDetailItem(IconData icon, String text) {
-    return Flexible(
+  Widget _buildDetailItem(IconData icon, String text, String key) {
+    return Expanded(
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 4,
-        ), // Compact padding
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: Colors.grey[700],
-            ), // Slightly smaller icon
-            const SizedBox(width: 6), // Tighter spacing
+            Icon(icon, size: 14, color: Colors.grey[700]),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 2, // Prevent wrapping
-                style: const TextStyle(
-                  fontSize: 14, // Slightly smaller font for compactness
-                  color: Colors.black,
-                ),
+                maxLines: 2,
+                style: const TextStyle(fontSize: 14, color: Colors.black),
               ),
             ),
           ],
         ),
       ),
+      key: ValueKey(key), // Ensure unique key for each item
     );
   }
 
@@ -2822,156 +2810,65 @@ class _MarketPlaceProductDetailsPageState
                           else if (uniqueSellerComments.isEmpty)
                             const Center(child: Text('No details available'))
                           else
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                // Calculate max width per item based on screen width
-                                final maxItemWidth =
-                                    constraints.maxWidth /
-                                    3; // Max 3 items per row
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child: _buildDetailItem(
-                                            Icons.calendar_today,
-                                            uniqueSellerComments
-                                                .firstWhere(
-                                                  (comment) =>
-                                                      comment.attributeName
-                                                          .toLowerCase()
-                                                          .trim() ==
-                                                      'year',
-                                                  orElse:
-                                                      () => SellerComment(
-                                                        attributeName: 'Year',
-                                                        attributeValue: 'N/A',
-                                                      ),
-                                                )
-                                                .attributeValue,
-                                          ),
-                                        ),
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child: _buildDetailItem(
-                                            Icons.person,
-                                            uniqueSellerComments
-                                                .firstWhere(
-                                                  (comment) =>
-                                                      comment.attributeName
-                                                          .toLowerCase()
-                                                          .trim() ==
-                                                      'no of owners',
-                                                  orElse:
-                                                      () => SellerComment(
-                                                        attributeName:
-                                                            'No of owners',
-                                                        attributeValue: 'N/A',
-                                                      ),
-                                                )
-                                                .attributeValue,
-                                          ),
-                                        ),
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child: _buildDetailItem(
-                                            Icons.settings,
-                                            uniqueSellerComments
-                                                .firstWhere(
-                                                  (comment) =>
-                                                      comment.attributeName
-                                                          .toLowerCase()
-                                                          .trim() ==
-                                                      'transmission',
-                                                  orElse:
-                                                      () => SellerComment(
-                                                        attributeName:
-                                                            'Transmission',
-                                                        attributeValue: 'N/A',
-                                                      ),
-                                                )
-                                                .attributeValue,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(
-                                      height: 6,
-                                    ), // Tighter spacing between rows
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child: _buildDetailItem(
-                                            Icons.local_gas_station,
-                                            uniqueSellerComments
-                                                .firstWhere(
-                                                  (comment) =>
-                                                      comment.attributeName
-                                                          .toLowerCase()
-                                                          .trim() ==
-                                                      'fuel type',
-                                                  orElse:
-                                                      () => SellerComment(
-                                                        attributeName:
-                                                            'Fuel Type',
-                                                        attributeValue: 'N/A',
-                                                      ),
-                                                )
-                                                .attributeValue,
-                                          ),
-                                        ),
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child: _buildDetailItem(
-                                            Icons.speed,
-                                            uniqueSellerComments
-                                                .firstWhere(
-                                                  (comment) =>
-                                                      comment.attributeName
-                                                          .toLowerCase()
-                                                          .trim() ==
-                                                      'km range',
-                                                  orElse:
-                                                      () => SellerComment(
-                                                        attributeName:
-                                                            'KM Range',
-                                                        attributeValue: 'N/A',
-                                                      ),
-                                                )
-                                                .attributeValue,
-                                          ),
-                                        ),
-                                        // Add empty ConstrainedBox to align with top row
-                                        ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            maxWidth: maxItemWidth,
-                                          ),
-                                          child:
-                                              const SizedBox.shrink(), // Placeholder for alignment
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
+                          LayoutBuilder(
+  builder: (context, constraints) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _buildDetailItem(
+              Icons.calendar_today,
+              uniqueSellerComments.firstWhere(
+                (comment) => comment.attributeName.toLowerCase().trim() == 'year',
+                orElse: () => SellerComment(attributeName: 'Year', attributeValue: 'N/A'),
+              ).attributeValue,
+              'year',
+            ),
+            _buildDetailItem(
+              Icons.person,
+              uniqueSellerComments.firstWhere(
+                (comment) => comment.attributeName.toLowerCase().trim() == 'no of owners',
+                orElse: () => SellerComment(attributeName: 'No of owners', attributeValue: 'N/A'),
+              ).attributeValue,
+              'no_of_owners',
+            ),
+            _buildDetailItem(
+              Icons.settings,
+              uniqueSellerComments.firstWhere(
+                (comment) => comment.attributeName.toLowerCase().trim() == 'transmission',
+                orElse: () => SellerComment(attributeName: 'Transmission', attributeValue: 'N/A'),
+              ).attributeValue,
+              'transmission',
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            _buildDetailItem(
+              Icons.local_gas_station,
+              uniqueSellerComments.firstWhere(
+                (comment) => comment.attributeName.toLowerCase().trim() == 'fuel type',
+                orElse: () => SellerComment(attributeName: 'Fuel Type', attributeValue: 'N/A'),
+              ).attributeValue,
+              'fuel_type',
+            ),
+            _buildDetailItem(
+              Icons.speed,
+              uniqueSellerComments.firstWhere(
+                (comment) => comment.attributeName.toLowerCase().trim() == 'km range',
+                orElse: () => SellerComment(attributeName: 'KM Range', attributeValue: 'N/A'),
+              ).attributeValue,
+              'km_range',
+            ),
+            const Expanded(child: SizedBox.shrink()), // Placeholder for third column
+          ],
+        ),
+      ],
+    );
+  },
+)
                         ],
                       ),
                     ),
@@ -3024,7 +2921,7 @@ class _MarketPlaceProductDetailsPageState
                 ],
               ),
             ),
-          Positioned(
+            Positioned(
               left: 0,
               right: 0,
               bottom: 0,
@@ -3068,44 +2965,59 @@ class _MarketPlaceProductDetailsPageState
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _isWaitingForApproval ? null : _moveToAuction,
+                          onPressed:
+                              _isWaitingForApproval ? null : _moveToAuction,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isWaitingForApproval 
-                                ? Colors.white // White background when waiting
-                                : Palette.primaryblue, // Original blue when active
-                            foregroundColor: _isWaitingForApproval 
-                                ? Colors.black // Black text when waiting
-                                : Colors.white, // White text when active
-                            side: _isWaitingForApproval
-                                ? const BorderSide(color: Colors.black, width: 1) // Black border when waiting
-                                : BorderSide.none, // No border when active
+                            backgroundColor:
+                                _isWaitingForApproval
+                                    ? Colors
+                                        .white // White background when waiting
+                                    : Palette
+                                        .primaryblue, // Original blue when active
+                            foregroundColor:
+                                _isWaitingForApproval
+                                    ? Colors
+                                        .black // Black text when waiting
+                                    : Colors.white, // White text when active
+                            side:
+                                _isWaitingForApproval
+                                    ? const BorderSide(
+                                      color: Colors.black,
+                                      width: 1,
+                                    ) // Black border when waiting
+                                    : BorderSide.none, // No border when active
                             padding: const EdgeInsets.symmetric(vertical: 0),
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.zero,
                             ),
                           ),
-                          child: _isLoadingBid
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
+                          child:
+                              _isLoadingBid
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : Text(
+                                    _moveToAuctionButtonText,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          _isWaitingForApproval
+                                              ? Colors
+                                                  .black // Black text when waiting
+                                              : Colors
+                                                  .white, // White text when active
                                     ),
                                   ),
-                                )
-                              : Text(
-                                  _moveToAuctionButtonText,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: _isWaitingForApproval 
-                                        ? Colors.black // Black text when waiting
-                                        : Colors.white, // White text when active
-                                  ),
-                                ),
                         ),
-                      )] else ...[
+                      ),
+                    ] else ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => showProductBidDialog(context),
