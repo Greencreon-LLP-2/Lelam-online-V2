@@ -10,7 +10,9 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
@@ -89,6 +91,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String? userId;
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
+
+  bool _isLoadingContainerInfo = false;
+  List<ContainerInfo> _containerInfo = [];
+  String _containerInfoError = '';
+
   @override
   void initState() {
     super.initState();
@@ -103,12 +110,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     try {
       await _loadUserId(); // Ensure userId is loaded first
       await Future.wait([
-        _fetchLocations(),
-        _fetchAttributesData(),
-        _fetchSellerInfo(),
-        _fetchShortlistStatus(),
-        _fetchGalleryImages(),
-        _fetchBannerImage(),
+       _fetchAllData()
       ]);
     } catch (e, stackTrace) {
       debugPrint('Error in _initializeData: $e\n$stackTrace');
@@ -125,11 +127,182 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
+  Future<void> _fetchAllData() async {
+    await _fetchLocations();
+
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchContainerInfo();
+        await Future.delayed(Duration(milliseconds: 200));
+    await _fetchLocations();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchShortlistStatus();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchGalleryImages();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchBannerImage();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchAttributesData();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchSellerInfo();
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchContainerInfo() async {
+    setState(() {
+      _isLoadingContainerInfo = true;
+      _containerInfoError = '';
+    });
+
+    try {
+      final response = await MarketplaceService2.fetchContainerInfo(id);
+      setState(() {
+        _containerInfo = response.data;
+        _isLoadingContainerInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _containerInfoError = 'Failed to load details: $e';
+        _isLoadingContainerInfo = false;
+      });
+    }
+  }
+
+Widget _buildContainerInfo() {
+  if (_isLoadingContainerInfo) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_containerInfoError.isNotEmpty) {
+    return Center(
+      child: Text(
+        _containerInfoError,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (_containerInfo.isEmpty) {
+    return const Center(child: Text('Loading.......'));
+  }
+
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.30),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(1, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Details',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // First row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 0)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[0].icon),
+                          _containerInfo[0].value,
+                        ),
+                      if (_containerInfo.length > 1)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[1].icon),
+                          _containerInfo[1].value,
+                        ),
+                      if (_containerInfo.length > 2)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[2].icon),
+                          _containerInfo[2].value,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Second row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 3)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[3].icon),
+                          _containerInfo[3].value,
+                        ),
+                      if (_containerInfo.length > 4)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[4].icon),
+                          _containerInfo[4].value,
+                        ),
+                      if (_containerInfo.length <= 4)
+                        const SizedBox.shrink(),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildContainerDetailItem(IconData icon, String text) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  IconData _getIconFromBootstrap(String bootstrapIcon) {
+    final iconMap = {
+      'bi-calendar-minus-fill': Icons.calendar_today,
+      'bi-person-fill': Icons.person,
+      'bi-speedometer': Icons.speed,
+      'bi-fuel-pump-fill': Icons.local_gas_station,
+      'bi-gear-fill': Icons.settings,
+      // Add more mappings as needed
+    };
+
+    return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
   Future<void> _checkShortlistStatus() async {
@@ -1892,28 +2065,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     return formatter.format(number);
   }
 
-  Widget _buildDetailItem(IconData icon, String text, String key) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          children: [
-            Icon(icon, size: 14, color: Colors.grey[700]),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                text,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
-              ),
-            ),
-          ],
-        ),
-      ),
-      key: ValueKey(key), // Ensure unique key for each item
-    );
-  }
+
 
   Widget _buildSellerCommentItem(String label, String value) {
     return Padding(
@@ -2121,7 +2273,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
 
     if (uniqueSellerComments.isEmpty) {
-      return const Center(child: Text('No seller comments available'));
+      return const Center(child: Text('Loding.....'));
     }
 
     String formatAttributeName(String name) {
@@ -2440,156 +2592,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 ),
                 const Divider(),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.30),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                        offset: const Offset(1, 1),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(
-                      12.0,
-                    ), // Reduced padding for compactness
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Details',
-                          style: TextStyle(
-                            fontSize: 18, // Slightly smaller for consistency
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8), // Tighter spacing
-                        if (isLoadingSellerComments)
-                          const Center(child: CircularProgressIndicator())
-                        else if (uniqueSellerComments.isEmpty)
-                          const Center(child: Text('No details available'))
-                        else
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      _buildDetailItem(
-                                        Icons.calendar_today,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'year',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Year',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'year',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.person,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'no of owners',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'No of owners',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'no_of_owners',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.settings,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'transmission',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName:
-                                                        'Transmission',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'transmission',
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      _buildDetailItem(
-                                        Icons.local_gas_station,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'fuel type',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'Fuel Type',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'fuel_type',
-                                      ),
-                                      _buildDetailItem(
-                                        Icons.speed,
-                                        uniqueSellerComments
-                                            .firstWhere(
-                                              (comment) =>
-                                                  comment.attributeName
-                                                      .toLowerCase()
-                                                      .trim() ==
-                                                  'km range',
-                                              orElse:
-                                                  () => SellerComment(
-                                                    attributeName: 'KM Range',
-                                                    attributeValue: 'N/A',
-                                                  ),
-                                            )
-                                            .attributeValue,
-                                        'km_range',
-                                      ),
-                                      const Expanded(
-                                        child: SizedBox.shrink(),
-                                      ), // Placeholder for third column
-                                    ],
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildContainerInfo(),
+                  const Divider(),
 
                 Padding(
                   padding: const EdgeInsets.all(16.0),

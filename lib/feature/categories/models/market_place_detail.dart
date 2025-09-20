@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import '../models/market_place_detail.dart';
 import '../models/product_model.dart';
 
@@ -133,6 +134,76 @@ Future<Map<String, String>> fetchPostAttributeValues(String postId) async {
   } catch (e) {
     print('Error fetching attributes for post $postId: $e');
     return {};
+  }
+}
+
+Future<Map<String, String>> fetchPostDetailsWithIcons(String postId) async {
+    final url = '$baseUrl/post-details-with-icons.php?token=$token&post_id=$postId';
+    try {
+      print('Fetching post details with icons from: $url');
+      final response = await http.get(Uri.parse(url));
+      print('API Response Status: ${response.statusCode}');
+      print('API Response Body: ${response.body}');
+      if (response.statusCode == 200) {
+        final decodedBody = jsonDecode(response.body);
+        if (decodedBody['status'] == 'true' && decodedBody['data'] is List) {
+          final Map<String, String> uniqueAttributes = {};
+          for (var item in decodedBody['data']) {
+            final icon = item['icon']?.toString() ?? '';
+            final value = item['value']?.toString() ?? '';
+            if (value.isNotEmpty) {
+              // Map the icon to the corresponding attribute name
+              switch (icon) {
+                case 'bi-calendar-minus-fill':
+                  uniqueAttributes['Year'] = value;
+                  break;
+                case 'bi-person-fill':
+                  uniqueAttributes['No of owners'] = value;
+                  break;
+                case 'bi-speedometer':
+                  uniqueAttributes['KM Range'] = value;
+                  break;
+                case 'bi-fuel-pump-fill':
+                  uniqueAttributes['Fuel Type'] = value;
+                  break;
+                case 'bi-gear-fill':
+                  uniqueAttributes['Transmission'] = value;
+                  break;
+              }
+            }
+          }
+          return uniqueAttributes;
+        } else {
+          print('Invalid response: ${decodedBody['data']}');
+          return {};
+        }
+      } else {
+        throw Exception('Failed to fetch post details: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching post details for post $postId: $e');
+      return {};
+    }
+  }
+
+  // Add this method to your MarketplaceService2 class
+static Future<ContainerInfoResponse> fetchContainerInfo(String postId) async {
+  try {
+    final url = '$baseUrl/post-details-with-icons.php?token=$token&post_id=$postId';
+   
+    
+    final response = await http.get(Uri.parse(url));
+    
+    
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      return ContainerInfoResponse.fromJson(responseData);
+    } else {
+      throw Exception('Failed to load container info: ${response.statusCode}');
+    }
+  } catch (e) {
+   
+    throw e;
   }
 }
 
