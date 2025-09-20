@@ -1351,7 +1351,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 Container(
                   width: 120,
                   height: 150,
-                  margin: const EdgeInsets.all(8),
+                  // remove left gap so image aligns with any full-width banner above
+                  margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(8),
@@ -1605,24 +1606,33 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             ),
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
               Container(
-                margin: const EdgeInsets.all(0),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+
+                // make finance/exchange strip flush and remove extra vertical spacing
+                width: double.infinity,
+                padding: EdgeInsets.zero,
                 decoration: BoxDecoration(
                   color:
-                      isAuction
+                      (isAuction || isFinanceAvailable || isExchangeAvailable)
                           ? Palette.primarylightblue
                           : Colors.grey.shade50,
+                  // keep bottom radius to match card but no extra gap
                   borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(0),
                   ),
                 ),
-                child:
-                    isAuction
-                        ? _buildAuctionInfo(product)
-                        : _buildFinanceExchangeInfo(
-                          isFinanceAvailable,
-                          isExchangeAvailable,
-                        ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  child:
+                      isAuction
+                          ? _buildAuctionInfo(product)
+                          : _buildFinanceExchangeInfo(
+                            isFinanceAvailable,
+                            isExchangeAvailable,
+                          ),
+                ),
               ),
           ],
         ),
@@ -1708,6 +1718,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       );
     }
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color:
