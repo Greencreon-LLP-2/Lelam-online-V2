@@ -240,9 +240,9 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
         debugPrint('Total meetings loaded: ${meetings.length}');
       } else {
         debugPrint(
-          'Failed to fetch meetings: ${response.statusCode} - ${response.reasonPhrase}',
+          'No meetings: ${response.statusCode} - ${response.reasonPhrase}',
         );
-        errorMessage = 'Failed to fetch meetings';
+        errorMessage = 'No meetings';
       }
     } catch (e) {
       debugPrint('Error loading meetings: $e');

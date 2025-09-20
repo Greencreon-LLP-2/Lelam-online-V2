@@ -23,13 +23,10 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
-
+import 'dart:developer' as developer;
 import '../../services/details_service.dart' show TempApiService;
 
 class MarketplaceService {
-  static const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-  static const String token = '5cb2c9b569416b5db1604e0e12478ded';
-
   static final Map<String, List<MarketplacePost>> _postsCache = {};
   static List<Attribute>? _attributesCache;
   static List<AttributeVariation>? _attributeVariationsCache;
@@ -41,33 +38,26 @@ class MarketplaceService {
     required String userId,
   }) async {
     final cacheKey = '$categoryId-$userZoneId-$listingType-$userId';
-
     final endpoint =
         listingType == 'auction'
             ? '$baseUrl/list-category-post-auction.php'
             : '$baseUrl/list-category-post-marketplace.php';
-
     final url =
         listingType == 'auction'
             ? '$endpoint?token=$token&category_id=$categoryId&user_id=$userId&user_zone_id=$userZoneId'
             : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
-
     try {
-      print('Fetching posts from: $url');
       final response = await http.get(Uri.parse(url));
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-
         if (decodedBody is List) {
           final posts =
               decodedBody.map((json) {
                 try {
                   return MarketplacePost.fromJson(json);
                 } catch (e) {
-                  print('Error parsing post: $e');
-                  print('Problematic JSON: $json');
+                  developer.log('Error parsing post: $e');
+                  developer.log('Problematic JSON: $json');
                   throw Exception('Failed to parse post: $e');
                 }
               }).toList();
@@ -84,7 +74,7 @@ class MarketplaceService {
               'Please accept live auction terms') {
             throw Exception('Please accept live auction terms');
           } else if (decodedBody['data'] == 'Data not found') {
-            print('No posts found for $listingType');
+            developer.log('No posts found for $listingType');
             _postsCache[cacheKey] = [];
             return [];
           } else {
@@ -97,7 +87,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts ($listingType): $e');
+      developer.log('Error in fetchPosts ($listingType): $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -124,7 +114,7 @@ class MarketplaceService {
         throw Exception('Failed to load terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching auction terms: $e');
+      developer.log('Error fetching auction terms: $e');
       throw Exception('Error fetching terms: $e');
     }
   }
@@ -145,14 +135,14 @@ class MarketplaceService {
         throw Exception('Failed to accept terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error accepting auction terms: $e');
+      developer.log('Error accepting auction terms: $e');
       return false;
     }
   }
 
   Future<List<Attribute>> fetchAttributes() async {
     if (_attributesCache != null) {
-      print('Returning cached attributes');
+      developer.log('Returning cached attributes');
       return _attributesCache!;
     }
     _attributesCache = await TempApiService.fetchAttributes();
@@ -163,7 +153,7 @@ class MarketplaceService {
     Map<String, String> params,
   ) async {
     if (_attributeVariationsCache != null) {
-      print('Returning cached attribute variations');
+      developer.log('Returning cached attribute variations');
       return _attributeVariationsCache!;
     }
     _attributeVariationsCache = await TempApiService.fetchAttributeVariations(
@@ -331,13 +321,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 key: 'auction_terms_accepted',
                                 value: 'true',
                               );
-                            context.pop();
+                              context.pop();
                             } else {
                               setState(() {
                                 _errorMessage =
                                     'Failed to accept terms. Please try again.';
                               });
-                            context.pop();
+                              context.pop();
                             }
                           }
                           : null,
@@ -373,7 +363,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         );
       }
     } catch (e) {
-      print('Error checking auction terms: $e');
+      developer.log('Error checking auction terms: $e');
       return false;
     }
   }
@@ -386,7 +376,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _userId = userId;
       });
       if (kDebugMode) {
-        print('Checked login status: userId = $_userId');
+        developer.log('Checked login status: userId = $_userId');
       }
     }
   }
@@ -405,7 +395,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -416,13 +406,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       setState(() {
         _isLoadingLocations = false;
       });
-      print('Error fetching locations: $e');
+      developer.log('Error fetching locations: $e');
     }
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-      debugPrint(
+      developer.log(
         'Redirecting to login page: userId=$_userId, listingType=$_listingType',
       );
       context.push(
@@ -679,138 +669,157 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   List<Product> get filteredProducts {
     if (!_filtersChanged) return _filteredProductsCache;
-    final filtered = _products.where((product) {
-      final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-      if (_searchQuery.trim().isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final searchableText = [
-          product.title.toLowerCase(),
-          product.brand.toLowerCase(),
-          product.model.toLowerCase(),
-          product.modelVariation.toLowerCase(),
-          _getLocationName(product.parentZoneId).toLowerCase(),
-          attributeValues['Fuel Type']?.toLowerCase() ?? '',
-          attributeValues['Transmission']?.toLowerCase() ?? '',
-          attributeValues['Year']?.toLowerCase() ?? '',
-          attributeValues['Sold by']?.toLowerCase() ?? (product.byDealer == '1' ? 'dealer' : 'owner'),
-        ].join(' ');
-        if (!searchableText.contains(query)) return false;
-      }
-      if (_selectedLocation != 'all' && product.parentZoneId != _selectedLocation) return false;
-      if (_listingType == 'auction' && product.ifAuction != '1') return false;
-      if (_listingType == 'Marketplace' && product.ifAuction != '0') return false;
-      if (_selectedBrands.isNotEmpty && !_selectedBrands.contains(product.brand)) return false;
-      if (_selectedPriceRange != 'all') {
-        int price = product.ifAuction == '1'
-            ? (int.tryParse(product.auctionStartingPrice) ?? 0)
-            : (int.tryParse(product.price) ?? 0);
-        switch (_selectedPriceRange) {
-          case 'Under ₹2 Lakh':
-            if (price >= 200000) return false;
-            break;
-          case '₹2-5 Lakh':
-            if (price < 200000 || price >= 500000) return false;
-            break;
-          case '₹5-10 Lakh':
-            if (price < 500000 || price >= 1000000) return false;
-            break;
-          case '₹10-20 Lakh':
-            if (price < 1000000 || price >= 2000000) return false;
-            break;
-          case 'Above ₹20 Lakh':
-            if (price < 2000000) return false;
-            break;
-        }
-      }
-      final yearStr = attributeValues['Year'] ?? '0';
-      final year = int.tryParse(yearStr) ?? 0;
-      if (_selectedYearRange != 'all') {
-        switch (_selectedYearRange) {
-          case '2020 & Above':
-            if (year < 2020) return false;
-            break;
-          case '2018-2019':
-            if (year < 2018 || year > 2019) return false;
-            break;
-          case '2015-2017':
-            if (year < 2015 || year > 2017) return false;
-            break;
-          case '2010-2014':
-            if (year < 2010 || year > 2014) return false;
-            break;
-          case 'Below 2010':
-            if (year >= 2010) return false;
-            break;
-        }
-      }
-      final ownersStr = attributeValues['No of owners'] ?? '';
-      int owners = 0;
-      if (ownersStr.contains('1st')) owners = 1;
-      else if (ownersStr.contains('2nd')) owners = 2;
-      else if (ownersStr.contains('3rd')) owners = 3;
-      else if (ownersStr.contains('4')) owners = 4;
-      if (_selectedOwnersRange != 'all') {
-        switch (_selectedOwnersRange) {
-          case '1st Owner':
-            if (owners != 1) return false;
-            break;
-          case '2nd Owner':
-            if (owners != 2) return false;
-            break;
-          case '3rd Owner':
-            if (owners != 3) return false;
-            break;
-          case '4+ Owners':
-            if (owners < 4) return false;
-            break;
-        }
-      }
-      final fuel = attributeValues['Fuel Type'] ?? '';
-      if (_selectedFuelTypes.isNotEmpty && !_selectedFuelTypes.contains(fuel)) return false;
-      final trans = attributeValues['Transmission'] ?? '';
-      if (_selectedTransmissions.isNotEmpty && !_selectedTransmissions.contains(trans)) return false;
-      final kmStr = attributeValues['KM Range'] ?? '';
-      int km = 0;
-      final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
-      if (kmMatch != null) km = int.tryParse(kmMatch.group(1) ?? '0') ?? 0;
-      if (_selectedKmRange != 'all') {
-        switch (_selectedKmRange) {
-          case 'Under 10K':
-            if (km >= 10000) return false;
-            break;
-          case '10K-30K':
-            if (km < 10000 || km >= 30000) return false;
-            break;
-          case '30K-50K':
-            if (km < 30000 || km >= 50000) return false;
-            break;
-          case '50K-80K':
-            if (km < 50000 || km >= 80000) return false;
-            break;
-          case 'Above 80K':
-            if (km < 80000) return false;
-            break;
-        }
-      }
-      final soldBy = attributeValues['Sold by'] ?? (product.byDealer == '1' ? 'Dealer' : 'Owner');
-      if (_selectedSoldBy != 'all') {
-        switch (_selectedSoldBy) {
-          case 'Owner':
-            if (soldBy != 'Owner') return false;
-            break;
-          case 'Dealer':
-          case 'Certified Dealer':
-            if (soldBy != 'Dealer' && soldBy != 'Certified Dealer') return false;
-            break;
-        }
-      }
-      return true;
-    }).toList();
+    final filtered =
+        _products.where((product) {
+          final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+          if (_searchQuery.trim().isNotEmpty) {
+            final query = _searchQuery.toLowerCase().trim();
+            final searchableText = [
+              product.title.toLowerCase(),
+              product.brand.toLowerCase(),
+              product.model.toLowerCase(),
+              product.modelVariation.toLowerCase(),
+              _getLocationName(product.parentZoneId).toLowerCase(),
+              attributeValues['Fuel Type']?.toLowerCase() ?? '',
+              attributeValues['Transmission']?.toLowerCase() ?? '',
+              attributeValues['Year']?.toLowerCase() ?? '',
+              attributeValues['Sold by']?.toLowerCase() ??
+                  (product.byDealer == '1' ? 'dealer' : 'owner'),
+            ].join(' ');
+            if (!searchableText.contains(query)) return false;
+          }
+          if (_selectedLocation != 'all' &&
+              product.parentZoneId != _selectedLocation)
+            return false;
+          if (_listingType == 'auction' && product.ifAuction != '1')
+            return false;
+          if (_listingType == 'Marketplace' && product.ifAuction != '0')
+            return false;
+          if (_selectedBrands.isNotEmpty &&
+              !_selectedBrands.contains(product.brand))
+            return false;
+          if (_selectedPriceRange != 'all') {
+            int price =
+                product.ifAuction == '1'
+                    ? (int.tryParse(product.auctionStartingPrice) ?? 0)
+                    : (int.tryParse(product.price) ?? 0);
+            switch (_selectedPriceRange) {
+              case 'Under ₹2 Lakh':
+                if (price >= 200000) return false;
+                break;
+              case '₹2-5 Lakh':
+                if (price < 200000 || price >= 500000) return false;
+                break;
+              case '₹5-10 Lakh':
+                if (price < 500000 || price >= 1000000) return false;
+                break;
+              case '₹10-20 Lakh':
+                if (price < 1000000 || price >= 2000000) return false;
+                break;
+              case 'Above ₹20 Lakh':
+                if (price < 2000000) return false;
+                break;
+            }
+          }
+          final yearStr = attributeValues['Year'] ?? '0';
+          final year = int.tryParse(yearStr) ?? 0;
+          if (_selectedYearRange != 'all') {
+            switch (_selectedYearRange) {
+              case '2020 & Above':
+                if (year < 2020) return false;
+                break;
+              case '2018-2019':
+                if (year < 2018 || year > 2019) return false;
+                break;
+              case '2015-2017':
+                if (year < 2015 || year > 2017) return false;
+                break;
+              case '2010-2014':
+                if (year < 2010 || year > 2014) return false;
+                break;
+              case 'Below 2010':
+                if (year >= 2010) return false;
+                break;
+            }
+          }
+          final ownersStr = attributeValues['No of owners'] ?? '';
+          int owners = 0;
+          if (ownersStr.contains('1st'))
+            owners = 1;
+          else if (ownersStr.contains('2nd'))
+            owners = 2;
+          else if (ownersStr.contains('3rd'))
+            owners = 3;
+          else if (ownersStr.contains('4'))
+            owners = 4;
+          if (_selectedOwnersRange != 'all') {
+            switch (_selectedOwnersRange) {
+              case '1st Owner':
+                if (owners != 1) return false;
+                break;
+              case '2nd Owner':
+                if (owners != 2) return false;
+                break;
+              case '3rd Owner':
+                if (owners != 3) return false;
+                break;
+              case '4+ Owners':
+                if (owners < 4) return false;
+                break;
+            }
+          }
+          final fuel = attributeValues['Fuel Type'] ?? '';
+          if (_selectedFuelTypes.isNotEmpty &&
+              !_selectedFuelTypes.contains(fuel))
+            return false;
+          final trans = attributeValues['Transmission'] ?? '';
+          if (_selectedTransmissions.isNotEmpty &&
+              !_selectedTransmissions.contains(trans))
+            return false;
+          final kmStr = attributeValues['KM Range'] ?? '';
+          int km = 0;
+          final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
+          if (kmMatch != null) km = int.tryParse(kmMatch.group(1) ?? '0') ?? 0;
+          if (_selectedKmRange != 'all') {
+            switch (_selectedKmRange) {
+              case 'Under 10K':
+                if (km >= 10000) return false;
+                break;
+              case '10K-30K':
+                if (km < 10000 || km >= 30000) return false;
+                break;
+              case '30K-50K':
+                if (km < 30000 || km >= 50000) return false;
+                break;
+              case '50K-80K':
+                if (km < 50000 || km >= 80000) return false;
+                break;
+              case 'Above 80K':
+                if (km < 80000) return false;
+                break;
+            }
+          }
+          final soldBy =
+              attributeValues['Sold by'] ??
+              (product.byDealer == '1' ? 'Dealer' : 'Owner');
+          if (_selectedSoldBy != 'all') {
+            switch (_selectedSoldBy) {
+              case 'Owner':
+                if (soldBy != 'Owner') return false;
+                break;
+              case 'Dealer':
+              case 'Certified Dealer':
+                if (soldBy != 'Dealer' && soldBy != 'Certified Dealer')
+                  return false;
+                break;
+            }
+          }
+          return true;
+        }).toList();
     _filteredProductsCache = filtered;
     _filtersChanged = false;
     return filtered;
   }
-
 
   String getImageUrl(String imagePath) {
     final cleanedPath =
@@ -845,7 +854,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             listingType: _listingType,
             onClearAll: () {
               _fetchProducts();
-              print("works");
+              developer.log("works");
             },
             onApplyFilters: ({
               required List<String> selectedBrands,
@@ -868,7 +877,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 _selectedSoldBy = selectedSoldBy;
               });
               _fetchFilterListings();
-             
             },
           ),
     );
@@ -1059,7 +1067,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
+    developer.log(
       'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
     );
     return Scaffold(
@@ -1174,7 +1182,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        debugPrint(
+                        developer.log(
                           'Navigating to login page from auction prompt',
                         );
                         context.push(
@@ -1221,53 +1229,60 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ],
                 ),
               )
-               : filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No cars found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try adjusting your filters or search terms',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _fetchProducts(forceRefresh: true),
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          itemCount: filteredProducts.length + (_showMainSearch ? 2 : 1),
-                          itemBuilder: (context, index) {
-                            if (_showMainSearch && index == 0) {
-                              return _buildSearchField();
-                            }
-                            if (index == (_showMainSearch ? 1 : 0)) {
-                              return _buildListingTypeButtons();
-                            }
-                            final productIndex = index - (_showMainSearch ? 2 : 1);
-                            if (productIndex < filteredProducts.length) {
-                              final product = filteredProducts[productIndex];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: _buildProductCard(product),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
+              : filteredProducts.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your filters or search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : RefreshIndicator(
+                onRefresh: () => _fetchProducts(forceRefresh: true),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _products.length + (_showMainSearch ? 2 : 1),
+                  itemBuilder: (context, index) {
+                    if (_showMainSearch && index == 0) {
+                      return _buildSearchField();
+                    }
+                    if (index == (_showMainSearch ? 1 : 0)) {
+                      return _buildListingTypeButtons();
+                    }
+                    final productIndex = index - (_showMainSearch ? 2 : 1);
+                    if (productIndex < _products.length) {
+                      final product = _products[productIndex];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildProductCard(product),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
     );
   }
 
@@ -1348,10 +1363,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 ),
                               ),
                           errorWidget: (context, url, error) {
-                            print(
+                            developer.log(
                               'Failed to load image: https://lelamonline.com/admin/${product.image}',
                             );
-                            print('Error: $error');
+                            developer.log('Error: $error');
                             return Container(
                               color: Colors.grey.shade200,
                               child: Icon(
@@ -1791,7 +1806,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      print("Error while fetching filter listings: $e");
+      developer.log("Error while fetching filter listings: $e");
     }
   }
 }
