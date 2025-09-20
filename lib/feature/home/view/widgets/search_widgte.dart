@@ -1,11 +1,11 @@
 // file: lib/feature/home/view/widgets/search_results_widget.dart
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
-import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart' hide token, baseUrl;
-import 'package:flutter/foundation.dart';
+import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart'
+    hide token, baseUrl;
 
 class SearchResultsWidget extends StatefulWidget {
   final String searchQuery;
@@ -17,9 +17,12 @@ class SearchResultsWidget extends StatefulWidget {
 }
 
 class _SearchResultsWidgetState extends State<SearchResultsWidget> {
-  List<dynamic> _products = [];
+  final ApiService apiService = ApiService();
+
+  List<MarketplacePost> _products = [];
   bool _isLoading = false;
   String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -44,49 +47,135 @@ class _SearchResultsWidgetState extends State<SearchResultsWidget> {
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('${baseUrl}/search-post.php?token=${token}&q=$query'),
-        headers: {'Content-Type': 'application/json'},
+      final Map<String, dynamic> data = await apiService.get(
+        url: searchAnyProduct,
+        queryParams: {'q': query},
       );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        if (responseData['status'] == 'true' && responseData['data'] is List) {
-          setState(() {
-            _products = responseData['data'];
-            _isLoading = false;
-          });
-          if (kDebugMode) {
-            print('Products fetched for query "$query": ${_products.length} items');
-          }
-        } else {
-          throw Exception('Invalid response: ${responseData['status']}');
-        }
+      if (data['status'] == true &&
+          data['data'] != null &&
+          data['data'] is List) {
+        final results = data['data'] as List;
+        setState(() {
+          _products =
+              results.map((json) => MarketplacePost.fromJson(json)).toList();
+        });
       } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
+        setState(() {
+          _errorMessage = "No results found for \"$query\"";
+        });
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load products: $e';
+        _errorMessage = "Error while searching for \"$query\"";
       });
-      if (kDebugMode) {
-        print('Error fetching products: $e');
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_errorMessage ?? 'Failed to load products'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-        ),
-      );
+    } finally {
+      setState(() => _isLoading = false);
     }
+  }
+
+  void _openProductDetails(MarketplacePost product) {
+    final featureListModel = FeatureListModel(
+      id: product.id.toString(),
+      title: product.title,
+      price: product.price.toString(),
+      image: product.image ?? "",
+      ifAuction: product.ifAuction,
+      auctionStartingPrice: product.auctionStartingPrice,
+      slug: '',
+      categoryId: '',
+      brand: '',
+      model: '',
+      modelVariation: '',
+      description: '',
+      auctionPriceIntervel: '',
+      attributeId: [],
+      attributeVariationsId: [],
+      filters: {},
+      latitude: '',
+      longitude: '',
+      userZoneId: '',
+      parentZoneId: '',
+      zoneId: '',
+      landMark: '',
+      auctionStatus: '',
+      auctionStartin: '',
+      auctionEndin: '',
+      auctionAttempt: '',
+      adminApproval: '',
+      ifFinance: '',
+      ifExchange: '',
+      feature: '',
+      status: '',
+      visiterCount: '',
+      ifSold: '',
+      ifExpired: '',
+      byDealer: '',
+      createdBy: '',
+      createdOn: '',
+      updatedOn: '',
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailsPage(
+          product: featureListModel,
+          isAuction: featureListModel.ifAuction == "1",
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductCard(MarketplacePost product, bool hasDivider) {
+    return InkWell(
+      onTap: () => _openProductDetails(product),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: hasDivider ? Colors.grey.shade200 : Colors.transparent,
+              width: 1,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: product.image.isNotEmpty 
+                  ? Image.network(
+                    '$getImagePostImageUrl${product.image}',
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                    )
+                  : Container(
+                      width: 40,
+                      height: 40,
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                product.title,
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.searchQuery.isEmpty) {
-      return const SizedBox.shrink(); // Hide when no query
-    }
+    if (widget.searchQuery.isEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -102,9 +191,7 @@ class _SearchResultsWidgetState extends State<SearchResultsWidget> {
         ],
         border: Border.all(color: Colors.grey.shade300),
       ),
-      constraints: const BoxConstraints(
-        maxHeight: 200, // Limit height to mimic dropdown
-      ),
+      constraints: const BoxConstraints(maxHeight: 260),
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -119,68 +206,45 @@ class _SearchResultsWidgetState extends State<SearchResultsWidget> {
                   ? const Padding(
                       padding: EdgeInsets.all(8.0),
                       child: Text(
-                        'No products found',
+                        "No products found",
                         style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const ClampingScrollPhysics(),
-                      itemCount: _products.length,
-                      itemBuilder: (context, index) {
-                        final product = _products[index];
-                        return InkWell(
-                          onTap: () {
-                            // Map API response to FeatureListModel
-                            final featureListModel = FeatureListModel(
-                              id: product['id']?.toString() ?? '',
-                              title: product['name'] ?? 'Unnamed Product',
-                              price: product['price']?.toString() ?? '0',
-                              image: product['image']?.toString() ?? '',
-                              ifAuction: product['ifAuction']?.toString() ?? '0',
-                              auctionStartingPrice:
-                                  product['auctionStartingPrice']?.toString() ?? '0', slug: '', categoryId: '', brand: '', model: '', modelVariation: '', description: '', auctionPriceIntervel: '', attributeId: [], attributeVariationsId: [], filters: {}, latitude: '', longitude: '', userZoneId: '', parentZoneId: '', zoneId: '', landMark: '', auctionStatus: '', auctionStartin: '', auctionEndin: '', auctionAttempt: '', adminApproval: '', ifFinance: '', ifExchange: '', feature: '', status: '', visiterCount: '', ifSold: '', ifExpired: '', byDealer: '', createdBy: '', createdOn: '', updatedOn: '',
-                              // Add other required fields if necessary
-                            );
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ProductDetailsPage(
-                                  product: featureListModel,
-                                  isAuction: featureListModel.ifAuction == "1",
-                                ),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: Colors.grey.shade200,
-                                  width: index < _products.length - 1 ? 1 : 0, // No border for last item
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    product['name'] ?? 'Unnamed Product',
-                                    style: const TextStyle(fontSize: 14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  'ID: ${product['id'] ?? 'N/A'}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                              ],
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(8)),
+                          ),
+                          child: Text(
+                            "Found ${_products.length} results",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            physics: const ClampingScrollPhysics(),
+                            itemCount: _products.length,
+                            itemBuilder: (context, index) {
+                              return _buildProductCard(
+                                _products[index],
+                                index < _products.length - 1,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
     );
   }

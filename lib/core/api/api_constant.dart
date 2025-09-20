@@ -35,6 +35,8 @@ const String attributeVariations =
 const String getImageFromServer = '$baseUrl/get-image.php?file=';
 const String getImagePostImageUrl = '$simpleBaseUrl/admin/';
 const String faqUrl = '$baseUrl/list-faq.php';
+const String searchAnyProduct = '$baseUrl/search-post.php';
+const String notifications = '$baseUrl/fetch-notifications.php';
 const String allusers = '$baseUrl/index.php';
 const String userDetails = '$baseUrl/user-details.php';
 const String userRegister = '$baseUrl/register.php';
