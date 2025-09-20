@@ -50,6 +50,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         Uri.parse(
           '$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
         ),
+
         headers: {'token': token},
       );
 
@@ -75,7 +76,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               fetchedAds.add(widget.adData!);
               _expandedImages[passedAdId] = false;
             } else {
-              developer.log('Passed ad already exists in fetched ads');
+
+              print('Passed ad already exists in fetched ads');
+
               final adIndex = fetchedAds.indexWhere(
                 (ad) => ad['id'] == passedAdId,
               );
@@ -151,28 +154,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     }
   }
 
-  Future<String?> _fetchMainImageUrl(String postId) async {
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/get-post-main-image.php?token=$token&post_id=$postId',
-        ),
-        headers: {'token': token},
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        developer.log('Fetch main image response for post $postId: $responseData');
-        if (responseData['status'] == 'true' && responseData['data'] is Map) {
-          return responseData['data']['image_url'] ?? '';
-        }
-      }
-      return null;
-    } catch (e) {
-      developer.log('Error fetching main image for post $postId: $e');
-      return null;
-    }
-  }
 
   Future<void> _checkApprovalStatus(String postId) async {
     try {
@@ -423,6 +404,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         body: {'id': adId, 'action': 'delete'},
       );
 
+
       developer.log(
         'Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
       );
@@ -481,6 +463,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         imageUrl = '$getImagePostImageUrl${ad['image'] as String}';
       } else {
         imageUrl =
+
             '$getImagePostImageUrl${ad['image'].startsWith('/') ? ad['image'].substring(1) : ad['image']}';
       }
     } else {
@@ -490,6 +473,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       );
     }
     final isExpanded = _expandedImages[ad['id']] ?? false;
+
 
     developer.log(imageUrl);
 
@@ -572,6 +556,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           'adData': ad,
                         },
                       );
+
                       developer.log(
                         'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
                       );
@@ -609,6 +594,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               onTap: () {
                 setState(() {
                   _expandedImages[ad['id']] = !isExpanded;
+=
                   developer.log(
                     'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
                   );
@@ -622,6 +608,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child:
+
                     imageUrl != null
                         ? CachedNetworkImage(
                           imageUrl: imageUrl,
@@ -639,6 +626,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                                 ),
                               ),
                           errorWidget: (context, url, error) {
+
                             developer.log(
                               'Error loading image for ad ${ad['id']}: $error',
                             );
@@ -956,9 +944,17 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(errorMessage!),
+            Icon(Icons.inventory, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadAds, child: const Text('Retry')),
+            Text(
+              'No ads found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+
           ],
         ),
       );
@@ -969,9 +965,18 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('No ads found'),
+            Icon(Icons.inventory, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadAds, child: const Text('Refresh')),
+
+            Text(
+              'No ads found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+
           ],
         ),
       );

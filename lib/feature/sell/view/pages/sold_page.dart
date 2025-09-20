@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
@@ -11,7 +10,7 @@ import 'package:provider/provider.dart';
 
 class SoldPage extends StatelessWidget {
   final String? userId;
-  final Map<String, dynamic>? adData; 
+  final Map<String, dynamic>? adData;
 
   const SoldPage({super.key, this.userId, this.adData});
 
@@ -19,10 +18,7 @@ class SoldPage extends StatelessWidget {
     try {
       final response = await ApiService().get(
         url: '$baseUrl/sold.php',
-        queryParams: {
-          'token': token,
-          'user_id': userId,
-        },
+        queryParams: {'token': token, 'user_id': userId},
       );
       if (kDebugMode) print('Sold items response: $response');
 
@@ -39,7 +35,10 @@ class SoldPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
 
     if (!userProvider.isLoggedIn) {
       return Scaffold(
@@ -66,11 +65,10 @@ class SoldPage extends StatelessWidget {
     }
 
     final effectiveUserId = userId ?? userProvider.userData?.userId ?? '';
- // Retrieve from LoggedUserProvider or HiveHelper
+    // Retrieve from LoggedUserProvider or HiveHelper
 
     if (effectiveUserId.isEmpty) {
       return Scaffold(
-        
         backgroundColor: Colors.grey[50],
         body: const Center(
           child: Text(
@@ -82,7 +80,6 @@ class SoldPage extends StatelessWidget {
     }
 
     return Scaffold(
-
       backgroundColor: Colors.grey[50],
       body: FutureBuilder<List<dynamic>>(
         future: _fetchSoldItems(effectiveUserId, token),
@@ -90,45 +87,39 @@ class SoldPage extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            // Fluttertoast.showToast(
-            //   msg: snapshot.error.toString(),
-            //   toastLength: Toast.LENGTH_LONG,
-            //   gravity: ToastGravity.BOTTOM,
-            //   backgroundColor: Colors.red.withOpacity(0.8),
-            //   textColor: Colors.white,
-            //   fontSize: 16.0,
-            // );
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'No sold items',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
+                  Icon(Icons.sell, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      // Trigger rebuild to retry
-                      (context as Element).markNeedsBuild();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                  Text(
+                    'No sold items found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
                     ),
-                    child: const Text('Retry'),
                   ),
                 ],
               ),
             );
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                'No sold items found',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.sell, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No sold items found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -149,16 +140,16 @@ class SoldPage extends StatelessWidget {
                   contentPadding: const EdgeInsets.all(16),
                   title: Text(
                     item['title']?.toString() ?? 'Untitled',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   subtitle: Text(
                     'Price: ${item['price']?.toString() ?? 'N/A'}',
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
-                  trailing: const Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                  ),
+                  trailing: const Icon(Icons.sell, color: Colors.green),
                 ),
               );
             },
