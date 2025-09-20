@@ -531,7 +531,6 @@ class _AdPostPageState extends State<AdPostPage> {
           ),
         ),
         centerTitle: true,
-       
       ),
       body: AdPostForm(
         formKey: _formKey,
@@ -776,8 +775,8 @@ class _AdPostFormState extends State<AdPostForm>
               _selectedAttributes[attr.name] = filters[attr.id][0].toString();
             }
           }
-        } catch (e) {
-          print(e);
+        } catch (e, stack) {
+          print(stack);
         }
       }
     });
@@ -949,6 +948,11 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   Future<void> _submitForm() async {
+    if (_selectedImages.isEmpty) {
+      _showSnackBar('Please select at least 1 image', Colors.red);
+      return;
+    }
+
     // Brand/model validations
     if (widget.categoryId == '1' || widget.categoryId == '2') {
       if (_selectedBrand == null || _selectedBrandModel == null) {
@@ -957,17 +961,25 @@ class _AdPostFormState extends State<AdPostForm>
       }
     }
     if (widget.categoryId == '3') {
-      if (_selectedBrandModel == null) {
+      if (_controllers['listPrice']!.text.isEmpty) {
+        _showSnackBar('Please provide listing price', Colors.red);
+        return;
+      }
+      if (_brandModels.isNotEmpty && _selectedBrand == null) {
         _showSnackBar('Please select a Brand Type', Colors.red);
         return;
       }
-      if (_selectedBrand == null) {
+      if (_selectedBrandModel == null) {
         _showSnackBar('Please select Sale/rent type from Brand', Colors.red);
         return;
       }
     }
     if (widget.categoryId == '4' && _selectedBrand == null) {
-      _showSnackBar('Please select Sale/rent type from Brand', Colors.red);
+      if (_controllers['listPrice']!.text.isEmpty) {
+        _showSnackBar('Please provide listing price', Colors.red);
+        return;
+      }
+      _showSnackBar('Please select Sale/rent type from Model', Colors.red);
       return;
     }
 
@@ -1118,7 +1130,8 @@ class _AdPostFormState extends State<AdPostForm>
       } else {
         throw Exception(response['message'] ?? 'Failed to save ad');
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print(stack);
       _showSnackBar('Error saving ad: $e', Colors.red);
     } finally {
       setState(() {
@@ -1361,13 +1374,12 @@ class _AdPostFormState extends State<AdPostForm>
             _brandModels = [];
           });
           if (newValue != null) {
-            setState(
-              () async =>
-                  _brandModels = await AttributeValueService.fetchBrandModels(
-                    newValue.id,
-                    widget.categoryId,
-                  ),
-            );
+            final List<BrandModel> result =
+                await AttributeValueService.fetchBrandModels(
+                  newValue.id,
+                  widget.categoryId,
+                );
+            setState(() => _brandModels = result);
           }
         },
         isRequired: true,
