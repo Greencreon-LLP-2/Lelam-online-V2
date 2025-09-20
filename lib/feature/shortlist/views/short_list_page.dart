@@ -486,7 +486,7 @@ Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
       ),
       body: errorMessage == 'please_login'
           ? Center(
-              child: Column(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // const Icon(
@@ -504,11 +504,12 @@ Future<List<Product>> _fetchProductsForPostIds(List<String> postIds) async {
                       debugPrint('ShortListPage - Navigating to login page');
                     },
                     style: ElevatedButton.styleFrom(
+
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 0,
-                        vertical: 0,
+                        horizontal: 5,
+                        vertical: 5,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),

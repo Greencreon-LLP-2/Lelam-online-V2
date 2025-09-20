@@ -246,7 +246,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       }
     } catch (e) {
       debugPrint('Error loading meetings: $e');
-      errorMessage = 'Error loading meetings';
+      errorMessage = 'No meeting found';
     }
 
     if (mounted) {
@@ -648,17 +648,13 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Colors.red,
-                              ),
+                              
                               const SizedBox(height: 12),
                               Text(
                                 errorMessage!,
                                 style: const TextStyle(
                                   fontSize: 14,
-                                  color: Colors.red,
+                                  color: Colors.grey,
                                 ),
                                 textAlign: TextAlign.center,
                               ),

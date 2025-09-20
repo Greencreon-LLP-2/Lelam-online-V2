@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 class NotificationPage extends StatefulWidget {
@@ -24,6 +27,17 @@ class _NotificationPageState extends State<NotificationPage> {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     apiService = ApiService();
+
+    // if (!_userProvider.isLoggedIn || _userProvider.userId == null) {
+    //   WidgetsBinding.instance.addPostFrameCallback((_) {
+    //     // if (mounted) {
+    //     //   context.pushNamed(RouteNames.loginPage);
+    //     // }
+    //   });
+    //   return;
+    // }
+
+    // Fetch notifications only if user is logged in
     fetchNotifications();
   }
 
@@ -77,11 +91,45 @@ class _NotificationPageState extends State<NotificationPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_userProvider.isLoggedIn || _userProvider.userId == null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Please log in to view notifications',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  context.pushNamed(RouteNames.loginPage);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Log In',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.blue,
+        backgroundColor: AppTheme.primaryColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -110,8 +158,7 @@ class _NotificationPageState extends State<NotificationPage> {
                     ),
                   )
                 : ListView.builder(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     itemCount: notificationsList.length,
                     itemBuilder: (context, index) {
                       final notif = notificationsList[index];
