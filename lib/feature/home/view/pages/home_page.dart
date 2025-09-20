@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
+import 'dart:developer' as developer;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,7 +38,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     if (kDebugMode) {
-      print('HomePage initialized, userId: ${_userProvider.userData?.userId}');
+      developer.log('HomePage initialized, userId: ${_userProvider.userData?.userId}');
     }
     _fetchDistricts();
   }
@@ -72,7 +73,7 @@ class _HomePageState extends State<HomePage> {
             _isLoading = false;
           });
           if (kDebugMode) {
-            print('Districts fetched: $_districts');
+            developer.log('Districts fetched: $_districts');
           }
         } else {
           throw Exception('Invalid response: ${responseData['status']}');
@@ -86,7 +87,7 @@ class _HomePageState extends State<HomePage> {
         _errorMessage = 'Failed to load districts: $e';
       });
       if (kDebugMode) {
-        print('Error fetching districts: $e');
+        developer.log('Error fetching districts: $e');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,7 +100,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onRefresh() async {
     if (kDebugMode) {
-      print(
+      developer.log(
         'Pull-to-refresh triggered, searchQuery: $_searchQuery, selectedDistrict: $_selectedDistrict',
       );
     }
@@ -110,11 +111,11 @@ class _HomePageState extends State<HomePage> {
       });
       await Future.delayed(const Duration(seconds: 1));
       if (kDebugMode) {
-        print('Refresh completed');
+        developer.log('Refresh completed');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error during refresh: $e');
+        developer.log('Error during refresh: $e');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -169,7 +170,7 @@ class _HomePageState extends State<HomePage> {
                                               _selectedDistrict = newValue;
                                             });
                                             if (kDebugMode) {
-                                              print(
+                                              developer.log(
                                                 'Selected district: $_selectedDistrict',
                                               );
                                             }
@@ -185,7 +186,7 @@ class _HomePageState extends State<HomePage> {
                           onPressed: () {
                             context.pushNamed(RouteNames.notificationPage);
                             if (kDebugMode) {
-                              print('Navigating to notification page');
+                              developer.log('Navigating to notification page');
                             }
                           },
                           icon: const Icon(Icons.notifications),
@@ -205,7 +206,7 @@ class _HomePageState extends State<HomePage> {
                             _searchQuery = query;
                           });
                           if (kDebugMode) {
-                            print('Search query updated: $_searchQuery');
+                            developer.log('Search query updated: $_searchQuery');
                           }
                         }
                       },

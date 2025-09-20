@@ -7,7 +7,7 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
+import 'dart:developer' as developer;
 // MarketplacePost model (unchanged)
 class MarketplacePost {
   final String id;
@@ -195,8 +195,8 @@ class MarketplaceService {
             try {
               return MarketplacePost.fromJson(json);
             } catch (e) {
-              print('Error parsing post: $e');
-              print('Problematic JSON: $json');
+              developer.log('Error parsing post: $e');
+              developer.log('Problematic JSON: $json');
               throw Exception('Failed to parse post: $e');
             }
           }).toList();
@@ -210,7 +210,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts: $e');
+      developer.log('Error in fetchPosts: $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -244,6 +244,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String _selectedAreaRange = 'all';
   List<String> _selectedFurnishings = [];
   String _selectedPostedBy = 'all';
+  String _selectedCategory = 'Property Type';
+
+  final TextEditingController _minPriceController = TextEditingController();
+  final TextEditingController _maxPriceController = TextEditingController();
 
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
@@ -255,6 +259,15 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _scrollController.addListener(_handleScroll);
     _fetchPosts();
     _fetchLocations();
+
+    // Initialize price text fields if selectedPriceRange is not 'all'
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.split('-');
+      if (parts.length == 2) {
+        _minPriceController.text = parts[0];
+        _maxPriceController.text = parts[1];
+      }
+    }
   }
 
   @override
@@ -262,6 +275,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _searchController.dispose();
+    _minPriceController.dispose();
+    _maxPriceController.dispose();
     super.dispose();
   }
 
@@ -290,7 +305,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -390,6 +405,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   child: Column(
                     children: [
+                      // Top handle and title
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 12),
                         width: 40,
@@ -400,14 +416,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Filter Properties',
-                              style: TextStyle(
-                                fontSize: 20,
+                            Text(
+                              _listingType == 'auction'
+                                  ? 'Filter Auction Properties'
+                                  : 'Filter Properties',
+                              style: const TextStyle(
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -420,6 +438,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                   _selectedAreaRange = 'all';
                                   _selectedFurnishings.clear();
                                   _selectedPostedBy = 'all';
+                                  _minPriceController.clear();
+                                  _maxPriceController.clear();
                                 });
                                 _fetchPosts();
                               },
@@ -428,6 +448,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 style: TextStyle(
                                   color: Colors.red,
                                   fontWeight: FontWeight.w600,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -435,67 +456,87 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         ),
                       ),
                       const Divider(height: 1),
+                      // Two-column layout
                       Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildMultiSelectFilterSection(
-                                'Property Type',
-                                _propertyTypes,
-                                _selectedPropertyTypes,
-                                setModalState,
+                        child: Row(
+                          children: [
+                            // Left: Category list
+                            Container(
+                              width: 100,
+                              color: Palette.primaryblue,
+                              child: ListView.builder(
+                                itemCount: [
+                                  'Property Type',
+                                  'Price Range',
+                                  'Bedrooms',
+                                  'Area',
+                                  'Furnishing',
+                                  'Posted By'
+                                ].length,
+                                itemBuilder: (context, index) {
+                                  final category = [
+                                    'Property Type',
+                                    'Price Range',
+                                    'Bedrooms',
+                                    'Area',
+                                    'Furnishing',
+                                    'Posted By'
+                                  ][index];
+                                  final isSelected = _selectedCategory == category;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setModalState(() {
+                                        _selectedCategory = category;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.transparent,
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isSelected
+                                                ? Palette.primaryblue
+                                                : Colors.transparent,
+                                            width: 4,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        category,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          color: isSelected
+                                              ? Palette.primaryblue
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                              _buildSingleSelectFilterSection(
-                                'Price Range',
-                                _priceRanges,
-                                _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
-                                subtitle:
-                                    _listingType == 'auction'
-                                        ? 'Filter by starting bid price'
-                                        : 'Filter by sale price',
+                            ),
+                            // Right: Options for selected category
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: _buildOptionsSection(),
                               ),
-                              _buildSingleSelectFilterSection(
-                                'Bedrooms',
-                                _bedroomRanges,
-                                _selectedBedroomRange,
-                                (value) => setModalState(
-                                  () => _selectedBedroomRange = value,
-                                ),
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Area',
-                                _areaRanges,
-                                _selectedAreaRange,
-                                (value) => setModalState(
-                                  () => _selectedAreaRange = value,
-                                ),
-                              ),
-                              _buildMultiSelectFilterSection(
-                                'Furnishing',
-                                _furnishings,
-                                _selectedFurnishings,
-                                setModalState,
-                              ),
-                              _buildSingleSelectFilterSection(
-                                'Posted By',
-                                _postedByOptions,
-                                _selectedPostedBy,
-                                (value) => setModalState(
-                                  () => _selectedPostedBy = value,
-                                ),
-                              ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
+                      // Bottom buttons
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           border: Border(
@@ -509,24 +550,22 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 onPressed: () => Navigator.pop(context),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: const Text(
                                   'Cancel',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () async {
@@ -663,18 +702,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: const Text(
                                   'Apply Filters',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -699,57 +736,74 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setModalState(() {
+                          if (value == true) {
+                            selectedValues.add(option);
+                          } else {
+                            selectedValues.remove(option);
+                          }
+                        });
+                      },
+                      activeColor: Palette.primarypink,
+                      checkColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -762,67 +816,269 @@ class _RealEstatePageState extends State<RealEstatePage> {
     ValueChanged<String> onChanged, {
     String? subtitle,
   }) {
+    if (title == 'Price Range') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select $title',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _minPriceController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Min Price',
+                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(color: Palette.primarypink),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                  onChanged: (value) {
+                    setState(() {
+                      final min = _minPriceController.text;
+                      final max = _maxPriceController.text;
+                      if (min.isNotEmpty && max.isNotEmpty) {
+                        _selectedPriceRange = '$min-$max';
+                      } else {
+                        _selectedPriceRange = 'all';
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _maxPriceController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Max Price',
+                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: const BorderSide(color: Palette.primarypink),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  style: const TextStyle(fontSize: 12),
+                  onChanged: (value) {
+                    setState(() {
+                      final min = _minPriceController.text;
+                      final max = _maxPriceController.text;
+                      if (min.isNotEmpty && max.isNotEmpty) {
+                        _selectedPriceRange = '$min-$max';
+                      } else {
+                        _selectedPriceRange = 'all';
+                      }
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedPriceRange = 'all';
+                _minPriceController.clear();
+                _maxPriceController.clear();
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _selectedPriceRange == 'all' ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _selectedPriceRange == 'all' ? Palette.primarypink : Colors.grey.shade300,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Radio<String>(
+                    value: 'all',
+                    groupValue: _selectedPriceRange,
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedPriceRange = value;
+                          _minPriceController.clear();
+                          _maxPriceController.clear();
+                        });
+                      }
+                    },
+                    activeColor: Palette.primarypink,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Any Price Range',
+                      style: TextStyle(
+                        color: Palette.primarypink,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 4),
           Text(
             subtitle,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               color: Colors.grey.shade600,
               fontStyle: FontStyle.italic,
             ),
           ),
         ],
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Radio<String>(
+                      value: option,
+                      groupValue: selectedValue,
+                      onChanged: (value) {
+                        if (value != null) onChanged(value);
+                      },
+                      activeColor: Palette.primarypink,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayText,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
+  }
+
+  Widget _buildOptionsSection() {
+    switch (_selectedCategory) {
+      case 'Property Type':
+        return _buildMultiSelectFilterSection(
+          'Property Type',
+          _propertyTypes,
+          _selectedPropertyTypes,
+          setState,
+        );
+      case 'Price Range':
+        return _buildSingleSelectFilterSection(
+          'Price Range',
+          _priceRanges,
+          _selectedPriceRange,
+          (value) => setState(() => _selectedPriceRange = value),
+          subtitle: _listingType == 'auction'
+              ? 'Filter by starting bid price'
+              : 'Filter by sale price',
+        );
+      case 'Bedrooms':
+        return _buildSingleSelectFilterSection(
+          'Bedrooms',
+          _bedroomRanges,
+          _selectedBedroomRange,
+          (value) => setState(() => _selectedBedroomRange = value),
+        );
+      case 'Area':
+        return _buildSingleSelectFilterSection(
+          'Area',
+          _areaRanges,
+          _selectedAreaRange,
+          (value) => setState(() => _selectedAreaRange = value),
+        );
+      case 'Furnishing':
+        return _buildMultiSelectFilterSection(
+          'Furnishing',
+          _furnishings,
+          _selectedFurnishings,
+          setState,
+        );
+      case 'Posted By':
+        return _buildSingleSelectFilterSection(
+          'Posted By',
+          _postedByOptions,
+          _selectedPostedBy,
+          (value) => setState(() => _selectedPostedBy = value),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   int _getActiveFilterCount() {
@@ -1196,14 +1452,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             ),
                             image: DecorationImage(
                               image: NetworkImage(getImageUrl(post.image)),
-                              fit:
-                                  BoxFit
-                                      .cover, // Ensures full image is visible, scaled to fit
+                              fit: BoxFit.cover,
                               onError: (exception, stackTrace) {
-                                print(
+                                developer.log(
                                   'Failed to load image: ${getImageUrl(post.image)}',
                                 );
-                                print('Error: $exception');
+                                developer.log('Error: $exception');
                               },
                             ),
                           ),
@@ -1255,13 +1509,6 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            // Text(
-                            //   propertyType,
-                            //   style: TextStyle(
-                            //     fontSize: 10,
-                            //     color: Colors.grey.shade600,
-                            //   ),
-                            // ),
                             const SizedBox(height: 8),
                             Text(
                               isAuction

@@ -6,7 +6,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_Category_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-
+import 'dart:developer' as developer;
 import 'package:lelamonline_flutter/utils/palette.dart';
 
 // MarketplacePost model
@@ -193,8 +193,8 @@ class MarketplaceService {
             try {
               return MarketplacePost.fromJson(json);
             } catch (e) {
-              print('Error parsing post: $e');
-              print('Problematic JSON: $json');
+              developer.log('Error parsing post: $e');
+              developer.log('Problematic JSON: $json');
               throw Exception('Failed to parse post: $e');
             }
           }).toList();
@@ -208,7 +208,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts: $e');
+      developer.log('Error in fetchPosts: $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -406,7 +406,7 @@ class _OthersPageState extends State<OthersPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -548,170 +548,243 @@ class _OthersPageState extends State<OthersPage> {
     return filtered;
   }
 
-  void _showFilterBottomSheet() {
+ void _showFilterBottomSheet() {
+    String selectedFilter = 'Vehicle Type'; // Default selected filter
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setModalState) => Container(
-                  height: MediaQuery.of(context).size.height * 0.85,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: StatefulBuilder(
+          builder: (context, setModalState) => Column(
+            children: [
+              // Top handle and title
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Filter Bikes & Others',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(vertical: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+                    TextButton(
+                      onPressed: () {
+                        setModalState(() {
+                          _selectedVehicleTypes.clear();
+                          _selectedPriceRange = 'all';
+                          _selectedCondition = 'all';
+                          _selectedFuelTypes.clear();
+                        });
+                      },
+                      child: const Text(
+                        'Clear All',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Two-column layout
+              Expanded(
+                child: Row(
+                  children: [
+                    // Left: Filter Categories
+                    Container(
+                      width: 140,
+                      color: Palette.primaryblue,
+                      child: ListView(
+                        children: [
+                          _buildFilterCategoryTile(
+                            title: 'Vehicle Type',
+                            isSelected: selectedFilter == 'Vehicle Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Vehicle Type');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Price Range',
+                            isSelected: selectedFilter == 'Price Range',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Price Range');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Condition',
+                            isSelected: selectedFilter == 'Condition',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Condition');
+                            },
+                          ),
+                          _buildFilterCategoryTile(
+                            title: 'Fuel Type',
+                            isSelected: selectedFilter == 'Fuel Type',
+                            onTap: () {
+                              setModalState(() => selectedFilter = 'Fuel Type');
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Right: Filter Options
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Filter Bikes & Others',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _selectedVehicleTypes.clear();
-                                  _selectedPriceRange = 'all';
-                                  _selectedCondition = 'all';
-                                  _selectedFuelTypes.clear();
-                                });
-                              },
-                              child: const Text(
-                                'Clear All',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            if (selectedFilter == 'Vehicle Type')
                               _buildMultiSelectFilterSection(
                                 'Vehicle Type',
                                 _vehicleTypes,
                                 _selectedVehicleTypes,
                                 setModalState,
                               ),
+                            if (selectedFilter == 'Price Range')
                               _buildSingleSelectFilterSection(
                                 'Price Range',
                                 _priceRanges,
                                 _selectedPriceRange,
-                                (value) => setModalState(
-                                  () => _selectedPriceRange = value,
-                                ),
+                                (value) => setModalState(() => _selectedPriceRange = value),
                               ),
+                            if (selectedFilter == 'Condition')
                               _buildSingleSelectFilterSection(
                                 'Condition',
                                 _conditions,
                                 _selectedCondition,
-                                (value) => setModalState(
-                                  () => _selectedCondition = value,
-                                ),
+                                (value) => setModalState(() => _selectedCondition = value),
                               ),
+                            if (selectedFilter == 'Fuel Type')
                               _buildMultiSelectFilterSection(
                                 'Fuel Type',
                                 _fuelTypes,
                                 _selectedFuelTypes,
                                 setModalState,
                               ),
-                              const SizedBox(height: 100),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border(
-                            top: BorderSide(color: Colors.grey.shade200),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Cancel',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {});
-                                  Navigator.pop(context);
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Apply Filters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
+              // Bottom buttons
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+ Widget _buildFilterCategoryTile({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          border: Border(
+            left: BorderSide(
+              color: isSelected ? Palette.primaryblue : Colors.transparent,
+              width: 4,
+            ),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected ? Palette.primaryblue : Colors.white,
+          ),
+        ),
+      ),
     );
   }
 
@@ -724,57 +797,74 @@ class _OthersPageState extends State<OthersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValues.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setModalState(() {
-                      if (isSelected) {
-                        selectedValues.remove(option);
-                      } else {
-                        selectedValues.add(option);
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      option,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValues.contains(option);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedValues.remove(option);
+                  } else {
+                    selectedValues.add(option);
+                  }
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (value) {
+                        setModalState(() {
+                          if (value == true) {
+                            selectedValues.add(option);
+                          } else {
+                            selectedValues.remove(option);
+                          }
+                        });
+                      },
+                      activeColor: Palette.primarypink,
+                      checkColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -789,55 +879,64 @@ class _OthersPageState extends State<OthersPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
         Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          'Select $title',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((option) {
-                final isSelected = selectedValue == option;
-                final displayText = option == 'all' ? 'Any $title' : option;
-                return GestureDetector(
-                  onTap: () => onChanged(option),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected
-                              ? Palette.primarypink
-                              : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSelected
-                                ? Palette.primarypink
-                                : Colors.grey.shade300,
-                      ),
-                    ),
-                    child: Text(
-                      displayText,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
+        const SizedBox(height: 8),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: options.length,
+          itemBuilder: (context, index) {
+            final option = options[index];
+            final isSelected = selectedValue == option;
+            final displayText = option == 'all' ? 'Any $title' : option;
+            return GestureDetector(
+              onTap: () => onChanged(option),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    width: 1,
                   ),
-                );
-              }).toList(),
+                ),
+                child: Row(
+                  children: [
+                    Radio<String>(
+                      value: option,
+                      groupValue: selectedValue,
+                      onChanged: (value) {
+                        if (value != null) onChanged(value);
+                      },
+                      activeColor: Palette.primarypink,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayText,
+                        style: TextStyle(
+                          color: isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
   }
 
+ 
   int _getActiveFilterCount() {
     int count = 0;
     if (_selectedVehicleTypes.isNotEmpty) count++;
@@ -1234,10 +1333,10 @@ class _OthersPageState extends State<OthersPage> {
                               image: NetworkImage(getImageUrl(bike.image)),
                               fit: BoxFit.cover,
                               onError: (exception, stackTrace) {
-                                print(
+                                developer.log(
                                   'Failed to load image: ${getImageUrl(bike.image)}',
                                 );
-                                print('Error: $exception');
+                                developer.log('Error: $exception');
                               },
                             ),
                           ),

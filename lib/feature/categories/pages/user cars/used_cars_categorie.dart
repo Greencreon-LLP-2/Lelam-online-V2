@@ -23,7 +23,7 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
-
+import 'dart:developer' as developer;
 import '../../services/details_service.dart' show TempApiService;
 
 class MarketplaceService {
@@ -53,10 +53,10 @@ class MarketplaceService {
             : '$endpoint?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
 
     try {
-      print('Fetching posts from: $url');
+      developer.log('Fetching posts from: $url');
       final response = await http.get(Uri.parse(url));
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
+      developer.log('API Response Status: ${response.statusCode}');
+      developer.log('API Response Body: ${response.body}');
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
 
@@ -66,8 +66,8 @@ class MarketplaceService {
                 try {
                   return MarketplacePost.fromJson(json);
                 } catch (e) {
-                  print('Error parsing post: $e');
-                  print('Problematic JSON: $json');
+                  developer.log('Error parsing post: $e');
+                  developer.log('Problematic JSON: $json');
                   throw Exception('Failed to parse post: $e');
                 }
               }).toList();
@@ -84,7 +84,7 @@ class MarketplaceService {
               'Please accept live auction terms') {
             throw Exception('Please accept live auction terms');
           } else if (decodedBody['data'] == 'Data not found') {
-            print('No posts found for $listingType');
+            developer.log('No posts found for $listingType');
             _postsCache[cacheKey] = [];
             return [];
           } else {
@@ -97,7 +97,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts ($listingType): $e');
+      developer.log('Error in fetchPosts ($listingType): $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -124,7 +124,7 @@ class MarketplaceService {
         throw Exception('Failed to load terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching auction terms: $e');
+      developer.log('Error fetching auction terms: $e');
       throw Exception('Error fetching terms: $e');
     }
   }
@@ -145,14 +145,14 @@ class MarketplaceService {
         throw Exception('Failed to accept terms: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error accepting auction terms: $e');
+      developer.log('Error accepting auction terms: $e');
       return false;
     }
   }
 
   Future<List<Attribute>> fetchAttributes() async {
     if (_attributesCache != null) {
-      print('Returning cached attributes');
+      developer.log('Returning cached attributes');
       return _attributesCache!;
     }
     _attributesCache = await TempApiService.fetchAttributes();
@@ -163,7 +163,7 @@ class MarketplaceService {
     Map<String, String> params,
   ) async {
     if (_attributeVariationsCache != null) {
-      print('Returning cached attribute variations');
+      developer.log('Returning cached attribute variations');
       return _attributeVariationsCache!;
     }
     _attributeVariationsCache = await TempApiService.fetchAttributeVariations(
@@ -373,7 +373,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         );
       }
     } catch (e) {
-      print('Error checking auction terms: $e');
+      developer.log('Error checking auction terms: $e');
       return false;
     }
   }
@@ -386,7 +386,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _userId = userId;
       });
       if (kDebugMode) {
-        print('Checked login status: userId = $_userId');
+        developer.log('Checked login status: userId = $_userId');
       }
     }
   }
@@ -405,7 +405,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          print(
+          developer.log(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -416,13 +416,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       setState(() {
         _isLoadingLocations = false;
       });
-      print('Error fetching locations: $e');
+      developer.log('Error fetching locations: $e');
     }
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-      debugPrint(
+      developer.log(
         'Redirecting to login page: userId=$_userId, listingType=$_listingType',
       );
       context.push(
@@ -844,7 +844,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             listingType: _listingType,
             onClearAll: () {
               _fetchProducts();
-              print("works");
+              developer.log("works");
             },
             onApplyFilters: ({
               required List<String> selectedBrands,
@@ -1058,7 +1058,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
+    developer.log(
       'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
     );
     return Scaffold(
@@ -1173,7 +1173,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        debugPrint(
+                        developer.log(
                           'Navigating to login page from auction prompt',
                         );
                         context.push(
@@ -1354,10 +1354,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 ),
                               ),
                           errorWidget: (context, url, error) {
-                            print(
+                            developer.log(
                               'Failed to load image: https://lelamonline.com/admin/${product.image}',
                             );
-                            print('Error: $error');
+                            developer.log('Error: $error');
                             return Container(
                               color: Colors.grey.shade200,
                               child: Icon(
@@ -1797,7 +1797,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      print("Error while fetching filter listings: $e");
+      developer.log("Error while fetching filter listings: $e");
     }
   }
 }

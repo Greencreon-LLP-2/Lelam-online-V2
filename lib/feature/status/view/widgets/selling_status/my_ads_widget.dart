@@ -12,6 +12,7 @@ import 'package:lelamonline_flutter/feature/status/view/widgets/seller_tab_bar_w
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'dart:developer' as developer;
 
 class MyAdsWidget extends StatefulWidget {
   final Map<String, dynamic>? adData;
@@ -54,7 +55,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('API response: $responseData');
+        developer.log('API response: $responseData');
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final fetchedAds = List<Map<String, dynamic>>.from(
             responseData['data'],
@@ -70,11 +71,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               (ad) => ad['id'] == passedAdId,
             );
             if (!isAlreadyIncluded) {
-              print('Adding passed ad data: ${widget.adData}');
+              developer.log('Adding passed ad data: ${widget.adData}');
               fetchedAds.add(widget.adData!);
               _expandedImages[passedAdId] = false;
             } else {
-              print('Passed ad already exists in fetched ads');
+              developer.log('Passed ad already exists in fetched ads');
               final adIndex = fetchedAds.indexWhere(
                 (ad) => ad['id'] == passedAdId,
               );
@@ -94,7 +95,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               final dateB = dateFormat.parse(b['created_on'] as String);
               return dateB.compareTo(dateA);
             } catch (e) {
-              print('Error parsing dates for sorting: $e');
+              developer.log('Error parsing dates for sorting: $e');
               return 0;
             }
           });
@@ -103,7 +104,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
             ads = fetchedAds;
             isLoading = false;
           });
-          print('Fetched ${ads.length} ads');
+          developer.log('Fetched ${ads.length} ads');
 
           for (var ad in ads) {
             if (ad['admin_approval'] == '0') {
@@ -121,7 +122,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
       }
     } catch (e) {
-      print('No ads Found');
+      developer.log('No ads Found');
       setState(() {
         errorMessage = '$e';
         isLoading = false;
@@ -138,7 +139,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Status response for post $postId: $responseData');
+        developer.log('Status response for post $postId: $responseData');
         if (responseData['status'] == 'true') {
           setState(() {
             _adStatuses[postId] = responseData['data'] ?? 'Unknown';
@@ -146,7 +147,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         }
       }
     } catch (e) {
-      print('Error loading status for post $postId: $e');
+      developer.log('Error loading status for post $postId: $e');
     }
   }
 
@@ -161,14 +162,14 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Fetch main image response for post $postId: $responseData');
+        developer.log('Fetch main image response for post $postId: $responseData');
         if (responseData['status'] == 'true' && responseData['data'] is Map) {
           return responseData['data']['image_url'] ?? '';
         }
       }
       return null;
     } catch (e) {
-      print('Error fetching main image for post $postId: $e');
+      developer.log('Error fetching main image for post $postId: $e');
       return null;
     }
   }
@@ -182,7 +183,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Approval status response for post $postId: $responseData');
+        developer.log('Approval status response for post $postId: $responseData');
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final statusData = responseData['data'][0];
           if (statusData['admin_approval'] == '1') {
@@ -205,7 +206,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         }
       }
     } catch (e) {
-      print('Error checking approval status for post $postId: $e');
+      developer.log('Error checking approval status for post $postId: $e');
     }
   }
 
@@ -220,7 +221,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Auction terms response for post $postId: $responseData');
+        developer.log('Auction terms response for post $postId: $responseData');
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final termsData = responseData['data'][0];
           if (termsData['check'] == 0) {
@@ -231,7 +232,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         }
       }
     } catch (e) {
-      print('Error checking auction terms for post $postId: $e');
+      developer.log('Error checking auction terms for post $postId: $e');
     }
   }
 
@@ -276,7 +277,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Accept terms response for post $postId: $responseData');
+        developer.log('Accept terms response for post $postId: $responseData');
         if (responseData['status'] == 'true') {
           Fluttertoast.showToast(
             msg: 'Terms accepted for ad $postId',
@@ -293,7 +294,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         throw Exception('Failed to accept terms: ${response.reasonPhrase}');
       }
     } catch (e) {
-      print('Error accepting terms for post $postId: $e');
+      developer.log('Error accepting terms for post $postId: $e');
       Fluttertoast.showToast(
         msg: 'Error accepting terms: $e',
         toastLength: Toast.LENGTH_LONG,
@@ -319,7 +320,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Move to auction response for post $postId: $responseData');
+        developer.log('Move to auction response for post $postId: $responseData');
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -344,7 +345,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         throw Exception('Failed to move to auction: ${response.reasonPhrase}');
       }
     } catch (e) {
-      print('Error moving to auction for post $postId: $e');
+      developer.log('Error moving to auction for post $postId: $e');
       Fluttertoast.showToast(
         msg: 'Error moving to auction: $e',
         toastLength: Toast.LENGTH_LONG,
@@ -370,7 +371,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        print('Mark as delivered response for post $postId: $responseData');
+        developer.log('Mark as delivered response for post $postId: $responseData');
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -397,7 +398,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         );
       }
     } catch (e) {
-      print('Error marking ad $postId as delivered: $e');
+      developer.log('Error marking ad $postId as delivered: $e');
       Fluttertoast.showToast(
         msg: 'Error marking as delivered: $e',
         toastLength: Toast.LENGTH_LONG,
@@ -422,12 +423,12 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         body: {'id': adId, 'action': 'delete'},
       );
 
-      print(
+      developer.log(
         'Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
       );
-      print('Delete ad request body: id=$adId, action=delete');
-      print('Delete ad response status: ${response.statusCode}');
-      print('Delete ad response body: ${response.body}');
+      developer.log('Delete ad request body: id=$adId, action=delete');
+      developer.log('Delete ad response status: ${response.statusCode}');
+      developer.log('Delete ad response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonStart = response.body.indexOf('{');
@@ -435,9 +436,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         if (jsonStart != -1 && jsonEnd != -1) {
           final jsonString = response.body.substring(jsonStart, jsonEnd);
           final responseData = jsonDecode(jsonString);
-          print('Decoded delete ad response: $responseData');
+          developer.log('Decoded delete ad response: $responseData');
           if (responseData['status'] == 'true' && responseData['code'] != 4) {
-            print('Deleted ad $adId via API');
+            developer.log('Deleted ad $adId via API');
             await Future.delayed(const Duration(milliseconds: 100));
             await _loadAds();
             Fluttertoast.showToast(
@@ -459,7 +460,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         );
       }
     } catch (e) {
-      print('Error deleting ad: $e');
+      developer.log('Error deleting ad: $e');
       setState(() {
         errorMessage = 'Error deleting ad: $e';
       });
@@ -484,13 +485,13 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       }
     } else {
       imageUrl = '$getImagePostImageUrl${ad['id']}.jpg';
-      print(
+      developer.log(
         'Warning: Image field empty for ad ${ad['id']}, using fallback URL: $imageUrl',
       );
     }
     final isExpanded = _expandedImages[ad['id']] ?? false;
 
-    print(imageUrl);
+    developer.log(imageUrl);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -571,7 +572,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           'adData': ad,
                         },
                       );
-                      print(
+                      developer.log(
                         'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
                       );
                     } else if (value == 'delete') {
@@ -608,7 +609,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               onTap: () {
                 setState(() {
                   _expandedImages[ad['id']] = !isExpanded;
-                  print(
+                  developer.log(
                     'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
                   );
                 });
@@ -638,7 +639,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                                 ),
                               ),
                           errorWidget: (context, url, error) {
-                            print(
+                            developer.log(
                               'Error loading image for ad ${ad['id']}: $error',
                             );
                             Fluttertoast.showToast(
