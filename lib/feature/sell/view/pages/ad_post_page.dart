@@ -674,10 +674,27 @@ class _AdPostFormState extends State<AdPostForm>
     }
 
     // Fetch districts and brands
-    _districts = await AttributeValueService.fetchDistricts();
+    _districts = [
+  {
+    'id': '0', // Use a unique ID for "All Kerala"
+    'name': 'All Kerala',
+    'slug': 'all-kerala',
+    'parent_id': '0',
+    'image': '',
+    'description': '',
+    'latitude': '',
+    'longitude': '',
+    'popular': '0',
+    'status': '1',
+    'allstore_onoff': '1',
+    'created_on': '',
+    'updated_on': '',
+  },
+  ...await AttributeValueService.fetchDistricts()
+];
     _brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
-      _selectedDistrict ??=
+      _selectedDistrict ??= 'All Kerala'; 
           _districts.isNotEmpty ? _districts[0]['name'] : null;
       if (widget.adData?['brand'] != null) {
         _selectedBrand = _brands.firstWhere(

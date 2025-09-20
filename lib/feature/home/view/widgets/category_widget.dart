@@ -7,7 +7,7 @@ import 'package:lelamonline_flutter/feature/categories/pages/other_category/othe
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
-import 'package:rate_limiter/rate_limiter.dart';
+
 import 'package:shimmer/shimmer.dart';
 import 'package:http/http.dart' as http; // For handling HTTP errors
 
@@ -20,10 +20,6 @@ class CategoryWidget extends StatefulWidget {
 
 class _CategoryWidgetState extends State<CategoryWidget> {
   late Future<List<CategoryModel>> _categoriesFuture;
-  final _debouncedRefresh = debounce(
-    (Function() fn) => fn(),
-    const Duration(seconds: 2),
-  );
 
   // Retry configuration
   static const int maxRetries = 3;
