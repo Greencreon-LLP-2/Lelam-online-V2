@@ -1,4 +1,4 @@
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +11,11 @@ import 'package:shimmer/shimmer.dart';
 
 class ProductSectionWidget extends StatelessWidget {
   final String searchQuery;
-  const ProductSectionWidget({super.key, this.searchQuery = '', String? userId});
+  const ProductSectionWidget({
+    super.key,
+    this.searchQuery = '',
+    String? userId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -183,10 +187,11 @@ class ProductSectionWidget extends StatelessWidget {
     );
     return formatter.format(price.round());
   }
+
   Widget _buildProductCard(BuildContext context, FeatureListModel product) {
     final isAuction = product.ifAuction == "1";
     final formattedPrice =
-         '${_formatPrice(double.tryParse(product.price) ?? 0)}';
+        '${_formatPrice(double.tryParse(product.price) ?? 0)}';
     final formattedAuctionPrice =
         double.tryParse(product.auctionStartingPrice)?.toStringAsFixed(0) ??
         '0';
@@ -197,10 +202,11 @@ class ProductSectionWidget extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductDetailsPage(
-              product: product,
-              isAuction: product.ifAuction == "1",
-            ),
+            builder:
+                (context) => ProductDetailsPage(
+                  product: product,
+                  isAuction: product.ifAuction == "1",
+                ),
           ),
         );
       },
@@ -236,29 +242,27 @@ class ProductSectionWidget extends StatelessWidget {
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(12),
                       ),
-                      child: Image.network(
-                        imageUrl,
+                      child: CachedNetworkImage(
+                        imageUrl:
+                            'https://lelamonline.com/admin/${product.image}',
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              color: Colors.grey,
+                        placeholder:
+                            (context, url) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(color: Colors.grey[300]),
                             ),
-                          ),
-                        ),
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Shimmer.fromColors(
-                            baseColor: Colors.grey[300]!,
-                            highlightColor: Colors.grey[100]!,
-                            child: Container(
-                              color: Colors.grey[300],
+                        errorWidget:
+                            (context, url, error) => Container(
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.grey,
+                                ),
+                              ),
                             ),
-                          );
-                        },
                       ),
                     ),
                   ),
@@ -329,25 +333,28 @@ class ProductSectionWidget extends StatelessWidget {
 class VerifiedBannerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Colors.blue, Colors.blueAccent],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    final paint =
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Colors.blue, Colors.blueAccent],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    final path = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height * 0.6)
-      ..close();
+    final path =
+        Path()
+          ..moveTo(0, 0)
+          ..lineTo(size.width, 0)
+          ..lineTo(size.width, size.height)
+          ..lineTo(0, size.height * 0.6)
+          ..close();
 
     canvas.drawPath(path, paint);
 
-    final shadowPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.3)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+    final shadowPaint =
+        Paint()
+          ..color = Colors.blue.withOpacity(0.3)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
     canvas.drawPath(path, shadowPaint);
   }

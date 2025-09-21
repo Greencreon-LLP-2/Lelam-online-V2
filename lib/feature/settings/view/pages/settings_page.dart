@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
@@ -51,12 +52,12 @@ class SettingsPage extends StatelessWidget {
               child: ClipOval(
                 child:
                     originalImageUrl != null
-                        ? Image.network(
-                          originalImageUrl,
+                        ? CachedNetworkImage(
+                          imageUrl: originalImageUrl,
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
-                          errorBuilder:
+                          errorWidget:
                               (context, error, stackTrace) => Image.asset(
                                 'assets/images/avatar.gif',
                                 width: 80,

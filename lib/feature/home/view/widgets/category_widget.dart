@@ -32,7 +32,9 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   }
 
   // Function to fetch categories with retry logic
-  Future<List<CategoryModel>> _fetchCategoriesWithRetry({int retryCount = 0}) async {
+  Future<List<CategoryModel>> _fetchCategoriesWithRetry({
+    int retryCount = 0,
+  }) async {
     try {
       return await CategoryService().fetchCategories();
     } on http.ClientException catch (e) {
@@ -71,7 +73,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               return _buildShimmerCategories();
             } else if (snapshot.hasError) {
               // User-friendly error message
-              String errorMessage = 'Failed to load categories. Please try again.';
+              String errorMessage =
+                  'Failed to load categories. Please try again.';
               if (snapshot.error.toString().contains('429')) {
                 errorMessage = 'Too many requests. Please wait and try again.';
               }
@@ -104,7 +107,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               scrollDirection: Axis.horizontal,
               itemBuilder: (context, index) {
                 final category = categories[index];
-                final imageUrl = 'https://lelamonline.com/admin/${category.image}';
+                final imageUrl =
+                    'https://lelamonline.com/admin/${category.image}';
                 return InkWell(
                   onTap: () {
                     switch (category.id) {
@@ -155,20 +159,20 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                           child: CachedNetworkImage(
                             imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Shimmer.fromColors(
-                              baseColor: Colors.grey[300]!,
-                              highlightColor: Colors.grey[100]!,
-                              child: Container(
-                                color: Colors.grey[300],
-                              ),
-                            ),
+                            placeholder:
+                                (context, url) => Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(color: Colors.grey[300]),
+                                ),
                             errorWidget: (context, url, error) {
                               // Retry image loading for 429 errors
                               if (error.toString().contains('429')) {
                                 return FutureBuilder(
                                   future: _retryImageLoad(imageUrl),
                                   builder: (context, imageSnapshot) {
-                                    if (imageSnapshot.connectionState == ConnectionState.waiting) {
+                                    if (imageSnapshot.connectionState ==
+                                        ConnectionState.waiting) {
                                       return Shimmer.fromColors(
                                         baseColor: Colors.grey[300]!,
                                         highlightColor: Colors.grey[100]!,
@@ -187,7 +191,11 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                                         ),
                                       );
                                     }
-                                    return Image.network(imageUrl, fit: BoxFit.cover);
+                                    return CachedNetworkImage(
+                                      fit: BoxFit.cover,
+                                      imageUrl:
+                                          'https://lelamonline.com/admin/${category.image}',
+                                    );
                                   },
                                 );
                               }
@@ -201,7 +209,6 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                                 ),
                               );
                             },
-                           
                           ),
                         ),
                       ),
@@ -232,9 +239,10 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   // Function to retry image loading with exponential backoff
   Future<void> _retryImageLoad(String imageUrl, {int retryCount = 0}) async {
     try {
-      final response = await http.get(Uri.parse(imageUrl), headers: {
-        'User-Agent': 'LelamOnlineApp/1.0',
-      });
+      final response = await http.get(
+        Uri.parse(imageUrl),
+        headers: {'User-Agent': 'LelamOnlineApp/1.0'},
+      );
       if (response.statusCode == 200) {
         return;
       } else if (response.statusCode == 429 && retryCount < maxRetries) {
@@ -270,11 +278,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                 ),
               ),
               const SizedBox(height: 4),
-              Container(
-                width: 70,
-                height: 12,
-                color: Colors.grey[300],
-              ),
+              Container(width: 70, height: 12, color: Colors.grey[300]),
             ],
           ),
         );

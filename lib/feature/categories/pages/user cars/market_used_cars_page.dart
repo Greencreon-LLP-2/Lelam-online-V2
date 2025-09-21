@@ -137,26 +137,18 @@ class _MarketPlaceProductDetailsPageState
 
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
 
-    _fetchAllData();
 
+ _fetchLocations();
+     _fetchSellerComments();
+     _fetchSellerInfo();
+     _checkShortlistStatus();
+     _fetchGalleryImages();
+     _fetchBannerImage();
+
+     _fetchContainerInfo();
     _isCheckingShortlist = true;
   }
 
-  Future<void> _fetchAllData() async {
-    await _fetchLocations();
-    await Future.delayed(Duration(milliseconds: 100)); // Add delay
-    await _fetchSellerComments();
-    await Future.delayed(Duration(milliseconds: 500));
-    await _fetchSellerInfo();
-    await Future.delayed(Duration(milliseconds: 400));
-    await _checkShortlistStatus();
-    await Future.delayed(Duration(milliseconds: 200));
-    await _fetchGalleryImages();
-    await Future.delayed(Duration(milliseconds: 300));
-    await _fetchBannerImage();
-
-    await _fetchContainerInfo();
-  }
 
   // Add this method to your MarketplaceService2 class
   Future<void> _fetchContainerInfo() async {
@@ -1168,8 +1160,15 @@ void _showLoginPromptDialog(BuildContext context, String action) {
     builder: (dialogContext) {
       return LoginDialog(
         onSuccess: () {
-        
-          _fetchAllData();
+         _fetchLocations();
+     _fetchSellerComments();
+     _fetchSellerInfo();
+     _checkShortlistStatus();
+     _fetchGalleryImages();
+     _fetchBannerImage();
+
+     _fetchContainerInfo();
+       
         },
       );
     },

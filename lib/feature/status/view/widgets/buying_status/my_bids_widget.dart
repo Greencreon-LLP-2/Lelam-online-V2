@@ -36,6 +36,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   bool isLoading = true;
   String? error;
   String? _userId;
+  final Map<String, dynamic> _bidCache = {};
+final Map<String, dynamic> _postCache = {};
 
   @override
   void initState() {
@@ -345,7 +347,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       context.pushNamed(
         RouteNames.buyingStatusPage,
         queryParameters: {
-          'initialTab': '1', // Index of My Meetings tab
+          'initialTab': '1', 
           'initialStatus': 'Meeting Request',
           'postId': postId,
           'bidId': bidId,

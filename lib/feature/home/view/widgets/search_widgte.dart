@@ -1,5 +1,7 @@
 // file: lib/feature/home/view/widgets/search_results_widget.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
@@ -119,65 +121,112 @@ class _SearchResultsWidgetState extends State<SearchResultsWidget> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductDetailsPage(
-          product: featureListModel,
-          isAuction: featureListModel.ifAuction == "1",
-        ),
+        builder:
+            (context) => ProductDetailsPage(
+              product: featureListModel,
+              isAuction: featureListModel.ifAuction == "1",
+            ),
       ),
     );
   }
 
-  Widget _buildProductCard(MarketplacePost product, bool hasDivider) {
-    return InkWell(
-      onTap: () => _openProductDetails(product),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: hasDivider ? Colors.grey.shade200 : Colors.transparent,
-              width: 1,
-            ),
+Widget _buildProductCard(MarketplacePost product, bool hasDivider) {
+  // Format price based on whether it's an auction or marketplace item
+  final isAuction = product.ifAuction == '1';
+  final price = isAuction
+      ? double.tryParse(product.auctionStartingPrice) ?? 0
+      : double.tryParse(product.price) ?? 0;
+  final formatter = NumberFormat.currency(
+    locale: 'en_IN',
+    symbol: '₹',
+    decimalDigits: 0,
+  );
+  final formattedPrice = formatter.format(price.round());
+
+  return InkWell(
+    onTap: () {
+      // Dismiss keyboard before navigating
+      FocusScope.of(context).unfocus();
+      _openProductDetails(product);
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: hasDivider ? Colors.grey.shade200 : Colors.transparent,
+            width: 1,
           ),
         ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: product.image.isNotEmpty 
-                  ? Image.network(
-                    '$getImagePostImageUrl${product.image}',
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.image),
-                    )
-                  : Container(
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: product.image.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: '$getImagePostImageUrl${product.image}',
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
                       width: 40,
                       height: 40,
                       color: Colors.grey.shade200,
                       child: const Icon(Icons.image, color: Colors.grey),
                     ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 40,
+                      height: 40,
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  )
+                : Container(
+                    width: 40,
+                    height: 40,
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.image, color: Colors.grey),
+                  ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.title,
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  isAuction ? 'Starting: $formattedPrice' : formattedPrice,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue.shade700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                product.title,
-                style: const TextStyle(fontSize: 14),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  @override
-  Widget build(BuildContext context) {
-    if (widget.searchQuery.isEmpty) return const SizedBox.shrink();
+@override
+Widget build(BuildContext context) {
+  if (widget.searchQuery.isEmpty) return const SizedBox.shrink();
 
-    return Container(
+  return GestureDetector(
+    onTap: () {
+      // Dismiss keyboard when tapping anywhere in the widget
+      FocusScope.of(context).unfocus();
+    },
+    child: Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -246,6 +295,7 @@ class _SearchResultsWidgetState extends State<SearchResultsWidget> {
                         ),
                       ],
                     ),
-    );
-  }
+    ),
+  );
+}
 }

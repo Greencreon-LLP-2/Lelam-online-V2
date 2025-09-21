@@ -1317,7 +1317,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     if (!isFinanceAvailable) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(color: Palette.primarylightblue),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,

@@ -1731,9 +1731,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     children: [
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 5,
+                          padding: const EdgeInsets.only(
+                           top: 3
                           ),
                           decoration: BoxDecoration(
                             color:
@@ -1803,7 +1802,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     if (!isFinanceAvailable) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
       decoration: BoxDecoration(color: Palette.primarylightblue),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,

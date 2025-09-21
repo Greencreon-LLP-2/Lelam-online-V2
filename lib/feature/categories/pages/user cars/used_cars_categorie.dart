@@ -12,7 +12,8 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart' hide ModelVariation;
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart'
+    hide ModelVariation;
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
@@ -21,6 +22,7 @@ import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/utils/filters_page.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
@@ -210,7 +212,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<Product> _filteredProductsCache = [];
   bool _filtersChanged = false;
   Map<String, ModelVariation?> _modelVariationsCache = {};
-Set<String> _fetchingModelVariationIds = {};
+  Set<String> _fetchingModelVariationIds = {};
 
   @override
   void initState() {
@@ -220,14 +222,7 @@ Set<String> _fetchingModelVariationIds = {};
     _scrollController.addListener(_handleScroll);
     _listingType = widget.showAuctions ? 'auction' : 'Marketplace';
     _checkLoginStatus().then((_) {
-      if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
-        context.push(
-          RouteNames.loginPage,
-          extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
-        );
-      } else {
-        _fetchProducts();
-      }
+      _fetchProducts();
     });
     _fetchLocations();
   }
@@ -255,8 +250,6 @@ Set<String> _fetchingModelVariationIds = {};
     }
     _fetchVisibleAttributes();
   }
-
-
 
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
@@ -373,18 +366,17 @@ Set<String> _fetchingModelVariationIds = {};
     }
   }
 
-  Future<void> _checkLoginStatus() async {
-    final userId =
-        _userProvider.userId ?? await _storage.read(key: 'userId') ?? '';
-    if (mounted) {
-      setState(() {
-        _userId = userId;
-      });
-      if (kDebugMode) {
-        developer.log('Checked login status: userId = $_userId');
-      }
+Future<void> _checkLoginStatus() async {
+  final userId = _userProvider.userId ?? '';
+  if (mounted) {
+    setState(() {
+      _userId = userId;
+    });
+    if (kDebugMode) {
+      developer.log('Checked login status: userId = $_userId');
     }
   }
+}
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -416,13 +408,23 @@ Set<String> _fetchingModelVariationIds = {};
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
-    if (_listingType == 'auction' && (_userId == null || _userId!.isEmpty)) {
+    if (_listingType == 'auction' &&
+        (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
       developer.log(
-        'Redirecting to login page: userId=$_userId, listingType=$_listingType',
+        'Showing login dialog: userId=$_userId, listingType=$_listingType',
       );
-      context.push(
-        RouteNames.loginPage,
-        extra: {'redirectTo': 'usedCars', 'listingType': 'auction'},
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (BuildContext dialogContext) => LoginDialog(
+              onSuccess: () async {
+                await _checkLoginStatus(); // Update userId after login
+                await _fetchProducts(
+                  forceRefresh: true,
+                ); // Fetch products after login
+              },
+            ),
       );
       setState(() {
         _isLoading = false;
@@ -510,49 +512,57 @@ Set<String> _fetchingModelVariationIds = {};
     }
   }
 
-Future<void> _fetchModelVariation(String postId) async {
-  if (_modelVariationsCache.containsKey(postId) || _fetchingModelVariationIds.contains(postId)) {
-    return;
-  }
-  _fetchingModelVariationIds.add(postId);
-  try {
-    final variation = await _marketplaceService.fetchModelVariation(postId);
-    if (mounted) {
-      setState(() {
-        _modelVariationsCache[postId] = variation;
-        _fetchingModelVariationIds.remove(postId);
-        _filtersChanged = true;
-      });
+  Future<void> _fetchModelVariation(String postId) async {
+    if (_modelVariationsCache.containsKey(postId) ||
+        _fetchingModelVariationIds.contains(postId)) {
+      return;
     }
-  } catch (e) {
-    if (mounted) {
-      setState(() {
-        _fetchingModelVariationIds.remove(postId);
-      });
+    _fetchingModelVariationIds.add(postId);
+    try {
+      final variation = await _marketplaceService.fetchModelVariation(postId);
+      if (mounted) {
+        setState(() {
+          _modelVariationsCache[postId] = variation;
+          _fetchingModelVariationIds.remove(postId);
+          _filtersChanged = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _fetchingModelVariationIds.remove(postId);
+        });
+      }
     }
   }
-}
 
   void _fetchVisibleAttributes() {
-  if (_debounceTimer?.isActive ?? false) return;
-  _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final scrollOffset = _scrollController.offset;
-    const itemHeight = 180.0;
-    final firstVisibleIndex = (scrollOffset / itemHeight).floor();
-    final lastVisibleIndex = ((scrollOffset + screenHeight) / itemHeight).ceil();
+    if (_debounceTimer?.isActive ?? false) return;
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      final screenHeight = MediaQuery.of(context).size.height;
+      final scrollOffset = _scrollController.offset;
+      const itemHeight = 180.0;
+      final firstVisibleIndex = (scrollOffset / itemHeight).floor();
+      final lastVisibleIndex =
+          ((scrollOffset + screenHeight) / itemHeight).ceil();
 
-    for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _filteredProductsCache.length; i++) {
-      final product = _filteredProductsCache[i];
-      if (!_postAttributeValuesCache.containsKey(product.id) && !_fetchingPostIds.contains(product.id)) {
-        _fetchPostAttributes(product.id);
+      for (
+        int i = firstVisibleIndex;
+        i <= lastVisibleIndex && i < _filteredProductsCache.length;
+        i++
+      ) {
+        final product = _filteredProductsCache[i];
+        if (!_postAttributeValuesCache.containsKey(product.id) &&
+            !_fetchingPostIds.contains(product.id)) {
+          _fetchPostAttributes(product.id);
+        }
+        if (!_modelVariationsCache.containsKey(product.id) &&
+            !_fetchingModelVariationIds.contains(product.id)) {
+          _fetchModelVariation(product.id);
+        }
       }
-      if (!_modelVariationsCache.containsKey(product.id) && !_fetchingModelVariationIds.contains(product.id)) {
-        _fetchModelVariation(product.id);
-      }
-    }
-  });
-}
+    });
+  }
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
@@ -1154,230 +1164,188 @@ Future<void> _fetchModelVariation(String postId) async {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    developer.log(
-      'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
-    );
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+@override
+Widget build(BuildContext context) {
+  developer.log(
+    'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
+  );
+  return Consumer<LoggedUserProvider>(
+    builder: (context, userProvider, child) {
+      // Update _userId when provider changes
+      _userId = userProvider.userId ?? '';
+      return Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-        ),
-        title:
-            _showAppBarSearch
-                ? _buildAppBarSearchField()
-                : const Text('Used Cars'),
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                onPressed: _showFilterBottomSheet,
-                icon: const Icon(Icons.tune, color: Colors.black87),
-              ),
-              if (_getActiveFilterCount() > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${_getActiveFilterCount()}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          ),
+          title: _showAppBarSearch
+              ? _buildAppBarSearchField()
+              : const Text('Used Cars'),
+          actions: [
+            Stack(
+              children: [
+                IconButton(
+                  onPressed: _showFilterBottomSheet,
+                  icon: const Icon(Icons.tune, color: Colors.black87),
+                ),
+                if (_getActiveFilterCount() > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${_getActiveFilterCount()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          _isLoadingLocations
-              ? const CircularProgressIndicator()
-              : PopupMenuButton<String>(
-                icon: const Icon(Icons.location_on, color: Colors.black87),
-                onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
+              ],
+            ),
+            _isLoadingLocations
+                ? const CircularProgressIndicator()
+                : PopupMenuButton<String>(
+                    icon: const Icon(Icons.location_on, color: Colors.black87),
+                    onSelected: (String value) {
+                      setState(() {
+                        _selectedLocation = value == 'all'
                             ? 'all'
                             : _locations
                                 .firstWhere((loc) => loc.name == value)
                                 .id;
-                    _filtersChanged = true;
-                    _fetchProducts();
-                  });
-                },
-                itemBuilder: (BuildContext context) {
-                  return _keralaCities.map((String city) {
-                    return PopupMenuItem<String>(
-                      value: city,
-                      child: Row(
-                        children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const Icon(
-                              Icons.check,
-                              color: Colors.blue,
-                              size: 16,
-                            ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
-                            const SizedBox(width: 8),
-                          Text(city == 'all' ? 'All Kerala' : city),
-                        ],
-                      ),
-                    );
-                  }).toList();
-                },
-              ),
-        ],
-      ),
-      body:
-          _isLoading || _isLoadingLocations
-              ? const Center(
+                        _filtersChanged = true;
+                        _fetchProducts();
+                      });
+                    },
+                    itemBuilder: (BuildContext context) {
+                      return _keralaCities.map((String city) {
+                        return PopupMenuItem<String>(
+                          value: city,
+                          child: Row(
+                            children: [
+                              if (_selectedLocation ==
+                                  (city == 'all'
+                                      ? 'all'
+                                      : _locations
+                                          .firstWhere((loc) => loc.name == city)
+                                          .id))
+                                const Icon(
+                                  Icons.check,
+                                  color: Colors.blue,
+                                  size: 16,
+                                ),
+                              if (_selectedLocation ==
+                                  (city == 'all'
+                                      ? 'all'
+                                      : _locations
+                                          .firstWhere((loc) => loc.name == city)
+                                          .id))
+                                const SizedBox(width: 8),
+                              Text(city == 'all' ? 'All Kerala' : city),
+                            ],
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+          ],
+        ),
+        body: _isLoading || _isLoadingLocations
+            ? const Center(
                 child: CircularProgressIndicator(color: Palette.primaryblue),
               )
-              : _listingType == 'auction' &&
-                  (_userId == null || _userId!.isEmpty || _userId == 'Unknown')
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.lock_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Please log in to view auction listings',
-                      style: TextStyle(fontSize: 16, color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        developer.log(
-                          'Navigating to login page from auction prompt',
-                        );
-                        context.push(
-                          RouteNames.loginPage,
-                          extra: {
-                            'redirectTo': 'usedCars',
-                            'listingType': 'auction',
-                          },
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Palette.primaryblue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+            : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
-                        textStyle: const TextStyle(fontSize: 16),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => _fetchProducts(forceRefresh: true),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : filteredProducts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No cars found',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Try adjusting your filters or search terms',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => _fetchProducts(forceRefresh: true),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          itemCount: _products.length + (_showMainSearch ? 2 : 1),
+                          itemBuilder: (context, index) {
+                            if (_showMainSearch && index == 0) {
+                              return _buildSearchField();
+                            }
+                            if (index == (_showMainSearch ? 1 : 0)) {
+                              return _buildListingTypeButtons();
+                            }
+                            final productIndex = index - (_showMainSearch ? 2 : 1);
+                            if (productIndex < filteredProducts.length) {
+                              final product = filteredProducts[productIndex];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _buildProductCard(product),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
                       ),
-                      child: const Text('Log In'),
-                    ),
-                  ],
-                ),
-              )
-              : _errorMessage != null
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                    const SizedBox(height: 16),
-                    Text(
-                      _errorMessage!,
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => _fetchProducts(forceRefresh: true),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              )
-              : filteredProducts.isEmpty
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.search_off,
-                      size: 64,
-                      color: Colors.grey.shade400,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No cars found',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try adjusting your filters or search terms',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-              : RefreshIndicator(
-                onRefresh: () => _fetchProducts(forceRefresh: true),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  itemCount:
-                      _products.length +
-                      (_showMainSearch ? 2 : 1), // Removed SearchResultsWidget
-                  itemBuilder: (context, index) {
-                    if (_showMainSearch && index == 0) {
-                      return _buildSearchField();
-                    }
-                    if (index == (_showMainSearch ? 1 : 0)) {
-                      return _buildListingTypeButtons();
-                    }
-                    final productIndex = index - (_showMainSearch ? 2 : 1);
-                    if (productIndex < filteredProducts.length) {
-                      // Use filteredProducts here
-                      final product = filteredProducts[productIndex];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _buildProductCard(product),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ),
-    );
-  }
-
+      );
+    },
+  );
+}
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
@@ -1433,10 +1401,7 @@ Future<void> _fetchModelVariation(String postId) async {
                     height: 150,
                     // remove left gap so image aligns with any full-width banner above
                     margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                    
-                    ),
+                    decoration: BoxDecoration(color: Colors.grey.shade200),
                     child: Stack(
                       children: [
                         ClipRRect(
@@ -1553,16 +1518,16 @@ Future<void> _fetchModelVariation(String postId) async {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-  _modelVariationsCache[product.id] != null
-      ? ' ${_modelVariationsCache[product.id]!.variations}'
-      : _fetchingModelVariationIds.contains(product.id)
-          ? 'Loading...'
-          : product.modelVariation, // Fallback
-  style: TextStyle(
-    fontSize: 10,
-    color: Colors.grey.shade600,
-  ),
-),
+                          _modelVariationsCache[product.id] != null
+                              ? ' ${_modelVariationsCache[product.id]!.variations}'
+                              : _fetchingModelVariationIds.contains(product.id)
+                              ? 'Loading...'
+                              : product.modelVariation, // Fallback
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         if (isAuction)
                           Text(
@@ -1693,14 +1658,14 @@ Future<void> _fetchModelVariation(String postId) async {
               ],
             ),
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
-              Container(     
+              Container(
                 decoration: BoxDecoration(
                   color:
                       (isAuction || isFinanceAvailable || isExchangeAvailable)
                           ? Palette.primarylightblue
                           : Colors.grey.shade50,
+
                   // keep bottom radius to match card but no extra gap
-                  
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
