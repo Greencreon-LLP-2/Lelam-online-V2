@@ -29,11 +29,11 @@ class ChatListPage extends HookWidget {
       listen: false,
     );
     final userId = userProvider.userId ?? '';
-    final userName = userProvider.userData?.name?.isNotEmpty == true
+    final userName = userProvider.userData?.name.isNotEmpty == true
         ? userProvider.userData!.name
         : 'Guest User';
 
- Future<void> _openWhatsApp(BuildContext context) async {
+ Future<void> openWhatsApp(BuildContext context) async {
   const phoneNumber = '+918089308048';
   const message = 'Hello Support Team';
   const supportEmail = 'support@lelamonline.com'; // Replace with actual support email
@@ -150,7 +150,7 @@ class ChatListPage extends HookWidget {
   }
 }
 
-    Future<void> _fetchOtherUsers(
+    Future<void> fetchOtherUsers(
       String userId,
       ValueNotifier<List<Map<String, dynamic>>> chatRooms,
       ValueNotifier<Map<String, Map<String, String>>> userData,
@@ -239,7 +239,7 @@ class ChatListPage extends HookWidget {
               chatRooms.value = List<Map<String, dynamic>>.from(
                 jsonResponse['data'],
               );
-              await _fetchOtherUsers(userId, chatRooms, userData);
+              await fetchOtherUsers(userId, chatRooms, userData);
             } else {
               error.value = 'Failed to load chat rooms';
             }
@@ -293,7 +293,7 @@ class ChatListPage extends HookWidget {
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _openWhatsApp(context),
+            onPressed: () => openWhatsApp(context),
             backgroundColor: const Color(0xFF25D366),
             tooltip: 'Contact Support on WhatsApp',
             label: Row(
@@ -320,7 +320,7 @@ class ChatListPage extends HookWidget {
       );
     }
 
-    Widget _buildUserTile(Map<String, dynamic> chatRoom) {
+    Widget buildUserTile(Map<String, dynamic> chatRoom) {
       final userIdFrom = chatRoom['user_id_from'].toString();
       final userIdTo = chatRoom['user_id_to'].toString();
       final otherUserId = userIdFrom == userId ? userIdTo : userIdFrom;
@@ -387,7 +387,7 @@ class ChatListPage extends HookWidget {
       );
     }
 
-    Widget _buildLoadingTile(Map<String, dynamic> chatRoom) {
+    Widget buildLoadingTile(Map<String, dynamic> chatRoom) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
@@ -460,7 +460,7 @@ class ChatListPage extends HookWidget {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openWhatsApp(context),
+        onPressed: () => openWhatsApp(context),
         backgroundColor: const Color(0xFF25D366),
         tooltip: 'Contact Support on WhatsApp',
         label: Row(
@@ -573,10 +573,10 @@ class ChatListPage extends HookWidget {
                         if (isFetchingUsers.value &&
                             (!userData.value.containsKey(userIdFrom) ||
                                 !userData.value.containsKey(userIdTo))) {
-                          return _buildLoadingTile(chatRoom);
+                          return buildLoadingTile(chatRoom);
                         }
 
-                        return _buildUserTile(chatRoom);
+                        return buildUserTile(chatRoom);
                       },
                     ),
     );

@@ -81,7 +81,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
-  double _minBidIncrement = 1000;
+  final double _minBidIncrement = 1000;
   bool _isBidDialogOpen = false;
 
   bool _isMeetingDialogOpen = false;
@@ -473,7 +473,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       }
     } catch (e) {
       debugPrint('Error placing bid: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -485,9 +485,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
-    final TextEditingController _bidController = TextEditingController();
+    final TextEditingController bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(
+    Future<void> showResponseDialog(
       String message,
       bool isSuccess,
       bool isHighestBid,
@@ -747,7 +747,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _bidController,
+                      controller: bidController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: false,
                       ),
@@ -851,7 +851,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               _isLoadingBid
                                   ? null
                                   : () async {
-                                    final String amount = _bidController.text;
+                                    final String amount = bidController.text;
                                     if (amount.isEmpty) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -972,7 +972,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
     await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
-    _bidController.dispose();
+    bidController.dispose();
 
     if (result != null) {
       final bool ok = result['success'] == true;
@@ -980,7 +980,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           result['message']?.toString() ??
           (ok ? 'Bid placed successfully' : 'Failed to place bid');
       final bool isHighestBid = result['isHighestBid'] ?? false;
-      await _showResponseDialog(msg, ok, isHighestBid);
+      await showResponseDialog(msg, ok, isHighestBid);
     }
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
@@ -2167,8 +2167,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     ? _getOwnerText(comment.attributeValue)
                     : comment.attributeValue,
               ),
-            )
-            .toList(),
+            ),
       ],
     );
   }
@@ -2382,7 +2381,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                       Text(
                         widget.isAuction
                             ? '${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)} - ${formatPriceInt(double.tryParse(widget.product.price) ?? 0)}'
-                            : '${formatPriceInt(double.tryParse(price) ?? 0)}',
+                            : formatPriceInt(double.tryParse(price) ?? 0),
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -2435,7 +2434,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                               );
                             },
                             icon: const Icon(Icons.chat),
-                            label: const Text('Chat with Seller'),
+                            label: const Text('Contact Seller'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,

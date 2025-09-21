@@ -11,7 +11,6 @@ import 'package:lelamonline_flutter/feature/categories/models/market_place_detai
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart'
     show MarketplacePost;
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
-import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:go_router/go_router.dart';

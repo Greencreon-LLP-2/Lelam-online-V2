@@ -212,7 +212,7 @@ class _FAQPageState extends State<FAQPage> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),

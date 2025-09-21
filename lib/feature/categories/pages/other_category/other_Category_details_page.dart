@@ -59,7 +59,7 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
   late final LoggedUserProvider _userProvider;
   String? userId;
   bool _isLoadingBid = false;
-  double _minBidIncrement = 1000;
+  final double _minBidIncrement = 1000;
   String _currentHighestBid = '0';
   bool _isBidDialogOpen = false;
   bool _isMeetingDialogOpen = false;
@@ -321,7 +321,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                             debugPrint('Attempting to accept terms');
                             try {
                               final url =
-                                  '${baseUrl}/seller-accept-terms.php?token=${token}&post_id=$id&user_id=${_userProvider.userId}';
+                                  '$baseUrl/seller-accept-terms.php?token=$token&post_id=$id&user_id=${_userProvider.userId}';
                               debugPrint('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
                               debugPrint(
@@ -426,7 +426,7 @@ Future<bool> _checkAuctionTermsStatus() async {
       debugPrint('Terms accepted, proceeding to move to auction');
 
       final url =
-          '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
+          '$baseUrl/sell-move-to-auction.php?token=$token}&post_id=$id';
       debugPrint('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -822,9 +822,9 @@ Future<bool> _checkAuctionTermsStatus() async {
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid();
-    final TextEditingController _bidController = TextEditingController();
+    final TextEditingController bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(
+    Future<void> showResponseDialog(
       String message,
       bool isSuccess,
       bool isHighestBid,
@@ -1031,7 +1031,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _bidController,
+                  controller: bidController,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: false,
                   ),
@@ -1101,7 +1101,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                           _isLoadingBid
                               ? null
                               : () async {
-                                final amount = _bidController.text;
+                                final amount = bidController.text;
                                 if (amount.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -1178,9 +1178,9 @@ Future<bool> _checkAuctionTermsStatus() async {
           ),
     );
 
-    _bidController.dispose();
+    bidController.dispose();
     if (result != null) {
-      await _showResponseDialog(
+      await showResponseDialog(
         result['message'],
         result['success'],
         result['isHighestBid'],

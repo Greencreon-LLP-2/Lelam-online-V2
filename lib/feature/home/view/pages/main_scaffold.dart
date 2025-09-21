@@ -268,7 +268,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         body: SafeArea(child: _pages[currentIndex]),
         bottomNavigationBar: SafeArea(
           bottom: true,
-          child: Container(
+          child: SizedBox(
             height: 35, // Reduced height for BottomNavigationBar
             child: BottomNavigationBar(
               type: BottomNavigationBarType.fixed,

@@ -126,31 +126,4 @@ class FeatureListModel {
       updatedOn: json['updated_on'] ?? '',
     );
   }
-
-  static List<String> _parseStringList(dynamic value) {
-    if (value is String) {
-      try {
-        final decoded = jsonDecode(value) as List;
-        return decoded.map((e) => e.toString()).toList();
-      } catch (_) {
-        return [value.toString()];
-      }
-    } else if (value is List) {
-      return value.map((e) => e.toString()).toList();
-    }
-    return [];
-  }
-
-  static Map<String, dynamic> _parseFilters(dynamic value) {
-    if (value is String) {
-      try {
-        return Map<String, dynamic>.from(jsonDecode(value));
-      } catch (_) {
-        return {};
-      }
-    } else if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
-    return {};
-  }
 }

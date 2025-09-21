@@ -94,8 +94,9 @@ class MarketplacePost {
       if (value is String) {
         try {
           final decoded = jsonDecode(value);
-          if (decoded is List)
+          if (decoded is List) {
             return List<String>.from(decoded.map((e) => e.toString()));
+          }
         } catch (e) {
           return value.split(',').map((e) => e.trim()).toList();
         }

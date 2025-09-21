@@ -1,7 +1,5 @@
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';

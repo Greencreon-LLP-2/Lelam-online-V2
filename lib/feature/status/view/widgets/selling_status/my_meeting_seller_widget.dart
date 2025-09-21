@@ -54,6 +54,32 @@ class StatusPill extends StatelessWidget {
   }
 }
 
+class PillConnector extends StatelessWidget {
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const PillConnector({
+    super.key,
+    this.isActive = false,
+    this.activeColor = Colors.green,
+    this.inactiveColor = Colors.grey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 4,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      decoration: BoxDecoration(
+        color: isActive ? activeColor : inactiveColor,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
 class MyMeetingsSellerWidget extends StatefulWidget {
   final String baseUrl;
   final String token;
@@ -601,32 +627,36 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children:
-                    statuses.map((status) {
-                      final index = statuses.indexOf(status);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: StatusPill(
-                          label: status,
-                          isActive: index == selectedIndex,
-                          activeColor: AppTheme.primaryColor,
-                          inactiveColor: Colors.grey,
-                          onTap: () {
-                            debugPrint(
-                              'StatusPill tapped: $status (index: $index)',
-                            );
-                            if (mounted) {
-                              setState(() {
-                                selectedIndex = index;
-                                locationText = '';
-                                debugPrint('Selected tab: $status');
-                              });
-                              _loadMeetings();
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                children: [
+                  for (int i = 0; i < statuses.length; i++) ...[
+                    StatusPill(
+                      label: statuses[i],
+                      isActive: i == selectedIndex,
+                      activeColor: AppTheme.primaryColor,
+                      inactiveColor: Colors.grey,
+                      onTap: () {
+                        debugPrint(
+                          'StatusPill tapped: ${statuses[i]} (index: $i)',
+                        );
+                        if (mounted) {
+                          setState(() {
+                            selectedIndex = i;
+                            locationText = '';
+                            debugPrint('Selected tab: ${statuses[i]}');
+                          });
+                          _loadMeetings();
+                        }
+                      },
+                    ),
+                    if (i != statuses.length - 1)
+                      PillConnector(
+                        isActive:
+                            (i == selectedIndex || i + 1 == selectedIndex),
+                        activeColor: AppTheme.primaryColor,
+                        inactiveColor: Colors.grey,
+                      ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -648,7 +678,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              
                               const SizedBox(height: 12),
                               Text(
                                 errorMessage!,

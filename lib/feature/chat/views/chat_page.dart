@@ -425,7 +425,7 @@ class ChatPage extends HookWidget {
       }
     }
 
-    Future<void> _showDeleteConfirmation(String messageId) async {
+    Future<void> showDeleteConfirmation(String messageId) async {
       if (!context.mounted) return;
       final bool? shouldDelete = await showDialog<bool>(
         context: context,
@@ -462,7 +462,7 @@ class ChatPage extends HookWidget {
       }
     }
 
-    Future<void> _showDeleteChatConfirmation() async {
+    Future<void> showDeleteChatConfirmation() async {
       if (!context.mounted || chatRoom.value == null) return;
       final bool? shouldDelete = await showDialog<bool>(
         context: context,
@@ -783,7 +783,7 @@ class ChatPage extends HookWidget {
                   size: 20,
                 ),
               ),
-              onPressed: _showDeleteChatConfirmation,
+              onPressed: showDeleteChatConfirmation,
             ),
             const SizedBox(width: 8),
           ],
@@ -951,7 +951,7 @@ class ChatPage extends HookWidget {
                                 final showTime = _formatTime(message.createdOn);
 
                                 return GestureDetector(
-                                  onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
+                                  onLongPress: isMe ? () => showDeleteConfirmation(message.id) : null,
                                   child: Align(
                                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                                     child: Container(

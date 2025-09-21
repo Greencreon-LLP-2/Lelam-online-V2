@@ -11,7 +11,7 @@ class MessageSendingService {
     required String message,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-send.php?token=${token}&user_id=$userId&chat_room_id=$chatRoomId&message=${Uri.encodeComponent(message)}',
+      '$baseUrl/chat-message-send.php?token=$token&user_id=$userId&chat_room_id=$chatRoomId&message=${Uri.encodeComponent(message)}',
     );
 
     try {

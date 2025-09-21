@@ -97,8 +97,9 @@ class MarketplacePost {
       if (value is String) {
         try {
           final decoded = jsonDecode(value);
-          if (decoded is List)
+          if (decoded is List) {
             return List<String>.from(decoded.map((e) => e.toString()));
+          }
         } catch (e) {
           return value.split(',').map((e) => e.trim()).toList();
         }
@@ -218,82 +219,44 @@ class MarketplaceService {
 // Bike model extending MarketplacePost
 class Bike extends MarketplacePost {
   Bike({
-    required String id,
-    required String slug,
-    required String title,
-    required String categoryId,
-    required String image,
-    required String brand,
-    required String model,
-    required String modelVariation,
-    required String description,
-    required String price,
-    required String auctionPriceInterval,
-    required String auctionStartingPrice,
-    required List<String> attributeId,
-    required List<String> attributeVariationsId,
-    required Map<String, List<String>> filters,
-    required String latitude,
-    required String longitude,
-    required String userZoneId,
-    required String parentZoneId,
-    required String landMark,
-    required String ifAuction,
-    required String auctionStatus,
-    required String auctionStartin,
-    required String auctionEndin,
-    required String auctionAttempt,
-    required String adminApproval,
-    required String ifFinance,
-    required String ifExchange,
-    required String feature,
-    required String status,
-    required String visiterCount,
-    required String ifSold,
-    required String ifExpired,
-    required String byDealer,
-    required String createdBy,
-    required String createdOn,
-    required String updatedOn,
-  }) : super(
-         id: id,
-         slug: slug,
-         title: title,
-         categoryId: categoryId,
-         image: image,
-         brand: brand,
-         model: model,
-         modelVariation: modelVariation,
-         description: description,
-         price: price,
-         auctionPriceInterval: auctionPriceInterval,
-         auctionStartingPrice: auctionStartingPrice,
-         attributeId: attributeId,
-         attributeVariationsId: attributeVariationsId,
-         filters: filters,
-         latitude: latitude,
-         longitude: longitude,
-         userZoneId: userZoneId,
-         parentZoneId: parentZoneId,
-         landMark: landMark,
-         ifAuction: ifAuction,
-         auctionStatus: auctionStatus,
-         auctionStartin: auctionStartin,
-         auctionEndin: auctionEndin,
-         auctionAttempt: auctionAttempt,
-         adminApproval: adminApproval,
-         ifFinance: ifFinance,
-         ifExchange: ifExchange,
-         feature: feature,
-         status: status,
-         visiterCount: visiterCount,
-         ifSold: ifSold,
-         ifExpired: ifExpired,
-         byDealer: byDealer,
-         createdBy: createdBy,
-         createdOn: createdOn,
-         updatedOn: updatedOn,
-       );
+    required super.id,
+    required super.slug,
+    required super.title,
+    required super.categoryId,
+    required super.image,
+    required super.brand,
+    required super.model,
+    required super.modelVariation,
+    required super.description,
+    required super.price,
+    required super.auctionPriceInterval,
+    required super.auctionStartingPrice,
+    required super.attributeId,
+    required super.attributeVariationsId,
+    required super.filters,
+    required super.latitude,
+    required super.longitude,
+    required super.userZoneId,
+    required super.parentZoneId,
+    required super.landMark,
+    required super.ifAuction,
+    required super.auctionStatus,
+    required super.auctionStartin,
+    required super.auctionEndin,
+    required super.auctionAttempt,
+    required super.adminApproval,
+    required super.ifFinance,
+    required super.ifExchange,
+    required super.feature,
+    required super.status,
+    required super.visiterCount,
+    required super.ifSold,
+    required super.ifExpired,
+    required super.byDealer,
+    required super.createdBy,
+    required super.createdOn,
+    required super.updatedOn,
+  });
 
   factory Bike.fromMarketplacePost(MarketplacePost post) {
     return Bike(
@@ -348,10 +311,10 @@ class OthersPage extends StatefulWidget {
 class _OthersPageState extends State<OthersPage> {
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  List<String> _selectedVehicleTypes = [];
+  final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
-  List<String> _selectedFuelTypes = [];
+  final List<String> _selectedFuelTypes = [];
 
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();

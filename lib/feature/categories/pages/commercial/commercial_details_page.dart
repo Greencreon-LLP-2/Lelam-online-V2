@@ -73,7 +73,7 @@ class _CommercialProductDetailsPageState
 
   bool _isBidDialogOpen = false;
   bool _isLoadingBid = false;
-  double _minBidIncrement = 1000;
+  final double _minBidIncrement = 1000;
   String _currentHighestBid = '0';
 
   bool _isMeetingDialogOpen = false;
@@ -294,7 +294,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                             developer.log('Attempting to accept terms');
                             try {
                               final url =
-                                  '${baseUrl}/seller-accept-terms.php?token=${token}&post_id=$id&user_id=${_userProvider.userId}';
+                                  '$baseUrl/seller-accept-terms.php?token=$token&post_id=$id&user_id=${_userProvider.userId}';
                               developer.log('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
                               developer.log(
@@ -399,7 +399,7 @@ Future<bool> _checkAuctionTermsStatus() async {
       developer.log('Terms accepted, proceeding to move to auction');
 
       final url =
-          '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
+          '$baseUrl/sell-move-to-auction.php?token=$token}&post_id=$id';
       developer.log('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -881,7 +881,7 @@ Future<bool> _checkAuctionTermsStatus() async {
       }
     } catch (e) {
       developer.log('Error placing bid: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -893,9 +893,9 @@ Future<bool> _checkAuctionTermsStatus() async {
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid();
-    final TextEditingController _bidController = TextEditingController();
+    final TextEditingController bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(String message, bool isSuccess) async {
+    Future<void> showResponseDialog(String message, bool isSuccess) async {
       final String formattedBid =
           _currentHighestBid.startsWith('Error')
               ? _currentHighestBid
@@ -1090,7 +1090,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        controller: _bidController,
+                        controller: bidController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: false,
                         ),
@@ -1196,7 +1196,7 @@ Future<bool> _checkAuctionTermsStatus() async {
                               _isLoadingBid
                                   ? null
                                   : () async {
-                                    final String amount = _bidController.text;
+                                    final String amount = bidController.text;
                                     if (amount.isEmpty) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -1308,14 +1308,14 @@ Future<bool> _checkAuctionTermsStatus() async {
 
     await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
-    _bidController.dispose();
+    bidController.dispose();
 
     if (result != null) {
       final bool ok = result['success'] == true;
       final String msg =
           result['message']?.toString() ??
           (ok ? 'Bid placed successfully' : 'Failed to place bid');
-      await _showResponseDialog(msg, ok);
+      await showResponseDialog(msg, ok);
     }
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
@@ -2178,7 +2178,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
+    void showLoginDialog() {
       showDialog(
         context: context,
         builder:
@@ -2239,7 +2239,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                   listen: false,
                 );
                 if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
+                  showLoginDialog();
                 } else {
                   showDialog(
                     context: context,

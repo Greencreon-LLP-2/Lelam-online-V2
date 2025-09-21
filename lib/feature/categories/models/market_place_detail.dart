@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
-import '../models/market_place_detail.dart';
-import '../models/product_model.dart';
 
 class MarketplaceService2 {
   static const String baseUrl = 'https://lelamonline.com/admin/api/v1';

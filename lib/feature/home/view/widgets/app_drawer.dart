@@ -125,7 +125,7 @@ class AppDrawerWidget extends StatelessWidget {
                             onTap: () => Navigator.pop(context),
                           ),
                         )
-                        .toList(),
+                        ,
                   ],
                 ),
                 const Divider(),

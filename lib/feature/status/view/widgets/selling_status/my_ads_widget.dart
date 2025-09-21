@@ -27,8 +27,8 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   List<Map<String, dynamic>> ads = [];
   bool isLoading = true;
   String? errorMessage;
-  Map<String, bool> _expandedImages = {};
-  Map<String, String> _adStatuses = {};
+  final Map<String, bool> _expandedImages = {};
+  final Map<String, String> _adStatuses = {};
 
   late final LoggedUserProvider _userProvider;
 
@@ -76,7 +76,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               fetchedAds.add(widget.adData!);
               _expandedImages[passedAdId] = false;
             } else {
-
               print('Passed ad already exists in fetched ads');
 
               final adIndex = fetchedAds.indexWhere(
@@ -154,7 +153,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     }
   }
 
-
   Future<void> _checkApprovalStatus(String postId) async {
     try {
       final response = await http.get(
@@ -164,7 +162,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Approval status response for post $postId: $responseData');
+        developer.log(
+          'Approval status response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final statusData = responseData['data'][0];
           if (statusData['admin_approval'] == '1') {
@@ -301,7 +301,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Move to auction response for post $postId: $responseData');
+        developer.log(
+          'Move to auction response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -352,7 +354,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Mark as delivered response for post $postId: $responseData');
+        developer.log(
+          'Mark as delivered response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -403,7 +407,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         },
         body: {'id': adId, 'action': 'delete'},
       );
-
 
       developer.log(
         'Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
@@ -463,7 +466,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         imageUrl = '$getImagePostImageUrl${ad['image'] as String}';
       } else {
         imageUrl =
-
             '$getImagePostImageUrl${ad['image'].startsWith('/') ? ad['image'].substring(1) : ad['image']}';
       }
     } else {
@@ -473,7 +475,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       );
     }
     final isExpanded = _expandedImages[ad['id']] ?? false;
-
 
     developer.log(imageUrl);
 
@@ -594,11 +595,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               onTap: () {
                 setState(() {
                   _expandedImages[ad['id']] = !isExpanded;
-=
-                  developer.log(
-                    'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
-                  );
                 });
+
+                developer.log(
+                  'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
+                );
               },
               child: Container(
                 width: 110,
@@ -607,46 +608,38 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                   color: Colors.brown.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child:
-
-                    imageUrl != null
-                        ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          httpHeaders: {'token': token},
-                          fit: BoxFit.cover,
-                          placeholder:
-                              (context, url) => Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                          errorWidget: (context, url, error) {
-
-                            developer.log(
-                              'Error loading image for ad ${ad['id']}: $error',
-                            );
-                            Fluttertoast.showToast(
-                              msg: 'Failed to load image for ad ${ad['id']}',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                              backgroundColor: Colors.red,
-                              textColor: Colors.white,
-                            );
-                            return Image.asset(
-                              'assets/placeholder_image.png',
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        )
-                        : Image.asset(
-                          'assets/placeholder_image.png',
-                          fit: BoxFit.cover,
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  httpHeaders: {'token': token},
+                  fit: BoxFit.cover,
+                  placeholder:
+                      (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
+                      ),
+                  errorWidget: (context, url, error) {
+                    developer.log(
+                      'Error loading image for ad ${ad['id']}: $error',
+                    );
+                    Fluttertoast.showToast(
+                      msg: 'Failed to load image for ad ${ad['id']}',
+                      toastLength: Toast.LENGTH_SHORT,
+                      gravity: ToastGravity.BOTTOM,
+                      backgroundColor: Colors.red,
+                      textColor: Colors.white,
+                    );
+                    return Image.asset(
+                      'assets/placeholder_image.png',
+                      fit: BoxFit.cover,
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -954,7 +947,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );
@@ -976,7 +968,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );

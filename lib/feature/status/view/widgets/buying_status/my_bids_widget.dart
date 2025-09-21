@@ -660,7 +660,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
     }).toList();
 
-    developer.log('Filtered ${selectedBidType}: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
+    developer.log('Filtered $selectedBidType: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
 
     return filtered;
   }

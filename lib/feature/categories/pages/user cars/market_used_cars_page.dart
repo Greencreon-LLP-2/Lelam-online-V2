@@ -65,7 +65,7 @@ class _MarketPlaceProductDetailsPageState
   bool isLoadingSeller = true;
   String sellerErrorMessage = '';
 
-  double _minBidIncrement = 1000;
+  final double _minBidIncrement = 1000;
   bool _isLoadingBid = false;
   String _currentHighestBid = '0';
   bool _isLoadingGallery = true;
@@ -89,7 +89,7 @@ class _MarketPlaceProductDetailsPageState
   bool _isTogglingFavorite = false;
 
   String _moveToAuctionButtonText = 'Move to Auction';
-  bool _isWaitingForApproval = false;
+  final bool _isWaitingForApproval = false;
 
   @override
   void initState() {
@@ -845,7 +845,7 @@ class _MarketPlaceProductDetailsPageState
       }
     } catch (e) {
       developer.log('Error placing bid: $e');
-      throw e;
+      rethrow;
     } finally {
       setState(() {
         _isLoadingBid = false;
@@ -1031,9 +1031,9 @@ class _MarketPlaceProductDetailsPageState
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
-    final TextEditingController _bidController = TextEditingController();
+    final TextEditingController bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(
+    Future<void> showResponseDialog(
       String message,
       bool isSuccess,
       bool isHighestBid,
@@ -1296,7 +1296,7 @@ class _MarketPlaceProductDetailsPageState
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _bidController,
+                      controller: bidController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: false,
                       ),
@@ -1400,7 +1400,7 @@ class _MarketPlaceProductDetailsPageState
                               _isLoadingBid
                                   ? null
                                   : () async {
-                                    final String amount = _bidController.text;
+                                    final String amount = bidController.text;
                                     if (amount.isEmpty) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -1523,7 +1523,7 @@ class _MarketPlaceProductDetailsPageState
 
     await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
-    _bidController.dispose();
+    bidController.dispose();
 
     if (result != null) {
       final bool ok = result['success'] == true;
@@ -1531,7 +1531,7 @@ class _MarketPlaceProductDetailsPageState
           result['message']?.toString() ??
           (ok ? 'Bid placed successfully' : 'Failed to place bid');
       final bool isHighestBid = result['isHighestBid'] ?? false;
-      await _showResponseDialog(msg, ok, isHighestBid);
+      await showResponseDialog(msg, ok, isHighestBid);
     }
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
@@ -2354,7 +2354,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
+    void showLoginDialog() {
       showDialog(
         context: context,
         builder:
@@ -2415,7 +2415,7 @@ class _MarketPlaceProductDetailsPageState
                   listen: false,
                 );
                 if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
+                  showLoginDialog();
                 } else {
                   showDialog(
                     context: context,
@@ -2492,7 +2492,7 @@ class _MarketPlaceProductDetailsPageState
                 comment.attributeValue,
               ),
             )
-            .toList(),
+            ,
       ],
     );
   }

@@ -6,7 +6,7 @@ import 'package:lelamonline_flutter/feature/chat/model/chat_message_model.dart';
 class FetchMessagesService {
   Future<List<ChatMessage>> fetchMessages(String chatRoomId) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-list.php?token=${token}&chat_room_id=$chatRoomId',
+      '$baseUrl/chat-message-list.php?token=$token&chat_room_id=$chatRoomId',
     );
 
     try {
@@ -30,7 +30,7 @@ class FetchMessagesService {
 
   Future<bool> deleteChat({required String messageId}) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-message-delete.php?token=${token}&message_id=$messageId&user_id=6',
+      '$baseUrl/chat-message-delete.php?token=$token&message_id=$messageId&user_id=6',
     );
 
     try {

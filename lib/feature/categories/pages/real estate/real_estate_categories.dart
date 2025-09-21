@@ -96,8 +96,9 @@ class MarketplacePost {
       if (value is String) {
         try {
           final decoded = jsonDecode(value);
-          if (decoded is List)
+          if (decoded is List) {
             return List<String>.from(decoded.map((e) => e.toString()));
+          }
         } catch (e) {
           return value.split(',').map((e) => e.trim()).toList();
         }
@@ -228,7 +229,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   final String categoryId = '2';
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  String _listingType = 'sale';
+  final String _listingType = 'sale';
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
 
@@ -239,11 +240,11 @@ class _RealEstatePageState extends State<RealEstatePage> {
   String? _errorMessage;
 
   // Filter variables
-  List<String> _selectedPropertyTypes = [];
+  final List<String> _selectedPropertyTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedBedroomRange = 'all';
   String _selectedAreaRange = 'all';
-  List<String> _selectedFurnishings = [];
+  final List<String> _selectedFurnishings = [];
   String _selectedPostedBy = 'all';
   String _selectedCategory = 'Property Type';
 

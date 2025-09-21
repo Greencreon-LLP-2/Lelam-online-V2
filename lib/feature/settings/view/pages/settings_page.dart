@@ -75,19 +75,19 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Show name only if not empty
-            if ((userData?.name?.isNotEmpty ?? false))
+            if ((userData?.name.isNotEmpty ?? false))
               Text(
-                userData!.name!,
+                userData!.name,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
 
-            if ((userData?.username?.isNotEmpty ?? false)) ...[
+            if ((userData?.username.isNotEmpty ?? false)) ...[
               const SizedBox(height: 4),
               Text(
-                userData!.username!,
+                userData!.username,
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
             ],

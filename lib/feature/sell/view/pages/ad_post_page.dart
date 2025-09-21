@@ -777,7 +777,7 @@ class _AdPostFormState extends State<AdPostForm>
             }
           }
 
-        } catch (e, stack) {
+        } catch (e) {
             developer.log(e.toString());
 
         }

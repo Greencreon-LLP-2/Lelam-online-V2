@@ -192,7 +192,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String? _errorMessage;
   List<LocationData> _locations = [];
   bool _isLoadingLocations = true;
-  Map<String, Map<String, String>> _postAttributeValuesCache = {};
+  final Map<String, Map<String, String>> _postAttributeValuesCache = {};
   List<String> _selectedBrands = [];
   String _selectedPriceRange = 'all';
   String _selectedYearRange = 'all';
@@ -690,15 +690,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             if (!searchableText.contains(query)) return false;
           }
           if (_selectedLocation != 'all' &&
-              product.parentZoneId != _selectedLocation)
+              product.parentZoneId != _selectedLocation) {
             return false;
-          if (_listingType == 'auction' && product.ifAuction != '1')
+          }
+          if (_listingType == 'auction' && product.ifAuction != '1') {
             return false;
-          if (_listingType == 'Marketplace' && product.ifAuction != '0')
+          }
+          if (_listingType == 'Marketplace' && product.ifAuction != '0') {
             return false;
+          }
           if (_selectedBrands.isNotEmpty &&
-              !_selectedBrands.contains(product.brand))
+              !_selectedBrands.contains(product.brand)) {
             return false;
+          }
           if (_selectedPriceRange != 'all') {
             int price =
                 product.ifAuction == '1'
@@ -745,9 +749,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }
           final ownersStr = attributeValues['No of owners'] ?? '';
           int owners = 0;
-          if (ownersStr.contains('1st'))
+          if (ownersStr.contains('1st')) {
             owners = 1;
-          else if (ownersStr.contains('2nd'))
+          } else if (ownersStr.contains('2nd'))
             owners = 2;
           else if (ownersStr.contains('3rd'))
             owners = 3;
@@ -771,12 +775,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           }
           final fuel = attributeValues['Fuel Type'] ?? '';
           if (_selectedFuelTypes.isNotEmpty &&
-              !_selectedFuelTypes.contains(fuel))
+              !_selectedFuelTypes.contains(fuel)) {
             return false;
+          }
           final trans = attributeValues['Transmission'] ?? '';
           if (_selectedTransmissions.isNotEmpty &&
-              !_selectedTransmissions.contains(trans))
+              !_selectedTransmissions.contains(trans)) {
             return false;
+          }
           final kmStr = attributeValues['KM Range'] ?? '';
           int km = 0;
           final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
@@ -810,8 +816,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
               case 'Dealer':
               case 'Certified Dealer':
-                if (soldBy != 'Dealer' && soldBy != 'Certified Dealer')
+                if (soldBy != 'Dealer' && soldBy != 'Certified Dealer') {
                   return false;
+                }
                 break;
             }
           }

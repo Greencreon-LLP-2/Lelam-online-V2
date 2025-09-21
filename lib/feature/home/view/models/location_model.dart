@@ -1,20 +1,16 @@
-import 'dart:convert';
-
 class LocationResponse {
   final bool status;
   final List<LocationData> data;
 
-  LocationResponse({
-    required this.status,
-    required this.data,
-  });
+  LocationResponse({required this.status, required this.data});
 
   factory LocationResponse.fromJson(Map<String, dynamic> json) {
     return LocationResponse(
       status: json['status'].toString() == "true",
-      data: (json['data'] as List)
-          .map((item) => LocationData.fromJson(item))
-          .toList(),
+      data:
+          (json['data'] as List)
+              .map((item) => LocationData.fromJson(item))
+              .toList(),
     );
   }
 
@@ -93,4 +89,3 @@ class LocationData {
     };
   }
 }
-

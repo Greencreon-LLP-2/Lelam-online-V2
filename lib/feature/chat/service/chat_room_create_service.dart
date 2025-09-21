@@ -11,7 +11,7 @@ class ChatRoomCreationService {
     required String listenerId,
   }) async {
     final url = Uri.parse(
-      '${baseUrl}/chat-room-list.php?token=${token}&user_id=$userId',
+      '$baseUrl/chat-room-list.php?token=$token&user_id=$userId',
     );
 
     try {

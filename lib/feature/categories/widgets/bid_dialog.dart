@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 void showBidDialog(BuildContext context) {
-  final TextEditingController _bidController = TextEditingController();
+  final TextEditingController bidController = TextEditingController();
 
   void showThankYouDialog() {
     showDialog(
@@ -20,7 +20,7 @@ void showBidDialog(BuildContext context) {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _bidController.dispose();
+                bidController.dispose();
               },
               child: const Text('OK', style: TextStyle(color: Colors.grey)),
             ),
@@ -28,7 +28,7 @@ void showBidDialog(BuildContext context) {
               onPressed: () {
                 // Placeholder for call support functionality (e.g., launch phone dialer)
                 Navigator.of(context).pop();
-                _bidController.dispose();
+                bidController.dispose();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -60,7 +60,7 @@ void showBidDialog(BuildContext context) {
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: _bidController,
+              controller: bidController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 hintText: 'Enter amount',
@@ -74,13 +74,13 @@ void showBidDialog(BuildContext context) {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _bidController.dispose();
+              bidController.dispose();
             },
             child: const Text('Close', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
-              if (_bidController.text.isNotEmpty) {
+              if (bidController.text.isNotEmpty) {
                 Navigator.of(context).pop();
                 showThankYouDialog();
               }

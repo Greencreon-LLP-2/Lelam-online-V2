@@ -74,7 +74,7 @@ class _RealEstateProductDetailsPageState
 
   bool _isBidDialogOpen = false;
   bool _isLoadingBid = false;
-  double _minBidIncrement = 1000;
+  final double _minBidIncrement = 1000;
   String _currentHighestBid = '0';
 
   bool _isMeetingDialogOpen = false;
@@ -414,7 +414,7 @@ class _RealEstateProductDetailsPageState
       developer.log('Terms accepted, proceeding to move to auction');
 
       final url =
-          '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
+          '$baseUrl/sell-move-to-auction.php?token=$token}&post_id=$id';
       developer.log('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -906,7 +906,7 @@ class _RealEstateProductDetailsPageState
       }
     } catch (e) {
       developer.log('Error placing bid: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -918,9 +918,9 @@ class _RealEstateProductDetailsPageState
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
-    final TextEditingController _bidController = TextEditingController();
+    final TextEditingController bidController = TextEditingController();
 
-    Future<void> _showResponseDialog(
+    Future<void> showResponseDialog(
       String message,
       bool isSuccess,
       bool isHighestBid,
@@ -1180,7 +1180,7 @@ class _RealEstateProductDetailsPageState
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: _bidController,
+                      controller: bidController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: false,
                       ),
@@ -1284,7 +1284,7 @@ class _RealEstateProductDetailsPageState
                               _isLoadingBid
                                   ? null
                                   : () async {
-                                    final String amount = _bidController.text;
+                                    final String amount = bidController.text;
                                     if (amount.isEmpty) {
                                       ScaffoldMessenger.of(
                                         context,
@@ -1405,7 +1405,7 @@ class _RealEstateProductDetailsPageState
 
     await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
-    _bidController.dispose();
+    bidController.dispose();
 
     if (result != null) {
       final bool ok = result['success'] == true;
@@ -1413,7 +1413,7 @@ class _RealEstateProductDetailsPageState
           result['message']?.toString() ??
           (ok ? 'Bid placed successfully' : 'Failed to place bid');
       final bool isHighestBid = result['isHighestBid'] ?? false;
-      await _showResponseDialog(msg, ok, isHighestBid);
+      await showResponseDialog(msg, ok, isHighestBid);
     }
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
@@ -2451,7 +2451,7 @@ class _RealEstateProductDetailsPageState
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
+    void showLoginDialog() {
       showDialog(
         context: context,
         builder:
@@ -2512,7 +2512,7 @@ class _RealEstateProductDetailsPageState
                   listen: false,
                 );
                 if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
+                  showLoginDialog();
                 } else {
                   showDialog(
                     context: context,
