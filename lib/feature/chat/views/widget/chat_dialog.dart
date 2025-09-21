@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart' as url_launcher;
 
@@ -24,11 +25,14 @@ class ChatOptionsDialog extends StatelessWidget {
 
   Future<Map<String, dynamic>> createChatRoom(
       BuildContext context, int userIdTo) async {
+    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userIdFrom = userProvider.userData?.userId ?? '6'; // Fallback to '6' if userId is null
     final url = Uri.parse(
-        '$baseUrl/chat-room-create.php?token=$token&user_id_from=6&user_id_to=$userIdTo');
+        '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userIdFrom&user_id_to=$userIdTo');
 
     try {
       final response = await http.get(url);
+      print('chat-room-create.php response: ${response.body}');
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         return jsonResponse['data'] ?? {};
@@ -36,6 +40,7 @@ class ChatOptionsDialog extends StatelessWidget {
         throw Exception('Failed to create chat room: ${response.statusCode}');
       }
     } catch (e) {
+      print('Error creating chat room: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -93,37 +98,25 @@ class ChatOptionsDialog extends StatelessWidget {
         Navigator.of(context).pop();
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
-            title: const Text(
-              'Login Required',
-              style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-            ),
-            content: const Text('Please log in to chat with the seller.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  context.pushNamed(RouteNames.loginPage);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                ),
-                child: const Text(
-                  'Log In',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
+          builder: (context) => LoginDialog(
+            onSuccess: () async {
+              // After successful login, create chat room and proceed
+              final data = await createChatRoom(context, userIdTo);
+              if (data.isNotEmpty) {
+                final chatRoomId = data['chat_room_id'];
+                final message = data['message'];
+
+                if (message != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(message)),
+                  );
+                }
+
+                if (chatRoomId != null) {
+                  onSuccess();
+                }
+              }
+            },
           ),
         );
         return;

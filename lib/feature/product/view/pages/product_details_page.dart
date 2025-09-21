@@ -2566,7 +2566,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                               );
                             },
                             icon: const Icon(Icons.chat),
-                            label: const Text('Chat with Seller'),
+                            label: const Text('Contact Seller'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,

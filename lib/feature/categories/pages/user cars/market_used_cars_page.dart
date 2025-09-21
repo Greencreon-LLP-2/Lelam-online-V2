@@ -1248,7 +1248,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                     children: [
                       if (isSuccess && isHighestBid)
                         Text(
-                          'Congratulations, your bid is the highest bid! 🎉',
+                          'Congratulations, your bid is the highest bid! 🎉 \ncheck statue in Hight Bids',
                           style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
