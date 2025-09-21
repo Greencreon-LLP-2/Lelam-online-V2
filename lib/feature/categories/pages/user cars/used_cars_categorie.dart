@@ -722,33 +722,17 @@ Future<void> _fetchModelVariation(String postId) async {
           if (_selectedLocation != 'all' &&
               product.parentZoneId != _selectedLocation) {
             return false;
-<<<<<<< HEAD
           }
           if (_listingType == 'auction' && product.ifAuction != '1') {
-=======
-
-          // Listing type filter
-          if (_listingType == 'auction' && product.ifAuction != '1')
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
             return false;
           }
           if (_listingType == 'Marketplace' && product.ifAuction != '0') {
             return false;
-<<<<<<< HEAD
           }
-=======
-
-          // Brand filter
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
           if (_selectedBrands.isNotEmpty &&
               !_selectedBrands.contains(product.brand)) {
             return false;
-<<<<<<< HEAD
           }
-=======
-
-          // Price range filter
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
           if (_selectedPriceRange != 'all') {
             int price =
                 product.ifAuction == '1'
@@ -829,22 +813,12 @@ Future<void> _fetchModelVariation(String postId) async {
           if (_selectedFuelTypes.isNotEmpty &&
               !_selectedFuelTypes.contains(fuel)) {
             return false;
-<<<<<<< HEAD
           }
-=======
-
-          // Transmission filter
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
           final trans = attributeValues['Transmission'] ?? '';
           if (_selectedTransmissions.isNotEmpty &&
               !_selectedTransmissions.contains(trans)) {
             return false;
-<<<<<<< HEAD
           }
-=======
-
-          // KM range filter
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
           final kmStr = attributeValues['KM Range'] ?? '';
           int km = 0;
           final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);

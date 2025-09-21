@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -558,13 +559,9 @@ void initState() {
             await Future.delayed(const Duration(milliseconds: 200));
           }
         } else {
-<<<<<<< HEAD
           developer.log(
             'Unexpected response format: ${responseData.toString()}',
           );
-=======
-         print('Unexpected response format: ${responseData.toString()}');
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
           errorMessage = 'Currently No Meeting';
         }
 
@@ -592,13 +589,9 @@ void initState() {
     if (mounted) {
       setState(() {
         selectedIndex = 2;
-<<<<<<< HEAD
         developer.log(
           'Switched to Awaiting Location tab for meeting $meetingId',
         );
-=======
-       print('Switched to Awaiting Location tab for meeting $meetingId');
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
       });
       _loadMeetings();
     }
@@ -700,26 +693,30 @@ Widget build(BuildContext context) {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: statuses.map((status) {
-                  final index = statuses.indexOf(status);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: StatusPill(
-                      label: status,
-                      isActive: index == selectedIndex,
+                children: [
+                  for (int i = 0; i < statuses.length; i++) ...[
+                    StatusPill(
+                      label: statuses[i],
+                      isActive: i == selectedIndex,
                       activeColor: Colors.blue,
                       onTap: () {
                         if (mounted) {
                           setState(() {
-                            selectedIndex = index;
-                           print('Selected tab: $status');
+                            selectedIndex = i;
+                            print('Selected tab: ${statuses[i]}');
                           });
                           _loadMeetings();
                         }
                       },
                     ),
-                  );
-                }).toList(),
+                    if (i != statuses.length - 1)
+                      PillConnector(
+                        isActive: (i == selectedIndex || i + 1 == selectedIndex),
+                        activeColor: Colors.blue,
+                        inactiveColor: Colors.grey,
+                      ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -1195,13 +1192,7 @@ Widget build(BuildContext context) {
                                     );
                                   }
                                 } catch (e) {
-<<<<<<< HEAD
-                                  developer.log(
-                                    'Error updating meeting time: $e',
-                                  );
-=======
                                  print('Error updating meeting time: $e');
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(

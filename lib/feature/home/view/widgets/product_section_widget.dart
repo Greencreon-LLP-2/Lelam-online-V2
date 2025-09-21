@@ -1,11 +1,8 @@
 
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
-=======
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
 import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:lelamonline_flutter/feature/product/view/pages/product_details_page.dart';

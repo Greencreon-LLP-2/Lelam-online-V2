@@ -2506,29 +2506,6 @@ void _showLoginPromptDialog(BuildContext context, String action) {
         );
   }
 
-<<<<<<< HEAD
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    void showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
-=======
 Widget _buildQuestionsSection(BuildContext context, String id) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2565,7 +2542,6 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                         }
                       },
                     );
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
                   },
                 );
               } else {
@@ -2589,66 +2565,12 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                 Text('Ask a question'),
               ],
             ),
-<<<<<<< HEAD
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  showLoginDialog();
-                } else {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-=======
           ),
         ],
       ),
     ],
   );
 }
->>>>>>> 70c9b823186fb010cf967cdebfd8da0b9e77b4e5
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
