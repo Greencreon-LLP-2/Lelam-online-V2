@@ -1,4 +1,3 @@
-// file: lib/feature/home/view/home_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -28,7 +27,7 @@ class _HomePageState extends State<HomePage> {
   String? _selectedDistrict;
   String? userId;
   late final LoggedUserProvider _userProvider;
-  List<String> _districts = [];
+  List<String> _districts = ['All Kerala'];
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -65,10 +64,11 @@ class _HomePageState extends State<HomePage> {
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final List<dynamic> data = responseData['data'];
           setState(() {
-            _districts = data
-                .where((item) => item['status'] == '1')
-                .map((item) => item['name'].toString())
-                .toList();
+            _districts = ['All Kerala'] +
+                data
+                    .where((item) => item['status'] == '1')
+                    .map((item) => item['name'].toString())
+                    .toList();
             _isLoading = false;
           });
           if (kDebugMode) {

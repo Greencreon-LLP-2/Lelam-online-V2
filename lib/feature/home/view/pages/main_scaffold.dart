@@ -62,7 +62,10 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 
   void _checkAndShowNameDialog() {
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
     if (kDebugMode) {
       print('Checking dialog conditions:');
       print('userId: ${userProvider.userData?.userId}');
@@ -70,7 +73,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       print('hasShownNameDialog: $_hasShownNameDialog');
     }
     if (userProvider.userData?.userId != null &&
-        (userProvider.userData?.name == null || userProvider.userData!.name.isEmpty) &&
+        (userProvider.userData?.name == null ||
+            userProvider.userData!.name.isEmpty) &&
         !_hasShownNameDialog) {
       _showNameDialog();
     }
@@ -79,7 +83,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   void _showNameDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false, 
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
@@ -87,10 +91,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           ),
           title: const Text(
             'Please enter your name to continue',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           content: TextField(
             controller: _nameController,
@@ -111,10 +112,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                 Navigator.of(context).pop();
                 // Don't set flag to true on cancel, so it can retry later
               },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey),
-              ),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
@@ -150,7 +148,10 @@ class _MainScaffoldState extends State<MainScaffold> {
   // Updated _saveName method
   Future<void> _saveName(BuildContext dialogContext) async {
     try {
-      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+      final userProvider = Provider.of<LoggedUserProvider>(
+        context,
+        listen: false,
+      );
       final changedFields = <String, String>{
         'user_id': userProvider.userData?.userId ?? '',
         'name': _nameController.text,
@@ -170,9 +171,11 @@ class _MainScaffoldState extends State<MainScaffold> {
           queryParams: {"user_id": userProvider.userData?.userId ?? ''},
         );
 
-        if (updatedResponse['status'] == true && updatedResponse['code'] == 200) {
+        if (updatedResponse['status'] == true &&
+            updatedResponse['code'] == 200) {
           final updatedUserData = UserData.fromJson(
-            updatedResponse['data'][0] as Map<String, dynamic>, // Parse from array[0]
+            updatedResponse['data'][0]
+                as Map<String, dynamic>, // Parse from array[0]
           );
 
           // Save & notify provider
@@ -181,7 +184,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           // Persist the flag in Hive
           await _hiveHelper.setHasShownNameDialog(true);
           setState(() {
-            _hasShownNameDialog = true; 
+            _hasShownNameDialog = true;
           });
 
           Fluttertoast.showToast(
@@ -212,18 +215,19 @@ class _MainScaffoldState extends State<MainScaffold> {
       // Don't close dialog on error, allow retry
     }
   }
+
   List<Widget> get _pages => [
-        HomePage(),
-        isStatus ? BuyingStatusPage() : ChatListPage(),
-        isStatus ? SellingStatusPage(adData: adData) : SellPage(),
-        isStatus ? ShortListPage() : StatusPage(),
-        Center(
-          child: Text(
-            'Profile: User ID ${userId ?? 'Unknown'}',
-            style: const TextStyle(fontSize: 16),
-          ),
-        ),
-      ];
+    HomePage(),
+    isStatus ? BuyingStatusPage() : ChatListPage(),
+    isStatus ? SellingStatusPage(adData: adData) : SellPage(),
+    isStatus ? ShortListPage() : StatusPage(),
+    Center(
+      child: Text(
+        'Profile: User ID ${userId ?? 'Unknown'}',
+        style: const TextStyle(fontSize: 16),
+      ),
+    ),
+  ];
 
   Future<bool> _onWillPop() async {
     if (currentIndex != 0) {
@@ -236,20 +240,85 @@ class _MainScaffoldState extends State<MainScaffold> {
 
     bool? shouldExit = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Exit App'),
-        content: const Text('Are you sure you want to exit the app?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+      builder:
+          (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            elevation: 8,
+            child: Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.exit_to_app,
+                      size: 32,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Exit App',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Are you sure you want to exit the app?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed:
+                              () => Navigator.of(dialogContext).pop(false),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.black87),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              () => Navigator.of(dialogContext).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Exit',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Exit'),
-          ),
-        ],
-      ),
     );
 
     return shouldExit ?? false;
@@ -257,7 +326,10 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
     userId = userProvider.userData?.userId; // Update userId for profile page
     return WillPopScope(
       onWillPop: _onWillPop,
@@ -296,7 +368,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                 fontSize: 7, // Reduced font size
                 fontWeight: FontWeight.w600,
               ),
-              unselectedLabelStyle: const TextStyle(fontSize: 7), // Reduced font size
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 7,
+              ), // Reduced font size
               selectedFontSize: 7,
               unselectedFontSize: 7,
               iconSize: 16, // Reduced icon size
@@ -307,28 +381,34 @@ class _MainScaffoldState extends State<MainScaffold> {
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(
-                    isStatus ? Icons.add_shopping_cart : Icons.chat_bubble_outline,
+                    isStatus
+                        ? Icons.add_shopping_cart
+                        : Icons.chat_bubble_outline,
                   ),
                   label: isStatus ? 'Buying' : 'Chat',
                 ),
                 BottomNavigationBarItem(
-                  icon: isStatus
-                      ? const Icon(Icons.sell)
-                      : FittedBox(
-                          fit: BoxFit.contain,
-                          child: Container(
-                            padding: const EdgeInsets.all(1),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.black, width: 2),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              size: 10, // Reduced icon size
-                              color: Color.fromARGB(255, 12, 9, 233),
+                  icon:
+                      isStatus
+                          ? const Icon(Icons.sell)
+                          : FittedBox(
+                            fit: BoxFit.contain,
+                            child: Container(
+                              padding: const EdgeInsets.all(1),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                size: 10, // Reduced icon size
+                                color: Color.fromARGB(255, 12, 9, 233),
+                              ),
                             ),
                           ),
-                        ),
                   label: isStatus ? 'Selling' : 'Sell',
                 ),
                 BottomNavigationBarItem(

@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lelamonline_flutter/feature/info/view/info_detail_page.dart';
 
 class AppDrawerWidget extends StatelessWidget {
   const AppDrawerWidget({super.key});
@@ -13,7 +16,7 @@ class AppDrawerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<LoggedUserProvider>();
     final userData = userProvider.userData;
-
+    const supportPhone = '+9198765432102';
     return Drawer(
       child: Column(
         children: [
@@ -22,7 +25,7 @@ class AppDrawerWidget extends StatelessWidget {
             accountName: Text(
               userProvider.isLoggedIn && userData?.name.isNotEmpty == true
                   ? userData!.name
-                  : 'Welcome',
+                  : 'Welcomee',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             accountEmail: Text(
@@ -122,7 +125,14 @@ class AppDrawerWidget extends StatelessWidget {
                             contentPadding: const EdgeInsets.only(left: 72),
                             leading: const Icon(Icons.privacy_tip_outlined),
                             title: Text(title),
-                            onTap: () => Navigator.pop(context),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => InfoDetailPage(title: title),
+                                ),
+                              );
+                            },
                           ),
                         )
                         ,
@@ -132,7 +142,10 @@ class AppDrawerWidget extends StatelessWidget {
                 _buildDrawerItem(
                   icon: Icons.contact_phone,
                   title: 'Contact Us',
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showContactOptions(context, supportPhone);
+                  },
                 ),
                 _buildDrawerItem(
                   icon: Icons.help_outline,
@@ -165,6 +178,62 @@ class AppDrawerWidget extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showContactOptions(BuildContext context, String phone) async {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: SvgPicture.asset(
+                  'assets/icons/whatsapp_icon.svg',
+                  width: 26,
+                  height: 26,
+                  fit: BoxFit.cover,
+                ),
+                title: const Text('WhatsApp'),
+                subtitle: Text(phone),
+                onTap: () async {
+                  final normalized = phone.replaceAll('+', '');
+                  final uri = Uri.parse(
+                    'https://wa.me/$normalized?text=${Uri.encodeComponent("Hello")}',
+                  );
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cannot open WhatsApp')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.call, color: Colors.blue),
+                title: const Text('Call'),
+                subtitle: Text(phone),
+                onTap: () async {
+                  final uri = Uri(scheme: 'tel', path: phone);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cannot make a call')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

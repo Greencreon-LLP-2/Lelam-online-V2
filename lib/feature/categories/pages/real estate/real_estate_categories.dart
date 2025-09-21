@@ -5,10 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
-import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'dart:developer' as developer;
+
 // MarketplacePost model (unchanged)
 class MarketplacePost {
   final String id;
@@ -254,6 +254,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
 
+  // New variables for filtering and caching
+  List<MarketplacePost> _filteredPostsCache = [];
+  bool _filtersChanged = true; // Initialize to true for initial filtering
+
   @override
   void initState() {
     super.initState();
@@ -332,6 +336,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
       );
       setState(() {
         _posts = posts;
+        _filtersChanged = true;
         _isLoading = false;
       });
     } catch (e) {
@@ -342,6 +347,154 @@ class _RealEstatePageState extends State<RealEstatePage> {
     }
   }
 
+  // New method for relevance scoring
+  double _calculateRelevanceScore(MarketplacePost post, String query) {
+    double score = 0;
+    final propertyType = post.filters['propertyType']?.isNotEmpty ?? false
+        ? post.filters['propertyType']!.first.toLowerCase()
+        : '';
+    final sellerType = post.byDealer == '1' ? 'dealer' : 'owner';
+
+    if (post.title.toLowerCase().contains(query)) score += 3.0;
+    if (propertyType.contains(query)) score += 2.0;
+    if (post.description.toLowerCase().contains(query)) score += 1.5;
+    if (_getLocationName(post.parentZoneId).toLowerCase().contains(query))
+      score += 1.0;
+    if (sellerType.contains(query)) score += 0.5;
+
+    return score;
+  }
+
+  // New getter for filtered and sorted posts
+  List<MarketplacePost> get filteredPosts {
+    if (!_filtersChanged) return _filteredPostsCache;
+
+    final filtered = _posts.where((post) {
+      final propertyType = post.filters['propertyType']?.isNotEmpty ?? false
+          ? post.filters['propertyType']!.first
+          : 'N/A';
+      final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+
+      // Search query filtering
+      if (_searchQuery.trim().isNotEmpty) {
+        final query = _searchQuery.toLowerCase().trim();
+        final searchableText = [
+          post.title.toLowerCase(),
+          propertyType.toLowerCase(),
+          _getLocationName(post.parentZoneId).toLowerCase(),
+          post.description.toLowerCase(),
+          sellerType.toLowerCase(),
+        ].join(' ');
+        if (!searchableText.contains(query)) return false;
+      }
+
+      // Location filter
+      if (_selectedLocation != 'all' && post.parentZoneId != _selectedLocation)
+        return false;
+
+      // Listing type filter
+      if (_listingType == 'auction' && post.ifAuction != '1') return false;
+      if (_listingType == 'sale' && post.ifAuction != '0') return false;
+
+      // Property type filter
+      if (_selectedPropertyTypes.isNotEmpty &&
+          !(_selectedPropertyTypes.contains(propertyType)))
+        return false;
+
+      // Price range filter
+      if (_selectedPriceRange != 'all') {
+        int price = post.ifAuction == '1'
+            ? (int.tryParse(post.auctionStartingPrice) ?? 0)
+            : (int.tryParse(post.price) ?? 0);
+        switch (_selectedPriceRange) {
+          case 'Under 50L':
+            if (price >= 5000000) return false;
+            break;
+          case '50L-1Cr':
+            if (price < 5000000 || price >= 10000000) return false;
+            break;
+          case '1Cr-2Cr':
+            if (price < 10000000 || price >= 20000000) return false;
+            break;
+          case '2Cr-5Cr':
+            if (price < 20000000 || price >= 50000000) return false;
+            break;
+          case 'Above 5Cr':
+            if (price < 50000000) return false;
+            break;
+        }
+      }
+
+      // Bedroom range filter
+      final bedrooms = post.filters['bedrooms']?.isNotEmpty ?? false
+          ? post.filters['bedrooms']!.first
+          : 'N/A';
+      if (_selectedBedroomRange != 'all' && bedrooms != _selectedBedroomRange)
+        return false;
+
+      // Area range filter
+      final areaStr = post.filters['area']?.isNotEmpty ?? false
+          ? post.filters['area']!.first
+          : '0';
+      int area = int.tryParse(areaStr) ?? 0;
+      if (_selectedAreaRange != 'all') {
+        switch (_selectedAreaRange) {
+          case 'Under 500 sq ft':
+            if (area >= 500) return false;
+            break;
+          case '500-1000 sq ft':
+            if (area < 500 || area >= 1000) return false;
+            break;
+          case '1000-1500 sq ft':
+            if (area < 1000 || area >= 1500) return false;
+            break;
+          case '1500-2000 sq ft':
+            if (area < 1500 || area >= 2000) return false;
+            break;
+          case 'Above 2000 sq ft':
+            if (area < 2000) return false;
+            break;
+        }
+      }
+
+      // Furnishing filter
+      final furnishing = post.filters['furnishing']?.isNotEmpty ?? false
+          ? post.filters['furnishing']!.first
+          : 'N/A';
+      if (_selectedFurnishings.isNotEmpty &&
+          !_selectedFurnishings.contains(furnishing))
+        return false;
+
+      // Posted by filter
+      if (_selectedPostedBy != 'all') {
+        switch (_selectedPostedBy) {
+          case 'Owner':
+            if (sellerType != 'Owner') return false;
+            break;
+          case 'Builder':
+          case 'Agent':
+            if (sellerType != 'Dealer') return false;
+            break;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    // Sort posts based on search query relevance if search query exists
+    if (_searchQuery.trim().isNotEmpty) {
+      final query = _searchQuery.toLowerCase().trim();
+      filtered.sort((a, b) {
+        final aScore = _calculateRelevanceScore(a, query);
+        final bScore = _calculateRelevanceScore(b, query);
+        return bScore.compareTo(aScore); // Higher score comes first
+      });
+    }
+
+    _filteredPostsCache = filtered;
+    _filtersChanged = false;
+    return filtered;
+  }
 
   final List<String> _propertyTypes = [
     'Apartment',
@@ -693,6 +846,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
                                     setState(() {
                                       _posts = finalPosts;
+                                      _filtersChanged = true;
                                       _isLoading = false;
                                     });
                                   } catch (e) {
@@ -1106,7 +1260,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
         autofillHints: null, // Disable autofill
         enableSuggestions: false, // Disable suggestions
         enableInteractiveSelection: true,
-        onChanged: (value) => setState(() => _searchQuery = value),
+        onChanged: (value) => setState(() {
+          _searchQuery = value;
+          _filtersChanged = true;
+        }),
         decoration: InputDecoration(
           hintText: 'Search properties...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
@@ -1118,6 +1275,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     setState(() {
                       _searchQuery = '';
                       _searchController.clear();
+                      _filtersChanged = true;
                     });
                   },
                 )
@@ -1136,7 +1294,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
       child: TextField(
         controller: _searchController,
         onChanged: (value) {
-          setState(() => _searchQuery = value);
+          setState(() {
+            _searchQuery = value;
+            _filtersChanged = true;
+          });
         },
         autofillHints: null, // Disable autofill to prevent keyboard dismissal
         enableSuggestions: false, // Disable suggestions to reduce IME interference
@@ -1152,6 +1313,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     setState(() {
                       _searchQuery = '';
                       _searchController.clear();
+                      _filtersChanged = true;
                     });
                   },
                 )
@@ -1263,6 +1425,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             _selectedLocation = value == 'all'
                                 ? 'all'
                                 : _locations.firstWhere((loc) => loc.name == value).id;
+                            _filtersChanged = true;
                             _fetchPosts();
                           });
                         },
@@ -1304,14 +1467,11 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
                       children: [
-                        if (!_showAppBarSearch) ...[
-                          _buildSearchField(),
-                          SearchResultsWidget(searchQuery: _searchQuery), // Add SearchResultsWidget
-                        ],
+                        if (!_showAppBarSearch) _buildSearchField(),
                       ],
                     ),
             ),
-            if (!_isLoadingLocations && _searchQuery.isEmpty) // Hide posts when searching
+            if (!_isLoadingLocations)
               _isLoading
                   ? const SliverToBoxAdapter(
                       child: Center(child: CircularProgressIndicator()),
@@ -1344,7 +1504,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             ),
                           ),
                         )
-                      : _posts.isEmpty
+                      : filteredPosts.isEmpty
                           ? SliverToBoxAdapter(
                               child: Center(
                                 child: Column(
@@ -1379,13 +1539,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           : SliverList(
                               delegate: SliverChildBuilderDelegate(
                                 (context, index) {
-                                  final post = _posts[index];
+                                  final post = filteredPosts[index];
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 16),
                                     child: _buildPostCard(post),
                                   );
                                 },
-                                childCount: _posts.length,
+                                childCount: filteredPosts.length,
                               ),
                             ),
           ],

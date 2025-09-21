@@ -10,7 +10,9 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
+import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
@@ -18,6 +20,7 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
@@ -89,6 +92,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   String? userId;
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
+
+  bool _isLoadingContainerInfo = false;
+  List<ContainerInfo> _containerInfo = [];
+  String _containerInfoError = '';
+
   @override
   void initState() {
     super.initState();
@@ -103,12 +111,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     try {
       await _loadUserId(); // Ensure userId is loaded first
       await Future.wait([
-        _fetchLocations(),
-        _fetchAttributesData(),
-        _fetchSellerInfo(),
-        _fetchShortlistStatus(),
-        _fetchGalleryImages(),
-        _fetchBannerImage(),
+       _fetchAllData()
       ]);
     } catch (e, stackTrace) {
       debugPrint('Error in _initializeData: $e\n$stackTrace');
@@ -125,11 +128,180 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
+  Future<void> _fetchAllData() async {
+    await _fetchLocations();
+
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchContainerInfo();
+        await Future.delayed(Duration(milliseconds: 200));
+    await _fetchLocations();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchShortlistStatus();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchGalleryImages();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchBannerImage();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchAttributesData();
+    await Future.delayed(Duration(milliseconds: 200));
+    await _fetchSellerInfo();
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
     _transformationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchContainerInfo() async {
+    setState(() {
+      _isLoadingContainerInfo = true;
+      _containerInfoError = '';
+    });
+
+    try {
+      final response = await MarketplaceService2.fetchContainerInfo(id);
+      setState(() {
+        _containerInfo = response.data;
+        _isLoadingContainerInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _containerInfoError = 'Failed to load details: $e';
+        _isLoadingContainerInfo = false;
+      });
+    }
+  }
+
+Widget _buildContainerInfo() {
+  if (_isLoadingContainerInfo) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_containerInfoError.isNotEmpty) {
+    return Center(
+      child: Text(
+        _containerInfoError,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (_containerInfo.isEmpty) {
+    return const Center(child: Text('Loading.......'));
+  }
+
+return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.30),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(1, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Details',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // First row: 3 items
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 0)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[0].icon),
+                          _containerInfo[0].value,
+                        ),
+                      if (_containerInfo.length > 1)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[1].icon),
+                          _containerInfo[1].value,
+                        ),
+                      if (_containerInfo.length > 2)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[2].icon),
+                          _containerInfo[2].value,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Second row: 2 items
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 3)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[3].icon),
+                          _containerInfo[3].value,
+                        ),
+                      if (_containerInfo.length > 4)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[4].icon),
+                          _containerInfo[4].value,
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildContainerDetailItem(IconData icon, String text) {
+  return Container(
+    width: 110, // Fixed width for consistent alignment across rows
+    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[700]),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 14, color: Colors.black),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  IconData _getIconFromBootstrap(String bootstrapIcon) {
+    final iconMap = {
+      'bi-calendar-minus-fill': Icons.calendar_today,
+      'bi-person-fill': Icons.person,
+      'bi-speedometer': Icons.speed,
+      'bi-fuel-pump-fill': Icons.local_gas_station,
+      'bi-gear-fill': Icons.settings,
+      // Add more mappings as needed
+    };
+
+    return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
   Future<void> _checkShortlistStatus() async {
@@ -638,7 +810,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         elevation: 0,
                       ),
                       child: const Text(
-                        'OK',
+                        'Check Status',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -1114,7 +1286,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => MyMeetingsWidget(),
+                            builder: (context) => MyMeetingsWidget(showAppBar: true),
                           ),
                         );
                       }
@@ -1711,141 +1883,157 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
   }
 
-  void _showMeetingDialog(BuildContext context) {
-    if (_isMeetingDialogOpen) {
-      debugPrint('Meeting dialog already open');
-      return;
-    }
+void _showMeetingDialog(BuildContext context) {
+  if (_isMeetingDialogOpen) {
+    debugPrint('Meeting dialog already open');
+    return;
+  }
 
-    setState(() {
-      _isMeetingDialogOpen = true;
-    });
-
-    DateTime selectedDate = DateTime.now();
-
+  final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  if (!userProvider.isLoggedIn) {
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-
-              content: Container(
-                constraints: const BoxConstraints(maxWidth: 300),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      leading: const Icon(
-                        Icons.calendar_today,
-                        color: AppTheme.primaryColor,
-                      ),
-                      title: const Text('Select Date'),
-                      subtitle: Text(
-                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                        style: const TextStyle(color: AppTheme.primaryColor),
-                      ),
-                      onTap: () async {
-                        final DateTime? picked = await showDatePicker(
-                          context: dialogContext,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 30),
-                          ),
-                        );
-                        if (picked != null && picked != selectedDate) {
-                          setDialogState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[300]!),
-                      ),
-                    ),
-                    if (_isSchedulingMeeting)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed:
-                      _isSchedulingMeeting
-                          ? null
-                          : () => Navigator.of(dialogContext).pop(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed:
-                      _isSchedulingMeeting
-                          ? null
-                          : () async {
-                            setDialogState(() {
-                              _isSchedulingMeeting = true;
-                            });
-                            try {
-                              await _fixMeeting(selectedDate);
-                              if (mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
-                            } finally {
-                              setDialogState(() {
-                                _isSchedulingMeeting = false;
-                              });
-                            }
-                          },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.zero,
-                    ),
-                  ),
-                  child: const Text(
-                    'Schedule Meeting',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            );
+        return LoginDialog(
+          onSuccess: () {
+            if (mounted) {
+              Navigator.of(dialogContext).pop(); // Close login dialog
+              _showMeetingDialog(context); // Re-open meeting dialog
+            }
           },
         );
       },
-    ).whenComplete(() {
-      if (mounted) {
-        setState(() {
-          _isMeetingDialogOpen = false;
-        });
-      }
-    });
+    );
+    return;
   }
+
+  setState(() {
+    _isMeetingDialogOpen = true;
+  });
+
+  DateTime selectedDate = DateTime.now();
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.calendar_today,
+                      color: AppTheme.primaryColor,
+                    ),
+                    title: const Text('Select Date'),
+                    subtitle: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(color: AppTheme.primaryColor),
+                    ),
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 30),
+                        ),
+                      );
+                      if (picked != null && picked != selectedDate) {
+                        setDialogState(() {
+                          selectedDate = picked;
+                        });
+                      }
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  if (_isSchedulingMeeting)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          _isSchedulingMeeting = true;
+                        });
+                        try {
+                          await _fixMeeting(selectedDate);
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } finally {
+                          setDialogState(() {
+                            _isSchedulingMeeting = false;
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: const Text(
+                  'Schedule Meeting',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          );
+        },
+      );
+    },
+  ).whenComplete(() {
+    if (mounted) {
+      setState(() {
+        _isMeetingDialogOpen = false;
+      });
+    }
+  });
+}
 
   void _launchPhoneCall() async {
     const phoneNumber = 'tel:+919876543210';
@@ -1892,38 +2080,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     return formatter.format(number);
   }
 
-  Widget _buildDetailItem(IconData icon, String text) {
-    return Flexible(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 4,
-        ), // Compact padding
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: Colors.grey[700],
-            ), // Slightly smaller icon
-            const SizedBox(width: 6), // Tighter spacing
-            Expanded(
-              child: Text(
-                text,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1, // Prevent wrapping
-                style: const TextStyle(
-                  fontSize: 14, // Slightly smaller font for compactness
-                  color: Colors.black,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildSellerCommentItem(String label, String value) {
     return Padding(
@@ -2013,112 +2170,86 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         );
   }
 
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final userId = await _storage.read(key: 'userId');
-                if (userId == null) {
-                  _showLoginPromptDialog(context, 'ask a question');
-                  return;
-                }
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return LoginDialog(
+                      onSuccess: () {
+                        if (mounted) {
+                          Navigator.of(dialogContext).pop();
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => ReviewDialog(postId: id),
+                          );
+                        }
+                      },
+                    );
+                  },
+                );
+              } else {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (context) => ReviewDialog(postId: id),
                 );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text(
-                    'Ask a question',
-                    semanticsLabel: 'Ask a question to the seller',
-                  ),
-                ],
-              ),
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
-          ],
-        ),
-      ],
-    );
-  }
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
-  void _showLoginPromptDialog(BuildContext context, String action) {
-    debugPrint('Showing login prompt for action: $action, userId: $userId');
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
-
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return LoginDialog(
+        onSuccess: () {
+        
+          _fetchAllData();
+        },
+      );
+    },
+  );
+}
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
       return const Center(child: CircularProgressIndicator());
@@ -2131,7 +2262,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
 
     if (uniqueSellerComments.isEmpty) {
-      return const Center(child: Text('No seller comments available'));
+      return const Center(child: Text('Loding.....'));
     }
 
     String formatAttributeName(String name) {
@@ -2449,190 +2580,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 ),
                 const Divider(),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.30),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                        offset: const Offset(1, 1),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(
-                      12.0,
-                    ), // Reduced padding for compactness
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Details',
-                          style: TextStyle(
-                            fontSize: 18, // Slightly smaller for consistency
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8), // Tighter spacing
-                        if (isLoadingSellerComments)
-                          const Center(child: CircularProgressIndicator())
-                        else if (uniqueSellerComments.isEmpty)
-                          const Center(child: Text('No details available'))
-                        else
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              // Calculate max width per item based on screen width
-                              final maxItemWidth =
-                                  constraints.maxWidth /
-                                  3; // Max 3 items per row
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child: _buildDetailItem(
-                                          Icons.calendar_today,
-                                          uniqueSellerComments
-                                              .firstWhere(
-                                                (comment) =>
-                                                    comment.attributeName
-                                                        .toLowerCase()
-                                                        .trim() ==
-                                                    'year',
-                                                orElse:
-                                                    () => SellerComment(
-                                                      attributeName: 'Year',
-                                                      attributeValue: 'N/A',
-                                                    ),
-                                              )
-                                              .attributeValue,
-                                        ),
-                                      ),
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child: _buildDetailItem(
-                                          Icons.person,
-                                          uniqueSellerComments
-                                              .firstWhere(
-                                                (comment) =>
-                                                    comment.attributeName
-                                                        .toLowerCase()
-                                                        .trim() ==
-                                                    'no of owners',
-                                                orElse:
-                                                    () => SellerComment(
-                                                      attributeName:
-                                                          'No of owners',
-                                                      attributeValue: 'N/A',
-                                                    ),
-                                              )
-                                              .attributeValue,
-                                        ),
-                                      ),
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child: _buildDetailItem(
-                                          Icons.settings,
-                                          uniqueSellerComments
-                                              .firstWhere(
-                                                (comment) =>
-                                                    comment.attributeName
-                                                        .toLowerCase()
-                                                        .trim() ==
-                                                    'transmission',
-                                                orElse:
-                                                    () => SellerComment(
-                                                      attributeName:
-                                                          'Transmission',
-                                                      attributeValue: 'N/A',
-                                                    ),
-                                              )
-                                              .attributeValue,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 6,
-                                  ), // Tighter spacing between rows
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child: _buildDetailItem(
-                                          Icons.local_gas_station,
-                                          uniqueSellerComments
-                                              .firstWhere(
-                                                (comment) =>
-                                                    comment.attributeName
-                                                        .toLowerCase()
-                                                        .trim() ==
-                                                    'fuel type',
-                                                orElse:
-                                                    () => SellerComment(
-                                                      attributeName:
-                                                          'Fuel Type',
-                                                      attributeValue: 'N/A',
-                                                    ),
-                                              )
-                                              .attributeValue,
-                                        ),
-                                      ),
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child: _buildDetailItem(
-                                          Icons.speed,
-                                          uniqueSellerComments
-                                              .firstWhere(
-                                                (comment) =>
-                                                    comment.attributeName
-                                                        .toLowerCase()
-                                                        .trim() ==
-                                                    'km range',
-                                                orElse:
-                                                    () => SellerComment(
-                                                      attributeName: 'KM Range',
-                                                      attributeValue: 'N/A',
-                                                    ),
-                                              )
-                                              .attributeValue,
-                                        ),
-                                      ),
-                                      // Add empty ConstrainedBox to align with top row
-                                      ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxItemWidth,
-                                        ),
-                                        child:
-                                            const SizedBox.shrink(), // Placeholder for alignment
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildContainerInfo(),
+                  const Divider(),
 
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -2671,7 +2620,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildQuestionsSection(),
+                      _buildQuestionsSection(context, id),
                     ],
                   ),
                 ),

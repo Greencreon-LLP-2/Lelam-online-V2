@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart'; // Add this import
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
 import 'package:lelamonline_flutter/feature/categories/models/categories_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_categoty.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_categories.dart';
-import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/used_cars_categorie.dart';
+import 'package:lelamonline_flutter/feature/categories/services/categories_service.dart';
+
 import 'package:shimmer/shimmer.dart';
+import 'package:http/http.dart' as http; // For handling HTTP errors
 
 class CategoryWidget extends StatefulWidget {
   const CategoryWidget({super.key});
@@ -18,19 +21,34 @@ class CategoryWidget extends StatefulWidget {
 class _CategoryWidgetState extends State<CategoryWidget> {
   late Future<List<CategoryModel>> _categoriesFuture;
 
+  // Retry configuration
+  static const int maxRetries = 3;
+  static const Duration initialRetryDelay = Duration(seconds: 2);
+
   @override
   void initState() {
     super.initState();
-    _categoriesFuture = CategoryService().fetchCategories();
+    _categoriesFuture = _fetchCategoriesWithRetry();
   }
 
-  // Retry function for 429 errors
-  Future<void> _retryAfterDelay(Duration delay) async {
-    await Future.delayed(delay);
-    if (mounted) {
-      setState(() {
-        _categoriesFuture = CategoryService().fetchCategories();
-      });
+  // Function to fetch categories with retry logic
+  Future<List<CategoryModel>> _fetchCategoriesWithRetry({int retryCount = 0}) async {
+    try {
+      return await CategoryService().fetchCategories();
+    } on http.ClientException catch (e) {
+      // Handle HTTP errors
+      if (e.message.contains('429') && retryCount < maxRetries) {
+        // Exponential backoff: delay = initialRetryDelay * 2^retryCount
+        await Future.delayed(initialRetryDelay * (1 << retryCount));
+        return _fetchCategoriesWithRetry(retryCount: retryCount + 1);
+      }
+      // Log the error for debugging
+      debugPrint('Error fetching categories: $e');
+      rethrow; // Rethrow to display in UI
+    } catch (e) {
+      // Handle other errors
+      debugPrint('Unexpected error: $e');
+      rethrow;
     }
   }
 
@@ -42,9 +60,9 @@ class _CategoryWidgetState extends State<CategoryWidget> {
       child: RefreshIndicator(
         onRefresh: () async {
           setState(() {
-            _categoriesFuture = CategoryService().fetchCategories();
+            _categoriesFuture = _fetchCategoriesWithRetry();
           });
-          await _categoriesFuture; // Wait for the data to reload
+          await _categoriesFuture;
         },
         child: FutureBuilder<List<CategoryModel>>(
           future: _categoriesFuture,
@@ -52,25 +70,28 @@ class _CategoryWidgetState extends State<CategoryWidget> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return _buildShimmerCategories();
             } else if (snapshot.hasError) {
-              final error = snapshot.error.toString();
-              if (error.contains('429') || error.contains('Too Many Requests')) {
-                // Handle 429 specifically with retry
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                      const SizedBox(height: 8),
-                      const Text('Too many requests. Please wait...'),
-                      ElevatedButton(
-                        onPressed: () => _retryAfterDelay(const Duration(seconds: 2)),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                );
+              // User-friendly error message
+              String errorMessage = 'Failed to load categories. Please try again.';
+              if (snapshot.error.toString().contains('429')) {
+                errorMessage = 'Too many requests. Please wait and try again.';
               }
-              return Center(child: Text('Error: ${snapshot.error}'));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(errorMessage, textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _categoriesFuture = _fetchCategoriesWithRetry();
+                        });
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text('No categories found'));
             }
@@ -86,7 +107,6 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                 final imageUrl = 'https://lelamonline.com/admin/${category.image}';
                 return InkWell(
                   onTap: () {
-                    print(category.id);
                     switch (category.id) {
                       case "1":
                         Navigator.push(
@@ -143,14 +163,32 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                               ),
                             ),
                             errorWidget: (context, url, error) {
-                              // Handle 429 error specifically
-                              if (error.toString().contains('429') || error.toString().contains('Too Many Requests')) {
-                                return Shimmer.fromColors(
-                                  baseColor: Colors.grey[300]!,
-                                  highlightColor: Colors.grey[100]!,
-                                  child: Container(
-                                    color: Colors.grey[300],
-                                  ),
+                              // Retry image loading for 429 errors
+                              if (error.toString().contains('429')) {
+                                return FutureBuilder(
+                                  future: _retryImageLoad(imageUrl),
+                                  builder: (context, imageSnapshot) {
+                                    if (imageSnapshot.connectionState == ConnectionState.waiting) {
+                                      return Shimmer.fromColors(
+                                        baseColor: Colors.grey[300]!,
+                                        highlightColor: Colors.grey[100]!,
+                                        child: Container(
+                                          color: Colors.grey[300],
+                                        ),
+                                      );
+                                    } else if (imageSnapshot.hasError) {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.broken_image,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return Image.network(imageUrl, fit: BoxFit.cover);
+                                  },
                                 );
                               }
                               return Container(
@@ -163,9 +201,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                                 ),
                               );
                             },
-                            httpHeaders: {
-                              'User-Agent': 'LelamOnlineApp/1.0', // Custom user agent to potentially bypass some limits
-                            },
+                           
                           ),
                         ),
                       ),
@@ -193,10 +229,30 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     );
   }
 
+  // Function to retry image loading with exponential backoff
+  Future<void> _retryImageLoad(String imageUrl, {int retryCount = 0}) async {
+    try {
+      final response = await http.get(Uri.parse(imageUrl), headers: {
+        'User-Agent': 'LelamOnlineApp/1.0',
+      });
+      if (response.statusCode == 200) {
+        return;
+      } else if (response.statusCode == 429 && retryCount < maxRetries) {
+        await Future.delayed(initialRetryDelay * (1 << retryCount));
+        return _retryImageLoad(imageUrl, retryCount: retryCount + 1);
+      } else {
+        throw Exception('Failed to load image: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error loading image: $e');
+      rethrow;
+    }
+  }
+
   Widget _buildShimmerCategories() {
     return ListView.separated(
       separatorBuilder: (context, index) => const SizedBox(width: 35),
-      itemCount: 5, // Show 5 shimmer placeholders
+      itemCount: 5,
       scrollDirection: Axis.horizontal,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(

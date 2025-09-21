@@ -674,10 +674,27 @@ class _AdPostFormState extends State<AdPostForm>
     }
 
     // Fetch districts and brands
-    _districts = await AttributeValueService.fetchDistricts();
+    _districts = [
+  {
+    'id': '0', // Use a unique ID for "All Kerala"
+    'name': 'All Kerala',
+    'slug': 'all-kerala',
+    'parent_id': '0',
+    'image': '',
+    'description': '',
+    'latitude': '',
+    'longitude': '',
+    'popular': '0',
+    'status': '1',
+    'allstore_onoff': '1',
+    'created_on': '',
+    'updated_on': '',
+  },
+  ...await AttributeValueService.fetchDistricts()
+];
     _brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
-      _selectedDistrict ??=
+      _selectedDistrict ??= 'All Kerala'; 
           _districts.isNotEmpty ? _districts[0]['name'] : null;
       if (widget.adData?['brand'] != null) {
         _selectedBrand = _brands.firstWhere(
@@ -1122,11 +1139,7 @@ class _AdPostFormState extends State<AdPostForm>
           extra: {
             'userId': widget.userId,
             'adData': {
-              ...formData,
               'id': postId,
-              'created_on': DateTime.now().toIso8601String(),
-              'updated_on': DateTime.now().toIso8601String(),
-              'image': _selectedImages[_coverImageIndex].path,
             },
           },
         );
@@ -1487,18 +1500,18 @@ class _AdPostFormState extends State<AdPostForm>
         label: 'Landmark',
         alignLabelWithHint: true,
       ),
-      if (widget.categoryId == '1') ...[
-        const SizedBox(height: 12),
-        CustomFormField(
-          controller: _controllers['registration']!,
-          label: 'Registration Valid Till',
-        ),
-        const SizedBox(height: 12),
-        CustomFormField(
-          controller: _controllers['insurance']!,
-          label: 'Insurance Upto',
-        ),
-      ],
+      // if (widget.categoryId == '1') ...[
+      //   const SizedBox(height: 12),
+      //   CustomFormField(
+      //     controller: _controllers['registration']!,
+      //     label: 'Registration Valid Till',
+      //   ),
+      //   const SizedBox(height: 12),
+      //   CustomFormField(
+      //     controller: _controllers['insurance']!,
+      //     label: 'Insurance Upto',
+      //   ),
+      // ],
       const SizedBox(height: 12),
       CustomFormField(
         controller: _controllers['description']!,

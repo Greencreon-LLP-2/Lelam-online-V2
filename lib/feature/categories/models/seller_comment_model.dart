@@ -1,6 +1,6 @@
 class SellerCommentsModel {
   final String status;
-  final List<SellerComment> data;
+  late final List<SellerComment> data;
   final String code;
 
   SellerCommentsModel({

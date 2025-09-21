@@ -212,32 +212,49 @@ class MeetingCard extends StatelessWidget {
   }
 
   String _getMeetingStatus(Map<String, dynamic> meeting) {
-    if (meeting['meeting_done'] == '1') return 'Meeting Completed';
+    debugPrint(
+      'Meeting ${meeting['id']}: status=${meeting['status']}, '
+      'meeting_done=${meeting['meeting_done']}, '
+      'if_location_request=${meeting['if_location_request']}, '
+      'meeting_date=${meeting['meeting_date']}, '
+      'seller_approvel=${meeting['seller_approvel']}, '
+      'admin_approvel=${meeting['admin_approvel']}, '
+      'location_link=${meeting['location_link']}',
+    );
+    if (meeting['meeting_done'] == '1') {
+      debugPrint('Meeting ${meeting['id']} status: Meeting Completed');
+      return 'Meeting Completed';
+    }
     if (meeting['seller_approvel'] == '1' &&
         meeting['admin_approvel'] == '1' &&
         meeting['meeting_done'] == '0' &&
         meeting['if_location_request'] == '1' &&
         meeting['location_link']?.isNotEmpty == true) {
+      debugPrint('Meeting ${meeting['id']} status: Ready For Meeting');
       return 'Ready For Meeting';
     }
     if (meeting['if_location_request'] == '1' &&
-        meeting['status'] == '1' &&
+        (meeting['status'] == '1' || meeting['status'] == true) &&
         meeting['meeting_done'] == '0' &&
         (meeting['location_link'] == null || meeting['location_link'] == '')) {
+      debugPrint('Meeting ${meeting['id']} status: Awaiting Location');
       return 'Awaiting Location';
     }
-    if (meeting['status'] == '1' &&
-        meeting['meeting_done'] == '0' &&
-        meeting['meeting_date'] != 'N/A' &&
-        meeting['meeting_date']?.isNotEmpty == true &&
-        meeting['if_location_request'] != '1') {
-      return 'Date Fixed';
-    }
-    if (meeting['status'] == '1' &&
+    if ((meeting['status'] == '1' || meeting['status'] == true) &&
         meeting['meeting_done'] == '0' &&
         meeting['if_location_request'] == '0') {
+      debugPrint('Meeting ${meeting['id']} status: Meeting Request');
       return 'Meeting Request';
     }
+    if ((meeting['status'] == '1' || meeting['status'] == true) &&
+        meeting['meeting_done'] == '0' &&
+        meeting['if_location_request'] != '0' &&
+        meeting['meeting_date'] != 'N/A' &&
+        meeting['meeting_date']?.isNotEmpty == true) {
+      debugPrint('Meeting ${meeting['id']} status: Date Fixed');
+      return 'Date Fixed';
+    }
+    debugPrint('Meeting ${meeting['id']} status: Unknown');
     return 'Unknown';
   }
 
@@ -261,12 +278,13 @@ class MeetingCard extends StatelessWidget {
           status == 'Meeting Completed'
               ? _fetchMeetingDoneStatus(meeting['id'])
               : Future.value({
-                'middleStatus_data':
-                    meeting['middleStatus_data'] ?? 'Schedule meeting',
-                'footerStatus_data':
-                    meeting['footerStatus_data'] ?? 'Click call support for full details',
-                'timer': meeting['timer'] ?? '0',
-              }),
+                  'middleStatus_data':
+                      meeting['middleStatus_data'] ?? 'Schedule meeting',
+                  'footerStatus_data':
+                      meeting['footerStatus_data'] ??
+                      'Click call support for full details',
+                  'timer': meeting['timer'] ?? '0',
+                }),
       builder: (context, statusSnapshot) {
         final statusData =
             statusSnapshot.data ??
@@ -274,7 +292,8 @@ class MeetingCard extends StatelessWidget {
               'middleStatus_data':
                   meeting['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  meeting['footerStatus_data'] ?? 'Click call support for full details',
+                  meeting['footerStatus_data'] ??
+                  'Click call support for full details',
               'timer': meeting['timer'] ?? '0',
             };
 
@@ -282,10 +301,10 @@ class MeetingCard extends StatelessWidget {
           future:
               status == 'Meeting Completed'
                   ? _fetchOfferPrice(
-                    meeting['user_id'],
-                    meeting['post_id'],
-                    meeting['id'],
-                  )
+                      meeting['user_id'],
+                      meeting['post_id'],
+                      meeting['id'],
+                    )
                   : Future.value(meeting['price_offered'] ?? '0.00'),
           builder: (context, offerPriceSnapshot) {
             final offerPrice =
@@ -374,9 +393,9 @@ class MeetingCard extends StatelessWidget {
                                               child: const Center(
                                                 child:
                                                     CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color: Colors.blue,
-                                                    ),
+                                                  strokeWidth: 2,
+                                                  color: Colors.blue,
+                                                ),
                                               ),
                                             ),
                                         errorWidget: (context, url, error) {
@@ -684,6 +703,9 @@ class MeetingCard extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       onSelected: (value) {
+                                        debugPrint(
+                                          'Menu option selected: $value for meeting ${meeting['id']}',
+                                        );
                                         if (value == 'edit_date' &&
                                             status != 'Meeting Completed') {
                                           onEditDate(meeting);
@@ -693,8 +715,7 @@ class MeetingCard extends StatelessWidget {
                                         } else if (value ==
                                             'proceed_with_bid') {
                                           onProceedWithBid();
-                                        } else if (value == 'send_location' &&
-                                            status == 'Meeting Request') {
+                                        } else if (value == 'send_location') {
                                           onSendLocationRequest(meeting);
                                         } else if (value == 'view_location') {
                                           onViewLocation(meeting);
