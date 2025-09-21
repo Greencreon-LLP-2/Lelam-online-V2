@@ -20,6 +20,7 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
@@ -191,7 +192,7 @@ Widget _buildContainerInfo() {
     return const Center(child: Text('Loading.......'));
   }
 
-  return Container(
+return Container(
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(12),
@@ -219,7 +220,7 @@ Widget _buildContainerInfo() {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // First row
+                  // First row: 3 items
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -241,7 +242,7 @@ Widget _buildContainerInfo() {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Second row
+                  // Second row: 2 items
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -255,8 +256,6 @@ Widget _buildContainerInfo() {
                           _getIconFromBootstrap(_containerInfo[4].icon),
                           _containerInfo[4].value,
                         ),
-                      if (_containerInfo.length <= 4)
-                        const SizedBox.shrink(),
                     ],
                   ),
                 ],
@@ -270,24 +269,24 @@ Widget _buildContainerInfo() {
 }
 
 Widget _buildContainerDetailItem(IconData icon, String text) {
-  return Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Icon(icon, size: 14, color: Colors.grey[700]),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: const TextStyle(fontSize: 14, color: Colors.black),
-            ),
+  return Container(
+    width: 110, // Fixed width for consistent alignment across rows
+    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[700]),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 14, color: Colors.black),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -811,7 +810,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         elevation: 0,
                       ),
                       child: const Text(
-                        'OK',
+                        'Check Status',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -1287,7 +1286,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => MyMeetingsWidget(),
+                            builder: (context) => MyMeetingsWidget(showAppBar: true),
                           ),
                         );
                       }
@@ -1884,141 +1883,157 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     );
   }
 
-  void _showMeetingDialog(BuildContext context) {
-    if (_isMeetingDialogOpen) {
-      debugPrint('Meeting dialog already open');
-      return;
-    }
+void _showMeetingDialog(BuildContext context) {
+  if (_isMeetingDialogOpen) {
+    debugPrint('Meeting dialog already open');
+    return;
+  }
 
-    setState(() {
-      _isMeetingDialogOpen = true;
-    });
-
-    DateTime selectedDate = DateTime.now();
-
+  final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  if (!userProvider.isLoggedIn) {
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-
-              content: Container(
-                constraints: const BoxConstraints(maxWidth: 300),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      leading: const Icon(
-                        Icons.calendar_today,
-                        color: AppTheme.primaryColor,
-                      ),
-                      title: const Text('Select Date'),
-                      subtitle: Text(
-                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                        style: const TextStyle(color: AppTheme.primaryColor),
-                      ),
-                      onTap: () async {
-                        final DateTime? picked = await showDatePicker(
-                          context: dialogContext,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 30),
-                          ),
-                        );
-                        if (picked != null && picked != selectedDate) {
-                          setDialogState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.grey[300]!),
-                      ),
-                    ),
-                    if (_isSchedulingMeeting)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8.0),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed:
-                      _isSchedulingMeeting
-                          ? null
-                          : () => Navigator.of(dialogContext).pop(),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed:
-                      _isSchedulingMeeting
-                          ? null
-                          : () async {
-                            setDialogState(() {
-                              _isSchedulingMeeting = true;
-                            });
-                            try {
-                              await _fixMeeting(selectedDate);
-                              if (mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
-                            } finally {
-                              setDialogState(() {
-                                _isSchedulingMeeting = false;
-                              });
-                            }
-                          },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.zero,
-                    ),
-                  ),
-                  child: const Text(
-                    'Schedule Meeting',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            );
+        return LoginDialog(
+          onSuccess: () {
+            if (mounted) {
+              Navigator.of(dialogContext).pop(); // Close login dialog
+              _showMeetingDialog(context); // Re-open meeting dialog
+            }
           },
         );
       },
-    ).whenComplete(() {
-      if (mounted) {
-        setState(() {
-          _isMeetingDialogOpen = false;
-        });
-      }
-    });
+    );
+    return;
   }
+
+  setState(() {
+    _isMeetingDialogOpen = true;
+  });
+
+  DateTime selectedDate = DateTime.now();
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            content: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(
+                      Icons.calendar_today,
+                      color: AppTheme.primaryColor,
+                    ),
+                    title: const Text('Select Date'),
+                    subtitle: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(color: AppTheme.primaryColor),
+                    ),
+                    onTap: () async {
+                      final DateTime? picked = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: selectedDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(
+                          const Duration(days: 30),
+                        ),
+                      );
+                      if (picked != null && picked != selectedDate) {
+                        setDialogState(() {
+                          selectedDate = picked;
+                        });
+                      }
+                    },
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  if (_isSchedulingMeeting)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: _isSchedulingMeeting
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          _isSchedulingMeeting = true;
+                        });
+                        try {
+                          await _fixMeeting(selectedDate);
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } finally {
+                          setDialogState(() {
+                            _isSchedulingMeeting = false;
+                          });
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: const Text(
+                  'Schedule Meeting',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          );
+        },
+      );
+    },
+  ).whenComplete(() {
+    if (mounted) {
+      setState(() {
+        _isMeetingDialogOpen = false;
+      });
+    }
+  });
+}
 
   void _launchPhoneCall() async {
     const phoneNumber = 'tel:+919876543210';
@@ -2155,112 +2170,86 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
   }
 
-  Widget _buildQuestionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final userId = await _storage.read(key: 'userId');
-                if (userId == null) {
-                  _showLoginPromptDialog(context, 'ask a question');
-                  return;
-                }
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return LoginDialog(
+                      onSuccess: () {
+                        if (mounted) {
+                          Navigator.of(dialogContext).pop();
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => ReviewDialog(postId: id),
+                          );
+                        }
+                      },
+                    );
+                  },
+                );
+              } else {
                 showDialog(
                   context: context,
                   barrierDismissible: false,
                   builder: (context) => ReviewDialog(postId: id),
                 );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text(
-                    'Ask a question',
-                    semanticsLabel: 'Ask a question to the seller',
-                  ),
-                ],
-              ),
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
-          ],
-        ),
-      ],
-    );
-  }
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
-  void _showLoginPromptDialog(BuildContext context, String action) {
-    debugPrint('Showing login prompt for action: $action, userId: $userId');
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
-
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return LoginDialog(
+        onSuccess: () {
+        
+          _fetchAllData();
+        },
+      );
+    },
+  );
+}
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
       return const Center(child: CircularProgressIndicator());
@@ -2632,7 +2621,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _buildQuestionsSection(),
+                      _buildQuestionsSection(context, id),
                     ],
                   ),
                 ),

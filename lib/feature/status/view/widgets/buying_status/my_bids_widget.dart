@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
@@ -134,47 +136,47 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     }
   }
 
-  // Future<int> _fetchMeetingAttempts(String bidId) async {
-  //   try {
-  //     final response = await http.get(
-  //       Uri.parse(
-  //         '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${widget.userId}',
-  //       ),
-  //       headers: {
-  //         'token': widget.token,
-  //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-  //       },
-  //     );
-  //     print(
-  //       'my-meeting-request.php response for bid_id $bidId: ${response.body}',
-  //     );
-  //     if (response.statusCode == 200) {
-  //       final responseData = jsonDecode(response.body);
-  //       List meetings = [];
-  //       if (responseData is List) {
-  //         meetings = responseData;
-  //       } else if (responseData is Map &&
-  //           (responseData['status'] == true ||
-  //               responseData['status'] == 'true')) {
-  //         meetings = responseData['data'] as List;
-  //       }
-  //       final count =
-  //           meetings
-  //               .where((m) => m['bid_id'] == bidId && m['status'] == '1')
-  //               .length;
-  //       print('Meeting attempts for bid_id $bidId: $count');
-  //       return count;
-  //     } else {
-  //       print(
-  //         'my-meeting-request.php failed with status ${response.statusCode} for bid_id $bidId',
-  //       );
-  //     }
-  //     return 0;
-  //   } catch (e) {
-  //     print('Error fetching meeting attempts for bid_id $bidId: $e');
-  //     return 0;
-  //   }
-  // }
+  Future<int> _fetchMeetingAttempts(String bidId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${widget.userId}',
+        ),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
+      );
+      print(
+        'my-meeting-request.php response for bid_id $bidId: ${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        List meetings = [];
+        if (responseData is List) {
+          meetings = responseData;
+        } else if (responseData is Map &&
+            (responseData['status'] == true ||
+                responseData['status'] == 'true')) {
+          meetings = responseData['data'] as List;
+        }
+        final count =
+            meetings
+                .where((m) => m['bid_id'] == bidId && m['status'] == '1')
+                .length;
+        print('Meeting attempts for bid_id $bidId: $count');
+        return count;
+      } else {
+        print(
+          'my-meeting-request.php failed with status ${response.statusCode} for bid_id $bidId',
+        );
+      }
+      return 0;
+    } catch (e) {
+      print('Error fetching meeting attempts for bid_id $bidId: $e');
+      return 0;
+    }
+  }
 
   Future<List<Map<String, String>>> _fetchMeetingTimes() async {
     try {
@@ -318,74 +320,51 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                   print(
                                     'procced-meeting-with-bid.php response: ${response.body}',
                                   );
-                                  if (response.statusCode == 200) {
-                                    final data = jsonDecode(response.body);
-                                    if (data['status'] == true ||
-                                        data['status'] == 'true') {
-                                      if (data['code'] == 2) {
-                                        print(
-                                          'Bid not found for bid_id: $bidId',
-                                        );
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Error: Bid not found on server',
-                                            ),
-                                          ),
-                                        );
-                                      } else if (data['code'] == 1) {
-                                        print(
-                                          'Post not found for post_id: $postId',
-                                        );
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Error: Post not found',
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Meeting scheduled for $selectedTimeName',
-                                            ),
-                                          ),
-                                        );
-                                        await _loadBids();
-                                        print(
-                                          'Meeting scheduled, refreshing meetings recommended',
-                                        );
-                                      }
-                                    } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    print(
-                                      'procced-meeting-with-bid.php failed with status ${response.statusCode}',
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Failed to schedule meeting',
-                                        ),
-                                      ),
-                                    );
-                                  }
+                             if (response.statusCode == 200) {
+  final data = jsonDecode(response.body);
+  if (data['status'] == true || data['status'] == 'true') {
+    if (data['code'] == 2) {
+      print('Bid not found for bid_id: $bidId');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Bid not found on server')),
+      );
+    } else if (data['code'] == 1) {
+      print('Post not found for post_id: $postId');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Post not found')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Meeting scheduled for $selectedTimeName'),
+        ),
+      );
+      await _loadBids();
+      print('Meeting scheduled, navigating to My Meetings tab');
+      // Navigate to BuyingStatusPage with My Meetings tab and Meeting Request status
+      context.pushNamed(
+        RouteNames.buyingStatusPage,
+        queryParameters: {
+          'initialTab': '1', // Index of My Meetings tab
+          'initialStatus': 'Meeting Request',
+          'postId': postId,
+          'bidId': bidId,
+        },
+      );
+    }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}'),
+      ),
+    );
+  }
+} else {
+  print('procced-meeting-with-bid.php failed with status ${response.statusCode}');
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Failed to schedule meeting')),
+  );
+}
                                 } catch (e) {
                                   print(
                                     'Error scheduling meeting with bid: $e',

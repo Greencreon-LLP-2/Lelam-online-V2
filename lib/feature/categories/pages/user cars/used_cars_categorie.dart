@@ -670,9 +670,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   List<Product> get filteredProducts {
     if (!_filtersChanged) return _filteredProductsCache;
+
+    // Filter products based on all criteria
     final filtered =
         _products.where((product) {
           final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+
+          // Search query filtering
           if (_searchQuery.trim().isNotEmpty) {
             final query = _searchQuery.toLowerCase().trim();
             final searchableText = [
@@ -689,16 +693,24 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             ].join(' ');
             if (!searchableText.contains(query)) return false;
           }
+
+          // Location filter
           if (_selectedLocation != 'all' &&
               product.parentZoneId != _selectedLocation)
             return false;
+
+          // Listing type filter
           if (_listingType == 'auction' && product.ifAuction != '1')
             return false;
           if (_listingType == 'Marketplace' && product.ifAuction != '0')
             return false;
+
+          // Brand filter
           if (_selectedBrands.isNotEmpty &&
               !_selectedBrands.contains(product.brand))
             return false;
+
+          // Price range filter
           if (_selectedPriceRange != 'all') {
             int price =
                 product.ifAuction == '1'
@@ -722,6 +734,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
             }
           }
+
+          // Year range filter
           final yearStr = attributeValues['Year'] ?? '0';
           final year = int.tryParse(yearStr) ?? 0;
           if (_selectedYearRange != 'all') {
@@ -743,6 +757,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
             }
           }
+
+          // Owners range filter
           final ownersStr = attributeValues['No of owners'] ?? '';
           int owners = 0;
           if (ownersStr.contains('1st'))
@@ -769,14 +785,20 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
             }
           }
+
+          // Fuel type filter
           final fuel = attributeValues['Fuel Type'] ?? '';
           if (_selectedFuelTypes.isNotEmpty &&
               !_selectedFuelTypes.contains(fuel))
             return false;
+
+          // Transmission filter
           final trans = attributeValues['Transmission'] ?? '';
           if (_selectedTransmissions.isNotEmpty &&
               !_selectedTransmissions.contains(trans))
             return false;
+
+          // KM range filter
           final kmStr = attributeValues['KM Range'] ?? '';
           int km = 0;
           final kmMatch = RegExp(r'(\d+)').firstMatch(kmStr);
@@ -800,6 +822,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
             }
           }
+
+          // Sold by filter
           final soldBy =
               attributeValues['Sold by'] ??
               (product.byDealer == '1' ? 'Dealer' : 'Owner');
@@ -815,11 +839,47 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 break;
             }
           }
+
           return true;
         }).toList();
+
+    // Sort products based on search query relevance if search query exists
+    if (_searchQuery.trim().isNotEmpty) {
+      final query = _searchQuery.toLowerCase().trim();
+      filtered.sort((a, b) {
+        final aScore = _calculateRelevanceScore(a, query);
+        final bScore = _calculateRelevanceScore(b, query);
+        return bScore.compareTo(aScore); // Higher score comes first
+      });
+    }
+
     _filteredProductsCache = filtered;
     _filtersChanged = false;
     return filtered;
+  }
+
+  double _calculateRelevanceScore(Product product, String query) {
+    final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+    double score = 0;
+
+    if (product.title.toLowerCase().contains(query)) score += 3.0;
+    if (product.brand.toLowerCase().contains(query)) score += 2.0;
+    if (product.model.toLowerCase().contains(query)) score += 1.5;
+    if (product.modelVariation.toLowerCase().contains(query)) score += 1.0;
+    if (_getLocationName(product.parentZoneId).toLowerCase().contains(query))
+      score += 0.5;
+    if ((attributeValues['Fuel Type']?.toLowerCase() ?? '').contains(query))
+      score += 0.5;
+    if ((attributeValues['Transmission']?.toLowerCase() ?? '').contains(query))
+      score += 0.5;
+    if ((attributeValues['Year']?.toLowerCase() ?? '').contains(query))
+      score += 0.5;
+    if ((attributeValues['Sold by']?.toLowerCase() ??
+            (product.byDealer == '1' ? 'dealer' : 'owner'))
+        .contains(query))
+      score += 0.5;
+
+    return score;
   }
 
   String getImageUrl(String imagePath) {
@@ -1270,24 +1330,18 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   controller: _scrollController,
                   itemCount:
                       _products.length +
-                      (_showMainSearch
-                          ? 3
-                          : 1), // Adjusted for SearchResultsWidget
+                      (_showMainSearch ? 2 : 1), // Removed SearchResultsWidget
                   itemBuilder: (context, index) {
                     if (_showMainSearch && index == 0) {
                       return _buildSearchField();
                     }
-                    if (_showMainSearch && index == 1) {
-                      return SearchResultsWidget(
-                        searchQuery: _searchQuery,
-                      ); // Add SearchResultsWidget
-                    }
-                    if (index == (_showMainSearch ? 2 : 0)) {
+                    if (index == (_showMainSearch ? 1 : 0)) {
                       return _buildListingTypeButtons();
                     }
-                    final productIndex = index - (_showMainSearch ? 3 : 1);
-                    if (productIndex < _products.length) {
-                      final product = _products[productIndex];
+                    final productIndex = index - (_showMainSearch ? 2 : 1);
+                    if (productIndex < filteredProducts.length) {
+                      // Use filteredProducts here
+                      final product = filteredProducts[productIndex];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: _buildProductCard(product),
@@ -1417,38 +1471,41 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           ),
                         ),
                       if (isVerified || isFeatured)
-  Positioned(
-    top: 4,
-    left: 4,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.blue,
-        borderRadius: BorderRadius.circular(12), // rounded pill shape
-      ),
-      child: Row(
-    
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(
-            Icons.verified,
-            size: 12,
-            color: Colors.white,
-          ),
-          SizedBox(width: 4),
-          Text(
-            "Verified",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    ),
-  ),
-
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(
+                                12,
+                              ), // rounded pill shape
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(
+                                  Icons.verified,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Verified",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1605,25 +1662,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ],
             ),
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
-              Container(
-
-                // make finance/exchange strip flush and remove extra vertical spacing
-                width: double.infinity,
-                padding: EdgeInsets.zero,
+              Container(     
                 decoration: BoxDecoration(
                   color:
                       (isAuction || isFinanceAvailable || isExchangeAvailable)
                           ? Palette.primarylightblue
                           : Colors.grey.shade50,
                   // keep bottom radius to match card but no extra gap
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(0),
-                  ),
+                  
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
+                    horizontal: 4,
+                    vertical: 0,
                   ),
                   child:
                       isAuction
@@ -1661,7 +1712,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Widget _buildAuctionInfo(Product product) {
     return Row(
       children: [
-        const Icon(Icons.gavel, size: 12, color: Colors.black),
+        const Icon(Icons.gavel, size: 10, color: Colors.black),
         const SizedBox(width: 4),
         Text(
           'Attempts: ${product.auctionAttempt}/3',
@@ -1840,7 +1891,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       final List<Product> products =
           finalPosts.map((post) => post.toProduct()).toList();
 
-      // final attributeValuePairs =
+      // final attributeValuePairs
       //     await AttributeValueService.fetchAttributeValuePairs();
 
       setState(() {

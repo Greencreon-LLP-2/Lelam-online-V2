@@ -178,6 +178,7 @@ class ProductSectionWidget extends StatelessWidget {
   String _formatPrice(double price) {
     final formatter = NumberFormat.currency(
       locale: 'en_IN',
+      symbol: '',
       decimalDigits: 0,
     );
     return formatter.format(price.round());

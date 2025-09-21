@@ -136,6 +136,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     });
     debugPrint('AuctionProductDetailsPage - Loaded userId: $userId');
   }
+
   Future<void> _fetchContainerInfo() async {
     setState(() {
       _isLoadingContainerInfo = true;
@@ -156,108 +157,107 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     }
   }
 
-Widget _buildContainerInfo() {
-  if (_isLoadingContainerInfo) {
-    return const Center(child: CircularProgressIndicator());
-  }
+  Widget _buildContainerInfo() {
+    if (_isLoadingContainerInfo) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  if (_containerInfoError.isNotEmpty) {
-    return Center(
-      child: Text(
-        _containerInfoError,
-        style: const TextStyle(color: Colors.red),
+    if (_containerInfoError.isNotEmpty) {
+      return Center(
+        child: Text(
+          _containerInfoError,
+          style: const TextStyle(color: Colors.red),
+        ),
+      );
+    }
+
+    if (_containerInfo.isEmpty) {
+      return const Center(child: Text('Loading.......'));
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(1, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // First row: 3 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 0)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[0].icon),
+                            _containerInfo[0].value,
+                          ),
+                        if (_containerInfo.length > 1)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[1].icon),
+                            _containerInfo[1].value,
+                          ),
+                        if (_containerInfo.length > 2)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[2].icon),
+                            _containerInfo[2].value,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Second row: 2 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 3)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[3].icon),
+                            _containerInfo[3].value,
+                          ),
+                        if (_containerInfo.length > 4)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[4].icon),
+                            _containerInfo[4].value,
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  if (_containerInfo.isEmpty) {
-    return const Center(child: Text('Loading.......'));
-  }
-
-  return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.30),
-          blurRadius: 10,
-          spreadRadius: 1,
-          offset: const Offset(1, 1),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // First row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 0)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[0].icon),
-                          _containerInfo[0].value,
-                        ),
-                      if (_containerInfo.length > 1)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[1].icon),
-                          _containerInfo[1].value,
-                        ),
-                      if (_containerInfo.length > 2)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[2].icon),
-                          _containerInfo[2].value,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Second row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 3)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[3].icon),
-                          _containerInfo[3].value,
-                        ),
-                      if (_containerInfo.length > 4)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[4].icon),
-                          _containerInfo[4].value,
-                        ),
-                      if (_containerInfo.length <= 4)
-                        const SizedBox.shrink(),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-Widget _buildContainerDetailItem(IconData icon, String text) {
-  return Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  Widget _buildContainerDetailItem(IconData icon, String text) {
+    return Container(
+      width: 110, 
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 14, color: Colors.grey[700]),
           const SizedBox(width: 6),
@@ -265,15 +265,14 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
-              maxLines: 2,
+              maxLines: 1,
               style: const TextStyle(fontSize: 14, color: Colors.black),
             ),
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   IconData _getIconFromBootstrap(String bootstrapIcon) {
     final iconMap = {

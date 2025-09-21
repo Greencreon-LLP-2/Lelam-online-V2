@@ -25,6 +25,7 @@ import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_pag
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_ads_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
@@ -196,7 +197,7 @@ Widget _buildContainerInfo() {
     return const Center(child: Text('Loading.......'));
   }
 
-  return Container(
+return Container(
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(12),
@@ -224,7 +225,7 @@ Widget _buildContainerInfo() {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // First row
+                  // First row: 3 items
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -246,7 +247,7 @@ Widget _buildContainerInfo() {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Second row
+                  // Second row: 2 items
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
@@ -260,8 +261,6 @@ Widget _buildContainerInfo() {
                           _getIconFromBootstrap(_containerInfo[4].icon),
                           _containerInfo[4].value,
                         ),
-                      if (_containerInfo.length <= 4)
-                        const SizedBox.shrink(),
                     ],
                   ),
                 ],
@@ -275,24 +274,24 @@ Widget _buildContainerInfo() {
 }
 
 Widget _buildContainerDetailItem(IconData icon, String text) {
-  return Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Icon(icon, size: 14, color: Colors.grey[700]),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              text,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: const TextStyle(fontSize: 14, color: Colors.black),
-            ),
+  return Container(
+    width: 110, // Fixed width for consistent alignment across rows
+    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[700]),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 14, color: Colors.black),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -1162,63 +1161,20 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     );
   }
 
-  void _showLoginPromptDialog(BuildContext context, String action) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return LoginDialog(
+        onSuccess: () {
+        
+          _fetchAllData();
+        },
+      );
+    },
+  );
+}
 
   void showProductBidDialog(BuildContext context) async {
     if (!_userProvider.isLoggedIn) {
@@ -1381,7 +1337,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         elevation: 0,
                       ),
                       child: const Text(
-                        'OK',
+                        'Check Status',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -2550,97 +2506,71 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
   }
 
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return LoginDialog(
+                      onSuccess: () {
+                        if (mounted) {
+                          Navigator.of(dialogContext).pop();
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => ReviewDialog(postId: id),
+                          );
+                        }
+                      },
+                    );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => ReviewDialog(postId: id),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
               ],
             ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
-                } else {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
+          ),
+        ],
+      ),
+    ],
+  );
+}
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {

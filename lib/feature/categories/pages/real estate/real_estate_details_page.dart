@@ -22,9 +22,11 @@ import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
-import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart' show SellingStatusPage;
+import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart'
+    show SellingStatusPage;
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
@@ -87,7 +89,7 @@ class _RealEstateProductDetailsPageState
   String? _bannerImageUrl;
   bool _isLoadingBanner = false;
   String _bannerError = '';
- String _moveToAuctionButtonText = 'Move to Auction';
+  String _moveToAuctionButtonText = 'Move to Auction';
 
   @override
   void initState() {
@@ -109,7 +111,7 @@ class _RealEstateProductDetailsPageState
     ]);
   }
 
- Future<bool> _checkAuctionTermsStatus() async {
+  Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
       developer.log('User not logged in, cannot check auction terms.');
       return false;
@@ -480,7 +482,6 @@ class _RealEstateProductDetailsPageState
     }
   }
 
-
   Future<void> _fetchBannerImage() async {
     developer.log('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
     try {
@@ -536,7 +537,9 @@ class _RealEstateProductDetailsPageState
       setState(() {
         _isLoadingBanner = false;
       });
-      developer.log('RealEstateProductDetailsPage - _fetchBannerImage: Completed');
+      developer.log(
+        'RealEstateProductDetailsPage - _fetchBannerImage: Completed',
+      );
     }
   }
 
@@ -1423,54 +1426,14 @@ class _RealEstateProductDetailsPageState
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        return LoginDialog(
+          onSuccess: () {
+            _fetchLocations();
+            _fetchAttributesData();
+            _fetchSellerInfo();
+            _fetchGalleryImages();
+            _fetchBannerImage();
+          },
         );
       },
     );
@@ -2208,13 +2171,30 @@ class _RealEstateProductDetailsPageState
   }
 
   void _showMeetingDialog(BuildContext context) {
-    if (userId == null || userId == 'Unknown') {
-      _showLoginPromptDialog(context, 'schedule a meeting');
+    if (_isMeetingDialogOpen) {
+      developer.log('Meeting dialog already open');
       return;
     }
 
-    if (_isMeetingDialogOpen) {
-      developer.log('Meeting dialog already open');
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    if (!userProvider.isLoggedIn) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return LoginDialog(
+            onSuccess: () {
+              if (mounted) {
+                Navigator.of(dialogContext).pop(); // Close login dialog
+                _showMeetingDialog(context); // Re-open meeting dialog
+              }
+            },
+          );
+        },
+      );
       return;
     }
 
@@ -2234,7 +2214,6 @@ class _RealEstateProductDetailsPageState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -2283,9 +2262,7 @@ class _RealEstateProductDetailsPageState
                   onPressed:
                       _isSchedulingMeeting
                           ? null
-                          : () {
-                            Navigator.of(dialogContext).pop();
-                          },
+                          : () => Navigator.of(dialogContext).pop(),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -2450,96 +2427,71 @@ class _RealEstateProductDetailsPageState
         );
   }
 
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return LoginDialog(
+                      onSuccess: () {
+                        if (mounted) {
+                          Navigator.of(dialogContext).pop();
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => ReviewDialog(postId: id),
+                          );
+                        }
+                      },
+                    );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => ReviewDialog(postId: id),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
               ],
             ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
-                } else {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
   String _stripHtmlTags(String htmlString) {
     return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
@@ -3074,109 +3026,102 @@ class _RealEstateProductDetailsPageState
               ],
             ),
           ),
-           Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.white, // Prevents ParentDataWidget issues
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: Offset(1, 3),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+               
+                
+              ),
+              child: Row(
+                children: [
+                  if (_userProvider.userId == widget.product.createdBy) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SellingStatusPage(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Edit'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoadingBid ? null : _moveToAuction,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child:
+                            _isLoadingBid
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : Text(_moveToAuctionButtonText),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => showProductBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showMeetingDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Fix Meeting'),
+                      ),
                     ),
                   ],
-                ),
-                child: Row(
-                  children: [
-                    if (_userProvider.userId == widget.product.createdBy) ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SellingStatusPage(),
-            ),
-          );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Edit'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLoadingBid ? null : _moveToAuction,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child:
-                              _isLoadingBid
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Text(_moveToAuctionButtonText),
-                        ),
-                      ),
-                    ] else ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => showProductBidDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primarypink,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Place Bid'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _showMeetingDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Fix Meeting'),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
