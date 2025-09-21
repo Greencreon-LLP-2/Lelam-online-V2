@@ -119,9 +119,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     await _fetchSellerInfo();
 
     await Future.delayed(Duration(milliseconds: 200));
-
     await _fetchData();
-
     await _fetchContainerInfo();
   }
 
@@ -203,7 +201,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // First row: 3 items
                     Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
@@ -225,7 +222,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Second row: 2 items
                     Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       children: [
@@ -253,7 +249,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
   Widget _buildContainerDetailItem(IconData icon, String text) {
     return Container(
-      width: 110, 
+      width: 110,
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
@@ -281,9 +277,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
       'bi-speedometer': Icons.speed,
       'bi-fuel-pump-fill': Icons.local_gas_station,
       'bi-gear-fill': Icons.settings,
-      // Add more mappings as needed
     };
-
     return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
@@ -298,7 +292,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
@@ -344,7 +337,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         final Map<String, SellerComment> uniqueAttributes = {};
         final List<SellerComment> orderedComments = [];
 
-        // Process attributes for uniqueness
         for (var comment in sellerComments.data) {
           final key = comment.attributeName.toLowerCase().replaceAll(
             RegExp(r'\s+'),
@@ -358,20 +350,16 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
         setState(() {
           uniqueSellerComments = orderedComments;
-
-          // Filter for Details section
-          detailComments =
-              uniqueSellerComments.where((comment) {
-                final name = comment.attributeName.toLowerCase().trim();
-                return [
-                  'year',
-                  'no of owners',
-                  'fuel type',
-                  'transmission',
-                  'km range',
-                ].contains(name);
-              }).toList();
-
+          detailComments = uniqueSellerComments.where((comment) {
+            final name = comment.attributeName.toLowerCase().trim();
+            return [
+              'year',
+              'no of owners',
+              'fuel type',
+              'transmission',
+              'km range',
+            ].contains(name);
+          }).toList();
           debugPrint(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
@@ -410,7 +398,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         }),
       ]);
 
-      // Set _currentHighestBid and _currentBid
       setState(() {
         if (_bidHistory.isNotEmpty) {
           _currentHighestBid =
@@ -481,22 +468,21 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse:
-          () => LocationData(
-            id: '',
-            slug: '',
-            parentId: '',
-            name: zoneId,
-            image: '',
-            description: '',
-            latitude: '',
-            longitude: '',
-            popular: '',
-            status: '',
-            allStoreOnOff: '',
-            createdOn: '',
-            updatedOn: '',
-          ),
+      orElse: () => LocationData(
+        id: '',
+        slug: '',
+        parentId: '',
+        name: zoneId,
+        image: '',
+        description: '',
+        latitude: '',
+        longitude: '',
+        popular: '',
+        status: '',
+        allStoreOnOff: '',
+        createdOn: '',
+        updatedOn: '',
+      ),
     );
     return location.name;
   }
@@ -745,24 +731,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             children: [
               const Text('Enter your bid amount in rupees'),
               const SizedBox(height: 16),
-              // Text(
-              //   'Current Highest Bid',
-              //   style:
-              //       const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              // ),
-              // const SizedBox(height: 4),
-              // Text(
-              //   _currentHighestBid.startsWith('Error')
-              //       ? _currentHighestBid
-              //       : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
-              //   style: TextStyle(
-              //     fontSize: 18,
-              //     fontWeight: FontWeight.bold,
-              //     color: _currentHighestBid.startsWith('Error')
-              //         ? Colors.red
-              //         : null,
-              //   ),
-              // ),
               if (isIncrease) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -833,10 +801,17 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 }
 
                 if (userId == null || userId == 'Unknown') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please log in to place a bid'),
-                      backgroundColor: Colors.red,
+                  showDialog(
+                    context: context,
+                    builder: (context) => ChatOptionsDialog(
+                      onChatWithSupport: () {
+                        debugPrint("Support contacted");
+                      },
+                      onChatWithSeller: () {
+                        debugPrint("Chat with seller started");
+                      },
+                      baseUrl: baseUrl,
+                      token: token,
                     ),
                   );
                   return;
@@ -890,158 +865,101 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     );
   }
 
-  // void _showMeetingDialog(BuildContext context) {
-  //   DateTime selectedDate = DateTime.now();
-  //   TimeOfDay selectedTime = TimeOfDay.now();
+  Future<void> _moveToMarketplace(BuildContext context) async {
+    const String token = '5cb2c9b569416b5db1604e0e12478ded';
+    final String url = '$baseUrl/auction-back-to-marketplace.php?token=$token&post_id=$id';
 
-  //   showDialog(
-  //     context: context,
-  //     builder: (BuildContext context) {
-  //       return AlertDialog(
-  //         shape: RoundedRectangleBorder(
-  //           borderRadius: BorderRadius.circular(15),
-  //         ),
-  //         title: Column(
-  //           children: [
-  //             const SizedBox(height: 8),
-  //             const Text('Schedule Meeting', style: TextStyle(fontSize: 24)),
-  //             const SizedBox(height: 4),
-  //             Text(
-  //               'Select date and time',
-  //               style: TextStyle(
-  //                 fontSize: 14,
-  //                 color: Colors.grey[600],
-  //                 fontWeight: FontWeight.normal,
-  //               ),
-  //             ),
-  //           ],
-  //         ),
-  //         content: Container(
-  //           constraints: const BoxConstraints(maxWidth: 300),
-  //           child: Column(
-  //             mainAxisSize: MainAxisSize.min,
-  //             children: [
-  //               ListTile(
-  //                 leading: const Icon(Icons.calendar_today, color: Colors.blue),
-  //                 title: const Text('Select Date'),
-  //                 subtitle: Text(
-  //                   '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-  //                   style: const TextStyle(color: Colors.blue),
-  //                 ),
-  //                 onTap: () async {
-  //                   final DateTime? picked = await showDatePicker(
-  //                     context: context,
-  //                     initialDate: selectedDate,
-  //                     firstDate: DateTime.now(),
-  //                     lastDate: DateTime.now().add(const Duration(days: 30)),
-  //                   );
-  //                   if (picked != null && picked != selectedDate) {
-  //                     selectedDate = picked;
-  //                     Navigator.pop(context);
-  //                     _showMeetingDialog(context);
-  //                   }
-  //                 },
-  //                 shape: RoundedRectangleBorder(
-  //                   borderRadius: BorderRadius.circular(12),
-  //                   side: BorderSide(color: Colors.grey[300]!),
-  //                 ),
-  //               ),
-  //               const SizedBox(height: 12),
-  //               ListTile(
-  //                 leading: const Icon(Icons.access_time, color: Colors.blue),
-  //                 title: const Text('Select Time'),
-  //                 subtitle: Text(
-  //                   selectedTime.format(context),
-  //                   style: const TextStyle(color: Colors.blue),
-  //                 ),
-  //                 onTap: () async {
-  //                   final TimeOfDay? picked = await showTimePicker(
-  //                     context: context,
-  //                     initialTime: selectedTime,
-  //                   );
-  //                   if (picked != null && picked != selectedTime) {
-  //                     selectedTime = picked;
-  //                     Navigator.pop(context);
-  //                     _showMeetingDialog(context);
-  //                   }
-  //                 },
-  //                 shape: RoundedRectangleBorder(
-  //                   borderRadius: BorderRadius.circular(12),
-  //                   side: BorderSide(color: Colors.grey[300]!),
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         ),
-  //         actions: [
-  //           TextButton(
-  //             onPressed: () => Navigator.pop(context),
-  //             style: TextButton.styleFrom(
-  //               padding: const EdgeInsets.symmetric(
-  //                 horizontal: 20,
-  //                 vertical: 12,
-  //               ),
-  //             ),
-  //             child: Text(
-  //               'Cancel',
-  //               style: TextStyle(
-  //                 color: Colors.grey[600],
-  //                 fontWeight: FontWeight.bold,
-  //               ),
-  //             ),
-  //           ),
-  //           ElevatedButton(
-  //             onPressed: () async {
-  //               try {
-  //                 final success = await _auctionService.agreeToBidding(
-  //                   id,
-  //                   '6',
-  //                 );
-  //                 if (success) {
-  //                   Navigator.pop(context);
-  //                   ScaffoldMessenger.of(context).showSnackBar(
-  //                     const SnackBar(
-  //                       content: Text('Meeting scheduled and bidding agreed!'),
-  //                       backgroundColor: Colors.green,
-  //                     ),
-  //                   );
-  //                 } else {
-  //                   ScaffoldMessenger.of(context).showSnackBar(
-  //                     const SnackBar(
-  //                       content: Text('Failed to schedule meeting'),
-  //                       backgroundColor: Colors.red,
-  //                     ),
-  //                   );
-  //                 }
-  //               } catch (e) {
-  //                 ScaffoldMessenger.of(context).showSnackBar(
-  //                   SnackBar(
-  //                     content: Text('Error scheduling meeting: $e'),
-  //                     backgroundColor: Colors.red,
-  //                   ),
-  //                 );
-  //               }
-  //             },
-  //             style: ElevatedButton.styleFrom(
-  //               backgroundColor: Colors.blue,
-  //               foregroundColor: Colors.white,
-  //               padding: const EdgeInsets.symmetric(
-  //                 horizontal: 20,
-  //                 vertical: 12,
-  //               ),
-  //               shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-  //             ),
-  //             child: const Text(
-  //               'Schedule Meeting',
-  //               style: TextStyle(fontWeight: FontWeight.bold),
-  //             ),
-  //           ),
-  //         ],
-  //         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-  //       );
-  //     },
-  //   );
-  // }
+    try {
+      final response = await http.get(Uri.parse(url));
+      debugPrint('Move to Marketplace API response: ${response.body}');
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List && jsonResponse['data'].isNotEmpty) {
+          final message = jsonResponse['data'][0]['message'] ?? 'Product moved to Market place!';
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Success'),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          throw Exception('Invalid API response');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error moving to marketplace: $e');
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to move to marketplace: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _agreeBidProceedMeeting(BuildContext context) async {
+    const String token = '5cb2c9b569416b5db1604e0e12478ded';
+    final String url = '$baseUrl/auction-agree-bidding.php?token=$token&post_id=$id&user_id=$userId';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      debugPrint('Agree Bid Proceed Meeting API response: ${response.body}');
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List && jsonResponse['data'].isNotEmpty) {
+          final message = jsonResponse['data'][0]['message'] ?? 'You Agree Bid and Proceed Meeting also Product moved to Market place';
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Success'),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          throw Exception('Invalid API response');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error agreeing bid: $e');
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text('Failed to agree bid and proceed meeting: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -1056,6 +974,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         DateTime.tryParse(auctionEndin) ??
         DateTime.now().add(const Duration(days: 2, hours: 5));
     final timeLeft = auctionEndTime.difference(DateTime.now());
+    final isSeller = userId != null && userId == createdBy;
 
     return CustomSafeArea(
       child: Scaffold(
@@ -1196,28 +1115,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         ),
                       ),
                     ),
-                  // Auction Timer
-                  // Container(
-                  //   padding: const EdgeInsets.symmetric(vertical: 8),
-                  //   color: Colors.red.shade50,
-                  //   child: Center(
-                  //     child: Row(
-                  //       mainAxisAlignment: MainAxisAlignment.center,
-                  //       children: [
-                  //         const Icon(Icons.timer, color: Colors.red),
-                  //         const SizedBox(width: 8),
-                  //         Text(
-                  //           'Auction ends in ${timeLeft.inDays}d ${timeLeft.inHours.remainder(24)}h ${timeLeft.inMinutes.remainder(60)}m',
-                  //           style: const TextStyle(
-                  //             fontSize: 16,
-                  //             fontWeight: FontWeight.w600,
-                  //             color: Colors.red,
-                  //           ),
-                  //         ),
-                  //       ],
-                  //     ),
-                  //   ),
-                  // ),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -1249,27 +1146,17 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                             const SizedBox(width: 4),
                             _isLoadingLocations
                                 ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
+                                    landMark,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
                             const Spacer(),
-                            // const Icon(
-                            //   Icons.access_time,
-                            //   size: 16,
-                            //   color: Colors.grey,
-                            // ),
-                            // const SizedBox(width: 4),
-                            // Text(
-                            //   'Ends: ${DateFormat('dd-MM-yyyy hh:mm a').format(auctionEndTime)}',
-                            //   style: const TextStyle(color: Colors.grey),
-                            // ),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -1333,21 +1220,16 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                               onPressed: () {
                                 showDialog(
                                   context: context,
-                                  builder:
-                                      (context) => ChatOptionsDialog(
-                                        onChatWithSupport: () {
-                                          // handle after support call
-                                          debugPrint("Support contacted");
-                                        },
-                                        onChatWithSeller: () {
-                                          // handle after seller chat
-                                          debugPrint(
-                                            "Chat with seller started",
-                                          );
-                                        },
-                                        baseUrl: baseUrl,
-                                        token: token,
-                                      ),
+                                  builder: (context) => ChatOptionsDialog(
+                                    onChatWithSupport: () {
+                                      debugPrint("Support contacted");
+                                    },
+                                    onChatWithSeller: () {
+                                      debugPrint("Chat with seller started");
+                                    },
+                                    baseUrl: baseUrl,
+                                    token: token,
+                                  ),
                                 );
                               },
                               icon: const Icon(Icons.support_agent),
@@ -1396,29 +1278,28 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                           )
                         else
                           Column(
-                            children:
-                                uniqueSellerComments
-                                    .where(
-                                      (comment) =>
-                                          comment.attributeName
-                                              .toLowerCase()
-                                              .trim() !=
-                                          'co driver side rear tyre',
-                                    )
-                                    .map(
-                                      (comment) => _buildSellerCommentItem(
-                                        comment.attributeName,
-                                        comment.attributeName
-                                                    .toLowerCase()
-                                                    .trim() ==
-                                                'no of owners'
-                                            ? _getOwnerText(
-                                              comment.attributeValue,
-                                            )
-                                            : comment.attributeValue,
-                                      ),
-                                    )
-                                    .toList(),
+                            children: uniqueSellerComments
+                                .where(
+                                  (comment) =>
+                                      comment.attributeName
+                                          .toLowerCase()
+                                          .trim() !=
+                                      'co driver side rear tyre',
+                                )
+                                .map(
+                                  (comment) => _buildSellerCommentItem(
+                                    comment.attributeName,
+                                    comment.attributeName
+                                                .toLowerCase()
+                                                .trim() ==
+                                            'no of owners'
+                                        ? _getOwnerText(
+                                            comment.attributeValue,
+                                          )
+                                        : comment.attributeValue,
+                                  ),
+                                )
+                                .toList(),
                           ),
                       ],
                     ),
@@ -1464,15 +1345,14 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                           )
                         else
                           Column(
-                            children:
-                                _bidHistory
-                                    .map(
-                                      (bid) => _buildBidHistoryItem(
-                                        bid['bidder'] ?? 'Guest User',
-                                        bid['amount'] ?? 'N/A',
-                                      ),
-                                    )
-                                    .toList(),
+                            children: _bidHistory
+                                .map(
+                                  (bid) => _buildBidHistoryItem(
+                                    bid['bidder'] ?? 'Guest User',
+                                    bid['amount'] ?? 'N/A',
+                                  ),
+                                )
+                                .toList(),
                           ),
                       ],
                     ),
@@ -1501,7 +1381,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => _showBidDialog(context),
+                        onPressed: isSeller
+                            ? () => _moveToMarketplace(context)
+                            : () => _showBidDialog(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,
                           foregroundColor: Colors.white,
@@ -1510,22 +1392,23 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                             borderRadius: BorderRadius.zero,
                           ),
                         ),
-                        child: const Text('Enter Price'),
+                        child: Text(isSeller ? 'Back to Market Place' : 'Enter Price'),
                       ),
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed:
-                            () => _showBidDialog(context, isIncrease: true),
+                        onPressed: isSeller
+                            ? () => _agreeBidProceedMeeting(context)
+                            : () => _showBidDialog(context, isIncrease: true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.zero,
                           ),
                         ),
-                        child: const Text('Increase minimum Bid'),
+                        child: Text(isSeller ? 'Agree Bid Proceed meeting' : 'Increase minimum Bid',textAlign: TextAlign.center,),
                       ),
                     ),
                   ],
@@ -1541,28 +1424,18 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   Widget _buildDetailItem(IconData icon, String text) {
     return Flexible(
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 4,
-        ), // Compact padding
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: Colors.grey[700],
-            ), // Slightly smaller icon
-            const SizedBox(width: 6), // Tighter spacing
+            Icon(icon, size: 14, color: Colors.grey[700]),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 2, // Prevent wrapping
-                style: const TextStyle(
-                  fontSize: 14, // Slightly smaller font for compactness
-                  color: Colors.black,
-                ),
+                maxLines: 2,
+                style: const TextStyle(fontSize: 14, color: Colors.black),
               ),
             ),
           ],
@@ -1631,59 +1504,59 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-        ? Center(
-          child: Text(
-            sellerErrorMessage,
-            style: const TextStyle(color: Colors.red),
-          ),
-        )
-        : GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SellerInformationPage(userId: createdBy),
-              ),
-            );
-          },
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage:
-                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                        ? CachedNetworkImageProvider(sellerProfileImage!)
-                        : const AssetImage('assets/images/avatar.gif')
-                            as ImageProvider,
-                radius: 30,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ? Center(
+                child: Text(
+                  sellerErrorMessage,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SellerInformationPage(userId: createdBy),
+                    ),
+                  );
+                },
+                child: Row(
                   children: [
-                    Text(
-                      sellerName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    CircleAvatar(
+                      backgroundImage:
+                          sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                              ? CachedNetworkImageProvider(sellerProfileImage!)
+                              : const AssetImage('assets/images/avatar.gif')
+                                  as ImageProvider,
+                      radius: 30,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sellerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Member Since $sellerActiveFrom',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Posts: $sellerNoOfPosts',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member Since $sellerActiveFrom',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posts: $sellerNoOfPosts',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                   ],
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            ],
-          ),
-        );
+              );
   }
 }

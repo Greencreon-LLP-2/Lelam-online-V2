@@ -12,7 +12,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
-import 'package:lelamonline_flutter/feature/categories/models/details_model.dart';
+import 'package:lelamonline_flutter/feature/categories/models/details_model.dart' hide ModelVariation;
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
 import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.dart';
@@ -20,12 +20,12 @@ import 'package:lelamonline_flutter/feature/categories/models/used_cars_model.da
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/auction_detail_page.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
-import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/filters_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 import '../../services/details_service.dart' show TempApiService;
+import 'package:lelamonline_flutter/feature/categories/models/model_variation_model.dart';
 
 class MarketplaceService {
   static final Map<String, List<MarketplacePost>> _postsCache = {};
@@ -209,6 +209,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Timer? _debounceTimer;
   List<Product> _filteredProductsCache = [];
   bool _filtersChanged = false;
+  Map<String, ModelVariation?> _modelVariationsCache = {};
+Set<String> _fetchingModelVariationIds = {};
 
   @override
   void initState() {
@@ -253,6 +255,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
     _fetchVisibleAttributes();
   }
+
+
 
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
@@ -506,29 +510,49 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  void _fetchVisibleAttributes() {
-    if (_debounceTimer?.isActive ?? false) return;
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      final screenHeight = MediaQuery.of(context).size.height;
-      final scrollOffset = _scrollController.offset;
-      const itemHeight = 180.0;
-      final firstVisibleIndex = (scrollOffset / itemHeight).floor();
-      final lastVisibleIndex =
-          ((scrollOffset + screenHeight) / itemHeight).ceil();
-
-      for (
-        int i = firstVisibleIndex;
-        i <= lastVisibleIndex && i < _filteredProductsCache.length;
-        i++
-      ) {
-        final product = _filteredProductsCache[i];
-        if (!_postAttributeValuesCache.containsKey(product.id) &&
-            !_fetchingPostIds.contains(product.id)) {
-          _fetchPostAttributes(product.id);
-        }
-      }
-    });
+Future<void> _fetchModelVariation(String postId) async {
+  if (_modelVariationsCache.containsKey(postId) || _fetchingModelVariationIds.contains(postId)) {
+    return;
   }
+  _fetchingModelVariationIds.add(postId);
+  try {
+    final variation = await _marketplaceService.fetchModelVariation(postId);
+    if (mounted) {
+      setState(() {
+        _modelVariationsCache[postId] = variation;
+        _fetchingModelVariationIds.remove(postId);
+        _filtersChanged = true;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() {
+        _fetchingModelVariationIds.remove(postId);
+      });
+    }
+  }
+}
+
+  void _fetchVisibleAttributes() {
+  if (_debounceTimer?.isActive ?? false) return;
+  _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final scrollOffset = _scrollController.offset;
+    const itemHeight = 180.0;
+    final firstVisibleIndex = (scrollOffset / itemHeight).floor();
+    final lastVisibleIndex = ((scrollOffset + screenHeight) / itemHeight).ceil();
+
+    for (int i = firstVisibleIndex; i <= lastVisibleIndex && i < _filteredProductsCache.length; i++) {
+      final product = _filteredProductsCache[i];
+      if (!_postAttributeValuesCache.containsKey(product.id) && !_fetchingPostIds.contains(product.id)) {
+        _fetchPostAttributes(product.id);
+      }
+      if (!_modelVariationsCache.containsKey(product.id) && !_fetchingModelVariationIds.contains(product.id)) {
+        _fetchModelVariation(product.id);
+      }
+    }
+  });
+}
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
@@ -1402,111 +1426,114 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 120,
-                  height: 150,
-                  // remove left gap so image aligns with any full-width banner above
-                  margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl:
-                              'https://lelamonline.com/admin/${product.image}',
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 150,
-                          // memCacheHeight: 120,
-                          // memCacheWidth: 120,
-                          // maxHeightDiskCache: 120,
-                          // maxWidthDiskCache: 120,
-                          placeholder:
-                              (context, url) => const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                          errorWidget: (context, url, error) {
-                            developer.log(
-                              'Failed to load image: https://lelamonline.com/admin/${product.image}',
-                            );
-                            developer.log('Error: $error');
-                            return Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                Icons.directions_car,
-                                size: 40,
-                                color: Colors.grey.shade400,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      if (isAuction)
-                        Positioned(
-                          top: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'AUCTION',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isVerified || isFeatured)
-                        Positioned(
-                          top: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              borderRadius: BorderRadius.circular(
-                                12,
-                              ), // rounded pill shape
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
-                                  Icons.verified,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  "Verified",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Container(
+                    width: 120,
+                    height: 150,
+                    // remove left gap so image aligns with any full-width banner above
+                    margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                    
+                    ),
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl:
+                                'https://lelamonline.com/admin/${product.image}',
+                            fit: BoxFit.cover,
+                            width: 120,
+                            height: 150,
+                            // memCacheHeight: 120,
+                            // memCacheWidth: 120,
+                            // maxHeightDiskCache: 120,
+                            // maxWidthDiskCache: 120,
+                            placeholder:
+                                (context, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
                                 ),
-                              ],
-                            ),
+                            errorWidget: (context, url, error) {
+                              developer.log(
+                                'Failed to load image: https://lelamonline.com/admin/${product.image}',
+                              );
+                              developer.log('Error: $error');
+                              return Container(
+                                color: Colors.grey.shade200,
+                                child: Icon(
+                                  Icons.directions_car,
+                                  size: 40,
+                                  color: Colors.grey.shade400,
+                                ),
+                              );
+                            },
                           ),
                         ),
-                    ],
+                        if (isAuction)
+                          Positioned(
+                            top: 4,
+                            left: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'AUCTION',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (isVerified || isFeatured)
+                          Positioned(
+                            top: 4,
+                            left: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(
+                                  12,
+                                ), // rounded pill shape
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(
+                                    Icons.verified,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    "Verified",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -1526,12 +1553,16 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          product.modelVariation,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
+  _modelVariationsCache[product.id] != null
+      ? ' ${_modelVariationsCache[product.id]!.variations}'
+      : _fetchingModelVariationIds.contains(product.id)
+          ? 'Loading...'
+          : product.modelVariation, // Fallback
+  style: TextStyle(
+    fontSize: 10,
+    color: Colors.grey.shade600,
+  ),
+),
                         const SizedBox(height: 4),
                         if (isAuction)
                           Text(
