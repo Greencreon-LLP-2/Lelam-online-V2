@@ -2218,7 +2218,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BuyingStatusPage(),
+                            builder: (context) => MyMeetingsWidget(showAppBar: true,),
                           ),
                         );
                       }

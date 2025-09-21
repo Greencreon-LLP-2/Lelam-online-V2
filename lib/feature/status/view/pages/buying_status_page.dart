@@ -69,7 +69,7 @@ class BuyingStatusPage extends StatelessWidget {
         body: TabBarView(
           children: [
             const MyBidsWidget(),
-            const MyMeetingsWidget(),
+            const MyMeetingsWidget(showAppBar: false),
             const ExpiredMeetingsPage(),
           ],
         ),
