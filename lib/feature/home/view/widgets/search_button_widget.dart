@@ -1,47 +1,39 @@
 import 'package:flutter/material.dart';
 
 class SearchButtonWidget extends StatelessWidget {
-  final ValueChanged<String> onSearch;
   final TextEditingController controller;
+  final Function(String) onSearch;
 
   const SearchButtonWidget({
     super.key,
-    required this.onSearch,
     required this.controller,
+    required this.onSearch,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade300,
-            blurRadius: 10,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onSearch,
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: () {
-              controller.clear();
-              onSearch('');
-            },
-          ),
-          hintStyle: TextStyle(color: Colors.grey.shade500),
-          hintText: 'Find Cars and more ...',
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        hintText: 'Search products...',
+
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            final query = controller.text.trim();
+            onSearch(query);
+          },
         ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        filled: true,
+        fillColor: Colors.white,
       ),
+      onSubmitted: (value) {
+        onSearch(value.trim());
+      },
     );
   }
 }

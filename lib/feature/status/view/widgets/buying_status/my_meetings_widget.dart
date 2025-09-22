@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -7,7 +8,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/meetingcard_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:retry/retry.dart';
-import 'dart:developer' as developer;
+
 import 'package:url_launcher/url_launcher.dart';
 
 class StatusPill extends StatelessWidget {
@@ -88,6 +89,7 @@ class MyMeetingsWidget extends StatefulWidget {
   final String? bidId;
   final Map<String, dynamic>? bid;
   final VoidCallback? onRefreshMeetings;
+  final bool showAppBar;
 
   const MyMeetingsWidget({
     super.key,
@@ -98,6 +100,7 @@ class MyMeetingsWidget extends StatefulWidget {
     this.bidId,
     this.bid,
     this.onRefreshMeetings,
+    this.showAppBar = true,
   });
 
   @override
@@ -118,23 +121,56 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   bool isLoading = true;
   String? _userId;
   Timer? _debounce;
-  Map<String, Map<String, dynamic>> _postDetailsCache = {};
+  final Map<String, Map<String, dynamic>> _postDetailsCache = {};
   List<Map<String, String>> _meetingTimesCache = [];
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.initialStatus != null &&
-        statuses.contains(widget.initialStatus)) {
-      selectedIndex = statuses.indexOf(widget.initialStatus!);
-    }
-    _loadUserId();
+@override
+void initState() {
+  super.initState();
+  if (widget.initialStatus != null &&
+      statuses.contains(widget.initialStatus)) {
+    selectedIndex = statuses.indexOf(widget.initialStatus!);
   }
+  _loadUserId();
+}
 
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  List<Widget> _buildPillRow() {
+    List<Widget> pillRow = [];
+    for (var i = 0; i < statuses.length; i++) {
+      pillRow.add(
+        StatusPill(
+          label: statuses[i],
+          isActive: i == selectedIndex,
+          activeColor: Colors.blue,
+          onTap: () {
+            if (mounted) {
+              setState(() {
+                selectedIndex = i;
+                developer.log('Selected tab: ${statuses[i]}');
+              });
+              _loadMeetings();
+            }
+          },
+        ),
+      );
+
+      if (i != statuses.length - 1) {
+        pillRow.add(
+          PillConnector(
+            isActive: (i == selectedIndex || i + 1 == selectedIndex),
+            activeColor: Colors.blue,
+            inactiveColor: Colors.grey,
+          ),
+        );
+      }
+    }
+    return pillRow;
   }
 
   Future<void> _loadUserId() async {
@@ -146,9 +182,9 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       final userData = userProvider.userData;
       setState(() {
         _userId = userData?.userId ?? 'Unknown';
-        developer.log('Loaded userId: $_userId');
+       print('Loaded userId: $_userId');
         if (_userId == 'Unknown') {
-          errorMessage = 'User ID not found. Please log in again.';
+          errorMessage = ' Please log in .';
           isLoading = false;
         }
       });
@@ -156,7 +192,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         await _loadMeetings();
       }
     } catch (e) {
-      developer.log('Error loading userId: $e');
+     print('Error loading userId: $e');
       setState(() {
         errorMessage = 'Error loading user ID: $e';
         isLoading = false;
@@ -166,7 +202,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
 
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     if (_postDetailsCache.containsKey(postId)) {
-      developer.log('Returning cached post details for post_id $postId');
+     print('Returning cached post details for post_id $postId');
       return _postDetailsCache[postId];
     }
 
@@ -185,10 +221,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying post-details for post_id $postId: $e');
+         print('Retrying post-details for post_id $postId: $e');
         },
       );
-      developer.log(
+     print(
         'post-details.php response for post_id $postId: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -223,22 +259,22 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for post-details.php');
+       print('Rate limit exceeded for post-details.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-      developer.log('No valid post data for post_id $postId');
+     print('No valid post data for post_id $postId');
       return null;
     } catch (e) {
-      developer.log('Error fetching post details for post_id $postId: $e');
+     print('Error fetching post details for post_id $postId: $e');
       return null;
     }
   }
 
   Future<List<Map<String, String>>> _fetchMeetingTimes() async {
     if (_meetingTimesCache.isNotEmpty) {
-      developer.log('Returning cached meeting times');
+     print('Returning cached meeting times');
       return _meetingTimesCache;
     }
 
@@ -257,10 +293,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying meeting-times: $e');
+         print('Retrying meeting-times: $e');
         },
       );
-      developer.log('meeting-times.php response: ${response.body}');
+     print('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -278,14 +314,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for meeting-times.php');
+       print('Rate limit exceeded for meeting-times.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
       return [];
     } catch (e) {
-      developer.log('Error fetching meeting times: $e');
+     print('Error fetching meeting times: $e');
       return [];
     }
   }
@@ -328,10 +364,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying $endpoint for meeting_id $meetingId: $e');
+         print('Retrying $endpoint for meeting_id $meetingId: $e');
         },
       );
-      developer.log(
+     print(
         '$endpoint response for meeting_id $meetingId: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -355,19 +391,19 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           }
         }
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for $endpoint');
+       print('Rate limit exceeded for $endpoint');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-      developer.log('No valid status data for meeting_id $meetingId');
+     print('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     } catch (e) {
-      developer.log('Error fetching meeting status for meeting_id $meetingId: $e');
+     print('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
@@ -419,17 +455,17 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
-      developer.log('Fetching meetings from: $url');
+     print('Fetching meetings from: $url');
       final response = await retry(
         () => http.get(Uri.parse(url), headers: headers),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying meetings fetch: $e');
+         print('Retrying meetings fetch: $e');
         },
       );
-      developer.log('Raw response body: ${response.body}');
+     print('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -438,15 +474,15 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                 responseData['status'] == 'true') &&
             responseData['data'] is List) {
           final List<dynamic> meetingData = responseData['data'];
-          developer.log('Found ${meetingData.length} meetings in API response');
+         print('Found ${meetingData.length} meetings in API response');
 
           for (var meeting in meetingData) {
-            developer.log(
+           print(
               'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
             );
             final postDetails = await _fetchPostDetails(meeting['post_id']);
             if (postDetails == null) {
-              developer.log(
+             print(
                 'Skipping meeting ${meeting['id']} due to missing post details',
               );
               continue;
@@ -515,28 +551,30 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                   'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
-            developer.log('Added meeting ${meeting['id']} to list: $meetingData');
-            developer.log(
+           print('Added meeting ${meeting['id']} to list: $meetingData');
+           print(
               'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
             );
             meetings.add(meetingData);
             await Future.delayed(const Duration(milliseconds: 200));
           }
         } else {
-          developer.log('Unexpected response format: ${responseData.toString()}');
+          developer.log(
+            'Unexpected response format: ${responseData.toString()}',
+          );
           errorMessage = 'Currently No Meeting';
         }
 
-        developer.log('Total meetings loaded: ${meetings.length}');
+       print('Total meetings loaded: ${meetings.length}');
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for meetings fetch');
+       print('Rate limit exceeded for meetings fetch');
         errorMessage = 'Too many requests. Please try again later.';
       } else {
-        developer.log('Failed to fetch meetings: ${response.reasonPhrase}');
+       print('Failed to fetch meetings: ${response.reasonPhrase}');
         errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
       }
     } catch (e) {
-      developer.log('Error loading meetings: $e');
+     print('Error loading meetings: $e');
       errorMessage = 'Error loading meetings: $e';
     }
 
@@ -551,67 +589,78 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     if (mounted) {
       setState(() {
         selectedIndex = 2;
-        developer.log('Switched to Awaiting Location tab for meeting $meetingId');
+        developer.log(
+          'Switched to Awaiting Location tab for meeting $meetingId',
+        );
       });
       _loadMeetings();
     }
   }
 
-  List<Map<String, dynamic>> _getFilteredMeetings() {
-    final status = statuses[selectedIndex];
-    developer.log('Filtering for status: $status');
+List<Map<String, dynamic>> _getFilteredMeetings() {
+  final status = statuses[selectedIndex];
+  print('Filtering for status: $status');
 
-    return meetings.where((meeting) {
-      developer.log(
-        'Meeting ${meeting['id']} - status: ${meeting['status']}, '
-        'seller_approvel: ${meeting['seller_approvel']}, '
-        'admin_approvel: ${meeting['admin_approvel']}, '
-        'meeting_done: ${meeting['meeting_done']}, '
-        'if_location_request: ${meeting['if_location_request']}, '
-        'meeting_date: ${meeting['meeting_date']}',
-      );
+  var filteredMeetings = meetings.where((meeting) {
+    print(
+      'Meeting ${meeting['id']} - status: ${meeting['status']}, '
+      'seller_approvel: ${meeting['seller_approvel']}, '
+      'admin_approvel: ${meeting['admin_approvel']}, '
+      'meeting_done: ${meeting['meeting_done']}, '
+      'if_location_request: ${meeting['if_location_request']}, '
+      'meeting_date: ${meeting['meeting_date']}',
+    );
 
-      if (status == 'Date Fixed') {
-        return meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['meeting_date'] != 'N/A' &&
-            meeting['meeting_date']?.isNotEmpty == true &&
-            meeting['if_location_request'] != '1';
-      } else if (status == 'Meeting Request') {
-        return meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['if_location_request'] == '0';
-      } else if (status == 'Awaiting Location') {
-        return meeting['if_location_request'] == '0' &&
-            meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            (meeting['location_link'] == null ||
-                meeting['location_link'] == '' ||
-                meeting['latitude'] == null ||
-                meeting['latitude'] == '' ||
-                meeting['longitude'] == null ||
-                meeting['longitude'] == '');
-      } else if (status == 'Ready For Meeting') {
-        return meeting['seller_approvel'] == '1' &&
-            meeting['admin_approvel'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['if_location_request'] != '0' &&
-            meeting['location_link']?.isNotEmpty == true;
-      } else if (status == 'Meeting Completed') {
-        return meeting['meeting_done'] == '1';
-      }
-      return false;
-    }).toList();
-  }
+    if (status == 'Date Fixed') {
+      return meeting['status'] == '1' &&
+          meeting['meeting_done'] == '0' &&
+          meeting['seller_approvel'] == '1' && 
+          meeting['admin_approvel'] == '1' && 
+          meeting['meeting_date'] != 'N/A' &&
+          meeting['meeting_date']?.isNotEmpty == true;
+    } else if (status == 'Meeting Request') {
+      return meeting['status'] == '1' &&
+          meeting['meeting_done'] == '0' &&
+          meeting['if_location_request'] == '0';
+    } else if (status == 'Awaiting Location') {
+      return meeting['if_location_request'] == '1' &&
+          meeting['status'] == '1' &&
+          meeting['meeting_done'] == '0' &&
+          (meeting['location_link'] == null ||
+              meeting['location_link'] == '' ||
+              meeting['latitude'] == null ||
+              meeting['latitude'] == '' ||
+              meeting['longitude'] == null ||
+              meeting['longitude'] == '');
+    } else if (status == 'Ready For Meeting') {
+      return meeting['seller_approvel'] == '1' &&
+          meeting['admin_approvel'] == '1' &&
+          meeting['meeting_done'] == '0' &&
+          meeting['if_location_request'] != '0' &&
+          meeting['location_link']?.isNotEmpty == true;
+    } else if (status == 'Meeting Completed') {
+      return meeting['meeting_done'] == '1';
+    }
+    return false;
+  }).toList();
 
+  // Sort meetings by updated_on or created_on in descending order (newest first)
+  filteredMeetings.sort((a, b) {
+    final aDate = DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ??
+        DateTime.now();
+    final bDate = DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ??
+        DateTime.now();
+    return bDate.compareTo(aDate); // Descending order
+  });
+
+  return filteredMeetings;
+}
   @override
   Widget build(BuildContext context) {
     final filteredMeetings = _getFilteredMeetings();
-    developer.log(
-      'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
-    );
+    print('Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}');
     for (var meeting in filteredMeetings) {
-      developer.log(
+      print(
         'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
         'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
         'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
@@ -620,6 +669,17 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
 
     return Scaffold(
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('My Meetings'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
+            )
+          : null,
       backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Column(
@@ -630,133 +690,94 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children:
-                      statuses.map((status) {
-                        final index = statuses.indexOf(status);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: StatusPill(
-                            label: status,
-                            isActive: index == selectedIndex,
-                            activeColor: Colors.blue,
-                            onTap: () {
-                              if (mounted) {
-                                setState(() {
-                                  selectedIndex = index;
-                                  developer.log('Selected tab: $status');
-                                });
-                                _loadMeetings();
-                              }
-                            },
-                          ),
-                        );
-                      }).toList(),
+                  children: _buildPillRow(),
                 ),
               ),
             ),
             Expanded(
               child: Container(
                 color: Colors.grey[50],
-                child:
-                    isLoading
-                        ? const Center(
-                          child: CircularProgressIndicator(color: Colors.blue),
-                        )
-                        : errorMessage != null
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.blue),
+                      )
+                    : errorMessage != null
                         ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.handshake,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No ${statuses[selectedIndex].toLowerCase()} found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.handshake,
+                                  size: 64,
+                                  color: Colors.grey,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No ${statuses[selectedIndex].toLowerCase()} found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[600],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
                         : filteredMeetings.isEmpty
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.handshake,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No ${statuses[selectedIndex].toLowerCase()} found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.handshake,
+                                      size: 64,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No ${statuses[selectedIndex].toLowerCase()} found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: filteredMeetings.length,
+                                itemBuilder: (context, index) {
+                                  final meeting = filteredMeetings[index];
+                                  print('Displaying meeting: ${meeting['id']}');
+                                  return MeetingCard(
+                                    meeting: meeting,
+                                    baseUrl: widget.baseUrl,
+                                    token: widget.token,
+                                    currentTab: statuses[selectedIndex], // Pass current tab
+                                    onLocationRequestSent: _onLocationRequestSent,
+                                    onProceedWithBid: () {
+                                      print('Proceed with Bid triggered for meeting ${meeting['id']}');
+                                      _proceedWithBid(context, meeting);
+                                    },
+                                    onEditDate: (meeting) => _editDate(context, meeting),
+                                    onEditTime: (meeting) => _editTime(context, meeting),
+                                    onSendLocationRequest: (meeting) =>
+                                        _sendLocationRequest(context, meeting),
+                                    onViewLocation: (meeting) => _viewLocation(context, meeting),
+                                  );
+                                },
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                        : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredMeetings.length,
-                          itemBuilder: (context, index) {
-                            final meeting = filteredMeetings[index];
-                            developer.log('Displaying meeting: ${meeting['id']}');
-                            return MeetingCard(
-                              meeting: meeting,
-                              baseUrl: widget.baseUrl,
-                              token: widget.token,
-                              // onCancel: () {
-                              //   if (mounted) {
-                              //     setState(() {
-                              //       meetings.removeWhere(
-                              //         (m) => m['id'] == meeting['id'],
-                              //       );
-
-                              //       _loadMeetings();
-                              //     });
-                              //   }
-                              // },
-                              onLocationRequestSent: _onLocationRequestSent,
-                              onProceedWithBid: () {
-
-                                developer.log('Proceed with Bid triggered for meeting ${meeting['id']}');
-                                _proceedWithBid(context, meeting);
-                              },
-                              // onIncreaseBid: () => _increaseBid(context, meeting),
-                              onEditDate:
-                                  (meeting) => _editDate(context, meeting),
-                              onEditTime:
-                                  (meeting) => _editTime(context, meeting),
-                              // onCancelMeeting:
-                              //     (meeting) => _cancelMeeting(context, meeting),
-                              onSendLocationRequest:
-                                  (meeting) =>
-                                      _sendLocationRequest(context, meeting),
-                              onViewLocation:
-                                  (meeting) => _viewLocation(context, meeting),
-                            );
-                          },
-                        ),
               ),
             ),
           ],
@@ -764,77 +785,68 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       ),
     );
   }
-
-  Future<void> _proceedWithBid(
+Future<void> _proceedWithBid(
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
-    developer.log('Proceed with Bid called for meeting ${meeting['id']}');
+    print('Proceed with Bid called for meeting ${meeting['id']}');
     if (_userId == null || _userId == 'Unknown') {
-      developer.log('Invalid user ID');
+      print('Invalid user ID');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
       );
       return;
     }
-    if (meeting['bid_amount'] == null ||
-        meeting['bid_amount'] == '0.00' ||
-        meeting['bid_id'] == '0') {
-      developer.log(
-        'Proceed with Bid failed: bid_amount=${meeting['bid_amount']}, bid_id=${meeting['bid_id']}',
-      );
-      await showDialog<bool>(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('No Bid Found'),
-              content: const Text(
-                'No valid bid exists for this meeting. Would you like to place a bid?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Place Bid'),
-                ),
-              ],
-            ),
-      );
-      // if (_ignorePlaceBid == true) {
-      //   await _increaseBid(context, meeting);
-      // }
-      return;
-    }
 
-    final double bidAmount =
-        double.tryParse(meeting['bid_amount']?.toString() ?? '0.00') ?? 0.00;
-    final bool? confirmed = await showDialog<bool>(
+    final TextEditingController bidController = TextEditingController();
+    double? bidAmount;
+
+    await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Confirm Bid'),
-            content: Text(
-              'Do you want to proceed with a bid of ₹${NumberFormat('#,##0').format(bidAmount)}?',
-              style: const TextStyle(fontSize: 16),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter Bid Amount'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: bidController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Bid Amount (₹)',
+                hintText: 'Enter your bid amount',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                bidAmount = double.tryParse(value);
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('OK'),
-              ),
-            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () {
+              if (bidAmount == null || bidAmount! <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid bid amount'),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
 
-    if (confirmed != true) {
-      developer.log('Bid confirmation cancelled by user');
+    if (bidAmount == null || bidAmount! <= 0) {
+      print('Invalid or no bid amount entered');
       return;
     }
 
@@ -842,7 +854,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       final response = await retry(
         () => http.get(
           Uri.parse(
-            '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=${meeting['bid_amount']}',
+            '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=$bidAmount',
           ),
           headers: {
             'token': widget.token,
@@ -853,17 +865,25 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying proceed with bid: $e');
+          print('Retrying proceed with bid: $e');
         },
       );
-      developer.log('my-meeting-proceed-with-bid.php response: ${response.body}');
+      print('my-meeting-proceed-with-bid.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Proceeded with bid successfully')),
+            SnackBar(
+              content: Text(
+                'Proceeded with bid of ₹${NumberFormat('#,##0').format(bidAmount)} successfully',
+              ),
+            ),
           );
-
+          // Switch to Meeting Request tab
+          setState(() {
+            selectedIndex = 1; // Index 1 is 'Meeting Request' in statuses list
+            print('Switched to Meeting Request tab after successful bid');
+          });
           await _loadMeetings();
           widget.onRefreshMeetings?.call();
         } else {
@@ -876,14 +896,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for proceed with bid');
+        print('Rate limit exceeded for proceed with bid');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-        developer.log(
+        print(
           'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -891,7 +911,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         );
       }
     } catch (e) {
-      developer.log('Error proceeding with bid: $e');
+      print('Error proceeding with bid: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error proceeding with bid')),
       );
@@ -963,10 +983,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                     delayFactor: const Duration(seconds: 2),
   //                     randomizationFactor: 0.25,
   //                     onRetry: (e) {
-  //                       developer.log('Retrying increase bid: $e');
+  //                      print('Retrying increase bid: $e');
   //                     },
   //                   );
-  //                   developer.log(
+  //                  print(
   //                     'my-meeting-increase-bid.php response: ${response.body}',
   //                   );
   //                   if (response.statusCode == 200) {
@@ -990,7 +1010,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                       );
   //                     }
   //                   } else if (response.statusCode == 429) {
-  //                     developer.log('Rate limit exceeded for increase bid');
+  //                    print('Rate limit exceeded for increase bid');
   //                     ScaffoldMessenger.of(context).showSnackBar(
   //                       const SnackBar(
   //                         content: Text(
@@ -999,7 +1019,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                       ),
   //                     );
   //                   } else {
-  //                     developer.log(
+  //                    print(
   //                       'my-meeting-increase-bid.php failed with status ${response.statusCode}',
   //                     );
   //                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1007,7 +1027,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //                     );
   //                   }
   //                 } catch (e) {
-  //                   developer.log('Error increasing bid: $e');
+  //                  print('Error increasing bid: $e');
   //                   ScaffoldMessenger.of(context).showSnackBar(
   //                     const SnackBar(content: Text('Error increasing bid')),
   //                   );
@@ -1033,7 +1053,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
-      developer.log('No meeting times available');
+     print('No meeting times available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No meeting times available')),
       );
@@ -1074,7 +1094,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                   (time) => time['value'] == value,
                                   orElse: () => {'name': ''},
                                 )['name'];
-                            developer.log(
+                           print(
                               'Selected time: $selectedTimeName ($selectedTimeValue)',
                             );
                           });
@@ -1092,7 +1112,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                           selectedTimeValue == null
                               ? null
                               : () async {
-                                developer.log(
+                               print(
                                   'Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}',
                                 );
                                 try {
@@ -1106,7 +1126,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                           'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
                                     },
                                   );
-                                  developer.log(
+                                 print(
                                     'my-meeting-fix-time.php response: ${response.body}',
                                   );
                                   if (response.statusCode == 200) {
@@ -1137,7 +1157,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                       );
                                     }
                                   } else {
-                                    developer.log(
+                                   print(
                                       'my-meeting-fix-time.php failed with status ${response.statusCode}',
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1147,7 +1167,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                                     );
                                   }
                                 } catch (e) {
-                                  developer.log('Error updating meeting time: $e');
+                                 print('Error updating meeting time: $e');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -1201,10 +1221,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           delayFactor: const Duration(seconds: 2),
           randomizationFactor: 0.25,
           onRetry: (e) {
-            developer.log('Retrying edit date: $e');
+           print('Retrying edit date: $e');
           },
         );
-        developer.log('my-meeting-edit-date.php response: ${response.body}');
+       print('my-meeting-edit-date.php response: ${response.body}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == true || data['status'] == 'true') {
@@ -1224,14 +1244,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
             );
           }
         } else if (response.statusCode == 429) {
-          developer.log('Rate limit exceeded for edit date');
+         print('Rate limit exceeded for edit date');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Too many requests. Please try again later.'),
             ),
           );
         } else {
-          developer.log(
+         print(
             'my-meeting-edit-date.php failed with status ${response.statusCode}',
           );
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1239,7 +1259,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } catch (e) {
-        developer.log('Error updating meeting date: $e');
+       print('Error updating meeting date: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error updating meeting date')),
         );
@@ -1272,10 +1292,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-          developer.log('Retrying send location request: $e');
+         print('Retrying send location request: $e');
         },
       );
-      developer.log(
+     print(
         'my-meeting-send-location-request.php response: ${response.body}',
       );
       if (response.statusCode == 200) {
@@ -1304,14 +1324,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           );
         }
       } else if (response.statusCode == 429) {
-        developer.log('Rate limit exceeded for send location request');
+       print('Rate limit exceeded for send location request');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-        developer.log(
+       print(
           'my-meeting-send-location-request.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1319,7 +1339,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         );
       }
     } catch (e) {
-      developer.log('Error sending location request: $e');
+     print('Error sending location request: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error sending location request')),
       );
@@ -1346,7 +1366,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
   //       },
   //     );
-  //     developer.log('my-meeting-cancel.php response: ${response.body}');
+  //    print('my-meeting-cancel.php response: ${response.body}');
   //     if (response.statusCode == 200) {
   //       final data = jsonDecode(response.body);
   //       if (data['status'] == true || data['status'] == 'true') {
@@ -1366,7 +1386,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //         );
   //       }
   //     } else {
-  //       developer.log(
+  //      print(
   //         'my-meeting-cancel.php failed with status ${response.statusCode}',
   //       );
   //       ScaffoldMessenger.of(context).showSnackBar(
@@ -1374,7 +1394,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   //       );
   //     }
   //   } catch (e) {
-  //     developer.log('Error cancelling meeting: $e');
+  //    print('Error cancelling meeting: $e');
   //     ScaffoldMessenger.of(
   //       context,
   //     ).showSnackBar(const SnackBar(content: Text('Error cancelling meeting')));

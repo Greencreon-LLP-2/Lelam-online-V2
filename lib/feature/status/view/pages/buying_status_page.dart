@@ -9,7 +9,20 @@ import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my
 import 'package:provider/provider.dart';
 
 class BuyingStatusPage extends StatelessWidget {
-  const BuyingStatusPage({super.key, String? userId});
+  final String? userId;
+  final int initialTab;
+  final String? initialStatus;
+  final String? postId;
+  final String? bidId;
+
+  const BuyingStatusPage({
+    super.key,
+    this.userId,
+    this.initialTab = 0,
+    this.initialStatus,
+    this.postId,
+    this.bidId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +54,7 @@ class BuyingStatusPage extends StatelessWidget {
 
     return DefaultTabController(
       length: 3,
+      initialIndex: initialTab,
       child: Scaffold(
         appBar: AppBar(
           title: const Text(
@@ -68,8 +82,13 @@ class BuyingStatusPage extends StatelessWidget {
         backgroundColor: Colors.grey[50],
         body: TabBarView(
           children: [
-            const MyBidsWidget(),
-            const MyMeetingsWidget(),
+            MyBidsWidget(userId: userId),
+            MyMeetingsWidget(
+              showAppBar: false,
+              initialStatus: initialStatus,
+              postId: postId,
+              bidId: bidId,
+            ),
             const ExpiredMeetingsPage(),
           ],
         ),

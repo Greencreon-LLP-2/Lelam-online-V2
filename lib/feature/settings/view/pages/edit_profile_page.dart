@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
@@ -338,18 +339,21 @@ Future<void> _saveChanges({required int saveType}) async {
                                   )
                                   : _originalImageUrl != null
                                   ? ClipOval(
-                                    child: Image.network(
-                                      _originalImageUrl!,
-                                      width: 120,
-                                      height: 120,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              Image.asset(
-                                                'assets/images/avatar.gif',
-                                                fit: BoxFit.cover,
-                                              ),
-                                    ),
+                                    child: CachedNetworkImage(
+  imageUrl: _originalImageUrl!,
+  width: 120,
+  height: 120,
+  fit: BoxFit.cover,
+  placeholder: (context, url) => Image.asset(
+    'assets/images/avatar.gif',
+    fit: BoxFit.cover,
+  ),
+  errorWidget: (context, url, error) => Image.asset(
+    'assets/images/avatar.gif',
+    fit: BoxFit.cover,
+  ),
+),
+
                                   )
                                   : Image.asset(
                                     'assets/images/avatar.gif',

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/splash_page.dart';
 import 'package:provider/provider.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -44,11 +46,30 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.categoriespage,
       builder: (context, state) => const CategoriesPage(),
     ),
-    GoRoute(
-      path: RouteNames.buyingStatusPage,
-      name: RouteNames.buyingStatusPage,
-      builder: (context, state) => const BuyingStatusPage(),
-    ),
+GoRoute(
+  path: RouteNames.buyingStatusPage,
+  name: RouteNames.buyingStatusPage,
+  builder: (context, state) {
+    final loggedUser = context.watch<LoggedUserProvider>();
+    // Extract query parameters using queryParameters
+    final initialTab = int.tryParse(state.uri.queryParameters['initialTab'] ?? '0') ?? 0;
+    final initialStatus = state.uri.queryParameters['initialStatus'];
+    final postId = state.uri.queryParameters['postId'];
+    final bidId = state.uri.queryParameters['bidId'];
+    final userId = loggedUser.isLoggedIn ? loggedUser.userData?.userId : null;
+
+    if (loggedUser.isLoggedIn) {
+      return BuyingStatusPage(
+        userId: userId,
+        initialTab: initialTab,
+        initialStatus: initialStatus,
+        postId: postId,
+        bidId: bidId,
+      );
+    }
+    return LoginPage();
+  },
+),
     GoRoute(
       path: RouteNames.sellpage,
       name: RouteNames.sellpage,
@@ -151,6 +172,25 @@ final GoRouter appRouter = GoRouter(
           );
         }
         return LoginPage();
+      },
+    ),
+    GoRoute(
+      path: '/search',
+      name: 'searchResults',
+      builder: (context, state) {
+        final query = state.uri.queryParameters['query'] ?? '';
+        return SearchResultsPage(searchQuery: query);
+      },
+    ),
+     GoRoute(
+      path: '/product-details',
+      name: 'productDetails',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return ProductDetailsPage(
+          product: extra['product'] as FeatureListModel,
+          isAuction: extra['isAuction'] as bool,
+        );
       },
     ),
   ],

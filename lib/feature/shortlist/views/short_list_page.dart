@@ -77,7 +77,7 @@ class _ShortListPageState extends State<ShortListPage> {
         _isLoadingLocations = false;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('User ID not found. Please log in again.'),
+            content: Text(' Please log in'),
             backgroundColor: Colors.red,
           ),
         );

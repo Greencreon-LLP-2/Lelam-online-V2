@@ -4,6 +4,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'dart:convert';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -181,63 +182,30 @@ class ReviewDialogState extends State<ReviewDialog> {
     return false;
   }
 
-  void _showLoginPromptDialog(BuildContext context, String action) {
-    debugPrint('Showing login prompt for action: $action, userId: $userId');
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
-
+ void _showLoginPromptDialog(BuildContext context, String action) {
+  debugPrint('Showing login prompt for action: $action, userId: $userId');
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return LoginDialog(
+        onSuccess: () async {
+          // Reload user ID after login
+          await _loadUserId();
+          // Re-show the ReviewDialog to allow the user to ask a question
+          if (mounted) {
+            Navigator.of(dialogContext).pop(); // Close login dialog
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => ReviewDialog(postId: widget.postId),
+            );
+          }
+        },
+      );
+    },
+  );
+}
   @override
   Widget build(BuildContext context) {
     return AlertDialog(

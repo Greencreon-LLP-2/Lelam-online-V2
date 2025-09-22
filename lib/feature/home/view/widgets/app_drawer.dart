@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +17,7 @@ class AppDrawerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<LoggedUserProvider>();
     final userData = userProvider.userData;
-    const supportPhone = '+9198765432102';
+    const supportPhone = '+918089308048';
     return Drawer(
       child: Column(
         children: [
@@ -40,17 +41,19 @@ class AppDrawerWidget extends StatelessWidget {
                 child:
                     (userProvider.isLoggedIn &&
                             userData?.image?.isNotEmpty == true)
-                        ? Image.network(
-                          "$getImageFromServer${userData!.image}",
+                        ? CachedNetworkImage(
+                          imageUrl: "$getImageFromServer${userData!.image}",
                           fit: BoxFit.cover,
                           width: 60,
                           height: 60,
-                          errorBuilder:
-                              (_, __, ___) => Image.asset(
-                                'assets/images/avatar.gif',
-                                fit: BoxFit.cover,
-                                width: 60,
-                                height: 60,
+                          placeholder:
+                              (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                          errorWidget:
+                              (context, url, error) => Icon(
+                                Icons.broken_image,
+                                color: Colors.white.withOpacity(0.8),
                               ),
                         )
                         : Image.asset(
