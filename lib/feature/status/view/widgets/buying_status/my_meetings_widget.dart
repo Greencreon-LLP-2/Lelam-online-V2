@@ -16,6 +16,7 @@ class StatusPill extends StatelessWidget {
   final bool isActive;
   final Color activeColor;
   final Color inactiveColor;
+  final bool showError;
   final VoidCallback? onTap;
 
   const StatusPill({
@@ -24,6 +25,7 @@ class StatusPill extends StatelessWidget {
     this.isActive = false,
     this.activeColor = Colors.green,
     this.inactiveColor = Colors.grey,
+    this.showError = false,
     this.onTap,
   });
 
@@ -42,13 +44,22 @@ class StatusPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? activeColor : Colors.black,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? activeColor : Colors.black,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+            if (showError) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.error_outline, color: Colors.red, size: 16),
+            ],
+          ],
         ),
       ),
     );
@@ -69,14 +80,15 @@ class PillConnector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: isActive ? activeColor : inactiveColor,
-        borderRadius: BorderRadius.circular(2),
-      ),
+    return Row(
+      children: [
+        
+        Transform.scale(
+          scaleX: 1.5, 
+        child: Icon(Icons.arrow_forward,
+        size:14 ,
+        color: isActive ? activeColor:inactiveColor,))
+      ],
     );
   }
 }
@@ -124,15 +136,15 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   final Map<String, Map<String, dynamic>> _postDetailsCache = {};
   List<Map<String, String>> _meetingTimesCache = [];
 
-@override
-void initState() {
-  super.initState();
-  if (widget.initialStatus != null &&
-      statuses.contains(widget.initialStatus)) {
-    selectedIndex = statuses.indexOf(widget.initialStatus!);
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialStatus != null &&
+        statuses.contains(widget.initialStatus)) {
+      selectedIndex = statuses.indexOf(widget.initialStatus!);
+    }
+    _loadUserId();
   }
-  _loadUserId();
-}
 
   @override
   void dispose() {
@@ -143,11 +155,15 @@ void initState() {
   List<Widget> _buildPillRow() {
     List<Widget> pillRow = [];
     for (var i = 0; i < statuses.length; i++) {
+      final bool isThisActive = i <= selectedIndex;
+      final bool showErrorOnThis = false;
+
       pillRow.add(
         StatusPill(
           label: statuses[i],
-          isActive: i == selectedIndex,
+          isActive: isThisActive,
           activeColor: Colors.blue,
+          showError: showErrorOnThis,
           onTap: () {
             if (mounted) {
               setState(() {
@@ -163,7 +179,7 @@ void initState() {
       if (i != statuses.length - 1) {
         pillRow.add(
           PillConnector(
-            isActive: (i == selectedIndex || i + 1 == selectedIndex),
+            isActive: i < selectedIndex,
             activeColor: Colors.blue,
             inactiveColor: Colors.grey,
           ),
@@ -182,7 +198,7 @@ void initState() {
       final userData = userProvider.userData;
       setState(() {
         _userId = userData?.userId ?? 'Unknown';
-       print('Loaded userId: $_userId');
+        print('Loaded userId: $_userId');
         if (_userId == 'Unknown') {
           errorMessage = ' Please log in .';
           isLoading = false;
@@ -192,7 +208,7 @@ void initState() {
         await _loadMeetings();
       }
     } catch (e) {
-     print('Error loading userId: $e');
+      print('Error loading userId: $e');
       setState(() {
         errorMessage = 'Error loading user ID: $e';
         isLoading = false;
@@ -202,7 +218,7 @@ void initState() {
 
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
     if (_postDetailsCache.containsKey(postId)) {
-     print('Returning cached post details for post_id $postId');
+      print('Returning cached post details for post_id $postId');
       return _postDetailsCache[postId];
     }
 
@@ -221,12 +237,10 @@ void initState() {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying post-details for post_id $postId: $e');
+          print('Retrying post-details for post_id $postId: $e');
         },
       );
-     print(
-        'post-details.php response for post_id $postId: ${response.body}',
-      );
+      print('post-details.php response for post_id $postId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -259,22 +273,22 @@ void initState() {
           }
         }
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for post-details.php');
+        print('Rate limit exceeded for post-details.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-     print('No valid post data for post_id $postId');
+      print('No valid post data for post_id $postId');
       return null;
     } catch (e) {
-     print('Error fetching post details for post_id $postId: $e');
+      print('Error fetching post details for post_id $postId: $e');
       return null;
     }
   }
 
   Future<List<Map<String, String>>> _fetchMeetingTimes() async {
     if (_meetingTimesCache.isNotEmpty) {
-     print('Returning cached meeting times');
+      print('Returning cached meeting times');
       return _meetingTimesCache;
     }
 
@@ -293,10 +307,10 @@ void initState() {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying meeting-times: $e');
+          print('Retrying meeting-times: $e');
         },
       );
-     print('meeting-times.php response: ${response.body}');
+      print('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -314,14 +328,14 @@ void initState() {
           }
         }
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for meeting-times.php');
+        print('Rate limit exceeded for meeting-times.php');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
       return [];
     } catch (e) {
-     print('Error fetching meeting times: $e');
+      print('Error fetching meeting times: $e');
       return [];
     }
   }
@@ -364,12 +378,10 @@ void initState() {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying $endpoint for meeting_id $meetingId: $e');
+          print('Retrying $endpoint for meeting_id $meetingId: $e');
         },
       );
-     print(
-        '$endpoint response for meeting_id $meetingId: ${response.body}',
-      );
+      print('$endpoint response for meeting_id $meetingId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -391,19 +403,19 @@ void initState() {
           }
         }
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for $endpoint');
+        print('Rate limit exceeded for $endpoint');
         setState(() {
           errorMessage = 'Too many requests. Please try again later.';
         });
       }
-     print('No valid status data for meeting_id $meetingId');
+      print('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
         'timer': '0',
       };
     } catch (e) {
-     print('Error fetching meeting status for meeting_id $meetingId: $e');
+      print('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
         'footerStatus_data': 'Click call support for full details',
@@ -455,17 +467,17 @@ void initState() {
               '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
-     print('Fetching meetings from: $url');
+      print('Fetching meetings from: $url');
       final response = await retry(
         () => http.get(Uri.parse(url), headers: headers),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying meetings fetch: $e');
+          print('Retrying meetings fetch: $e');
         },
       );
-     print('Raw response body: ${response.body}');
+      print('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -474,15 +486,15 @@ void initState() {
                 responseData['status'] == 'true') &&
             responseData['data'] is List) {
           final List<dynamic> meetingData = responseData['data'];
-         print('Found ${meetingData.length} meetings in API response');
+          print('Found ${meetingData.length} meetings in API response');
 
           for (var meeting in meetingData) {
-           print(
+            print(
               'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
             );
             final postDetails = await _fetchPostDetails(meeting['post_id']);
             if (postDetails == null) {
-             print(
+              print(
                 'Skipping meeting ${meeting['id']} due to missing post details',
               );
               continue;
@@ -551,8 +563,8 @@ void initState() {
                   'Click call support for full details',
               'timer': statusData?['timer'] ?? '0',
             };
-           print('Added meeting ${meeting['id']} to list: $meetingData');
-           print(
+            print('Added meeting ${meeting['id']} to list: $meetingData');
+            print(
               'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
             );
             meetings.add(meetingData);
@@ -565,16 +577,16 @@ void initState() {
           errorMessage = 'Currently No Meeting';
         }
 
-       print('Total meetings loaded: ${meetings.length}');
+        print('Total meetings loaded: ${meetings.length}');
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for meetings fetch');
+        print('Rate limit exceeded for meetings fetch');
         errorMessage = 'Too many requests. Please try again later.';
       } else {
-       print('Failed to fetch meetings: ${response.reasonPhrase}');
+        print('Failed to fetch meetings: ${response.reasonPhrase}');
         errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
       }
     } catch (e) {
-     print('Error loading meetings: $e');
+      print('Error loading meetings: $e');
       errorMessage = 'Error loading meetings: $e';
     }
 
@@ -597,68 +609,74 @@ void initState() {
     }
   }
 
-List<Map<String, dynamic>> _getFilteredMeetings() {
-  final status = statuses[selectedIndex];
-  print('Filtering for status: $status');
+  List<Map<String, dynamic>> _getFilteredMeetings() {
+    final status = statuses[selectedIndex];
+    print('Filtering for status: $status');
 
-  var filteredMeetings = meetings.where((meeting) {
-    print(
-      'Meeting ${meeting['id']} - status: ${meeting['status']}, '
-      'seller_approvel: ${meeting['seller_approvel']}, '
-      'admin_approvel: ${meeting['admin_approvel']}, '
-      'meeting_done: ${meeting['meeting_done']}, '
-      'if_location_request: ${meeting['if_location_request']}, '
-      'meeting_date: ${meeting['meeting_date']}',
-    );
+    var filteredMeetings =
+        meetings.where((meeting) {
+          print(
+            'Meeting ${meeting['id']} - status: ${meeting['status']}, '
+            'seller_approvel: ${meeting['seller_approvel']}, '
+            'admin_approvel: ${meeting['admin_approvel']}, '
+            'meeting_done: ${meeting['meeting_done']}, '
+            'if_location_request: ${meeting['if_location_request']}, '
+            'meeting_date: ${meeting['meeting_date']}',
+          );
 
-    if (status == 'Date Fixed') {
-      return meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['seller_approvel'] == '1' && 
-          meeting['admin_approvel'] == '1' && 
-          meeting['meeting_date'] != 'N/A' &&
-          meeting['meeting_date']?.isNotEmpty == true;
-    } else if (status == 'Meeting Request') {
-      return meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['if_location_request'] == '0';
-    } else if (status == 'Awaiting Location') {
-      return meeting['if_location_request'] == '1' &&
-          meeting['status'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          (meeting['location_link'] == null ||
-              meeting['location_link'] == '' ||
-              meeting['latitude'] == null ||
-              meeting['latitude'] == '' ||
-              meeting['longitude'] == null ||
-              meeting['longitude'] == '');
-    } else if (status == 'Ready For Meeting') {
-      return meeting['seller_approvel'] == '1' &&
-          meeting['admin_approvel'] == '1' &&
-          meeting['meeting_done'] == '0' &&
-          meeting['if_location_request'] != '0' &&
-          meeting['location_link']?.isNotEmpty == true;
-    } else if (status == 'Meeting Completed') {
-      return meeting['meeting_done'] == '1';
-    }
-    return false;
-  }).toList();
+          if (status == 'Date Fixed') {
+            return meeting['status'] == '1' &&
+                meeting['meeting_done'] == '0' &&
+                meeting['seller_approvel'] == '1' &&
+                meeting['admin_approvel'] == '1' &&
+                meeting['meeting_date'] != 'N/A' &&
+                meeting['meeting_date']?.isNotEmpty == true;
+          } else if (status == 'Meeting Request') {
+            return meeting['status'] == '1' &&
+                meeting['meeting_done'] == '0' &&
+                meeting['if_location_request'] == '0';
+          } else if (status == 'Awaiting Location') {
+            return meeting['if_location_request'] == '1' &&
+                meeting['status'] == '1' &&
+                meeting['meeting_done'] == '0' &&
+                (meeting['location_link'] == null ||
+                    meeting['location_link'] == '' ||
+                    meeting['latitude'] == null ||
+                    meeting['latitude'] == '' ||
+                    meeting['longitude'] == null ||
+                    meeting['longitude'] == '');
+          } else if (status == 'Ready For Meeting') {
+            return meeting['seller_approvel'] == '1' &&
+                meeting['admin_approvel'] == '1' &&
+                meeting['meeting_done'] == '0' &&
+                meeting['if_location_request'] != '0' &&
+                meeting['location_link']?.isNotEmpty == true;
+          } else if (status == 'Meeting Completed') {
+            return meeting['meeting_done'] == '1';
+          }
+          return false;
+        }).toList();
 
-  // Sort meetings by updated_on or created_on in descending order (newest first)
-  filteredMeetings.sort((a, b) {
-    final aDate = DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ??
-        DateTime.now();
-    final bDate = DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ??
-        DateTime.now();
-    return bDate.compareTo(aDate); // Descending order
-  });
+    // Sort meetings by updated_on or created_on in descending order (newest first)
+    filteredMeetings.sort((a, b) {
+      final aDate =
+          DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ??
+          DateTime.now();
+      final bDate =
+          DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ??
+          DateTime.now();
+      return bDate.compareTo(aDate); // Descending order
+    });
 
-  return filteredMeetings;
-}
+    return filteredMeetings;
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredMeetings = _getFilteredMeetings();
-    print('Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}');
+    print(
+      'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
+    );
     for (var meeting in filteredMeetings) {
       print(
         'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
@@ -669,17 +687,18 @@ List<Map<String, dynamic>> _getFilteredMeetings() {
     }
 
     return Scaffold(
-      appBar: widget.showAppBar
-          ? AppBar(
-              title: const Text('My Meetings'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              ),
-            )
-          : null,
+      appBar:
+          widget.showAppBar
+              ? AppBar(
+                title: const Text('My Meetings'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              )
+              : null,
       backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Column(
@@ -689,95 +708,101 @@ List<Map<String, dynamic>> _getFilteredMeetings() {
               padding: const EdgeInsets.all(16),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _buildPillRow(),
-                ),
+                child: Row(children: _buildPillRow()),
               ),
             ),
             Expanded(
               child: Container(
                 color: Colors.grey[50],
-                child: isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(color: Colors.blue),
-                      )
-                    : errorMessage != null
+                child:
+                    isLoading
+                        ? const Center(
+                          child: CircularProgressIndicator(color: Colors.blue),
+                        )
+                        : errorMessage != null
                         ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.handshake,
-                                  size: 64,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No ${statuses[selectedIndex].toLowerCase()} found',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.grey[600],
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
-                          )
-                        : filteredMeetings.isEmpty
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.handshake,
-                                      size: 64,
-                                      color: Colors.grey,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No ${statuses[selectedIndex].toLowerCase()} found',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: filteredMeetings.length,
-                                itemBuilder: (context, index) {
-                                  final meeting = filteredMeetings[index];
-                                  print('Displaying meeting: ${meeting['id']}');
-                                  return MeetingCard(
-                                    meeting: meeting,
-                                    baseUrl: widget.baseUrl,
-                                    token: widget.token,
-                                    currentTab: statuses[selectedIndex], // Pass current tab
-                                    onLocationRequestSent: _onLocationRequestSent,
-                                    onProceedWithBid: () {
-                                      print('Proceed with Bid triggered for meeting ${meeting['id']}');
-                                      _proceedWithBid(context, meeting);
-                                    },
-                                    onEditDate: (meeting) => _editDate(context, meeting),
-                                    onEditTime: (meeting) => _editTime(context, meeting),
-                                    onSendLocationRequest: (meeting) =>
-                                        _sendLocationRequest(context, meeting),
-                                    onViewLocation: (meeting) => _viewLocation(context, meeting),
-                                  );
-                                },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.handshake,
+                                size: 64,
+                                color: Colors.grey,
                               ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                        : filteredMeetings.isEmpty
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.handshake,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No ${statuses[selectedIndex].toLowerCase()} found',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                        : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredMeetings.length,
+                          itemBuilder: (context, index) {
+                            final meeting = filteredMeetings[index];
+                            print('Displaying meeting: ${meeting['id']}');
+                            return MeetingCard(
+                              meeting: meeting,
+                              baseUrl: widget.baseUrl,
+                              token: widget.token,
+                              currentTab:
+                                  statuses[selectedIndex], // Pass current tab
+                              onLocationRequestSent: _onLocationRequestSent,
+                              onProceedWithBid: () {
+                                print(
+                                  'Proceed with Bid triggered for meeting ${meeting['id']}',
+                                );
+                                _proceedWithBid(context, meeting);
+                              },
+                              onEditDate:
+                                  (meeting) => _editDate(context, meeting),
+                              onEditTime:
+                                  (meeting) => _editTime(context, meeting),
+                              onSendLocationRequest:
+                                  (meeting) =>
+                                      _sendLocationRequest(context, meeting),
+                              onViewLocation:
+                                  (meeting) => _viewLocation(context, meeting),
+                            );
+                          },
+                        ),
               ),
             ),
           ],
@@ -785,7 +810,8 @@ List<Map<String, dynamic>> _getFilteredMeetings() {
       ),
     );
   }
-Future<void> _proceedWithBid(
+
+  Future<void> _proceedWithBid(
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
@@ -803,46 +829,47 @@ Future<void> _proceedWithBid(
 
     await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Enter Bid Amount'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: bidController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Bid Amount (₹)',
-                hintText: 'Enter your bid amount',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (value) {
-                bidAmount = double.tryParse(value);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (bidAmount == null || bidAmount! <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a valid bid amount'),
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Enter Bid Amount'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: bidController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Bid Amount (₹)',
+                    hintText: 'Enter your bid amount',
+                    border: OutlineInputBorder(),
                   ),
-                );
-                return;
-              }
-              Navigator.pop(dialogContext, true);
-            },
-            child: const Text('OK'),
+                  onChanged: (value) {
+                    bidAmount = double.tryParse(value);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (bidAmount == null || bidAmount! <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid bid amount'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (bidAmount == null || bidAmount! <= 0) {
@@ -1053,7 +1080,7 @@ Future<void> _proceedWithBid(
     }
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
-     print('No meeting times available');
+      print('No meeting times available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No meeting times available')),
       );
@@ -1094,7 +1121,7 @@ Future<void> _proceedWithBid(
                                   (time) => time['value'] == value,
                                   orElse: () => {'name': ''},
                                 )['name'];
-                           print(
+                            print(
                               'Selected time: $selectedTimeName ($selectedTimeValue)',
                             );
                           });
@@ -1112,7 +1139,7 @@ Future<void> _proceedWithBid(
                           selectedTimeValue == null
                               ? null
                               : () async {
-                               print(
+                                print(
                                   'Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}',
                                 );
                                 try {
@@ -1126,7 +1153,7 @@ Future<void> _proceedWithBid(
                                           'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
                                     },
                                   );
-                                 print(
+                                  print(
                                     'my-meeting-fix-time.php response: ${response.body}',
                                   );
                                   if (response.statusCode == 200) {
@@ -1157,7 +1184,7 @@ Future<void> _proceedWithBid(
                                       );
                                     }
                                   } else {
-                                   print(
+                                    print(
                                       'my-meeting-fix-time.php failed with status ${response.statusCode}',
                                     );
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1167,7 +1194,7 @@ Future<void> _proceedWithBid(
                                     );
                                   }
                                 } catch (e) {
-                                 print('Error updating meeting time: $e');
+                                  print('Error updating meeting time: $e');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
@@ -1221,10 +1248,10 @@ Future<void> _proceedWithBid(
           delayFactor: const Duration(seconds: 2),
           randomizationFactor: 0.25,
           onRetry: (e) {
-           print('Retrying edit date: $e');
+            print('Retrying edit date: $e');
           },
         );
-       print('my-meeting-edit-date.php response: ${response.body}');
+        print('my-meeting-edit-date.php response: ${response.body}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == true || data['status'] == 'true') {
@@ -1244,14 +1271,14 @@ Future<void> _proceedWithBid(
             );
           }
         } else if (response.statusCode == 429) {
-         print('Rate limit exceeded for edit date');
+          print('Rate limit exceeded for edit date');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Too many requests. Please try again later.'),
             ),
           );
         } else {
-         print(
+          print(
             'my-meeting-edit-date.php failed with status ${response.statusCode}',
           );
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1259,7 +1286,7 @@ Future<void> _proceedWithBid(
           );
         }
       } catch (e) {
-       print('Error updating meeting date: $e');
+        print('Error updating meeting date: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error updating meeting date')),
         );
@@ -1292,12 +1319,10 @@ Future<void> _proceedWithBid(
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying send location request: $e');
+          print('Retrying send location request: $e');
         },
       );
-     print(
-        'my-meeting-send-location-request.php response: ${response.body}',
-      );
+      print('my-meeting-send-location-request.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
@@ -1324,14 +1349,14 @@ Future<void> _proceedWithBid(
           );
         }
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for send location request');
+        print('Rate limit exceeded for send location request');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-       print(
+        print(
           'my-meeting-send-location-request.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1339,7 +1364,7 @@ Future<void> _proceedWithBid(
         );
       }
     } catch (e) {
-     print('Error sending location request: $e');
+      print('Error sending location request: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error sending location request')),
       );
