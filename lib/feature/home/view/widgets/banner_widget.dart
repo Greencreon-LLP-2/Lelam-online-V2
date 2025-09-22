@@ -1,23 +1,17 @@
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:shimmer/shimmer.dart';
 
 class BannerWidget extends StatelessWidget {
   const BannerWidget({super.key});
 
   Future<String?> fetchBannerUrl() async {
-    const token = '5cb2c9b569416b5db1604e0e12478ded';
-    final headers = {
-      'token': token,
-      'Cookie': 'PHPSESSID=koib3m1uifk1b4ucclf5dsegpe',
-    };
+    final uri = Uri.parse(banner);
 
-    final uri = Uri.parse(
-      'https://lelamonline.com/admin/api/v1/banner.php?token=$token',
-    );
-
-    final request = http.Request('GET', uri)..headers.addAll(headers);
+    final request = http.Request('GET', uri);
     final response = await request.send();
 
     if (response.statusCode == 200) {
@@ -49,16 +43,14 @@ class BannerWidget extends StatelessWidget {
         return _buildContainer(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              snapshot.data!,
+            child: CachedNetworkImage(
+              imageUrl: snapshot.data!,
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (context, error, stackTrace) => const Text("Failed to load banner"),
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return _buildShimmerBanner();
-              },
+              placeholder: (context, url) => _buildShimmerBanner(),
+              errorWidget:
+                  (context, url, error) => const Text("Failed to load banner"),
             ),
           ),
         );

@@ -22,9 +22,11 @@ import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
-import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart' show SellingStatusPage;
+import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart'
+    show SellingStatusPage;
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
@@ -87,7 +89,7 @@ class _RealEstateProductDetailsPageState
   String? _bannerImageUrl;
   bool _isLoadingBanner = false;
   String _bannerError = '';
- String _moveToAuctionButtonText = 'Move to Auction';
+  String _moveToAuctionButtonText = 'Move to Auction';
 
   @override
   void initState() {
@@ -109,33 +111,33 @@ class _RealEstateProductDetailsPageState
     ]);
   }
 
- Future<bool> _checkAuctionTermsStatus() async {
+  Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, cannot check auction terms.');
+      print('User not logged in, cannot check auction terms.');
       return false;
     }
 
     final url =
         '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
     try {
-      developer.log('Checking auction terms status: $url');
+      print('Checking auction terms status: $url');
       final response = await http.get(Uri.parse(url));
-      developer.log(
+      print(
         'Terms check response: status=${response.statusCode}, body=${response.body}',
       );
 
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
         bool termsAccepted = decodedBody['status'] == 'true';
-        developer.log('Terms accepted: $termsAccepted');
+        print('Terms accepted: $termsAccepted');
 
         if (!termsAccepted) {
           // Terms not accepted, call seller-accept-terms.php
           final acceptUrl =
               '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-          developer.log('Accepting terms: $acceptUrl');
+          print('Accepting terms: $acceptUrl');
           final acceptResponse = await http.get(Uri.parse(acceptUrl));
-          developer.log(
+          print(
             'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
           );
 
@@ -144,7 +146,7 @@ class _RealEstateProductDetailsPageState
             if (acceptDecodedBody['status'] == 'true' &&
                 acceptDecodedBody['data'] is List &&
                 acceptDecodedBody['data'].isNotEmpty) {
-              developer.log('Terms accepted successfully');
+              print('Terms accepted successfully');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -160,7 +162,7 @@ class _RealEstateProductDetailsPageState
               );
               return true;
             } else {
-              developer.log(
+              print(
                 'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
               );
               ScaffoldMessenger.of(context).showSnackBar(
@@ -179,9 +181,7 @@ class _RealEstateProductDetailsPageState
               return false;
             }
           } else {
-            developer.log(
-              'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
-            );
+            print('Failed to accept terms: HTTP ${acceptResponse.statusCode}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -200,9 +200,7 @@ class _RealEstateProductDetailsPageState
         }
         return termsAccepted;
       } else {
-        developer.log(
-          'Failed to check auction terms: HTTP ${response.statusCode}',
-        );
+        print('Failed to check auction terms: HTTP ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -219,7 +217,7 @@ class _RealEstateProductDetailsPageState
         return false;
       }
     } catch (e) {
-      developer.log('Error checking auction terms: $e');
+      print('Error checking auction terms: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error checking auction terms: $e'),
@@ -239,13 +237,13 @@ class _RealEstateProductDetailsPageState
     bool isLoadingTerms = true;
     String? termsError;
 
-    developer.log('Attempting to fetch auction terms');
+    print('Attempting to fetch auction terms');
     try {
       termsHtml = await MarketplaceService2().fetchAuctionTerms();
-      developer.log('Terms fetched successfully: $termsHtml');
+      print('Terms fetched successfully: $termsHtml');
       isLoadingTerms = false;
     } catch (e) {
-      developer.log('Error fetching auction terms: $e');
+      print('Error fetching auction terms: $e');
       termsError = e.toString();
       isLoadingTerms = false;
     }
@@ -257,7 +255,7 @@ class _RealEstateProductDetailsPageState
         bool dialogIsAccepted = false;
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            developer.log(
+            print(
               'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
             );
             return AlertDialog(
@@ -285,7 +283,7 @@ class _RealEstateProductDetailsPageState
                       onChanged: (bool? value) {
                         setDialogState(() {
                           dialogIsAccepted = value ?? false;
-                          developer.log(
+                          print(
                             'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
                           );
                         });
@@ -297,7 +295,7 @@ class _RealEstateProductDetailsPageState
               actions: [
                 TextButton(
                   onPressed: () {
-                    developer.log('Terms dialog cancelled');
+                    print('Terms dialog cancelled');
                     Navigator.pop(dialogContext, false);
                   },
                   child: const Text('Cancel'),
@@ -306,13 +304,13 @@ class _RealEstateProductDetailsPageState
                   onPressed:
                       dialogIsAccepted && !isLoadingTerms && termsError == null
                           ? () async {
-                            developer.log('Attempting to accept terms');
+                            print('Attempting to accept terms');
                             try {
                               final url =
                                   '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-                              developer.log('Accepting terms: $url');
+                              print('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
-                              developer.log(
+                              print(
                                 'Accept terms response: status=${response.statusCode}, body=${response.body}',
                               );
 
@@ -321,7 +319,7 @@ class _RealEstateProductDetailsPageState
                                 if (decodedBody['status'] == 'true' &&
                                     decodedBody['data'] is List &&
                                     decodedBody['data'].isNotEmpty) {
-                                  developer.log('Terms accepted successfully');
+                                  print('Terms accepted successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -341,7 +339,7 @@ class _RealEstateProductDetailsPageState
                                   setDialogState(() {
                                     termsError =
                                         'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
-                                    developer.log(
+                                    print(
                                       'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
                                     );
                                   });
@@ -350,7 +348,7 @@ class _RealEstateProductDetailsPageState
                                 setDialogState(() {
                                   termsError =
                                       'Failed to accept terms: HTTP ${response.statusCode}';
-                                  developer.log(
+                                  print(
                                     'Failed to accept terms: HTTP ${response.statusCode}',
                                   );
                                 });
@@ -358,7 +356,7 @@ class _RealEstateProductDetailsPageState
                             } catch (e) {
                               setDialogState(() {
                                 termsError = 'Error accepting terms: $e';
-                                developer.log('Error accepting terms: $e');
+                                print('Error accepting terms: $e');
                               });
                             }
                           }
@@ -372,7 +370,7 @@ class _RealEstateProductDetailsPageState
       },
     ).then((value) {
       isAccepted = value ?? false;
-      developer.log('Terms dialog closed, isAccepted=$isAccepted');
+      print('Terms dialog closed, isAccepted=$isAccepted');
     });
 
     return isAccepted;
@@ -380,7 +378,7 @@ class _RealEstateProductDetailsPageState
 
   Future<void> _moveToAuction() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, showing login prompt');
+      print('User not logged in, showing login prompt');
       _showLoginPromptDialog(context, 'move to auction');
       return;
     }
@@ -390,10 +388,10 @@ class _RealEstateProductDetailsPageState
     });
 
     try {
-      developer.log('Showing terms dialog before moving to auction');
+      print('Showing terms dialog before moving to auction');
       final accepted = await _showTermsAndConditionsDialog(context);
       if (!accepted) {
-        developer.log('User did not accept terms, aborting move to auction');
+        print('User did not accept terms, aborting move to auction');
         setState(() {
           _isLoadingBid = false;
         });
@@ -411,17 +409,17 @@ class _RealEstateProductDetailsPageState
         return;
       }
 
-      developer.log('Terms accepted, proceeding to move to auction');
+      print('Terms accepted, proceeding to move to auction');
 
       final url =
           '${baseUrl}/sell-move-to-auction.php?token=$token}&post_id=$id';
-      developer.log('Moving to auction: $url');
+      print('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
       );
 
@@ -436,7 +434,7 @@ class _RealEstateProductDetailsPageState
             responseData['data']?[0]['message']?.toString() ?? '';
 
         if (isSuccess) {
-          developer.log('Successfully moved to auction');
+          print('Successfully moved to auction');
           setState(() {
             _moveToAuctionButtonText = 'Auction Waiting for Approval';
           });
@@ -463,7 +461,7 @@ class _RealEstateProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error moving to auction: $e');
+      print('Error moving to auction: $e');
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(
       //     content: Text('Error: $e'),
@@ -480,34 +478,30 @@ class _RealEstateProductDetailsPageState
     }
   }
 
-
   Future<void> _fetchBannerImage() async {
-    developer.log('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
+    print('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
     try {
       setState(() {
         _isLoadingBanner = true;
         _bannerError = '';
       });
 
-      final headers = {
-        'token': _token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': _token};
       final url = '$_baseUrl/post-ads-image.php?token=$_token';
-      developer.log('Fetching banner image: $url');
+      print('Fetching banner image: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'Banner API response (status: ${response.statusCode}): $responseBody',
       );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed banner response: $responseData');
+        print('Parsed banner response: $responseData');
 
         if (responseData['status'] == 'true' && responseData['data'] != null) {
           final bannerImage = responseData['data']['inner_post_image'] ?? '';
@@ -517,7 +511,7 @@ class _RealEstateProductDetailsPageState
                     ? 'https://lelamonline.com/admin/$bannerImage'
                     : null;
           });
-          developer.log('Set _bannerImageUrl=$_bannerImageUrl');
+          print('Set _bannerImageUrl=$_bannerImageUrl');
         } else {
           throw Exception('Invalid banner data: ${responseData['data']}');
         }
@@ -527,7 +521,7 @@ class _RealEstateProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error fetching banner image: $e');
+      print('Error fetching banner image: $e');
       setState(() {
         _bannerError = 'Failed to load banner: $e';
         _isLoadingBanner = false;
@@ -536,7 +530,7 @@ class _RealEstateProductDetailsPageState
       setState(() {
         _isLoadingBanner = false;
       });
-      developer.log('RealEstateProductDetailsPage - _fetchBannerImage: Completed');
+      print('RealEstateProductDetailsPage - _fetchBannerImage: Completed');
     }
   }
 
@@ -547,24 +541,21 @@ class _RealEstateProductDetailsPageState
         _galleryError = '';
       });
 
-      final headers = {
-        'token': _token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': _token};
       final url =
           '$_baseUrl/post-gallery.php?token=$_token&post_id=${widget.product.id}';
-      developer.log('Fetching gallery: $url');
+      print('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Gallery API response: $responseBody');
+      print('Gallery API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed responseData type: ${responseData.runtimeType}');
+        print('Parsed responseData type: ${responseData.runtimeType}');
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -580,7 +571,7 @@ class _RealEstateProductDetailsPageState
                     .toList();
             _isLoadingGallery = false;
           });
-          developer.log(
+          print(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
           );
         } else {
@@ -594,7 +585,7 @@ class _RealEstateProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error fetching gallery: $e');
+      print('Error fetching gallery: $e');
       setState(() {
         _galleryError = 'Failed to load gallery: $e';
         _isLoadingGallery = false;
@@ -628,18 +619,18 @@ class _RealEstateProductDetailsPageState
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$_baseUrl/post-fix-meeting.php?token=$_token&post_id=${widget.product.id}&user_id=$userId&meeting_date=$formattedDate';
-      developer.log('Scheduling meeting: $url');
+      print('Scheduling meeting: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('post-fix-meeting.php response: $responseBody');
+      print('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response: $responseData');
+        print('Parsed response: $responseData');
         if (responseData['status'] == true) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -675,7 +666,7 @@ class _RealEstateProductDetailsPageState
         }
       }
     } catch (e) {
-      developer.log('Error scheduling meeting: $e');
+      print('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -812,18 +803,18 @@ class _RealEstateProductDetailsPageState
       final headers = {'token': _token};
       final url =
           '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=${widget.product.id}';
-      developer.log('Fetching highest bid: $url');
+      print('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Full API response body: $responseBody');
-      developer.log('Response status code: ${response.statusCode}');
+      print('Full API response body: $responseBody');
+      print('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response data: $responseData');
+        print('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -832,29 +823,27 @@ class _RealEstateProductDetailsPageState
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            developer.log('Successfully fetched highest bid: $dataValue');
+            print('Successfully fetched highest bid: $dataValue');
           } else {
-            developer.log('API returned non-numeric data: $dataValue');
+            print('API returned non-numeric data: $dataValue');
             setState(() {
               _currentHighestBid = 'Error: $dataValue';
             });
           }
         } else {
-          developer.log('API status false: ${responseData['data']}');
+          print('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        developer.log(
-          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
-        );
+        print('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
         setState(() {
           _currentHighestBid = '0';
         });
       }
     } catch (e) {
-      developer.log('Exception in fetch highest bid: $e');
+      print('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -871,23 +860,20 @@ class _RealEstateProductDetailsPageState
     }
 
     try {
-      final headers = {
-        'token': _token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': _token};
       final url =
           '$_baseUrl/place-bid.php?token=$_token&post_id=${widget.product.id}&user_id=$userId&bidamt=$bidAmount';
-      developer.log('Placing bid: $url');
+      print('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('place-bid.php response: $responseBody');
+      print('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed place-bid response: $responseData');
+        print('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -905,7 +891,7 @@ class _RealEstateProductDetailsPageState
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      developer.log('Error placing bid: $e');
+      print('Error placing bid: $e');
       throw e;
     }
   }
@@ -932,7 +918,7 @@ class _RealEstateProductDetailsPageState
               : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
       // Support phone number (replace with your actual support number)
-      const String supportPhoneNumber = '+919876543210';
+      const String supportPhoneNumber = '+918089308048';
 
       return showDialog<void>(
         context: context,
@@ -1423,54 +1409,14 @@ class _RealEstateProductDetailsPageState
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        return LoginDialog(
+          onSuccess: () {
+            _fetchLocations();
+            _fetchAttributesData();
+            _fetchSellerInfo();
+            _fetchGalleryImages();
+            _fetchBannerImage();
+          },
         );
       },
     );
@@ -1492,13 +1438,13 @@ class _RealEstateProductDetailsPageState
       final headers = {'token': _token};
       final url =
           '$_baseUrl/add-to-shortlist.php?token=$_token&user_id=$userId&post_id=${widget.product.id}';
-      developer.log('Toggling shortlist: $url');
+      print('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('add-to-shortlist.php response: $responseBody');
+      print('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -1552,7 +1498,7 @@ class _RealEstateProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error toggling shortlist: $e');
+      print('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -1588,7 +1534,7 @@ class _RealEstateProductDetailsPageState
         queryParams: {"user_id": userId},
       );
 
-      developer.log('Shortlist API response: $response');
+      print('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -1599,18 +1545,16 @@ class _RealEstateProductDetailsPageState
           _isFavorited = isShortlisted;
           _isLoadingFavorite = false;
         });
-        developer.log(
-          'Product ${widget.product.id} isShortlisted: $isShortlisted',
-        );
+        print('Product ${widget.product.id} isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isLoadingFavorite = false;
         });
-        developer.log('Invalid shortlist data: ${response['data']}');
+        print('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      developer.log('Error checking shortlist status: $e');
+      print('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isLoadingFavorite = false;
@@ -1636,7 +1580,7 @@ class _RealEstateProductDetailsPageState
     setState(() {
       userId = userData?.userId ?? '';
     });
-    developer.log('RealEstateProductDetailsPage - Loaded userId: $userId');
+    print('RealEstateProductDetailsPage - Loaded userId: $userId');
   }
 
   // Future<void> _checkShortlistStatus() async {
@@ -1685,7 +1629,7 @@ class _RealEstateProductDetailsPageState
   //       );
   //     }
   //   } catch (e) {
-  //     developer.log('Error checking shortlist status: $e');
+  //     print('Error checking shortlist status: $e');
   //     setState(() {
   //       _isLoadingFavorite = false;
   //     });
@@ -1708,11 +1652,7 @@ class _RealEstateProductDetailsPageState
       final action = _isFavorited ? 'remove' : 'add';
       final response = await http.post(
         Uri.parse('$_baseUrl/$action-shortlist.php?token=$_token'),
-        headers: {
-          'token': _token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          'Content-Type': 'application/json',
-        },
+        headers: {'token': _token, 'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId, 'post_id': widget.product.id}),
       );
 
@@ -1739,7 +1679,7 @@ class _RealEstateProductDetailsPageState
         throw Exception('Failed to update shortlist: ${response.reasonPhrase}');
       }
     } catch (e) {
-      developer.log('Error toggling shortlist: $e');
+      print('Error toggling shortlist: $e');
       setState(() {
         _isLoadingFavorite = false;
       });
@@ -1805,7 +1745,7 @@ class _RealEstateProductDetailsPageState
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          developer.log(
+          print(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -1813,7 +1753,7 @@ class _RealEstateProductDetailsPageState
         throw Exception('Invalid API response format');
       }
     } catch (e) {
-      developer.log('Error fetching locations: $e');
+      print('Error fetching locations: $e');
       setState(() {
         _isLoadingLocations = false;
       });
@@ -1829,21 +1769,22 @@ class _RealEstateProductDetailsPageState
     try {
       final url =
           '$_baseUrl/post-attribute-values.php?token=$_token&post_id=${widget.product.id}';
-      developer.log('Fetching attributes: $url');
+      print('Fetching attributes: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: {'token': _token},
       );
+      print('Raw attributes API response: ${response.body}'); // Add this line
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
+        print('Parsed attributes response: $responseData');
         final sellerComments = SellerCommentsModel.fromJson(responseData);
 
         final Map<String, SellerComment> uniqueAttributes = {};
         final List<SellerComment> orderedComments = [];
 
-        // Process attributes for uniqueness
         for (var comment in sellerComments.data) {
           final key = comment.attributeName.toLowerCase().replaceAll(
             RegExp(r'\s+'),
@@ -1855,7 +1796,6 @@ class _RealEstateProductDetailsPageState
           }
         }
 
-        // Add Seller Type from byDealer
         orderedComments.add(
           SellerComment(
             attributeName: 'Seller Type',
@@ -1867,7 +1807,6 @@ class _RealEstateProductDetailsPageState
           attributeValue: widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
         );
 
-        // Add auction-specific attributes if isAuction is true
         if (widget.isAuction) {
           orderedComments.add(
             SellerComment(
@@ -1897,7 +1836,6 @@ class _RealEstateProductDetailsPageState
 
         setState(() {
           uniqueSellerComments = orderedComments;
-          // Filter for Details section
           detailComments =
               uniqueSellerComments.where((comment) {
                 final name = comment.attributeName.toLowerCase().trim();
@@ -1907,10 +1845,10 @@ class _RealEstateProductDetailsPageState
                 ].contains(name);
               }).toList();
 
-          developer.log(
+          print(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
-          developer.log(
+          print(
             'Filtered detailComments: ${detailComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
           isLoadingDetails = false;
@@ -1921,7 +1859,7 @@ class _RealEstateProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error fetching attributes: $e');
+      print('Error fetching attributes: $e');
       setState(() {
         attributesErrorMessage = 'Failed to load attributes: $e';
         isLoadingDetails = false;
@@ -1930,7 +1868,7 @@ class _RealEstateProductDetailsPageState
   }
 
   Widget _buildBannerAd() {
-    developer.log(
+    print(
       'Building banner ad: isLoadingBanner=$_isLoadingBanner, bannerError=$_bannerError, bannerImageUrl=$_bannerImageUrl',
     );
 
@@ -1951,7 +1889,7 @@ class _RealEstateProductDetailsPageState
     }
 
     if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
-      developer.log('No banner image available');
+      print('No banner image available');
       return const SizedBox.shrink();
     }
 
@@ -2208,13 +2146,30 @@ class _RealEstateProductDetailsPageState
   }
 
   void _showMeetingDialog(BuildContext context) {
-    if (userId == null || userId == 'Unknown') {
-      _showLoginPromptDialog(context, 'schedule a meeting');
+    if (_isMeetingDialogOpen) {
+      print('Meeting dialog already open');
       return;
     }
 
-    if (_isMeetingDialogOpen) {
-      developer.log('Meeting dialog already open');
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    if (!userProvider.isLoggedIn) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return LoginDialog(
+            onSuccess: () {
+              if (mounted) {
+                Navigator.of(dialogContext).pop(); // Close login dialog
+                _showMeetingDialog(context); // Re-open meeting dialog
+              }
+            },
+          );
+        },
+      );
       return;
     }
 
@@ -2234,7 +2189,6 @@ class _RealEstateProductDetailsPageState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -2283,9 +2237,7 @@ class _RealEstateProductDetailsPageState
                   onPressed:
                       _isSchedulingMeeting
                           ? null
-                          : () {
-                            Navigator.of(dialogContext).pop();
-                          },
+                          : () => Navigator.of(dialogContext).pop(),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -2451,48 +2403,6 @@ class _RealEstateProductDetailsPageState
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2512,7 +2422,24 @@ class _RealEstateProductDetailsPageState
                   listen: false,
                 );
                 if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
+                  showDialog(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (dialogContext) {
+                      return LoginDialog(
+                        onSuccess: () {
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  );
                 } else {
                   showDialog(
                     context: context,
@@ -3074,109 +3001,99 @@ class _RealEstateProductDetailsPageState
               ],
             ),
           ),
-           Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.white, // Prevents ParentDataWidget issues
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: Offset(1, 3),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(),
+              child: Row(
+                children: [
+                  if (_userProvider.userId == widget.product.createdBy) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SellingStatusPage(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Edit'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoadingBid ? null : _moveToAuction,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child:
+                            _isLoadingBid
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : Text(_moveToAuctionButtonText),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => showProductBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showMeetingDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Fix Meeting'),
+                      ),
                     ),
                   ],
-                ),
-                child: Row(
-                  children: [
-                    if (_userProvider.userId == widget.product.createdBy) ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SellingStatusPage(),
-            ),
-          );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Edit'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLoadingBid ? null : _moveToAuction,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child:
-                              _isLoadingBid
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Text(_moveToAuctionButtonText),
-                        ),
-                      ),
-                    ] else ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => showProductBidDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primarypink,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Place Bid'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _showMeetingDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Fix Meeting'),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );

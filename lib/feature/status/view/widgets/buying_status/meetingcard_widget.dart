@@ -9,6 +9,7 @@ class MeetingCard extends StatelessWidget {
   final Map<String, dynamic> meeting;
   final String baseUrl;
   final String token;
+  final String currentTab;
   final Function(String) onLocationRequestSent;
   final VoidCallback onProceedWithBid;
   final Function(Map<String, dynamic>) onEditDate;
@@ -21,6 +22,7 @@ class MeetingCard extends StatelessWidget {
     required this.meeting,
     required this.baseUrl,
     required this.token,
+    required this.currentTab,
     required this.onLocationRequestSent,
     required this.onProceedWithBid,
     required this.onEditDate,
@@ -212,32 +214,49 @@ class MeetingCard extends StatelessWidget {
   }
 
   String _getMeetingStatus(Map<String, dynamic> meeting) {
-    if (meeting['meeting_done'] == '1') return 'Meeting Completed';
+    debugPrint(
+      'Meeting ${meeting['id']}: status=${meeting['status']}, '
+      'meeting_done=${meeting['meeting_done']}, '
+      'if_location_request=${meeting['if_location_request']}, '
+      'meeting_date=${meeting['meeting_date']}, '
+      'seller_approvel=${meeting['seller_approvel']}, '
+      'admin_approvel=${meeting['admin_approvel']}, '
+      'location_link=${meeting['location_link']}',
+    );
+    if (meeting['meeting_done'] == '1') {
+      debugPrint('Meeting ${meeting['id']} status: Meeting Completed');
+      return 'Meeting Completed';
+    }
     if (meeting['seller_approvel'] == '1' &&
         meeting['admin_approvel'] == '1' &&
         meeting['meeting_done'] == '0' &&
         meeting['if_location_request'] == '1' &&
         meeting['location_link']?.isNotEmpty == true) {
+      debugPrint('Meeting ${meeting['id']} status: Ready For Meeting');
       return 'Ready For Meeting';
     }
     if (meeting['if_location_request'] == '1' &&
-        meeting['status'] == '1' &&
+        (meeting['status'] == '1' || meeting['status'] == true) &&
         meeting['meeting_done'] == '0' &&
         (meeting['location_link'] == null || meeting['location_link'] == '')) {
+      debugPrint('Meeting ${meeting['id']} status: Awaiting Location');
       return 'Awaiting Location';
     }
-    if (meeting['status'] == '1' &&
-        meeting['meeting_done'] == '0' &&
-        meeting['meeting_date'] != 'N/A' &&
-        meeting['meeting_date']?.isNotEmpty == true &&
-        meeting['if_location_request'] != '1') {
-      return 'Date Fixed';
-    }
-    if (meeting['status'] == '1' &&
+    if ((meeting['status'] == '1' || meeting['status'] == true) &&
         meeting['meeting_done'] == '0' &&
         meeting['if_location_request'] == '0') {
+      debugPrint('Meeting ${meeting['id']} status: Meeting Request');
       return 'Meeting Request';
     }
+    if ((meeting['status'] == '1' || meeting['status'] == true) &&
+        meeting['meeting_done'] == '0' &&
+        meeting['if_location_request'] != '0' &&
+        meeting['meeting_date'] != 'N/A' &&
+        meeting['meeting_date']?.isNotEmpty == true) {
+      debugPrint('Meeting ${meeting['id']} status: Date Fixed');
+      return 'Date Fixed';
+    }
+    debugPrint('Meeting ${meeting['id']} status: Unknown');
     return 'Unknown';
   }
 
@@ -264,7 +283,8 @@ class MeetingCard extends StatelessWidget {
                 'middleStatus_data':
                     meeting['middleStatus_data'] ?? 'Schedule meeting',
                 'footerStatus_data':
-                    meeting['footerStatus_data'] ?? 'Click call support for full details',
+                    meeting['footerStatus_data'] ??
+                    'Click call support for full details',
                 'timer': meeting['timer'] ?? '0',
               }),
       builder: (context, statusSnapshot) {
@@ -274,7 +294,8 @@ class MeetingCard extends StatelessWidget {
               'middleStatus_data':
                   meeting['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
-                  meeting['footerStatus_data'] ?? 'Click call support for full details',
+                  meeting['footerStatus_data'] ??
+                  'Click call support for full details',
               'timer': meeting['timer'] ?? '0',
             };
 
@@ -676,6 +697,9 @@ class MeetingCard extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       onSelected: (value) {
+                                        debugPrint(
+                                          'Menu option selected: $value for meeting ${meeting['id']}',
+                                        );
                                         if (value == 'edit_date' &&
                                             status != 'Meeting Completed') {
                                           onEditDate(meeting);
@@ -686,7 +710,7 @@ class MeetingCard extends StatelessWidget {
                                             'proceed_with_bid') {
                                           onProceedWithBid();
                                         } else if (value == 'send_location' &&
-                                            status == 'Meeting Request') {
+                                            currentTab == 'Meeting Request') {
                                           onSendLocationRequest(meeting);
                                         } else if (value == 'view_location') {
                                           onViewLocation(meeting);
@@ -722,7 +746,7 @@ class MeetingCard extends StatelessWidget {
                                                 ],
                                               ),
                                             ),
-                                            const PopupMenuItem<String>(
+                                            PopupMenuItem<String>(
                                               value: 'edit_time',
                                               child: Row(
                                                 children: [
@@ -732,7 +756,11 @@ class MeetingCard extends StatelessWidget {
                                                     color: Colors.blue,
                                                   ),
                                                   SizedBox(width: 8),
-                                                  Text('Edit Time'),
+                                                  Text(
+                                                    currentTab == 'Date Fixed'
+                                                        ? 'Fix Date'
+                                                        : 'Edit Time',
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -740,7 +768,8 @@ class MeetingCard extends StatelessWidget {
                                         }
 
                                         if (currentStatus ==
-                                            'Meeting Request') {
+                                                'Meeting Request' &&
+                                            currentTab == 'Meeting Request') {
                                           items.addAll([
                                             const PopupMenuItem<String>(
                                               value: 'proceed_with_bid',
@@ -773,7 +802,7 @@ class MeetingCard extends StatelessWidget {
                                           ]);
                                         } else if (currentStatus ==
                                             'Date Fixed') {
-                                          items.addAll([
+                                          items.add(
                                             const PopupMenuItem<String>(
                                               value: 'proceed_with_bid',
                                               child: Row(
@@ -788,25 +817,7 @@ class MeetingCard extends StatelessWidget {
                                                 ],
                                               ),
                                             ),
-                                          ]);
-                                          if (withBid && isLowBid) {
-                                            items.add(
-                                              const PopupMenuItem<String>(
-                                                value: 'increase_bid',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.arrow_upward,
-                                                      size: 16,
-                                                      color: Colors.blue,
-                                                    ),
-                                                    SizedBox(width: 8),
-                                                    Text('Increase Bid'),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          }
+                                          );
                                         } else if (currentStatus ==
                                             'Awaiting Location') {
                                           items.add(

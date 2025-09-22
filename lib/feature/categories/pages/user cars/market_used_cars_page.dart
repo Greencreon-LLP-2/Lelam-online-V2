@@ -25,11 +25,47 @@ import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_pag
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_ads_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer' as developer;
+
+// Add this to your models section
+class ContainerInfo {
+  final String icon;
+  final String value;
+
+  ContainerInfo({required this.icon, required this.value});
+
+  factory ContainerInfo.fromJson(Map<String, dynamic> json) {
+    return ContainerInfo(icon: json['icon'] ?? '', value: json['value'] ?? '');
+  }
+}
+
+class ContainerInfoResponse {
+  final bool status;
+  final List<ContainerInfo> data;
+  final String code;
+
+  ContainerInfoResponse({
+    required this.status,
+    required this.data,
+    required this.code,
+  });
+
+  factory ContainerInfoResponse.fromJson(Map<String, dynamic> json) {
+    return ContainerInfoResponse(
+      status: json['status'] == 'true',
+      data:
+          (json['data'] as List)
+              .map((item) => ContainerInfo.fromJson(item))
+              .toList(),
+      code: json['code'] ?? '0',
+    );
+  }
+}
 
 class MarketPlaceProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -91,54 +127,207 @@ class _MarketPlaceProductDetailsPageState
   String _moveToAuctionButtonText = 'Move to Auction';
   bool _isWaitingForApproval = false;
 
+  bool _isLoadingContainerInfo = false;
+  List<ContainerInfo> _containerInfo = [];
+  String _containerInfoError = '';
+
   @override
   void initState() {
     super.initState();
 
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
 
-    _fetchLocations();
 
-    _fetchSellerComments();
+ _fetchLocations();
+     _fetchSellerComments();
+     _fetchSellerInfo();
+     _checkShortlistStatus();
+     _fetchGalleryImages();
+     _fetchBannerImage();
 
-    _fetchSellerInfo();
-
-    _checkShortlistStatus();
-
-    _fetchGalleryImages();
-
-    _fetchBannerImage();
-
+     _fetchContainerInfo();
     _isCheckingShortlist = true;
+  }
+
+
+  // Add this method to your MarketplaceService2 class
+  Future<void> _fetchContainerInfo() async {
+    setState(() {
+      _isLoadingContainerInfo = true;
+      _containerInfoError = '';
+    });
+
+    try {
+      final response = await MarketplaceService2.fetchContainerInfo(id);
+      setState(() {
+        _containerInfo = response.data;
+        _isLoadingContainerInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _containerInfoError = 'Failed to load details: $e';
+        _isLoadingContainerInfo = false;
+      });
+    }
+  }
+
+Widget _buildContainerInfo() {
+  if (_isLoadingContainerInfo) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_containerInfoError.isNotEmpty) {
+    return Center(
+      child: Text(
+        _containerInfoError,
+        style: const TextStyle(color: Colors.red),
+      ),
+    );
+  }
+
+  if (_containerInfo.isEmpty) {
+    return const Center(child: Text('Loading.......'));
+  }
+
+return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.30),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(1, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Details',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // First row: 3 items
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 0)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[0].icon),
+                          _containerInfo[0].value,
+                        ),
+                      if (_containerInfo.length > 1)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[1].icon),
+                          _containerInfo[1].value,
+                        ),
+                      if (_containerInfo.length > 2)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[2].icon),
+                          _containerInfo[2].value,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Second row: 2 items
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      if (_containerInfo.length > 3)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[3].icon),
+                          _containerInfo[3].value,
+                        ),
+                      if (_containerInfo.length > 4)
+                        _buildContainerDetailItem(
+                          _getIconFromBootstrap(_containerInfo[4].icon),
+                          _containerInfo[4].value,
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildContainerDetailItem(IconData icon, String text) {
+  return Container(
+    width: 110, // Fixed width for consistent alignment across rows
+    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: Colors.grey[700]),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(fontSize: 14, color: Colors.black),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  IconData _getIconFromBootstrap(String bootstrapIcon) {
+    final iconMap = {
+      'bi-calendar-minus-fill': Icons.calendar_today,
+      'bi-person-fill': Icons.person,
+      'bi-speedometer': Icons.speed,
+      'bi-fuel-pump-fill': Icons.local_gas_station,
+      'bi-gear-fill': Icons.settings,
+      // Add more mappings as needed
+    };
+
+    return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
   Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, cannot check auction terms.');
+      print('User not logged in, cannot check auction terms.');
       return false;
     }
 
     final url =
         '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
     try {
-      developer.log('Checking auction terms status: $url');
+      print('Checking auction terms status: $url');
       final response = await http.get(Uri.parse(url));
-      developer.log(
+      print(
         'Terms check response: status=${response.statusCode}, body=${response.body}',
       );
 
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
         bool termsAccepted = decodedBody['status'] == 'true';
-        developer.log('Terms accepted: $termsAccepted');
+        print('Terms accepted: $termsAccepted');
 
         if (!termsAccepted) {
           // Terms not accepted, call seller-accept-terms.php
           final acceptUrl =
               '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-          developer.log('Accepting terms: $acceptUrl');
+          print('Accepting terms: $acceptUrl');
           final acceptResponse = await http.get(Uri.parse(acceptUrl));
-          developer.log(
+          print(
             'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
           );
 
@@ -147,7 +336,7 @@ class _MarketPlaceProductDetailsPageState
             if (acceptDecodedBody['status'] == 'true' &&
                 acceptDecodedBody['data'] is List &&
                 acceptDecodedBody['data'].isNotEmpty) {
-              developer.log('Terms accepted successfully');
+              print('Terms accepted successfully');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -163,7 +352,7 @@ class _MarketPlaceProductDetailsPageState
               );
               return true;
             } else {
-              developer.log(
+              print(
                 'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
               );
               ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +371,7 @@ class _MarketPlaceProductDetailsPageState
               return false;
             }
           } else {
-            developer.log(
+            print(
               'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
             );
             ScaffoldMessenger.of(context).showSnackBar(
@@ -203,7 +392,7 @@ class _MarketPlaceProductDetailsPageState
         }
         return termsAccepted;
       } else {
-        developer.log(
+        print(
           'Failed to check auction terms: HTTP ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -222,7 +411,7 @@ class _MarketPlaceProductDetailsPageState
         return false;
       }
     } catch (e) {
-      developer.log('Error checking auction terms: $e');
+      print('Error checking auction terms: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error checking auction terms: $e'),
@@ -242,13 +431,13 @@ class _MarketPlaceProductDetailsPageState
     bool isLoadingTerms = true;
     String? termsError;
 
-    developer.log('Attempting to fetch auction terms');
+    print('Attempting to fetch auction terms');
     try {
       termsHtml = await MarketplaceService2().fetchAuctionTerms();
-      developer.log('Terms fetched successfully: $termsHtml');
+      print('Terms fetched successfully: $termsHtml');
       isLoadingTerms = false;
     } catch (e) {
-      developer.log('Error fetching auction terms: $e');
+      print('Error fetching auction terms: $e');
       termsError = e.toString();
       isLoadingTerms = false;
     }
@@ -260,7 +449,7 @@ class _MarketPlaceProductDetailsPageState
         bool dialogIsAccepted = false;
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            developer.log(
+            print(
               'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
             );
             return AlertDialog(
@@ -288,7 +477,7 @@ class _MarketPlaceProductDetailsPageState
                       onChanged: (bool? value) {
                         setDialogState(() {
                           dialogIsAccepted = value ?? false;
-                          developer.log(
+                          print(
                             'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
                           );
                         });
@@ -300,7 +489,7 @@ class _MarketPlaceProductDetailsPageState
               actions: [
                 TextButton(
                   onPressed: () {
-                    developer.log('Terms dialog cancelled');
+                    print('Terms dialog cancelled');
                     Navigator.pop(dialogContext, false);
                   },
                   child: const Text('Cancel'),
@@ -309,13 +498,13 @@ class _MarketPlaceProductDetailsPageState
                   onPressed:
                       dialogIsAccepted && !isLoadingTerms && termsError == null
                           ? () async {
-                            developer.log('Attempting to accept terms');
+                            print('Attempting to accept terms');
                             try {
                               final url =
                                   '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-                              developer.log('Accepting terms: $url');
+                              print('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
-                              developer.log(
+                              print(
                                 'Accept terms response: status=${response.statusCode}, body=${response.body}',
                               );
 
@@ -324,7 +513,7 @@ class _MarketPlaceProductDetailsPageState
                                 if (decodedBody['status'] == 'true' &&
                                     decodedBody['data'] is List &&
                                     decodedBody['data'].isNotEmpty) {
-                                  developer.log('Terms accepted successfully');
+                                  print('Terms accepted successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -344,7 +533,7 @@ class _MarketPlaceProductDetailsPageState
                                   setDialogState(() {
                                     termsError =
                                         'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
-                                    developer.log(
+                                    print(
                                       'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
                                     );
                                   });
@@ -353,7 +542,7 @@ class _MarketPlaceProductDetailsPageState
                                 setDialogState(() {
                                   termsError =
                                       'Failed to accept terms: HTTP ${response.statusCode}';
-                                  developer.log(
+                                  print(
                                     'Failed to accept terms: HTTP ${response.statusCode}',
                                   );
                                 });
@@ -361,7 +550,7 @@ class _MarketPlaceProductDetailsPageState
                             } catch (e) {
                               setDialogState(() {
                                 termsError = 'Error accepting terms: $e';
-                                developer.log('Error accepting terms: $e');
+                                print('Error accepting terms: $e');
                               });
                             }
                           }
@@ -375,7 +564,7 @@ class _MarketPlaceProductDetailsPageState
       },
     ).then((value) {
       isAccepted = value ?? false;
-      developer.log('Terms dialog closed, isAccepted=$isAccepted');
+      print('Terms dialog closed, isAccepted=$isAccepted');
     });
 
     return isAccepted;
@@ -383,7 +572,7 @@ class _MarketPlaceProductDetailsPageState
 
   Future<void> _moveToAuction() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, showing login prompt');
+      print('User not logged in, showing login prompt');
       _showLoginPromptDialog(context, 'move to auction');
       return;
     }
@@ -393,10 +582,10 @@ class _MarketPlaceProductDetailsPageState
     });
 
     try {
-      developer.log('Showing terms dialog before moving to auction');
+      print('Showing terms dialog before moving to auction');
       final accepted = await _showTermsAndConditionsDialog(context);
       if (!accepted) {
-        developer.log('User did not accept terms, aborting move to auction');
+        print('User did not accept terms, aborting move to auction');
         setState(() {
           _isLoadingBid = false;
         });
@@ -414,18 +603,18 @@ class _MarketPlaceProductDetailsPageState
         return;
       }
 
-      developer.log('Terms accepted, proceeding to move to auction');
+      print('Terms accepted, proceeding to move to auction');
       final headers = {'token': MarketplaceService2.token};
       final url =
           '${MarketplaceService2.baseUrl}/sell-move-to-auction.php?token=${MarketplaceService2.token}&post_id=$id';
-      developer.log('Moving to auction: $url');
+      print('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
       );
 
@@ -440,7 +629,7 @@ class _MarketPlaceProductDetailsPageState
             responseData['data']?[0]['message']?.toString() ?? '';
 
         if (isSuccess) {
-          developer.log('Successfully moved to auction');
+          print('Successfully moved to auction');
           setState(() {
             _moveToAuctionButtonText = 'Auction Waiting for Approval';
           });
@@ -467,7 +656,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error moving to auction: $e');
+      print('Error moving to auction: $e');
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(
       //     content: Text('Error: $e'),
@@ -493,14 +682,14 @@ class _MarketPlaceProductDetailsPageState
     try {
       final headers = {'token': token};
       final url = '$baseUrl/post-attribute-values.php?token=$token&post_id=$id';
-      developer.log('Fetching seller comments: $url');
+      print('Fetching seller comments: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Seller comments API response: $responseBody');
+      print('Seller comments API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -522,7 +711,7 @@ class _MarketPlaceProductDetailsPageState
           }
 
           uniqueSellerComments = orderedComments;
-          developer.log(
+          print(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
 
@@ -534,7 +723,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error fetching seller comments: $e');
+      print('Error fetching seller comments: $e');
       setState(() {
         sellerCommentsError = 'Failed to load seller comments: $e';
         isLoadingSellerComments = false;
@@ -551,18 +740,18 @@ class _MarketPlaceProductDetailsPageState
 
       final headers = {'token': token};
       final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
-      developer.log('Fetching gallery: $url');
+      print('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Gallery API response: $responseBody');
+      print('Gallery API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed responseData type: ${responseData.runtimeType}');
+        print('Parsed responseData type: ${responseData.runtimeType}');
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -575,7 +764,7 @@ class _MarketPlaceProductDetailsPageState
                   )
                   .where((img) => img.isNotEmpty && img.contains('uploads/'))
                   .toList();
-          developer.log(
+          print(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
           );
         } else {
@@ -589,7 +778,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error fetching gallery: $e');
+      print('Error fetching gallery: $e');
       setState(() {
         _galleryError = 'Failed to load gallery: $e';
       });
@@ -609,18 +798,18 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-      developer.log('Fetching highest bid: $url');
+      print('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Full API response body: $responseBody');
-      developer.log('Response status code: ${response.statusCode}');
+      print('Full API response body: $responseBody');
+      print('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response data: $responseData');
+        print('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -629,9 +818,9 @@ class _MarketPlaceProductDetailsPageState
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            developer.log('Successfully fetched highest bid: $dataValue');
+            print('Successfully fetched highest bid: $dataValue');
           } else {
-            developer.log(
+            print(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
@@ -639,13 +828,13 @@ class _MarketPlaceProductDetailsPageState
             });
           }
         } else {
-          developer.log('API status false: ${responseData['data']}');
+          print('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        developer.log(
+        print(
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
@@ -653,7 +842,7 @@ class _MarketPlaceProductDetailsPageState
         });
       }
     } catch (e) {
-      developer.log('Exception in fetch highest bid: $e');
+      print('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -683,7 +872,7 @@ class _MarketPlaceProductDetailsPageState
         queryParams: {"user_id": _userProvider.userId},
       );
 
-      developer.log('Shortlist API response: $response');
+      print('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -695,16 +884,16 @@ class _MarketPlaceProductDetailsPageState
           _isFavorited = isShortlisted;
           _isCheckingShortlist = false;
         });
-        developer.log('Product $id isShortlisted: $isShortlisted');
+        print('Product $id isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isCheckingShortlist = false;
         });
-        developer.log('Invalid shortlist data: ${response['data']}');
+        print('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      developer.log('Error checking shortlist status: $e');
+      print('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isCheckingShortlist = false;
@@ -728,13 +917,13 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
-      developer.log('Toggling shortlist: $url');
+      print('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('add-to-shortlist.php response: $responseBody');
+      print('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -789,7 +978,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e) {
-      developer.log('Error toggling shortlist: $e');
+      print('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -815,16 +1004,17 @@ class _MarketPlaceProductDetailsPageState
       final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
+      print('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('place-bid.php response: $responseBody');
+      print('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed place-bid response: $responseData');
+        print('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -842,7 +1032,7 @@ class _MarketPlaceProductDetailsPageState
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      developer.log('Error placing bid: $e');
+      print('Error placing bid: $e');
       throw e;
     } finally {
       setState(() {
@@ -852,7 +1042,7 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Future<void> _fetchBannerImage() async {
-    developer.log(
+    print(
       'MarketPlaceProductDetailsPage - _fetchBannerImage: Starting',
     );
     try {
@@ -860,13 +1050,13 @@ class _MarketPlaceProductDetailsPageState
         _isLoadingBanner = true;
         _bannerError = '';
       });
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl',
       );
 
       final headers = {'token': token};
       final url = '$baseUrl/post-ads-image.php?token=$token';
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url',
       );
 
@@ -875,19 +1065,19 @@ class _MarketPlaceProductDetailsPageState
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody',
       );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log(
+        print(
           'MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData',
         );
 
         if (responseData['status'] == 'true' && responseData['data'] != null) {
           final bannerImage = responseData['data']['inner_post_image'] ?? '';
-          developer.log(
+          print(
             'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage',
           );
           setState(() {
@@ -895,7 +1085,7 @@ class _MarketPlaceProductDetailsPageState
                 bannerImage.isNotEmpty
                     ? 'https://lelamonline.com/admin/$bannerImage'
                     : null;
-            developer.log(
+            print(
               'MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl',
             );
           });
@@ -908,7 +1098,7 @@ class _MarketPlaceProductDetailsPageState
         );
       }
     } catch (e, stackTrace) {
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace',
       );
       setState(() {
@@ -918,7 +1108,7 @@ class _MarketPlaceProductDetailsPageState
       setState(() {
         _isLoadingBanner = false;
       });
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Completed',
       );
     }
@@ -942,7 +1132,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
-      developer.log('No banner image available');
+      print('No banner image available');
       return const SizedBox.shrink();
     }
 
@@ -963,63 +1153,27 @@ class _MarketPlaceProductDetailsPageState
     );
   }
 
-  void _showLoginPromptDialog(BuildContext context, String action) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: const Text(
-            'Login Required',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Please log in to $action.',
-            style: const TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.pushNamed(RouteNames.loginPage);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Log In',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        );
-      },
-    );
-  }
+void _showLoginPromptDialog(BuildContext context, String action) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) {
+      return LoginDialog(
+        onSuccess: () {
+         _fetchLocations();
+     _fetchSellerComments();
+     _fetchSellerInfo();
+     _checkShortlistStatus();
+     _fetchGalleryImages();
+     _fetchBannerImage();
+
+     _fetchContainerInfo();
+       
+        },
+      );
+    },
+  );
+}
 
   void showProductBidDialog(BuildContext context) async {
     if (!_userProvider.isLoggedIn) {
@@ -1043,7 +1197,7 @@ class _MarketPlaceProductDetailsPageState
               : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
       // Support phone number (replace with your actual support number)
-      const String supportPhoneNumber = '+919876543210';
+      const String supportPhoneNumber = '+918089308048';
 
       return showDialog<void>(
         context: context,
@@ -1093,7 +1247,7 @@ class _MarketPlaceProductDetailsPageState
                     children: [
                       if (isSuccess && isHighestBid)
                         Text(
-                          'Congratulations, your bid is the highest bid! 🎉',
+                          'Congratulations, your bid is the highest bid! 🎉 \ncheck statue in Hight Bids',
                           style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -1182,7 +1336,7 @@ class _MarketPlaceProductDetailsPageState
                         elevation: 0,
                       ),
                       child: const Text(
-                        'OK',
+                        'Check Status',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -1598,7 +1752,7 @@ class _MarketPlaceProductDetailsPageState
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          developer.log(
+          print(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -1895,8 +2049,8 @@ class _MarketPlaceProductDetailsPageState
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-      developer.log('Scheduling meeting: $url');
-      developer.log(
+      print('Scheduling meeting: $url');
+      print(
         'User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
 
@@ -1905,11 +2059,11 @@ class _MarketPlaceProductDetailsPageState
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('post-fix-meeting.php response: $responseBody');
+      print('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response: $responseData');
+        print('Parsed response: $responseData');
         if (responseData['status'] == true) {
           // Show success snackbar
           if (mounted) {
@@ -1950,7 +2104,7 @@ class _MarketPlaceProductDetailsPageState
         }
       }
     } catch (e) {
-      developer.log('Error scheduling meeting: $e');
+      print('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -1962,7 +2116,7 @@ class _MarketPlaceProductDetailsPageState
           _isSchedulingMeeting = false;
         });
       }
-      developer.log(
+      print(
         'User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
     }
@@ -2019,7 +2173,7 @@ class _MarketPlaceProductDetailsPageState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => BuyingStatusPage(),
+                            builder: (context) => MyMeetingsWidget(showAppBar: true,),
                           ),
                         );
                       }
@@ -2089,7 +2243,7 @@ class _MarketPlaceProductDetailsPageState
     }
 
     if (_isMeetingDialogOpen) {
-      developer.log('Meeting dialog already open');
+      print('Meeting dialog already open');
       return;
     }
 
@@ -2230,26 +2384,36 @@ class _MarketPlaceProductDetailsPageState
     return formatter.format(price.round());
   }
 
-  Widget _buildDetailItem(IconData icon, String text, String key) {
-    return Expanded(
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Flexible(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ), // Compact padding
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(icon, size: 14, color: Colors.grey[700]),
-            const SizedBox(width: 6),
+            Icon(
+              icon,
+              size: 14,
+              color: Colors.grey[700],
+            ), // Slightly smaller icon
+            const SizedBox(width: 6), // Tighter spacing
             Expanded(
               child: Text(
                 text,
                 overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                style: const TextStyle(fontSize: 14, color: Colors.black),
+                maxLines: 2, // Prevent wrapping
+                style: const TextStyle(
+                  fontSize: 14, // Slightly smaller font for compactness
+                  color: Colors.black,
+                ),
               ),
             ),
           ],
         ),
       ),
-      key: ValueKey(key), // Ensure unique key for each item
     );
   }
 
@@ -2341,97 +2505,71 @@ class _MarketPlaceProductDetailsPageState
         );
   }
 
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'You are the first one to ask question',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: true,
+                  builder: (dialogContext) {
+                    return LoginDialog(
+                      onSuccess: () {
+                        if (mounted) {
+                          Navigator.of(dialogContext).pop();
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => ReviewDialog(postId: id),
+                          );
+                        }
+                      },
+                    );
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => ReviewDialog(postId: id),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
               ],
             ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
-                } else {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
+          ),
+        ],
+      ),
+    ],
+  );
+}
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
@@ -2777,102 +2915,7 @@ class _MarketPlaceProductDetailsPageState
                     ),
                   ),
                   const Divider(),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.30),
-                          blurRadius: 10,
-                          spreadRadius: 1,
-                          offset: const Offset(1, 1),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(
-                        12.0,
-                      ), // Reduced padding for compactness
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Details',
-                            style: TextStyle(
-                              fontSize: 18, // Slightly smaller for consistency
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8), // Tighter spacing
-                          if (isLoadingSellerComments)
-                            const Center(child: CircularProgressIndicator())
-                          else if (uniqueSellerComments.isEmpty)
-                            const Center(child: Text('No details available'))
-                          else
-                          LayoutBuilder(
-  builder: (context, constraints) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _buildDetailItem(
-              Icons.calendar_today,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'year',
-                orElse: () => SellerComment(attributeName: 'Year', attributeValue: 'N/A'),
-              ).attributeValue,
-              'year',
-            ),
-            _buildDetailItem(
-              Icons.person,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'no of owners',
-                orElse: () => SellerComment(attributeName: 'No of owners', attributeValue: 'N/A'),
-              ).attributeValue,
-              'no_of_owners',
-            ),
-            _buildDetailItem(
-              Icons.settings,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'transmission',
-                orElse: () => SellerComment(attributeName: 'Transmission', attributeValue: 'N/A'),
-              ).attributeValue,
-              'transmission',
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Row(
-          children: [
-            _buildDetailItem(
-              Icons.local_gas_station,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'fuel type',
-                orElse: () => SellerComment(attributeName: 'Fuel Type', attributeValue: 'N/A'),
-              ).attributeValue,
-              'fuel_type',
-            ),
-            _buildDetailItem(
-              Icons.speed,
-              uniqueSellerComments.firstWhere(
-                (comment) => comment.attributeName.toLowerCase().trim() == 'km range',
-                orElse: () => SellerComment(attributeName: 'KM Range', attributeValue: 'N/A'),
-              ).attributeValue,
-              'km_range',
-            ),
-            const Expanded(child: SizedBox.shrink()), // Placeholder for third column
-          ],
-        ),
-      ],
-    );
-  },
-)
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildContainerInfo(),
                   const Divider(),
                   // Seller Comments Section
                   Padding(
@@ -2927,17 +2970,7 @@ class _MarketPlaceProductDetailsPageState
               bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: Offset(1, 3),
-                    ),
-                  ],
-                ),
+                
                 child: Row(
                   children: [
                     if (_userProvider.userId == widget.product.createdBy) ...[

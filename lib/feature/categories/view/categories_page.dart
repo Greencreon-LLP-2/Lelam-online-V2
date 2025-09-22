@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart'
+    show CachedNetworkImage;
 import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_categories.dart';
@@ -120,8 +122,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) =>
-                                            const UsedCarsPage(),
+                                        builder:
+                                            (context) => const UsedCarsPage(),
                                       ),
                                     );
                                     break;
@@ -129,8 +131,8 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) =>
-                                            const RealEstatePage(),
+                                        builder:
+                                            (context) => const RealEstatePage(),
                                       ),
                                     );
                                     break;
@@ -138,8 +140,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) =>
-                                            const CommercialVehiclesPage(),
+                                        builder:
+                                            (context) =>
+                                                const CommercialVehiclesPage(),
                                       ),
                                     );
                                     break;
@@ -225,19 +228,27 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                               child: ClipRRect(
                                                 borderRadius:
                                                     BorderRadius.circular(12),
-                                                child: Image.network(
-                                                  'https://lelamonline.com/admin/${category.image}',
+                                                child: CachedNetworkImage(
+                                                  imageUrl:
+                                                      'https://lelamonline.com/admin/${category.image}',
                                                   fit: BoxFit.cover,
-                                                  errorBuilder:
+                                                  placeholder:
                                                       (
                                                         context,
-                                                        error,
-                                                        stackTrace,
-                                                      ) => Icon(
-                                                        Icons.broken_image,
-                                                        color: Colors.white
-                                                            .withOpacity(0.8),
+                                                        url,
+                                                      ) => const Center(
+                                                        child:
+                                                            CircularProgressIndicator(),
                                                       ),
+                                                  errorWidget:
+                                                      (context, url, error) =>
+                                                          Icon(
+                                                            Icons.broken_image,
+                                                            color: Colors.white
+                                                                .withOpacity(
+                                                                  0.8,
+                                                                ),
+                                                          ),
                                                 ),
                                               ),
                                             ),

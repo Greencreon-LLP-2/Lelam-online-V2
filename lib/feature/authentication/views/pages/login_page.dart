@@ -557,19 +557,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         if (!_isOtpMode) ...[
                           const SizedBox(height: 8),
-                          TextButton(
-                            onPressed: () {
-                              context.pushNamed(RouteNames.signupPage);
-                            },
-                            child: Text(
-                              "Don't have an account? Sign Up",
-                              style: TextStyle(
-                                color: AppTheme.primaryColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                         
                         ],
                       ],
                     ),
