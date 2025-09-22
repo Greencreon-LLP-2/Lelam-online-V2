@@ -111,7 +111,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
         _userId = userData?.userId ?? 'Unknown';
         debugPrint('Loaded userId: "$_userId"');
         if (_userId == 'Unknown') {
-          errorMessage = 'User ID not found. Please log in again.';
+          errorMessage = ' Please log in .';
           isLoading = false;
         }
       });

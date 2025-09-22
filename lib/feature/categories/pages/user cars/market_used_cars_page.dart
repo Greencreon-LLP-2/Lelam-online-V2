@@ -303,31 +303,31 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
 
   Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, cannot check auction terms.');
+      print('User not logged in, cannot check auction terms.');
       return false;
     }
 
     final url =
         '${MarketplaceService2.baseUrl}/sell-check-auction-terms-accept.php?token=${MarketplaceService2.token}&post_id=$id';
     try {
-      developer.log('Checking auction terms status: $url');
+      print('Checking auction terms status: $url');
       final response = await http.get(Uri.parse(url));
-      developer.log(
+      print(
         'Terms check response: status=${response.statusCode}, body=${response.body}',
       );
 
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
         bool termsAccepted = decodedBody['status'] == 'true';
-        developer.log('Terms accepted: $termsAccepted');
+        print('Terms accepted: $termsAccepted');
 
         if (!termsAccepted) {
           // Terms not accepted, call seller-accept-terms.php
           final acceptUrl =
               '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-          developer.log('Accepting terms: $acceptUrl');
+          print('Accepting terms: $acceptUrl');
           final acceptResponse = await http.get(Uri.parse(acceptUrl));
-          developer.log(
+          print(
             'Accept terms response: status=${acceptResponse.statusCode}, body=${acceptResponse.body}',
           );
 
@@ -336,7 +336,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             if (acceptDecodedBody['status'] == 'true' &&
                 acceptDecodedBody['data'] is List &&
                 acceptDecodedBody['data'].isNotEmpty) {
-              developer.log('Terms accepted successfully');
+              print('Terms accepted successfully');
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -352,7 +352,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
               );
               return true;
             } else {
-              developer.log(
+              print(
                 'Failed to accept terms: ${acceptDecodedBody['data']?[0]['message'] ?? 'Unknown error'}',
               );
               ScaffoldMessenger.of(context).showSnackBar(
@@ -371,7 +371,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
               return false;
             }
           } else {
-            developer.log(
+            print(
               'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
             );
             ScaffoldMessenger.of(context).showSnackBar(
@@ -392,7 +392,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         }
         return termsAccepted;
       } else {
-        developer.log(
+        print(
           'Failed to check auction terms: HTTP ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -411,7 +411,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         return false;
       }
     } catch (e) {
-      developer.log('Error checking auction terms: $e');
+      print('Error checking auction terms: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error checking auction terms: $e'),
@@ -431,13 +431,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     bool isLoadingTerms = true;
     String? termsError;
 
-    developer.log('Attempting to fetch auction terms');
+    print('Attempting to fetch auction terms');
     try {
       termsHtml = await MarketplaceService2().fetchAuctionTerms();
-      developer.log('Terms fetched successfully: $termsHtml');
+      print('Terms fetched successfully: $termsHtml');
       isLoadingTerms = false;
     } catch (e) {
-      developer.log('Error fetching auction terms: $e');
+      print('Error fetching auction terms: $e');
       termsError = e.toString();
       isLoadingTerms = false;
     }
@@ -449,7 +449,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         bool dialogIsAccepted = false;
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialogState) {
-            developer.log(
+            print(
               'Showing terms dialog, isLoadingTerms=$isLoadingTerms, termsError=$termsError',
             );
             return AlertDialog(
@@ -477,7 +477,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                       onChanged: (bool? value) {
                         setDialogState(() {
                           dialogIsAccepted = value ?? false;
-                          developer.log(
+                          print(
                             'Checkbox changed: dialogIsAccepted=$dialogIsAccepted',
                           );
                         });
@@ -489,7 +489,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
               actions: [
                 TextButton(
                   onPressed: () {
-                    developer.log('Terms dialog cancelled');
+                    print('Terms dialog cancelled');
                     Navigator.pop(dialogContext, false);
                   },
                   child: const Text('Cancel'),
@@ -498,13 +498,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                   onPressed:
                       dialogIsAccepted && !isLoadingTerms && termsError == null
                           ? () async {
-                            developer.log('Attempting to accept terms');
+                            print('Attempting to accept terms');
                             try {
                               final url =
                                   '${MarketplaceService2.baseUrl}/seller-accept-terms.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
-                              developer.log('Accepting terms: $url');
+                              print('Accepting terms: $url');
                               final response = await http.get(Uri.parse(url));
-                              developer.log(
+                              print(
                                 'Accept terms response: status=${response.statusCode}, body=${response.body}',
                               );
 
@@ -513,7 +513,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                                 if (decodedBody['status'] == 'true' &&
                                     decodedBody['data'] is List &&
                                     decodedBody['data'].isNotEmpty) {
-                                  developer.log('Terms accepted successfully');
+                                  print('Terms accepted successfully');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -533,7 +533,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                                   setDialogState(() {
                                     termsError =
                                         'Failed to accept terms: ${decodedBody['data']?[0]['message'] ?? 'Unknown error'}';
-                                    developer.log(
+                                    print(
                                       'Failed to accept terms: ${decodedBody['data']?[0]['message']}',
                                     );
                                   });
@@ -542,7 +542,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                                 setDialogState(() {
                                   termsError =
                                       'Failed to accept terms: HTTP ${response.statusCode}';
-                                  developer.log(
+                                  print(
                                     'Failed to accept terms: HTTP ${response.statusCode}',
                                   );
                                 });
@@ -550,7 +550,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                             } catch (e) {
                               setDialogState(() {
                                 termsError = 'Error accepting terms: $e';
-                                developer.log('Error accepting terms: $e');
+                                print('Error accepting terms: $e');
                               });
                             }
                           }
@@ -564,7 +564,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       },
     ).then((value) {
       isAccepted = value ?? false;
-      developer.log('Terms dialog closed, isAccepted=$isAccepted');
+      print('Terms dialog closed, isAccepted=$isAccepted');
     });
 
     return isAccepted;
@@ -572,7 +572,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
 
   Future<void> _moveToAuction() async {
     if (_userProvider.userId == null) {
-      developer.log('User not logged in, showing login prompt');
+      print('User not logged in, showing login prompt');
       _showLoginPromptDialog(context, 'move to auction');
       return;
     }
@@ -582,10 +582,10 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     });
 
     try {
-      developer.log('Showing terms dialog before moving to auction');
+      print('Showing terms dialog before moving to auction');
       final accepted = await _showTermsAndConditionsDialog(context);
       if (!accepted) {
-        developer.log('User did not accept terms, aborting move to auction');
+        print('User did not accept terms, aborting move to auction');
         setState(() {
           _isLoadingBid = false;
         });
@@ -603,18 +603,18 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         return;
       }
 
-      developer.log('Terms accepted, proceeding to move to auction');
+      print('Terms accepted, proceeding to move to auction');
       final headers = {'token': MarketplaceService2.token};
       final url =
           '${MarketplaceService2.baseUrl}/sell-move-to-auction.php?token=${MarketplaceService2.token}&post_id=$id';
-      developer.log('Moving to auction: $url');
+      print('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'sell-move-to-auction.php response: status=${response.statusCode}, body=$responseBody',
       );
 
@@ -629,7 +629,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             responseData['data']?[0]['message']?.toString() ?? '';
 
         if (isSuccess) {
-          developer.log('Successfully moved to auction');
+          print('Successfully moved to auction');
           setState(() {
             _moveToAuctionButtonText = 'Auction Waiting for Approval';
           });
@@ -656,7 +656,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
       }
     } catch (e) {
-      developer.log('Error moving to auction: $e');
+      print('Error moving to auction: $e');
       // ScaffoldMessenger.of(context).showSnackBar(
       //   SnackBar(
       //     content: Text('Error: $e'),
@@ -682,14 +682,14 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     try {
       final headers = {'token': token};
       final url = '$baseUrl/post-attribute-values.php?token=$token&post_id=$id';
-      developer.log('Fetching seller comments: $url');
+      print('Fetching seller comments: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Seller comments API response: $responseBody');
+      print('Seller comments API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -711,7 +711,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
           }
 
           uniqueSellerComments = orderedComments;
-          developer.log(
+          print(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
 
@@ -723,7 +723,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
       }
     } catch (e) {
-      developer.log('Error fetching seller comments: $e');
+      print('Error fetching seller comments: $e');
       setState(() {
         sellerCommentsError = 'Failed to load seller comments: $e';
         isLoadingSellerComments = false;
@@ -740,18 +740,18 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
 
       final headers = {'token': token};
       final url = '$baseUrl/post-gallery.php?token=$token&post_id=$id';
-      developer.log('Fetching gallery: $url');
+      print('Fetching gallery: $url');
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Gallery API response: $responseBody');
+      print('Gallery API response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed responseData type: ${responseData.runtimeType}');
+        print('Parsed responseData type: ${responseData.runtimeType}');
 
         if (responseData['status'] == 'true' &&
             responseData['data'] is List &&
@@ -764,7 +764,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                   )
                   .where((img) => img.isNotEmpty && img.contains('uploads/'))
                   .toList();
-          developer.log(
+          print(
             'Fetched ${_galleryImages.length} gallery images: $_galleryImages',
           );
         } else {
@@ -778,7 +778,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
       }
     } catch (e) {
-      developer.log('Error fetching gallery: $e');
+      print('Error fetching gallery: $e');
       setState(() {
         _galleryError = 'Failed to load gallery: $e';
       });
@@ -798,18 +798,18 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       final headers = {'token': token};
       final url =
           '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-      developer.log('Fetching highest bid: $url');
+      print('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('Full API response body: $responseBody');
-      developer.log('Response status code: ${response.statusCode}');
+      print('Full API response body: $responseBody');
+      print('Response status code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response data: $responseData');
+        print('Parsed response data: $responseData');
 
         if (responseData['status'] == true) {
           final dataValue = (responseData['data']?.toString() ?? '0').trim();
@@ -818,9 +818,9 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             setState(() {
               _currentHighestBid = parsed.toString();
             });
-            developer.log('Successfully fetched highest bid: $dataValue');
+            print('Successfully fetched highest bid: $dataValue');
           } else {
-            developer.log(
+            print(
               'API returned non-numeric data (possible error): $dataValue',
             );
             setState(() {
@@ -828,13 +828,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             });
           }
         } else {
-          developer.log('API status false: ${responseData['data']}');
+          print('API status false: ${responseData['data']}');
           setState(() {
             _currentHighestBid = '0';
           });
         }
       } else {
-        developer.log(
+        print(
           'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
         );
         setState(() {
@@ -842,7 +842,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         });
       }
     } catch (e) {
-      developer.log('Exception in fetch highest bid: $e');
+      print('Exception in fetch highest bid: $e');
       setState(() {
         _currentHighestBid = 'Error: $e';
       });
@@ -872,7 +872,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         queryParams: {"user_id": _userProvider.userId},
       );
 
-      developer.log('Shortlist API response: $response');
+      print('Shortlist API response: $response');
 
       if (response['status'] == 'true' && response['data'] is List) {
         final List<dynamic> shortlistData = response['data'];
@@ -884,16 +884,16 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
           _isFavorited = isShortlisted;
           _isCheckingShortlist = false;
         });
-        developer.log('Product $id isShortlisted: $isShortlisted');
+        print('Product $id isShortlisted: $isShortlisted');
       } else {
         setState(() {
           _isFavorited = false;
           _isCheckingShortlist = false;
         });
-        developer.log('Invalid shortlist data: ${response['data']}');
+        print('Invalid shortlist data: ${response['data']}');
       }
     } catch (e) {
-      developer.log('Error checking shortlist status: $e');
+      print('Error checking shortlist status: $e');
       setState(() {
         _isFavorited = false;
         _isCheckingShortlist = false;
@@ -917,13 +917,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       final headers = {'token': token};
       final url =
           '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$id';
-      developer.log('Toggling shortlist: $url');
+      print('Toggling shortlist: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('add-to-shortlist.php response: $responseBody');
+      print('add-to-shortlist.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
@@ -978,7 +978,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
       }
     } catch (e) {
-      developer.log('Error toggling shortlist: $e');
+      print('Error toggling shortlist: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -1004,17 +1004,17 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       final headers = {'token': token};
       final url =
           '$baseUrl/place-bid.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&bidamt=$bidAmount';
-      developer.log('Placing bid: $url');
+      print('Placing bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('place-bid.php response: $responseBody');
+      print('place-bid.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed place-bid response: $responseData');
+        print('Parsed place-bid response: $responseData');
         final statusRaw = responseData['status'];
         final bool statusIsTrue =
             statusRaw == true || statusRaw == 'true' || statusRaw == '1';
@@ -1032,7 +1032,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         throw Exception('Failed to place bid: ${response.reasonPhrase}');
       }
     } catch (e) {
-      developer.log('Error placing bid: $e');
+      print('Error placing bid: $e');
       throw e;
     } finally {
       setState(() {
@@ -1042,7 +1042,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
   }
 
   Future<void> _fetchBannerImage() async {
-    developer.log(
+    print(
       'MarketPlaceProductDetailsPage - _fetchBannerImage: Starting',
     );
     try {
@@ -1050,13 +1050,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         _isLoadingBanner = true;
         _bannerError = '';
       });
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Token=$token, BaseUrl=$baseUrl',
       );
 
       final headers = {'token': token};
       final url = '$baseUrl/post-ads-image.php?token=$token';
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Fetching banner image: $url',
       );
 
@@ -1065,19 +1065,19 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner API response (status: ${response.statusCode}): $responseBody',
       );
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log(
+        print(
           'MarketPlaceProductDetailsPage - _fetchBannerImage: Parsed banner response: $responseData',
         );
 
         if (responseData['status'] == 'true' && responseData['data'] != null) {
           final bannerImage = responseData['data']['inner_post_image'] ?? '';
-          developer.log(
+          print(
             'MarketPlaceProductDetailsPage - _fetchBannerImage: Banner image path: $bannerImage',
           );
           setState(() {
@@ -1085,7 +1085,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                 bannerImage.isNotEmpty
                     ? 'https://lelamonline.com/admin/$bannerImage'
                     : null;
-            developer.log(
+            print(
               'MarketPlaceProductDetailsPage - _fetchBannerImage: Set _bannerImageUrl=$_bannerImageUrl',
             );
           });
@@ -1098,7 +1098,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         );
       }
     } catch (e, stackTrace) {
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Error fetching banner image: $e\n$stackTrace',
       );
       setState(() {
@@ -1108,7 +1108,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       setState(() {
         _isLoadingBanner = false;
       });
-      developer.log(
+      print(
         'MarketPlaceProductDetailsPage - _fetchBannerImage: Completed',
       );
     }
@@ -1132,7 +1132,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     }
 
     if (_bannerImageUrl == null || _bannerImageUrl!.isEmpty) {
-      developer.log('No banner image available');
+      print('No banner image available');
       return const SizedBox.shrink();
     }
 
@@ -1197,7 +1197,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
               : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
       // Support phone number (replace with your actual support number)
-      const String supportPhoneNumber = '+919876543210';
+      const String supportPhoneNumber = '+918089308048';
 
       return showDialog<void>(
         context: context,
@@ -1752,7 +1752,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          developer.log(
+          print(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -2049,8 +2049,8 @@ void _showLoginPromptDialog(BuildContext context, String action) {
       final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
       final url =
           '$baseUrl/post-fix-meeting.php?token=$token&post_id=$id&user_id=${_userProvider.userId}&meeting_date=$formattedDate';
-      developer.log('Scheduling meeting: $url');
-      developer.log(
+      print('Scheduling meeting: $url');
+      print(
         'User state before API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
 
@@ -2059,11 +2059,11 @@ void _showLoginPromptDialog(BuildContext context, String action) {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      developer.log('post-fix-meeting.php response: $responseBody');
+      print('post-fix-meeting.php response: $responseBody');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        developer.log('Parsed response: $responseData');
+        print('Parsed response: $responseData');
         if (responseData['status'] == true) {
           // Show success snackbar
           if (mounted) {
@@ -2104,7 +2104,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
         }
       }
     } catch (e) {
-      developer.log('Error scheduling meeting: $e');
+      print('Error scheduling meeting: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -2116,7 +2116,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
           _isSchedulingMeeting = false;
         });
       }
-      developer.log(
+      print(
         'User state after API call: isLoggedIn=${_userProvider.isLoggedIn}, userId=${_userProvider.userId}',
       );
     }
@@ -2243,7 +2243,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
     }
 
     if (_isMeetingDialogOpen) {
-      developer.log('Meeting dialog already open');
+      print('Meeting dialog already open');
       return;
     }
 

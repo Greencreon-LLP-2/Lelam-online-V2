@@ -17,7 +17,7 @@ class AppDrawerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<LoggedUserProvider>();
     final userData = userProvider.userData;
-    const supportPhone = '+9198765432102';
+    const supportPhone = '+918089308048';
     return Drawer(
       child: Column(
         children: [

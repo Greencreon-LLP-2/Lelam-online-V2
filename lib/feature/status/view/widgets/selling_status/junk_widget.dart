@@ -65,7 +65,7 @@ class _JunkWidgetState extends State<JunkWidget> {
         _userId = widget.userId ?? userData?.userId ?? 'Unknown';
         debugPrint('Loaded userId: "$_userId"');
         if (_userId == 'Unknown') {
-          errorMessage = 'User ID not found. Please log in again.';
+          errorMessage = ' Please log in again';
           isLoading = false;
         }
       });

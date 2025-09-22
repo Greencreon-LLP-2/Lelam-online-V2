@@ -25,4 +25,7 @@ class RouteNames {
   static const String commercialPage = '/commercialPage';
   static const String othersPage = '/othersPage';
   static const String splashPage = '/';
+   static const String searchResults = 'searchResults';
+    static const String productDetails = 'productDetails';
+   
 }

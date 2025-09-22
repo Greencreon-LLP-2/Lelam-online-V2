@@ -193,8 +193,8 @@ class MarketplaceService {
             try {
               return MarketplacePost.fromJson(json);
             } catch (e) {
-              developer.log('Error parsing post: $e');
-              developer.log('Problematic JSON: $json');
+              print('Error parsing post: $e');
+              print('Problematic JSON: $json');
               throw Exception('Failed to parse post: $e');
             }
           }).toList();
@@ -208,7 +208,7 @@ class MarketplaceService {
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      developer.log('Error in fetchPosts: $e');
+      print('Error in fetchPosts: $e');
       throw Exception('Error fetching posts: $e');
     }
   }
@@ -284,7 +284,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
-          developer.log(
+          print(
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
@@ -609,10 +609,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                                 _isLoading = false;
                               });
 
-                              developer.log('Filter applied successfully');
-                              developer.log(response as String);
+                              print('Filter applied successfully');
+                              print(response as String);
                             } catch (e) {
-                              developer.log("Error while applying filters: $e");
+                              print("Error while applying filters: $e");
                               setState(() => _isLoading = false);
                             }
 
@@ -1083,7 +1083,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             _buildSearchField(),
                             if (_searchQuery
                                 .isNotEmpty) // Show SearchResultsWidget when typing
-                              SearchResultsWidget(searchQuery: _searchQuery),
+                              SearchResultsPage(searchQuery: _searchQuery),
                           ],
                         ),
                       ),
@@ -1224,10 +1224,10 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                             image: NetworkImage(getImageUrl(post.image)),
                             fit: BoxFit.cover,
                             onError: (exception, stackTrace) {
-                              developer.log(
+                              print(
                                 'Failed to load image: ${getImageUrl(post.image)}',
                               );
-                              developer.log('Error: $exception');
+                              print('Error: $exception');
                             },
                           ),
                         ),

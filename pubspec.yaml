@@ -37,6 +37,7 @@ dependencies:
   flutter_svg: ^2.2.1
   logger: ^2.6.1
   rate_limiter: ^1.0.0
+  talker_dio_logger: ^5.0.1
   
   
 

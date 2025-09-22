@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -8,9 +9,13 @@ import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:developer' as developer;
+
+import 'package:talker_dio_logger/talker_dio_logger_interceptor.dart';
+import 'package:talker_dio_logger/talker_dio_logger_settings.dart';
 
 class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
@@ -29,21 +34,45 @@ class MyBidsWidget extends StatefulWidget {
 }
 
 class _MyBidsWidgetState extends State<MyBidsWidget> {
-  late final userProvider;
+ late final LoggedUserProvider userProvider;
   String? selectedBidType = 'Low Bids';
   List<Map<String, dynamic>> bids = [];
   List<Map<String, dynamic>> districts = [];
   bool isLoading = true;
   String? error;
   String? _userId;
-  final Map<String, dynamic> _bidCache = {};
-final Map<String, dynamic> _postCache = {};
-
-  @override
+  final Map<String, List<Map<String, dynamic>>> _bidCache = {
+    'Low Bids': [],
+    'High Bids': [],
+  }; // Cache for low and high bids
+  final Map<String, dynamic> _postCache = {};
+  late final Logger logger;
+  late final Dio dio;
+ @override
   void initState() {
     userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     super.initState();
     _loadUserIdAndBids();
+    logger = Logger(
+      printer: PrettyPrinter(
+        methodCount: 0,
+        errorMethodCount: 8,
+        lineLength: 120,
+        colors: true,
+        printEmojis: true,
+        printTime: false,
+      ),
+    );
+    dio = Dio(BaseOptions(
+      headers: {'token': widget.token},
+    ));
+    dio.interceptors.add(TalkerDioLogger(
+      settings: const TalkerDioLoggerSettings(
+        printRequestHeaders: true,
+        printResponseHeaders: true,
+        printResponseMessage: true,
+      ),
+    ));
   }
 
   Future<void> _loadUserIdAndBids() async {
@@ -78,9 +107,7 @@ final Map<String, dynamic> _postCache = {};
         },
       );
 
-      print(
-        'post-details.php response for post_id $postId: ${response.body}',
-      );
+      print('post-details.php response for post_id $postId: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -108,7 +135,7 @@ final Map<String, dynamic> _postCache = {};
             if (parentZoneId != null) {
               final district = districts.firstWhere(
                 (d) => d['id'] == parentZoneId,
-                orElse: () => {'name': 'Unknown District'},
+                orElse: () => {'name': ''},
               );
               location = district['name'] as String;
               if (postData['land_mark']?.isNotEmpty ?? false) {
@@ -206,9 +233,7 @@ final Map<String, dynamic> _postCache = {};
         }
         print('Invalid meeting times data: ${data.toString()}');
       } else {
-        print(
-          'meeting-times.php failed with status ${response.statusCode}',
-        );
+        print('meeting-times.php failed with status ${response.statusCode}');
       }
       return [];
     } catch (e) {
@@ -322,51 +347,84 @@ final Map<String, dynamic> _postCache = {};
                                   print(
                                     'procced-meeting-with-bid.php response: ${response.body}',
                                   );
-                             if (response.statusCode == 200) {
-  final data = jsonDecode(response.body);
-  if (data['status'] == true || data['status'] == 'true') {
-    if (data['code'] == 2) {
-      print('Bid not found for bid_id: $bidId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Bid not found on server')),
-      );
-    } else if (data['code'] == 1) {
-      print('Post not found for post_id: $postId');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Post not found')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Meeting scheduled for $selectedTimeName'),
-        ),
-      );
-      await _loadBids();
-      print('Meeting scheduled, navigating to My Meetings tab');
-      // Navigate to BuyingStatusPage with My Meetings tab and Meeting Request status
-      context.pushNamed(
-        RouteNames.buyingStatusPage,
-        queryParameters: {
-          'initialTab': '1', 
-          'initialStatus': 'Meeting Request',
-          'postId': postId,
-          'bidId': bidId,
-        },
-      );
-    }
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}'),
-      ),
-    );
-  }
-} else {
-  print('procced-meeting-with-bid.php failed with status ${response.statusCode}');
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Failed to schedule meeting')),
-  );
-}
+                                  if (response.statusCode == 200) {
+                                    final data = jsonDecode(response.body);
+                                    if (data['status'] == true ||
+                                        data['status'] == 'true') {
+                                      if (data['code'] == 2) {
+                                        print(
+                                          'Bid not found for bid_id: $bidId',
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Error: Bid not found on server',
+                                            ),
+                                          ),
+                                        );
+                                      } else if (data['code'] == 1) {
+                                        print(
+                                          'Post not found for post_id: $postId',
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Error: Post not found',
+                                            ),
+                                          ),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Meeting scheduled for $selectedTimeName',
+                                            ),
+                                          ),
+                                        );
+                                        await _loadBids();
+                                        print(
+                                          'Meeting scheduled, navigating to My Meetings tab',
+                                        );
+                                        // Navigate to BuyingStatusPage with My Meetings tab and Meeting Request status
+                                        context.pushNamed(
+                                          RouteNames.buyingStatusPage,
+                                          queryParameters: {
+                                            'initialTab': '1',
+                                            'initialStatus': 'Meeting Request',
+                                            'postId': postId,
+                                            'bidId': bidId,
+                                          },
+                                        );
+                                      }
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    print(
+                                      'procced-meeting-with-bid.php failed with status ${response.statusCode}',
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Failed to schedule meeting',
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 } catch (e) {
                                   print(
                                     'Error scheduling meeting with bid: $e',
@@ -418,11 +476,10 @@ final Map<String, dynamic> _postCache = {};
         }
       }
     } catch (e) {
-
       print('Error scheduling meeting without bid: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error scheduling meeting')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error scheduling meeting')));
     }
   }
 
@@ -509,7 +566,17 @@ final Map<String, dynamic> _postCache = {};
     );
   }
 
-  Future<void> _loadBids() async {
+Future<void> _loadBids() async {
+    // Check if both low and high bids are already cached
+    if (_bidCache['Low Bids']!.isNotEmpty && _bidCache['High Bids']!.isNotEmpty) {
+      print('Using cached bids for Low and High Bids');
+      setState(() {
+        bids = _bidCache[selectedBidType]!;
+        isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       isLoading = true;
       error = null;
@@ -531,91 +598,102 @@ final Map<String, dynamic> _postCache = {};
 
       List<Map<String, dynamic>> allBids = [];
 
-      final lowBidsResponse = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId',
-        ),
-        headers: headers,
-      );
+      // Fetch low bids if not cached
+      if (_bidCache['Low Bids']!.isEmpty) {
+        final lowBidsResponse = await http.get(
+          Uri.parse('${widget.baseUrl}/my-bids-low.php?token=${widget.token}&user_id=$_userId'),
+          headers: headers,
+        );
 
-      print('my-bids-low.php status: ${lowBidsResponse.statusCode}');
-      print('my-bids-low.php response: ${lowBidsResponse.body}');
+        print('my-bids-low.php status: ${lowBidsResponse.statusCode}');
+        print('my-bids-low.php response: ${lowBidsResponse.body}');
 
-      if (lowBidsResponse.statusCode == 200) {
-        final lowBidsData = jsonDecode(lowBidsResponse.body);
-        if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
-          final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
-          for (var bid in lowBids) {
-            bid['fromLowBids'] = true;
-            bid['fromHighBids'] = false;
-            allBids.add(bid);
+        if (lowBidsResponse.statusCode == 200) {
+          final lowBidsData = jsonDecode(lowBidsResponse.body);
+          if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
+            final lowBids = List<Map<String, dynamic>>.from(lowBidsData['data']);
+            for (var bid in lowBids) {
+              bid['fromLowBids'] = true;
+              bid['fromHighBids'] = false;
+              allBids.add(bid);
+              _bidCache['Low Bids']!.add(bid); // Cache low bids
+            }
+            print('Low bids fetched and cached: ${lowBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
           }
-          print(
-            'Low bids fetched: ${lowBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
-          );
         }
+      } else {
+        allBids.addAll(_bidCache['Low Bids']!);
+        print('Using cached low bids: ${_bidCache['Low Bids']!.length} items');
       }
 
-      final highBidsResponse = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId',
-        ),
-        headers: headers,
-      );
+      // Fetch high bids if not cached
+      if (_bidCache['High Bids']!.isEmpty) {
+        final highBidsResponse = await http.get(
+          Uri.parse('${widget.baseUrl}/my-bids-high.php?token=${widget.token}&user_id=$_userId'),
+          headers: headers,
+        );
 
-      print('my-bids-high.php status: ${highBidsResponse.statusCode}');
-      print('my-bids-high.php response: ${highBidsResponse.body}');
+        print('my-bids-high.php status: ${highBidsResponse.statusCode}');
+        print('my-bids-high.php response: ${highBidsResponse.body}');
 
-      if (highBidsResponse.statusCode == 200) {
-        final highBidsData = jsonDecode(highBidsResponse.body);
-        if (highBidsData['status'] == true && highBidsData['data'] is List) {
-          final highBids = List<Map<String, dynamic>>.from(
-            highBidsData['data'],
-          );
-          for (var bid in highBids) {
-            bid['fromHighBids'] = true;
-            bid['fromLowBids'] = false;
-            allBids.add(bid);
-            print(
-              'High bid: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, my_bid_amount=${bid['my_bid_amount']}, exp_date=${bid['exp_date']}',
-            );
+        if (highBidsResponse.statusCode == 200) {
+          final highBidsData = jsonDecode(highBidsResponse.body);
+          if (highBidsData['status'] == true && highBidsData['data'] is List) {
+            final highBids = List<Map<String, dynamic>>.from(highBidsData['data']);
+            for (var bid in highBids) {
+              bid['fromHighBids'] = true;
+              bid['fromLowBids'] = false;
+              allBids.add(bid);
+              _bidCache['High Bids']!.add(bid); // Cache high bids
+            }
+            print('High bids fetched and cached: ${highBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
           }
-          print(
-            'High bids fetched: ${highBids.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}',
-          );
         }
+      } else {
+        allBids.addAll(_bidCache['High Bids']!);
+        print('Using cached high bids: ${_bidCache['High Bids']!.length} items');
       }
 
-      print('Total bids fetched: ${allBids.length}');
+      print('Total bids fetched or loaded from cache: ${allBids.length}');
 
+      // Fetch post details for bids
       for (var bid in allBids) {
         print('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
 
-        final postDetails = await _fetchPostDetails(bid['post_id']);
-        if (postDetails == null) {
-          print('Skipping bid ${bid['id']} due to missing post details');
-          continue;
+        // Check if post details are cached
+        if (_postCache.containsKey(bid['post_id'])) {
+          print('Using cached post details for post_id: ${bid['post_id']}');
+          final postDetails = _postCache[bid['post_id']]!;
+          bid['title'] = postDetails['title'];
+          bid['carImage'] = postDetails['image'];
+          bid['targetPrice'] = postDetails['price'];
+          bid['location'] = postDetails['location'];
+          bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
+        } else {
+          final postDetails = await _fetchPostDetails(bid['post_id']);
+          if (postDetails == null) {
+            print('Skipping bid ${bid['id']} due to missing post details');
+            continue;
+          }
+          _postCache[bid['post_id']] = postDetails; // Cache post details
+          bid['title'] = postDetails['title'];
+          bid['carImage'] = postDetails['image'];
+          bid['targetPrice'] = postDetails['price'];
+          bid['location'] = postDetails['location'];
+          bid['store'] = postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
         }
 
-        bid['title'] = postDetails['title'];
-        bid['carImage'] = postDetails['image'];
-        bid['targetPrice'] = postDetails['price'];
-        bid['location'] = postDetails['location'];
-        bid['store'] =
-            postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual';
         bid['appId'] = 'APP_${bid['post_id']}';
         bid['bidPrice'] = bid['my_bid_amount']?.toString() ?? '0';
         bid['expirationDate'] = bid['exp_date']?.toString() ?? 'N/A';
         bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
-       // bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
+        // bid['meetingAttempts'] = await _fetchMeetingAttempts(bid['id']);
 
-        print(
-          'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}, fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}',
-        );
+        print('Bid processed: ${bid['title']}, bid_id: ${bid['id']}, post_id: ${bid['post_id']}, fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
       }
 
       setState(() {
-        bids = allBids;
+        bids = _bidCache[selectedBidType]!;
         isLoading = false;
       });
 
@@ -628,24 +706,11 @@ final Map<String, dynamic> _postCache = {};
       });
     }
   }
-
-  List<Map<String, dynamic>> _getFilteredBids() {
-
-    final filtered = bids.where((bid) {
-      print(
-        'Filtering bid ${bid['id']}: fromLowBids=${bid['fromLowBids']}, fromHighBids=${bid['fromHighBids']}, bidPrice=${bid['bidPrice']}, targetPrice=${bid['targetPrice']}');
-      if (selectedBidType == 'Low Bids') {
-        return bid['fromLowBids'] == true;
-      } else {
-        return bid['fromHighBids'] == true;
-      }
-    }).toList();
-
+List<Map<String, dynamic>> _getFilteredBids() {
+    final filtered = _bidCache[selectedBidType] ?? [];
     print('Filtered ${selectedBidType}: ${filtered.map((b) => 'id=${b['id']}, post_id=${b['post_id']}').toList()}');
-
     return filtered;
   }
-
   @override
   Widget build(BuildContext context) {
     final filteredBids = _getFilteredBids();
@@ -989,10 +1054,13 @@ class BidCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isHighBid = bid['fromHighBids'] == true;
 
-
     print('BidCard - Bid ID: ${bid['id']}, Post ID: ${bid['post_id']}');
-    print('BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}');
-    print('BidCard - bidPrice: ${bid['bidPrice']}, targetPrice: ${bid['targetPrice']}');
+    print(
+      'BidCard - fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}',
+    );
+    print(
+      'BidCard - bidPrice: ${bid['bidPrice']}, targetPrice: ${bid['targetPrice']}',
+    );
     print('BidCard - isHighBid: $isHighBid');
 
     return Container(
@@ -1340,7 +1408,6 @@ class BidCard extends StatelessWidget {
                     return items;
                   },
                 ),
-
               ],
             ),
           ),
