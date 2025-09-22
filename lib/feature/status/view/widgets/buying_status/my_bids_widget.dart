@@ -1144,7 +1144,7 @@ class BidCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'App Id: ${bid['appId'] ?? 'LAD_${bid['post_id']}'}',
+                                'App Id    : ${bid['appId'] ?? 'LAD_${bid['post_id']}'}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey[600],
