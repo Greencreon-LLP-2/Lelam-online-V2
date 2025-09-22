@@ -16,6 +16,7 @@ class StatusPill extends StatelessWidget {
   final bool isActive;
   final Color activeColor;
   final Color inactiveColor;
+  final bool showError;
   final VoidCallback? onTap;
 
   const StatusPill({
@@ -24,6 +25,7 @@ class StatusPill extends StatelessWidget {
     this.isActive = false,
     this.activeColor = Colors.green,
     this.inactiveColor = Colors.grey,
+    this.showError = false,
     this.onTap,
   });
 
@@ -42,13 +44,22 @@ class StatusPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isActive ? activeColor : Colors.black,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? activeColor : Colors.black,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+            if (showError) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.error_outline, color: Colors.red, size: 16),
+            ],
+          ],
         ),
       ),
     );
@@ -69,14 +80,15 @@ class PillConnector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: isActive ? activeColor : inactiveColor,
-        borderRadius: BorderRadius.circular(2),
-      ),
+    return Row(
+      children: [
+        
+        Transform.scale(
+          scaleX: 1.5, 
+        child: Icon(Icons.arrow_forward,
+        size:14 ,
+        color: isActive ? activeColor:inactiveColor,))
+      ],
     );
   }
 }
@@ -132,7 +144,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       selectedIndex = statuses.indexOf(widget.initialStatus!);
     }
     _loadUserId();
-    // Start periodic refresh for Awaiting Location
+
     if (selectedIndex == 2) {
       // Awaiting Location
       Timer.periodic(const Duration(minutes: 5), (timer) {
@@ -144,6 +156,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         }
       });
     }
+
   }
 
   @override
@@ -155,11 +168,15 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   List<Widget> _buildPillRow() {
     List<Widget> pillRow = [];
     for (var i = 0; i < statuses.length; i++) {
+      final bool isThisActive = i <= selectedIndex;
+      final bool showErrorOnThis = false;
+
       pillRow.add(
         StatusPill(
           label: statuses[i],
-          isActive: i == selectedIndex,
+          isActive: isThisActive,
           activeColor: Colors.blue,
+          showError: showErrorOnThis,
           onTap: () {
             if (mounted) {
               setState(() {
@@ -175,7 +192,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       if (i != statuses.length - 1) {
         pillRow.add(
           PillConnector(
-            isActive: (i == selectedIndex || i + 1 == selectedIndex),
+            isActive: i < selectedIndex,
             activeColor: Colors.blue,
             inactiveColor: Colors.grey,
           ),
@@ -623,6 +640,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           if (status == 'Date Fixed') {
             return meeting['status'] == '1' &&
                 meeting['meeting_done'] == '0' &&
+
                 meeting['if_location_request'] == '0' &&
                 meeting['seller_approvel'] == '1' &&
                 meeting['admin_approvel'] == '1' &&

@@ -76,7 +76,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               fetchedAds.add(widget.adData!);
               _expandedImages[passedAdId] = false;
             } else {
-
               print('Passed ad already exists in fetched ads');
 
               final adIndex = fetchedAds.indexWhere(
@@ -153,7 +152,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       print('Error loading status for post $postId: $e');
     }
   }
-
 
   Future<void> _checkApprovalStatus(String postId) async {
     try {
@@ -404,7 +402,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         body: {'id': adId, 'action': 'delete'},
       );
 
-
       print(
         'Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
       );
@@ -463,7 +460,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         imageUrl = '$getImagePostImageUrl${ad['image'] as String}';
       } else {
         imageUrl =
-
             '$getImagePostImageUrl${ad['image'].startsWith('/') ? ad['image'].substring(1) : ad['image']}';
       }
     } else {
@@ -473,7 +469,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       );
     }
     final isExpanded = _expandedImages[ad['id']] ?? false;
-
 
     print(imageUrl);
 
@@ -590,7 +585,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               ],
             ),
 
-           
             const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -637,70 +631,71 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                       _adDetail('Location', ad['district'] ?? 'Unknown'),
                     ],
                   ),
-                  
                 ),
                 Column(
                   children: [
-                     GestureDetector(
-              onTap: () {
-                setState(() {
-                  _expandedImages[ad['id']] = !isExpanded;
-                  print(
-                    'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
-                  );
-                });
-              },
-              child: Container(
-                width: 100,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: Colors.brown.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child:
 
-                    imageUrl != null
-                        ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          httpHeaders: {'token': token},
-                          fit: BoxFit.cover,
-                          placeholder:
-                              (context, url) => Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                          errorWidget: (context, url, error) {
-
-                            print(
-                              'Error loading image for ad ${ad['id']}: $error',
-                            );
-                            Fluttertoast.showToast(
-                              msg: 'Failed to load image for ad ${ad['id']}',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                              backgroundColor: Colors.red,
-                              textColor: Colors.white,
-                            );
-                            return Image.asset(
-                              'assets/placeholder_image.png',
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        )
-                        : Image.asset(
-                          'assets/placeholder_image.png',
-                          fit: BoxFit.cover,
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _expandedImages[ad['id']] = !isExpanded;
+                          print(
+                            'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
+                          );
+                        });
+                      },
+                      child: Container(
+                        width: 150,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: Colors.brown.shade100,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                         ),
-                     ),
+                        child:
+                            imageUrl != null
+                                ? CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  httpHeaders: {'token': token},
+                                  fit: BoxFit.cover,
+                                  placeholder:
+                                      (context, url) => Shimmer.fromColors(
+                                        baseColor: Colors.grey[300]!,
+                                        highlightColor: Colors.grey[100]!,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  errorWidget: (context, url, error) {
+                                    print(
+                                      'Error loading image for ad ${ad['id']}: $error',
+                                    );
+                                    Fluttertoast.showToast(
+                                      msg:
+                                          'Failed to load image for ad ${ad['id']}',
+                                      toastLength: Toast.LENGTH_SHORT,
+                                      gravity: ToastGravity.BOTTOM,
+                                      backgroundColor: Colors.red,
+                                      textColor: Colors.white,
+                                    );
+                                    return Image.asset(
+                                      'assets/placeholder_image.png',
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                )
+                                : Image.asset(
+                                  'assets/placeholder_image.png',
+                                  fit: BoxFit.cover,
+                                ),
+                      ),
+                    ),
                   ],
-                )
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -728,49 +723,44 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 ),
               ],
             ),
-            SizedBox(height: 15,),
-             Container(color: Colors.grey, height: 1.5,width: double.infinity,),
-           Row(
-           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [  
-            if (ad['rejectionMsg'] != null) ...[
-              const SizedBox(height: 1),
-              Center(
-                child: Text(
-                  ad['rejectionMsg'] as String,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          
-            
-            SizedBox(
-              width: 1,
-            ),               
-            if (_adStatuses[ad['id']] != null &&
-                _adStatuses[ad['id']]!.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 0.0),
-                child: Center(
-                  child: Text(
-                    _adStatuses[ad['id']]!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
+            SizedBox(height: 15),
+            Container(color: Colors.grey, height: 1.5, width: double.infinity),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (ad['rejectionMsg'] != null) ...[
+                  const SizedBox(height: 1),
+                  Center(
+                    child: Text(
+                      ad['rejectionMsg'] as String,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
+                ],
 
-              ),
-              
-            ],
-             PopupMenuButton<String>(
+                SizedBox(width: 1),
+                if (_adStatuses[ad['id']] != null &&
+                    _adStatuses[ad['id']]!.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 0.0),
+                    child: Center(
+                      child: Text(
+                        _adStatuses[ad['id']]!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                PopupMenuButton<String>(
                   icon: Icon(Icons.menu, color: Colors.grey.shade600),
-                  
+
                   position: PopupMenuPosition.over,
                   onSelected: (value) {
                     if (value == 'edit') {
@@ -812,10 +802,10 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           ),
                       ],
                 ),
-            ],
+              ],
             ),
-            Container(color: Colors.grey, height: 1.5,width: double.infinity,),
-           
+            Container(color: Colors.grey, height: 1.5, width: double.infinity),
+
             SizedBox(
               height: 250,
               child: SellerTabBarWidget(adData: ad, postId: ad['id'] as String),
@@ -937,14 +927,32 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   }
 
   Widget _adDetail(String label, String value, {bool highlight = false}) {
+    const double labelWidth =95;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          Container(
+            width: labelWidth,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
+          const SizedBox(width: 4),
+          Text(
+            ':',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black54,
+              fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               value,
@@ -1017,7 +1025,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );
@@ -1039,7 +1046,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );
