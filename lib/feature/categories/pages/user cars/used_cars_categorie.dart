@@ -366,17 +366,17 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-Future<void> _checkLoginStatus() async {
-  final userId = _userProvider.userId ?? '';
-  if (mounted) {
-    setState(() {
-      _userId = userId;
-    });
-    if (kDebugMode) {
-      developer.log('Checked login status: userId = $_userId');
+  Future<void> _checkLoginStatus() async {
+    final userId = _userProvider.userId ?? '';
+    if (mounted) {
+      setState(() {
+        _userId = userId;
+      });
+      if (kDebugMode) {
+        developer.log('Checked login status: userId = $_userId');
+      }
     }
   }
-}
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -1164,67 +1164,69 @@ Future<void> _checkLoginStatus() async {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  developer.log(
-    'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
-  );
-  return Consumer<LoggedUserProvider>(
-    builder: (context, userProvider, child) {
-      // Update _userId when provider changes
-      _userId = userProvider.userId ?? '';
-      return Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
+  @override
+  Widget build(BuildContext context) {
+    developer.log(
+      'UsedCarsPage - Building UI: userId=$_userId, listingType=$_listingType, errorMessage=$_errorMessage',
+    );
+    return Consumer<LoggedUserProvider>(
+      builder: (context, userProvider, child) {
+        // Update _userId when provider changes
+        _userId = userProvider.userId ?? '';
+        return Scaffold(
           backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          ),
-          title: _showAppBarSearch
-              ? _buildAppBarSearchField()
-              : const Text('Used Cars'),
-          actions: [
-            Stack(
-              children: [
-                IconButton(
-                  onPressed: _showFilterBottomSheet,
-                  icon: const Icon(Icons.tune, color: Colors.black87),
-                ),
-                if (_getActiveFilterCount() > 0)
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${_getActiveFilterCount()}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.black87),
+            ),
+            title:
+                _showAppBarSearch
+                    ? _buildAppBarSearchField()
+                    : const Text('Used Cars'),
+            actions: [
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showFilterBottomSheet,
+                    icon: const Icon(Icons.tune, color: Colors.black87),
+                  ),
+                  if (_getActiveFilterCount() > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${_getActiveFilterCount()}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            _isLoadingLocations
-                ? const CircularProgressIndicator()
-                : PopupMenuButton<String>(
+                ],
+              ),
+              _isLoadingLocations
+                  ? const CircularProgressIndicator()
+                  : PopupMenuButton<String>(
                     icon: const Icon(Icons.location_on, color: Colors.black87),
                     onSelected: (String value) {
                       setState(() {
-                        _selectedLocation = value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
+                        _selectedLocation =
+                            value == 'all'
+                                ? 'all'
+                                : _locations
+                                    .firstWhere((loc) => loc.name == value)
+                                    .id;
                         _filtersChanged = true;
                         _fetchProducts();
                       });
@@ -1260,18 +1262,25 @@ Widget build(BuildContext context) {
                       }).toList();
                     },
                   ),
-          ],
-        ),
-        body: _isLoading || _isLoadingLocations
-            ? const Center(
-                child: CircularProgressIndicator(color: Palette.primaryblue),
-              )
-            : _errorMessage != null
-                ? Center(
+            ],
+          ),
+          body:
+              _isLoading || _isLoadingLocations
+                  ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Palette.primaryblue,
+                    ),
+                  )
+                  : _errorMessage != null
+                  ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.error,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           _errorMessage!,
@@ -1288,64 +1297,66 @@ Widget build(BuildContext context) {
                       ],
                     ),
                   )
-                : filteredProducts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 64,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No cars found',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try adjusting your filters or search terms',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
+                  : filteredProducts.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _fetchProducts(forceRefresh: true),
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          itemCount: _products.length + (_showMainSearch ? 2 : 1),
-                          itemBuilder: (context, index) {
-                            if (_showMainSearch && index == 0) {
-                              return _buildSearchField();
-                            }
-                            if (index == (_showMainSearch ? 1 : 0)) {
-                              return _buildListingTypeButtons();
-                            }
-                            final productIndex = index - (_showMainSearch ? 2 : 1);
-                            if (productIndex < filteredProducts.length) {
-                              final product = filteredProducts[productIndex];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: _buildProductCard(product),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
+                        const SizedBox(height: 16),
+                        Text(
+                          'No cars found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-      );
-    },
-  );
-}
+                        const SizedBox(height: 8),
+                        Text(
+                          'Try adjusting your filters or search terms',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : RefreshIndicator(
+                    onRefresh: () => _fetchProducts(forceRefresh: true),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 80),
+                      controller: _scrollController,
+                      itemCount: _products.length + (_showMainSearch ? 2 : 1),
+                      itemBuilder: (context, index) {
+                        if (_showMainSearch && index == 0) {
+                          return _buildSearchField();
+                        }
+                        if (index == (_showMainSearch ? 1 : 0)) {
+                          return _buildListingTypeButtons();
+                        }
+                        final productIndex = index - (_showMainSearch ? 2 : 1);
+                        if (productIndex < filteredProducts.length) {
+                          final product = filteredProducts[productIndex];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildProductCard(product),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+        );
+      },
+    );
+  }
+
   Widget _buildProductCard(Product product) {
     final isAuction = product.ifAuction == '1';
     final isFinanceAvailable = product.ifFinance == '1';
