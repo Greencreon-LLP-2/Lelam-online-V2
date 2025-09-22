@@ -669,7 +669,7 @@ class MeetingCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const Divider(),
+                        Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
                           Container(
                             decoration: BoxDecoration(color: Colors.grey[50]),
                             child: Column(
@@ -689,15 +689,7 @@ class MeetingCard extends StatelessWidget {
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.menu, size: 22),
-                                      ),
+                                      icon:  const Icon(Icons.menu, size: 22),                                
                                       position: PopupMenuPosition.over,
                                       offset: const Offset(0, -200),
                                       elevation: 4,
@@ -903,7 +895,8 @@ class MeetingCard extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                const Divider(),
+                                  Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
+                                  SizedBox(height: 8,),
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
