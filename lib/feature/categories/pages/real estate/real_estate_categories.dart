@@ -1356,10 +1356,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
             _filtersChanged = true;
           });
         },
-        autofillHints: null, // Disable autofill to prevent keyboard dismissal
-        enableSuggestions:
-            false, // Disable suggestions to reduce IME interference
-        enableInteractiveSelection: true, // Keep selection enabled
+
+        autofillHints: null, 
+        enableSuggestions: false, 
+        enableInteractiveSelection: true, 
         decoration: InputDecoration(
           hintText: 'Search by property type, location, features...',
           hintStyle: TextStyle(color: Colors.grey.shade500),

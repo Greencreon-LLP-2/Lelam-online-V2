@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/feature_list_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/splash_page.dart';
 import 'package:provider/provider.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -170,6 +172,25 @@ GoRoute(
           );
         }
         return LoginPage();
+      },
+    ),
+    GoRoute(
+      path: '/search',
+      name: 'searchResults',
+      builder: (context, state) {
+        final query = state.uri.queryParameters['query'] ?? '';
+        return SearchResultsPage(searchQuery: query);
+      },
+    ),
+     GoRoute(
+      path: '/product-details',
+      name: 'productDetails',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return ProductDetailsPage(
+          product: extra['product'] as FeatureListModel,
+          isAuction: extra['isAuction'] as bool,
+        );
       },
     ),
   ],

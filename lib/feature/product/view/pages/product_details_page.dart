@@ -671,7 +671,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
               : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
       // Support phone number (replace with your actual support number)
-      const String supportPhoneNumber = '+919876543210';
+      const String supportPhoneNumber = '+918089308048';
 
       return showDialog<void>(
         context: context,
@@ -2036,7 +2036,7 @@ void _showMeetingDialog(BuildContext context) {
 }
 
   void _launchPhoneCall() async {
-    const phoneNumber = 'tel:+919876543210';
+    const phoneNumber = 'tel:+918089308048';
     if (await canLaunchUrl(Uri.parse(phoneNumber))) {
       await launchUrl(Uri.parse(phoneNumber));
     } else {

@@ -9,6 +9,7 @@ class MeetingCard extends StatelessWidget {
   final Map<String, dynamic> meeting;
   final String baseUrl;
   final String token;
+  final String currentTab;
   final Function(String) onLocationRequestSent;
   final VoidCallback onProceedWithBid;
   final Function(Map<String, dynamic>) onEditDate;
@@ -21,6 +22,7 @@ class MeetingCard extends StatelessWidget {
     required this.meeting,
     required this.baseUrl,
     required this.token,
+    required this.currentTab,
     required this.onLocationRequestSent,
     required this.onProceedWithBid,
     required this.onEditDate,
@@ -278,13 +280,13 @@ class MeetingCard extends StatelessWidget {
           status == 'Meeting Completed'
               ? _fetchMeetingDoneStatus(meeting['id'])
               : Future.value({
-                  'middleStatus_data':
-                      meeting['middleStatus_data'] ?? 'Schedule meeting',
-                  'footerStatus_data':
-                      meeting['footerStatus_data'] ??
-                      'Click call support for full details',
-                  'timer': meeting['timer'] ?? '0',
-                }),
+                'middleStatus_data':
+                    meeting['middleStatus_data'] ?? 'Schedule meeting',
+                'footerStatus_data':
+                    meeting['footerStatus_data'] ??
+                    'Click call support for full details',
+                'timer': meeting['timer'] ?? '0',
+              }),
       builder: (context, statusSnapshot) {
         final statusData =
             statusSnapshot.data ??
@@ -301,10 +303,10 @@ class MeetingCard extends StatelessWidget {
           future:
               status == 'Meeting Completed'
                   ? _fetchOfferPrice(
-                      meeting['user_id'],
-                      meeting['post_id'],
-                      meeting['id'],
-                    )
+                    meeting['user_id'],
+                    meeting['post_id'],
+                    meeting['id'],
+                  )
                   : Future.value(meeting['price_offered'] ?? '0.00'),
           builder: (context, offerPriceSnapshot) {
             final offerPrice =
@@ -393,9 +395,9 @@ class MeetingCard extends StatelessWidget {
                                               child: const Center(
                                                 child:
                                                     CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.blue,
-                                                ),
+                                                      strokeWidth: 2,
+                                                      color: Colors.blue,
+                                                    ),
                                               ),
                                             ),
                                         errorWidget: (context, url, error) {
@@ -667,7 +669,7 @@ class MeetingCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                          const Divider(),
+                        Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
                           Container(
                             decoration: BoxDecoration(color: Colors.grey[50]),
                             child: Column(
@@ -687,15 +689,7 @@ class MeetingCard extends StatelessWidget {
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Icon(Icons.menu, size: 22),
-                                      ),
+                                      icon:  const Icon(Icons.menu, size: 22),                                
                                       position: PopupMenuPosition.over,
                                       offset: const Offset(0, -200),
                                       elevation: 4,
@@ -715,7 +709,8 @@ class MeetingCard extends StatelessWidget {
                                         } else if (value ==
                                             'proceed_with_bid') {
                                           onProceedWithBid();
-                                        } else if (value == 'send_location') {
+                                        } else if (value == 'send_location' &&
+                                            currentTab == 'Meeting Request') {
                                           onSendLocationRequest(meeting);
                                         } else if (value == 'view_location') {
                                           onViewLocation(meeting);
@@ -751,7 +746,7 @@ class MeetingCard extends StatelessWidget {
                                                 ],
                                               ),
                                             ),
-                                            const PopupMenuItem<String>(
+                                            PopupMenuItem<String>(
                                               value: 'edit_time',
                                               child: Row(
                                                 children: [
@@ -761,7 +756,11 @@ class MeetingCard extends StatelessWidget {
                                                     color: Colors.blue,
                                                   ),
                                                   SizedBox(width: 8),
-                                                  Text('Edit Time'),
+                                                  Text(
+                                                    currentTab == 'Date Fixed'
+                                                        ? 'Fix Date'
+                                                        : 'Edit Time',
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -769,7 +768,8 @@ class MeetingCard extends StatelessWidget {
                                         }
 
                                         if (currentStatus ==
-                                            'Meeting Request') {
+                                                'Meeting Request' &&
+                                            currentTab == 'Meeting Request') {
                                           items.addAll([
                                             const PopupMenuItem<String>(
                                               value: 'proceed_with_bid',
@@ -802,7 +802,7 @@ class MeetingCard extends StatelessWidget {
                                           ]);
                                         } else if (currentStatus ==
                                             'Date Fixed') {
-                                          items.addAll([
+                                          items.add(
                                             const PopupMenuItem<String>(
                                               value: 'proceed_with_bid',
                                               child: Row(
@@ -817,25 +817,7 @@ class MeetingCard extends StatelessWidget {
                                                 ],
                                               ),
                                             ),
-                                          ]);
-                                          if (withBid && isLowBid) {
-                                            items.add(
-                                              const PopupMenuItem<String>(
-                                                value: 'increase_bid',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.arrow_upward,
-                                                      size: 16,
-                                                      color: Colors.blue,
-                                                    ),
-                                                    SizedBox(width: 8),
-                                                    Text('Increase Bid'),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          }
+                                          );
                                         } else if (currentStatus ==
                                             'Awaiting Location') {
                                           items.add(
@@ -913,7 +895,8 @@ class MeetingCard extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                const Divider(),
+                                  Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
+                                  SizedBox(height: 8,),
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(

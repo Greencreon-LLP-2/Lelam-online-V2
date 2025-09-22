@@ -10,7 +10,6 @@ import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.da
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
 import 'package:http/http.dart' as http;
-import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
@@ -24,7 +23,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   String? _selectedDistrict;
   String? userId;
   late final LoggedUserProvider _userProvider;
@@ -101,14 +99,11 @@ class _HomePageState extends State<HomePage> {
   Future<void> _onRefresh() async {
     if (kDebugMode) {
       developer.log(
-        'Pull-to-refresh triggered, searchQuery: $_searchQuery, selectedDistrict: $_selectedDistrict',
+        'Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict',
       );
     }
     try {
       await _fetchDistricts();
-      setState(() {
-        _searchQuery = _searchQuery;
-      });
       await Future.delayed(const Duration(seconds: 1));
       if (kDebugMode) {
         developer.log('Refresh completed');
@@ -123,6 +118,15 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: Colors.red.withOpacity(0.8),
         ),
       );
+    }
+  }
+
+  void _onSearch(String query) {
+    if (query.isNotEmpty) {
+      context.pushNamed('searchResults', queryParameters: {'query': query});
+      if (kDebugMode) {
+        developer.log('Navigating to search results with query: $query');
+      }
     }
   }
 
@@ -200,31 +204,18 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: SearchButtonWidget(
                       controller: _searchController,
-                      onSearch: (query) {
-                        if (mounted) {
-                          setState(() {
-                            _searchQuery = query;
-                          });
-                          if (kDebugMode) {
-                            developer.log('Search query updated: $_searchQuery');
-                          }
-                        }
-                      },
+                      onSearch: _onSearch,
                     ),
                   ),
-                  // Search Results (shown below search bar)
-                  SearchResultsWidget(searchQuery: _searchQuery),
-                  // Other widgets (shown only when no search query)
-                  if (_searchQuery.isEmpty) ...[
-                    const SizedBox(height: 5),
-                    const BannerWidget(),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16),
-                      child: CategoryWidget(),
-                    ),
-                    const SizedBox(height: 5),
-                    ProductSectionWidget(searchQuery: _searchQuery),
-                  ],
+                  // Other widgets
+                  const SizedBox(height: 5),
+                  const BannerWidget(),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: CategoryWidget(),
+                  ),
+                  const SizedBox(height: 5),
+                  ProductSectionWidget(searchQuery: ''),
                 ],
               ),
             ),

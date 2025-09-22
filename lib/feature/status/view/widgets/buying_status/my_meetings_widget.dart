@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -120,7 +121,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   bool isLoading = true;
   String? _userId;
   Timer? _debounce;
-  Map<String, Map<String, dynamic>> _postDetailsCache = {};
+  final Map<String, Map<String, dynamic>> _postDetailsCache = {};
   List<Map<String, String>> _meetingTimesCache = [];
 
 @override
@@ -139,6 +140,39 @@ void initState() {
     super.dispose();
   }
 
+  List<Widget> _buildPillRow() {
+    List<Widget> pillRow = [];
+    for (var i = 0; i < statuses.length; i++) {
+      pillRow.add(
+        StatusPill(
+          label: statuses[i],
+          isActive: i == selectedIndex,
+          activeColor: Colors.blue,
+          onTap: () {
+            if (mounted) {
+              setState(() {
+                selectedIndex = i;
+                developer.log('Selected tab: ${statuses[i]}');
+              });
+              _loadMeetings();
+            }
+          },
+        ),
+      );
+
+      if (i != statuses.length - 1) {
+        pillRow.add(
+          PillConnector(
+            isActive: (i == selectedIndex || i + 1 == selectedIndex),
+            activeColor: Colors.blue,
+            inactiveColor: Colors.grey,
+          ),
+        );
+      }
+    }
+    return pillRow;
+  }
+
   Future<void> _loadUserId() async {
     try {
       final userProvider = Provider.of<LoggedUserProvider>(
@@ -150,7 +184,7 @@ void initState() {
         _userId = userData?.userId ?? 'Unknown';
        print('Loaded userId: $_userId');
         if (_userId == 'Unknown') {
-          errorMessage = 'User ID not found. Please log in again.';
+          errorMessage = ' Please log in .';
           isLoading = false;
         }
       });
@@ -525,7 +559,9 @@ void initState() {
             await Future.delayed(const Duration(milliseconds: 200));
           }
         } else {
-         print('Unexpected response format: ${responseData.toString()}');
+          developer.log(
+            'Unexpected response format: ${responseData.toString()}',
+          );
           errorMessage = 'Currently No Meeting';
         }
 
@@ -553,17 +589,18 @@ void initState() {
     if (mounted) {
       setState(() {
         selectedIndex = 2;
-       print('Switched to Awaiting Location tab for meeting $meetingId');
+        developer.log(
+          'Switched to Awaiting Location tab for meeting $meetingId',
+        );
       });
       _loadMeetings();
     }
   }
 
- List<Map<String, dynamic>> _getFilteredMeetings() {
+List<Map<String, dynamic>> _getFilteredMeetings() {
   final status = statuses[selectedIndex];
   print('Filtering for status: $status');
 
-  // Filter meetings based on status
   var filteredMeetings = meetings.where((meeting) {
     print(
       'Meeting ${meeting['id']} - status: ${meeting['status']}, '
@@ -577,9 +614,10 @@ void initState() {
     if (status == 'Date Fixed') {
       return meeting['status'] == '1' &&
           meeting['meeting_done'] == '0' &&
+          meeting['seller_approvel'] == '1' && 
+          meeting['admin_approvel'] == '1' && 
           meeting['meeting_date'] != 'N/A' &&
-          meeting['meeting_date']?.isNotEmpty == true &&
-          meeting['if_location_request'] != '0';
+          meeting['meeting_date']?.isNotEmpty == true;
     } else if (status == 'Meeting Request') {
       return meeting['status'] == '1' &&
           meeting['meeting_done'] == '0' &&
@@ -617,227 +655,198 @@ void initState() {
 
   return filteredMeetings;
 }
+  @override
+  Widget build(BuildContext context) {
+    final filteredMeetings = _getFilteredMeetings();
+    print('Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}');
+    for (var meeting in filteredMeetings) {
+      print(
+        'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
+        'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
+        'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
+        'date=${meeting['meeting_date']}',
+      );
+    }
 
- @override
-Widget build(BuildContext context) {
-  final filteredMeetings = _getFilteredMeetings();
- print(
-    'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
-  );
-  for (var meeting in filteredMeetings) {
-   print(
-      'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
-      'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
-      'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
-      'date=${meeting['meeting_date']}',
-    );
-  }
-
-  return Scaffold(
-    appBar: widget.showAppBar
-        ? AppBar(
-            title: const Text('My Meetings'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                Navigator.pop(context);
-              },
-            ),
-          )
-        : null, // No AppBar if showAppBar is false
-    backgroundColor: Colors.grey[50],
-    body: SafeArea(
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: statuses.map((status) {
-                  final index = statuses.indexOf(status);
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: StatusPill(
-                      label: status,
-                      isActive: index == selectedIndex,
-                      activeColor: Colors.blue,
-                      onTap: () {
-                        if (mounted) {
-                          setState(() {
-                            selectedIndex = index;
-                           print('Selected tab: $status');
-                          });
-                          _loadMeetings();
-                        }
-                      },
-                    ),
-                  );
-                }).toList(),
+    return Scaffold(
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('My Meetings'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
+            )
+          : null,
+      backgroundColor: Colors.grey[50],
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _buildPillRow(),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Container(
-              color: Colors.grey[50],
-              child: isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.blue),
-                    )
-                  : errorMessage != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.handshake,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No ${statuses[selectedIndex].toLowerCase()} found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
+            Expanded(
+              child: Container(
+                color: Colors.grey[50],
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.blue),
+                      )
+                    : errorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.handshake,
+                                  size: 64,
+                                  color: Colors.grey,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      : filteredMeetings.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.handshake,
-                                    size: 64,
-                                    color: Colors.grey,
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No ${statuses[selectedIndex].toLowerCase()} found',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[600],
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No ${statuses[selectedIndex].toLowerCase()} found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filteredMeetings.length,
-                              itemBuilder: (context, index) {
-                                final meeting = filteredMeetings[index];
-                               print('Displaying meeting: ${meeting['id']}');
-                                return MeetingCard(
-                                  meeting: meeting,
-                                  baseUrl: widget.baseUrl,
-                                  token: widget.token,
-                                  onLocationRequestSent: _onLocationRequestSent,
-                                  onProceedWithBid: () {
-                                   print('Proceed with Bid triggered for meeting ${meeting['id']}');
-                                    _proceedWithBid(context, meeting);
-                                  },
-                                  onEditDate: (meeting) => _editDate(context, meeting),
-                                  onEditTime: (meeting) => _editTime(context, meeting),
-                                  onSendLocationRequest: (meeting) =>
-                                      _sendLocationRequest(context, meeting),
-                                  onViewLocation: (meeting) => _viewLocation(context, meeting),
-                                );
-                              },
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
+                          )
+                        : filteredMeetings.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.handshake,
+                                      size: 64,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No ${statuses[selectedIndex].toLowerCase()} found',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: filteredMeetings.length,
+                                itemBuilder: (context, index) {
+                                  final meeting = filteredMeetings[index];
+                                  print('Displaying meeting: ${meeting['id']}');
+                                  return MeetingCard(
+                                    meeting: meeting,
+                                    baseUrl: widget.baseUrl,
+                                    token: widget.token,
+                                    currentTab: statuses[selectedIndex], // Pass current tab
+                                    onLocationRequestSent: _onLocationRequestSent,
+                                    onProceedWithBid: () {
+                                      print('Proceed with Bid triggered for meeting ${meeting['id']}');
+                                      _proceedWithBid(context, meeting);
+                                    },
+                                    onEditDate: (meeting) => _editDate(context, meeting),
+                                    onEditTime: (meeting) => _editTime(context, meeting),
+                                    onSendLocationRequest: (meeting) =>
+                                        _sendLocationRequest(context, meeting),
+                                    onViewLocation: (meeting) => _viewLocation(context, meeting),
+                                  );
+                                },
+                              ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
-  Future<void> _proceedWithBid(
+    );
+  }
+Future<void> _proceedWithBid(
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
-   print('Proceed with Bid called for meeting ${meeting['id']}');
+    print('Proceed with Bid called for meeting ${meeting['id']}');
     if (_userId == null || _userId == 'Unknown') {
-     print('Invalid user ID');
+      print('Invalid user ID');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
       );
       return;
     }
-    if (meeting['bid_amount'] == null ||
-        meeting['bid_amount'] == '0.00' ||
-        meeting['bid_id'] == '0') {
-     print(
-        'Proceed with Bid failed: bid_amount=${meeting['bid_amount']}, bid_id=${meeting['bid_id']}',
-      );
-      await showDialog<bool>(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('No Bid Found'),
-              content: const Text(
-                'No valid bid exists for this meeting. Would you like to place a bid?',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Place Bid'),
-                ),
-              ],
-            ),
-      );
-      // if (_ignorePlaceBid == true) {
-      //   await _increaseBid(context, meeting);
-      // }
-      return;
-    }
 
-    final double bidAmount =
-        double.tryParse(meeting['bid_amount']?.toString() ?? '0.00') ?? 0.00;
-    final bool? confirmed = await showDialog<bool>(
+    final TextEditingController bidController = TextEditingController();
+    double? bidAmount;
+
+    await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Confirm Bid'),
-            content: Text(
-              'Do you want to proceed with a bid of ₹${NumberFormat('#,##0').format(bidAmount)}?',
-              style: const TextStyle(fontSize: 16),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter Bid Amount'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: bidController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Bid Amount (₹)',
+                hintText: 'Enter your bid amount',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                bidAmount = double.tryParse(value);
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('OK'),
-              ),
-            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () {
+              if (bidAmount == null || bidAmount! <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid bid amount'),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, true);
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
 
-    if (confirmed != true) {
-     print('Bid confirmation cancelled by user');
+    if (bidAmount == null || bidAmount! <= 0) {
+      print('Invalid or no bid amount entered');
       return;
     }
 
@@ -845,7 +854,7 @@ Widget build(BuildContext context) {
       final response = await retry(
         () => http.get(
           Uri.parse(
-            '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=${meeting['bid_amount']}',
+            '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=$bidAmount',
           ),
           headers: {
             'token': widget.token,
@@ -856,17 +865,25 @@ Widget build(BuildContext context) {
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
         onRetry: (e) {
-         print('Retrying proceed with bid: $e');
+          print('Retrying proceed with bid: $e');
         },
       );
-     print('my-meeting-proceed-with-bid.php response: ${response.body}');
+      print('my-meeting-proceed-with-bid.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Proceeded with bid successfully')),
+            SnackBar(
+              content: Text(
+                'Proceeded with bid of ₹${NumberFormat('#,##0').format(bidAmount)} successfully',
+              ),
+            ),
           );
-
+          // Switch to Meeting Request tab
+          setState(() {
+            selectedIndex = 1; // Index 1 is 'Meeting Request' in statuses list
+            print('Switched to Meeting Request tab after successful bid');
+          });
           await _loadMeetings();
           widget.onRefreshMeetings?.call();
         } else {
@@ -879,14 +896,14 @@ Widget build(BuildContext context) {
           );
         }
       } else if (response.statusCode == 429) {
-       print('Rate limit exceeded for proceed with bid');
+        print('Rate limit exceeded for proceed with bid');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Too many requests. Please try again later.'),
           ),
         );
       } else {
-       print(
+        print(
           'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
@@ -894,7 +911,7 @@ Widget build(BuildContext context) {
         );
       }
     } catch (e) {
-     print('Error proceeding with bid: $e');
+      print('Error proceeding with bid: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error proceeding with bid')),
       );

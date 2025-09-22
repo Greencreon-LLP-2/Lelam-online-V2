@@ -99,11 +99,11 @@ backgroundColor: Color(0xFF3261AB),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
               child: Text(
-                'Green Creone LLP',
+                'Powered by Green Creon LLP',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white, // Green color to match branding
+                  color: Colors.white, 
                 ),
               ),
             ),
