@@ -545,48 +545,48 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 const SizedBox(width: 4),
                 const Text('0', style: TextStyle(fontSize: 13)),
                 const SizedBox(width: 12),
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      context.pushNamed(
-                        RouteNames.adPostPage,
-                        extra: {
-                          'categoryId': ad['category_id']?.toString() ?? '',
-                          'adData': ad,
-                        },
-                      );
+                // PopupMenuButton<String>(
+                //   icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
+                //   onSelected: (value) {
+                //     if (value == 'edit') {
+                //       context.pushNamed(
+                //         RouteNames.adPostPage,
+                //         extra: {
+                //           'categoryId': ad['category_id']?.toString() ?? '',
+                //           'adData': ad,
+                //         },
+                //       );
 
-                      print(
-                        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
-                      );
-                    } else if (value == 'delete') {
-                      _deleteAd(ad['id'] as String);
-                    } else if (value == 'mark_delivered') {
-                      _markAsDelivered(ad['id'] as String);
-                    } else if (value == 'check_auction') {
-                      _checkAuctionTerms(ad['id'] as String);
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Delete'),
-                        ),
-                        if (ad['status'] == '1')
-                          const PopupMenuItem(
-                            value: 'mark_delivered',
-                            child: Text('Mark as Delivered'),
-                          ),
-                        if (ad['status'] == '1' && ad['if_auction'] == '0')
-                          const PopupMenuItem(
-                            value: 'check_auction',
-                            child: Text('Move to Auction'),
-                          ),
-                      ],
-                ),
+                //       print(
+                //         'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
+                //       );
+                //     } else if (value == 'delete') {
+                //       _deleteAd(ad['id'] as String);
+                //     } else if (value == 'mark_delivered') {
+                //       _markAsDelivered(ad['id'] as String);
+                //     } else if (value == 'check_auction') {
+                //       _checkAuctionTerms(ad['id'] as String);
+                //     }
+                //   },
+                //   itemBuilder:
+                //       (context) => [
+                //         const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                //         const PopupMenuItem(
+                //           value: 'delete',
+                //           child: Text('Delete'),
+                //         ),
+                //         if (ad['status'] == '1')
+                //           const PopupMenuItem(
+                //             value: 'mark_delivered',
+                //             child: Text('Mark as Delivered'),
+                //           ),
+                //         if (ad['status'] == '1' && ad['if_auction'] == '0')
+                //           const PopupMenuItem(
+                //             value: 'check_auction',
+                //             child: Text('Move to Auction'),
+                //           ),
+                //       ],
+                // ),
               ],
             ),
 
@@ -651,8 +651,8 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 });
               },
               child: Container(
-                width: 110,
-                height: 140,
+                width: 150,
+                height: 180,
                 decoration: BoxDecoration(
                   color: Colors.brown.shade100,
                   borderRadius: BorderRadius.circular(8),

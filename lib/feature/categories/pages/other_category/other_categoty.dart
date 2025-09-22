@@ -1224,7 +1224,7 @@ class _OthersPageState extends State<OthersPage> {
                             if (!_showAppBarSearch) _buildSearchField(),
                             if (_searchQuery
                                 .isNotEmpty) // Show SearchResultsWidget when typing
-                              SearchResultsWidget(searchQuery: _searchQuery),
+                              SearchResultsPage(searchQuery: _searchQuery),
                           ],
                         ),
                       ),
