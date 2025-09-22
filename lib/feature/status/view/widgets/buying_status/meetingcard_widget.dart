@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -5,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 
-class MeetingCard extends StatelessWidget {
+class MeetingCard extends StatefulWidget {
   final Map<String, dynamic> meeting;
   final String baseUrl;
   final String token;
@@ -34,25 +35,96 @@ class MeetingCard extends StatelessWidget {
   // Cache for location data
   static final Map<String, String> _locationCache = {};
 
+  @override
+  State<MeetingCard> createState() => _MeetingCardState();
+}
+
+class _MeetingCardState extends State<MeetingCard> {
+  Timer? _timer;
+  Duration _remainingTime = Duration.zero;
+  String _middleStatusData = 'Schedule meeting';
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimerIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  void _startTimerIfNeeded() {
+    _timer?.cancel();
+    debugPrint('Checking timer for meeting ${widget.meeting['id']}');
+    final status = _getMeetingStatus(widget.meeting);
+    debugPrint('Status: $status');
+    if (status == 'Awaiting Location') {
+      final createdOn = DateTime.tryParse(widget.meeting['created_on'] ?? '');
+      debugPrint('Created On: $createdOn');
+      if (createdOn != null) {
+        final expiryTime = createdOn.add(const Duration(hours: 24));
+        _remainingTime = expiryTime.difference(DateTime.now());
+        debugPrint('Remaining Time: ${_remainingTime.inSeconds} seconds');
+        if (_remainingTime.inSeconds > 0) {
+          _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+            setState(() {
+              _remainingTime = expiryTime.difference(DateTime.now());
+              if (_remainingTime.inSeconds <= 0) {
+                _middleStatusData = 'Meeting request has ended';
+                timer.cancel();
+                debugPrint('Timer expired for meeting ${widget.meeting['id']}');
+              } else {
+                _middleStatusData =
+                    'Meeting request ends in ${_formatDuration(_remainingTime)}';
+                debugPrint('Timer updated: $_middleStatusData');
+              }
+            });
+          });
+        } else {
+          _middleStatusData = 'Meeting request has ended';
+          debugPrint('Meeting already expired');
+        }
+      } else {
+        debugPrint(
+          'Error: Invalid or missing created_on for meeting ${widget.meeting['id']}',
+        );
+        _middleStatusData = 'Awaiting Location (Invalid Date)';
+      }
+    } else {
+      _middleStatusData = 'Schedule meeting';
+      debugPrint('No timer needed for status: $status');
+    }
+  }
+
   Future<Map<String, String>> _fetchLocations() async {
-    if (_locationCache.isNotEmpty) {
-      return _locationCache;
+    if (MeetingCard._locationCache.isNotEmpty) {
+      return MeetingCard._locationCache;
     }
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/list-location.php?token=$token'),
-        headers: {'token': token},
+        Uri.parse('${widget.baseUrl}/list-location.php?token=${widget.token}'),
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == 'true' && data['data'] is List) {
           for (var location in data['data']) {
             if (location['status'] == '1') {
-              _locationCache[location['id']] = location['name'];
+              MeetingCard._locationCache[location['id']] = location['name'];
             }
           }
-          return _locationCache;
+          return MeetingCard._locationCache;
         }
       }
       return {};
@@ -66,9 +138,9 @@ class MeetingCard extends StatelessWidget {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/my-meeting-done-post-status.php?token=$token&ads_post_customer_meeting_id=$meetingId',
+          '${widget.baseUrl}/my-meeting-done-post-status.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
         ),
-        headers: {'token': token},
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -105,22 +177,22 @@ class MeetingCard extends StatelessWidget {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/my-meetings-offer-price.php?token=$token&user_id=$userId&post_id=$postId&ads_post_customer_meeting_id=$meetingId&price_offered=${meeting['price_offered']}',
+          '${widget.baseUrl}/my-meetings-offer-price.php?token=${widget.token}&user_id=$userId&post_id=$postId&ads_post_customer_meeting_id=$meetingId&price_offered=${widget.meeting['price_offered']}',
         ),
-        headers: {'token': token},
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
           return data['data']['price_offered']?.toString() ??
-              meeting['price_offered'] ??
+              widget.meeting['price_offered'] ??
               '0.00';
         }
       }
-      return meeting['price_offered'] ?? '0.00';
+      return widget.meeting['price_offered'] ?? '0.00';
     } catch (e) {
       debugPrint('Error fetching offer price: $e');
-      return meeting['price_offered'] ?? '0.00';
+      return widget.meeting['price_offered'] ?? '0.00';
     }
   }
 
@@ -128,9 +200,9 @@ class MeetingCard extends StatelessWidget {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/my-meetings-decision-pendding.php?token=$token&ads_post_customer_meeting_id=$meetingId',
+          '${widget.baseUrl}/my-meetings-decision-pendding.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
         ),
-        headers: {'token': token},
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -149,9 +221,9 @@ class MeetingCard extends StatelessWidget {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/my-meetings-not-intersted.php?token=$token&ads_post_customer_meeting_id=$meetingId',
+          '${widget.baseUrl}/my-meetings-not-intersted.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
         ),
-        headers: {'token': token},
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -183,9 +255,9 @@ class MeetingCard extends StatelessWidget {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/my-meetings-revisit.php?token=$token&ads_post_customer_meeting_id=$meetingId',
+          '${widget.baseUrl}/my-meetings-revisit.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
         ),
-        headers: {'token': token},
+        headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -220,9 +292,16 @@ class MeetingCard extends StatelessWidget {
       'if_location_request=${meeting['if_location_request']}, '
       'meeting_date=${meeting['meeting_date']}, '
       'seller_approvel=${meeting['seller_approvel']}, '
-      'admin_approvel=${meeting['admin_approvel']}, '
-      'location_link=${meeting['location_link']}',
+      'admin_approvel=${meeting['admin_approvel']}',
     );
+    if (meeting['status'] == '1' &&
+        meeting['meeting_done'] == '0' &&
+        meeting['if_location_request'] == '0' &&
+        meeting['meeting_date'] != 'N/A' &&
+        meeting['meeting_date']?.isNotEmpty == true) {
+      debugPrint('Meeting ${meeting['id']} status: Date Fixed');
+      return 'Date Fixed';
+    }
     if (meeting['meeting_done'] == '1') {
       debugPrint('Meeting ${meeting['id']} status: Meeting Completed');
       return 'Meeting Completed';
@@ -242,19 +321,13 @@ class MeetingCard extends StatelessWidget {
       debugPrint('Meeting ${meeting['id']} status: Awaiting Location');
       return 'Awaiting Location';
     }
-    if ((meeting['status'] == '1' || meeting['status'] == true) &&
+    if (meeting['status'] == '1' &&
         meeting['meeting_done'] == '0' &&
-        meeting['if_location_request'] == '0') {
+        meeting['if_location_request'] == '0' &&
+        meeting['meeting_time'] != 'N/A' &&
+        meeting['meeting_time']?.isNotEmpty == true) {
       debugPrint('Meeting ${meeting['id']} status: Meeting Request');
       return 'Meeting Request';
-    }
-    if ((meeting['status'] == '1' || meeting['status'] == true) &&
-        meeting['meeting_done'] == '0' &&
-        meeting['if_location_request'] != '0' &&
-        meeting['meeting_date'] != 'N/A' &&
-        meeting['meeting_date']?.isNotEmpty == true) {
-      debugPrint('Meeting ${meeting['id']} status: Date Fixed');
-      return 'Date Fixed';
     }
     debugPrint('Meeting ${meeting['id']} status: Unknown');
     return 'Unknown';
@@ -262,60 +335,69 @@ class MeetingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _getMeetingStatus(meeting);
-    final bool withBid = meeting['with_bid'] == '1';
+    final status = _getMeetingStatus(widget.meeting);
+    final bool withBid = widget.meeting['with_bid'] == '1';
     final double bidAmount =
-        double.tryParse(meeting['bid_amount'] ?? meeting['bidPrice'] ?? '0') ??
+        double.tryParse(
+          widget.meeting['bid_amount'] ?? widget.meeting['bidPrice'] ?? '0',
+        ) ??
         0;
     final double targetPrice =
-        double.tryParse(meeting['targetPrice']?.toString() ?? '0') ?? 0;
+        double.tryParse(widget.meeting['targetPrice']?.toString() ?? '0') ?? 0;
     final bool isLowBid = bidAmount > 0 && bidAmount < targetPrice;
     final bool isReadyForMeeting =
-        meeting['seller_approvel'] == '1' &&
-        meeting['admin_approvel'] == '1' &&
-        meeting['meeting_done'] == '0';
+        widget.meeting['seller_approvel'] == '1' &&
+        widget.meeting['admin_approvel'] == '1' &&
+        widget.meeting['meeting_done'] == '0';
 
     return FutureBuilder<Map<String, dynamic>>(
       future:
           status == 'Meeting Completed'
-              ? _fetchMeetingDoneStatus(meeting['id'])
+              ? _fetchMeetingDoneStatus(widget.meeting['id'])
               : Future.value({
                 'middleStatus_data':
-                    meeting['middleStatus_data'] ?? 'Schedule meeting',
+                    status == 'Awaiting Location'
+                        ? _middleStatusData
+                        : widget.meeting['middleStatus_data'] ??
+                            'Schedule meeting',
                 'footerStatus_data':
-                    meeting['footerStatus_data'] ??
-                    'Click call support for full details',
-                'timer': meeting['timer'] ?? '0',
+                    widget.meeting['footerStatus_data'] ??
+                    'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
+                'timer': widget.meeting['timer'] ?? '0',
               }),
       builder: (context, statusSnapshot) {
         final statusData =
             statusSnapshot.data ??
             {
               'middleStatus_data':
-                  meeting['middleStatus_data'] ?? 'Schedule meeting',
+                  status == 'Awaiting Location'
+                      ? _middleStatusData
+                      : widget.meeting['middleStatus_data'] ??
+                          'Schedule meeting',
               'footerStatus_data':
-                  meeting['footerStatus_data'] ??
+                  widget.meeting['footerStatus_data'] ??
                   'Click call support for full details',
-              'timer': meeting['timer'] ?? '0',
+              'timer': widget.meeting['timer'] ?? '0',
             };
-
         return FutureBuilder<String>(
           future:
               status == 'Meeting Completed'
                   ? _fetchOfferPrice(
-                    meeting['user_id'],
-                    meeting['post_id'],
-                    meeting['id'],
+                    widget.meeting['user_id'],
+                    widget.meeting['post_id'],
+                    widget.meeting['id'],
                   )
-                  : Future.value(meeting['price_offered'] ?? '0.00'),
+                  : Future.value(widget.meeting['price_offered'] ?? '0.00'),
           builder: (context, offerPriceSnapshot) {
             final offerPrice =
-                offerPriceSnapshot.data ?? meeting['price_offered'] ?? '0.00';
+                offerPriceSnapshot.data ??
+                widget.meeting['price_offered'] ??
+                '0.00';
 
             return FutureBuilder<String>(
               future:
                   status == 'Meeting Completed'
-                      ? _fetchDecisionPendingStatus(meeting['id'])
+                      ? _fetchDecisionPendingStatus(widget.meeting['id'])
                       : Future.value(''),
               builder: (context, decisionPendingSnapshot) {
                 final decisionPendingStatus =
@@ -326,7 +408,7 @@ class MeetingCard extends StatelessWidget {
                   builder: (context, locationSnapshot) {
                     final locations = locationSnapshot.data ?? {};
                     final locationName =
-                        locations[meeting['parent_zone_id']] ??
+                        locations[widget.meeting['parent_zone_id']] ??
                         'Unknown Location';
 
                     return Container(
@@ -382,7 +464,8 @@ class MeetingCard extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(12),
                                       child: CachedNetworkImage(
                                         imageUrl:
-                                            meeting['carImage']?.toString() ??
+                                            widget.meeting['carImage']
+                                                ?.toString() ??
                                             '',
                                         width: 100,
                                         height: 150,
@@ -424,8 +507,8 @@ class MeetingCard extends StatelessWidget {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            meeting['title'] ??
-                                                'Unknown Vehicle (ID: ${meeting['post_id']})',
+                                            widget.meeting['title'] ??
+                                                'Unknown Vehicle (ID: ${widget.meeting['post_id']})',
                                             style: const TextStyle(
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
@@ -442,7 +525,7 @@ class MeetingCard extends StatelessWidget {
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                'App Id: ${meeting['appId'] ?? 'LAD_${meeting['post_id']}'}',
+                                                'App Id: ${widget.meeting['appId'] ?? 'LAD_${widget.meeting['post_id']}'}',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -484,7 +567,7 @@ class MeetingCard extends StatelessWidget {
                                               Text(
                                                 status == 'Meeting Completed'
                                                     ? 'Offer Price: ₹${NumberFormat('#,##0').format(double.tryParse(offerPrice) ?? 0)}'
-                                                    : 'Location Requests: ${meeting['location_request_count'] ?? '0'}/2',
+                                                    : 'Location Requests: ${widget.meeting['location_request_count'] ?? '0'}/2',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
@@ -523,7 +606,7 @@ class MeetingCard extends StatelessWidget {
                                             ),
                                           ),
                                           Text(
-                                            meeting['meeting_date']
+                                            widget.meeting['meeting_date']
                                                     ?.toString() ??
                                                 'N/A',
                                             style: const TextStyle(
@@ -548,7 +631,7 @@ class MeetingCard extends StatelessWidget {
                                             ),
                                           ),
                                           Text(
-                                            meeting['meeting_time']
+                                            widget.meeting['meeting_time']
                                                     ?.toString() ??
                                                 'N/A',
                                             style: const TextStyle(
@@ -590,39 +673,40 @@ class MeetingCard extends StatelessWidget {
                                         ],
                                       ),
                                     ),
-                                    if (withBid)
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'My Bid',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.grey[500],
-                                              ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'My Bid',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey[500],
                                             ),
-                                            Text(
-                                              bidAmount == 0
-                                                  ? 'N/A'
-                                                  : '₹${NumberFormat('#,##0').format(bidAmount)}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color:
-                                                    isLowBid
-                                                        ? Colors.orange[700]
-                                                        : Colors.green[700],
-                                              ),
+                                          ),
+                                          Text(
+                                            bidAmount == 0 && !withBid
+                                                ? 'N/A'
+                                                : '₹${NumberFormat('#,##0').format(bidAmount)}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  isLowBid
+                                                      ? Colors.orange[700]
+                                                      : Colors.green[700],
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
+                                    ),
                                   ],
                                 ),
                                 if (isReadyForMeeting &&
-                                    meeting['location_link']?.isNotEmpty ==
+                                    widget
+                                            .meeting['location_link']
+                                            ?.isNotEmpty ==
                                         true) ...[
                                   const SizedBox(height: 8),
                                   Row(
@@ -641,7 +725,9 @@ class MeetingCard extends StatelessWidget {
                                             ),
                                             GestureDetector(
                                               onTap:
-                                                  () => onViewLocation(meeting),
+                                                  () => widget.onViewLocation(
+                                                    widget.meeting,
+                                                  ),
                                               child: const Text(
                                                 'Open in Google Maps',
                                                 style: TextStyle(
@@ -654,7 +740,7 @@ class MeetingCard extends StatelessWidget {
                                               ),
                                             ),
                                             Text(
-                                              'Coordinates: ${meeting['latitude']}, ${meeting['longitude']}',
+                                              'Coordinates: ${widget.meeting['latitude']}, ${widget.meeting['longitude']}',
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 color: Colors.grey[600],
@@ -669,7 +755,11 @@ class MeetingCard extends StatelessWidget {
                               ],
                             ),
                           ),
-                        Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
+                          Container(
+                            height: 1.3,
+                            width: double.infinity,
+                            color: Colors.grey[300],
+                          ),
                           Container(
                             decoration: BoxDecoration(color: Colors.grey[50]),
                             child: Column(
@@ -678,18 +768,36 @@ class MeetingCard extends StatelessWidget {
                                   children: [
                                     Expanded(
                                       child: Center(
-                                        child: Text(
-                                          statusData['middleStatus_data'],
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            if (status ==
+                                                'Awaiting Location') ...[
+                                              Icon(
+                                                Icons.timer,
+                                                size: 18,
+                                                color: Colors.red,
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            Flexible(
+                                              child: Text(
+                                                statusData['middleStatus_data'],
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  color: Colors.red,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                     PopupMenuButton<String>(
-                                      icon:  const Icon(Icons.menu, size: 22),                                
+                                      icon: const Icon(Icons.menu, size: 22),
                                       position: PopupMenuPosition.over,
                                       offset: const Offset(0, -200),
                                       elevation: 4,
@@ -698,34 +806,40 @@ class MeetingCard extends StatelessWidget {
                                       ),
                                       onSelected: (value) {
                                         debugPrint(
-                                          'Menu option selected: $value for meeting ${meeting['id']}',
+                                          'Menu option selected: $value for meeting ${widget.meeting['id']}',
                                         );
                                         if (value == 'edit_date' &&
                                             status != 'Meeting Completed') {
-                                          onEditDate(meeting);
+                                          widget.onEditDate(widget.meeting);
                                         } else if (value == 'edit_time' &&
                                             status != 'Meeting Completed') {
-                                          onEditTime(meeting);
+                                          widget.onEditTime(widget.meeting);
                                         } else if (value ==
                                             'proceed_with_bid') {
-                                          onProceedWithBid();
+                                          widget.onProceedWithBid();
                                         } else if (value == 'send_location' &&
-                                            currentTab == 'Meeting Request') {
-                                          onSendLocationRequest(meeting);
+                                            widget.currentTab ==
+                                                'Meeting Request') {
+                                          widget.onSendLocationRequest(
+                                            widget.meeting,
+                                          );
                                         } else if (value == 'view_location') {
-                                          onViewLocation(meeting);
+                                          widget.onViewLocation(widget.meeting);
                                         } else if (value == 'not_interested') {
                                           _notInterested(
                                             context,
-                                            meeting['id'],
+                                            widget.meeting['id'],
                                           );
                                         } else if (value == 'revisit') {
-                                          _revisit(context, meeting['id']);
+                                          _revisit(
+                                            context,
+                                            widget.meeting['id'],
+                                          );
                                         }
                                       },
                                       itemBuilder: (BuildContext context) {
                                         final currentStatus = _getMeetingStatus(
-                                          meeting,
+                                          widget.meeting,
                                         );
                                         List<PopupMenuItem<String>> items = [];
 
@@ -757,8 +871,9 @@ class MeetingCard extends StatelessWidget {
                                                   ),
                                                   SizedBox(width: 8),
                                                   Text(
-                                                    currentTab == 'Date Fixed'
-                                                        ? 'Fix Date'
+                                                    widget.currentTab ==
+                                                            'Date Fixed'
+                                                        ? 'Fix Time'
                                                         : 'Edit Time',
                                                   ),
                                                 ],
@@ -767,9 +882,10 @@ class MeetingCard extends StatelessWidget {
                                           ]);
                                         }
 
-                                        if (currentStatus ==
+                                        if (widget.currentTab ==
                                                 'Meeting Request' &&
-                                            currentTab == 'Meeting Request') {
+                                            widget.meeting['if_location_request'] ==
+                                                '0') {
                                           items.addAll([
                                             const PopupMenuItem<String>(
                                               value: 'proceed_with_bid',
@@ -838,7 +954,8 @@ class MeetingCard extends StatelessWidget {
                                           );
                                         } else if (currentStatus ==
                                                 'Ready For Meeting' &&
-                                            meeting['location_link']
+                                            widget
+                                                    .meeting['location_link']
                                                     ?.isNotEmpty ==
                                                 true) {
                                           items.add(
@@ -895,8 +1012,12 @@ class MeetingCard extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                  Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
-                                  SizedBox(height: 8,),
+                                Container(
+                                  height: 1.3,
+                                  width: double.infinity,
+                                  color: Colors.grey[300],
+                                ),
+                                SizedBox(height: 8),
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
