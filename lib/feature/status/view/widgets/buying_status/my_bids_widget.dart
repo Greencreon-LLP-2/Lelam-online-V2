@@ -1271,7 +1271,7 @@ class BidCard extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(),
+          Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
           SizedBox(
             child: Row(
               children: [
@@ -1288,16 +1288,7 @@ class BidCard extends StatelessWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.menu, size: 22),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  icon: const Icon(Icons.menu, size: 22),
                   onSelected: (value) {
                     if (value == 'increase_bid') {
                       onIncreaseBid();
@@ -1363,7 +1354,8 @@ class BidCard extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(),
+          Container(height: 1.3,width: double.infinity,color: Colors.grey[300],),
+          SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(

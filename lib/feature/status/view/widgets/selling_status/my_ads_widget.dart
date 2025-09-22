@@ -544,53 +544,63 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 Icon(Icons.comment, size: 18, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 const Text('0', style: TextStyle(fontSize: 13)),
-                const SizedBox(width: 12),
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: Colors.grey.shade600),
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      context.pushNamed(
-                        RouteNames.adPostPage,
-                        extra: {
-                          'categoryId': ad['category_id']?.toString() ?? '',
-                          'adData': ad,
-                        },
-                      );
-
-                      developer.log(
-                        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
-                      );
-                    } else if (value == 'delete') {
-                      _deleteAd(ad['id'] as String);
-                    } else if (value == 'mark_delivered') {
-                      _markAsDelivered(ad['id'] as String);
-                    } else if (value == 'check_auction') {
-                      _checkAuctionTerms(ad['id'] as String);
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Delete'),
-                        ),
-                        if (ad['status'] == '1')
-                          const PopupMenuItem(
-                            value: 'mark_delivered',
-                            child: Text('Mark as Delivered'),
-                          ),
-                        if (ad['status'] == '1' && ad['if_auction'] == '0')
-                          const PopupMenuItem(
-                            value: 'check_auction',
-                            child: Text('Move to Auction'),
-                          ),
-                      ],
-                ),
+                
+               
               ],
             ),
+
+           
             const SizedBox(height: 10),
-            GestureDetector(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ad['title'] as String,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _adDetail('App ID', ad['id'] as String),
+                      _adDetail(
+                        'Posted Date',
+                        _formatDate(ad['created_on'] as String),
+                      ),
+                      _adDetail(
+                        'Exp Date',
+                        _formatExpDate(ad['created_on'] as String),
+                      ),
+                      _adDetail('Price', '₹${ad['price']}', highlight: true),
+                      _adDetail(
+                        'Category',
+                        _getCategoryName(ad['category_id'] as String),
+                      ),
+                      _adDetail(
+                        'Item In',
+                        ad['if_auction'] == '1' ? 'Auction' : 'Market Place',
+                      ),
+                      _adDetail(
+                        'Auction Attempt',
+                        ad['auction_attempt'] ?? '0/3',
+                      ),
+                      _adDetail(
+                        'Auction Price',
+                        ad['auction_starting_price'] ?? 'N/A',
+                      ),
+                      _adDetail('Meetings Done', '0'),
+                      _adDetail('Location', ad['district'] ?? 'Unknown'),
+                    ],
+                  ),
+                  
+                ),
+                Column(
+                  children: [
+                     GestureDetector(
               onTap: () {
                 setState(() {
                   _expandedImages[ad['id']] = !isExpanded;
@@ -646,55 +656,10 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           'assets/placeholder_image.png',
                           fit: BoxFit.cover,
                         ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ad['title'] as String,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      _adDetail('App ID', ad['id'] as String),
-                      _adDetail(
-                        'Posted Date',
-                        _formatDate(ad['created_on'] as String),
-                      ),
-                      _adDetail(
-                        'Exp Date',
-                        _formatExpDate(ad['created_on'] as String),
-                      ),
-                      _adDetail('Price', '₹${ad['price']}', highlight: true),
-                      _adDetail(
-                        'Category',
-                        _getCategoryName(ad['category_id'] as String),
-                      ),
-                      _adDetail(
-                        'Item In',
-                        ad['if_auction'] == '1' ? 'Auction' : 'Market Place',
-                      ),
-                      _adDetail(
-                        'Auction Attempt',
-                        ad['auction_attempt'] ?? '0/3',
-                      ),
-                      _adDetail(
-                        'Auction Price',
-                        ad['auction_starting_price'] ?? 'N/A',
-                      ),
-                      _adDetail('Meetings Done', '0'),
-                      _adDetail('Location', ad['district'] ?? 'Unknown'),
-                    ],
-                  ),
-                ),
+                         ),
+                     ),
+                  ],
+                )
               ],
             ),
             const SizedBox(height: 10),
@@ -722,8 +687,13 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 ),
               ],
             ),
+            SizedBox(height: 15,),
+             Container(color: Colors.grey, height: 1.5,width: double.infinity,),
+           Row(
+           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [  
             if (ad['rejectionMsg'] != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 1),
               Center(
                 child: Text(
                   ad['rejectionMsg'] as String,
@@ -734,24 +704,77 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 ),
               ),
             ],
-            const Divider(color: Colors.grey, thickness: 1, height: 20),
+          
+            
+            SizedBox(
+              width: 1,
+            ),               
             if (_adStatuses[ad['id']] != null &&
                 _adStatuses[ad['id']]!.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                padding: const EdgeInsets.symmetric(vertical: 0.0),
                 child: Center(
                   child: Text(
                     _adStatuses[ad['id']]!,
                     style: const TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 20,
                     ),
                   ),
                 ),
+
               ),
+              
             ],
-            const Divider(color: Colors.grey, thickness: 1, height: 20),
+             PopupMenuButton<String>(
+                  icon: Icon(Icons.menu, color: Colors.grey.shade600),
+                  
+                  position: PopupMenuPosition.over,
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      context.pushNamed(
+                        RouteNames.adPostPage,
+                        extra: {
+                          'categoryId': ad['category_id']?.toString() ?? '',
+                          'adData': ad,
+                        },
+                      );
+
+                      developer.log(
+                        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
+                      );
+                    } else if (value == 'delete') {
+                      _deleteAd(ad['id'] as String);
+                    } else if (value == 'mark_delivered') {
+                      _markAsDelivered(ad['id'] as String);
+                    } else if (value == 'check_auction') {
+                      _checkAuctionTerms(ad['id'] as String);
+                    }
+                  },
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                        if (ad['status'] == '1')
+                          const PopupMenuItem(
+                            value: 'mark_delivered',
+                            child: Text('Mark as Delivered'),
+                          ),
+                        if (ad['status'] == '1' && ad['if_auction'] == '0')
+                          const PopupMenuItem(
+                            value: 'check_auction',
+                            child: Text('Move to Auction'),
+                          ),
+                      ],
+                ),
+            ],
+            ),
+            Container(color: Colors.grey, height: 1.5,width: double.infinity,),
+           
             SizedBox(
               height: 250,
               child: SellerTabBarWidget(adData: ad, postId: ad['id'] as String),
