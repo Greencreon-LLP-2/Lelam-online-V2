@@ -1163,6 +1163,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                       );
                     }, childCount: _posts.length),
                   ),
+            SliverToBoxAdapter(child: const SizedBox(height: 80)),
           ],
         ),
       ),

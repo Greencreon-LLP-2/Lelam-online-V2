@@ -549,7 +549,7 @@ class _OthersPageState extends State<OthersPage> {
     return filtered;
   }
 
- void _showFilterBottomSheet() {
+  void _showFilterBottomSheet() {
     String selectedFilter = 'Vehicle Type'; // Default selected filter
 
     showModalBottomSheet(
@@ -559,207 +559,228 @@ class _OthersPageState extends State<OthersPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: StatefulBuilder(
-          builder: (context, setModalState) => Column(
-            children: [
-              // Top handle and title
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Filter Bikes & Others',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setModalState(() {
-                          _selectedVehicleTypes.clear();
-                          _selectedPriceRange = 'all';
-                          _selectedCondition = 'all';
-                          _selectedFuelTypes.clear();
-                        });
-                      },
-                      child: const Text(
-                        'Clear All',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+      builder:
+          (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: StatefulBuilder(
+              builder:
+                  (context, setModalState) => Column(
+                    children: [
+                      // Top handle and title
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 12),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // Two-column layout
-              Expanded(
-                child: Row(
-                  children: [
-                    // Left: Filter Categories
-                    Container(
-                      width: 140,
-                      color: Palette.primaryblue,
-                      child: ListView(
-                        children: [
-                          _buildFilterCategoryTile(
-                            title: 'Vehicle Type',
-                            isSelected: selectedFilter == 'Vehicle Type',
-                            onTap: () {
-                              setModalState(() => selectedFilter = 'Vehicle Type');
-                            },
-                          ),
-                          _buildFilterCategoryTile(
-                            title: 'Price Range',
-                            isSelected: selectedFilter == 'Price Range',
-                            onTap: () {
-                              setModalState(() => selectedFilter = 'Price Range');
-                            },
-                          ),
-                          _buildFilterCategoryTile(
-                            title: 'Condition',
-                            isSelected: selectedFilter == 'Condition',
-                            onTap: () {
-                              setModalState(() => selectedFilter = 'Condition');
-                            },
-                          ),
-                          _buildFilterCategoryTile(
-                            title: 'Fuel Type',
-                            isSelected: selectedFilter == 'Fuel Type',
-                            onTap: () {
-                              setModalState(() => selectedFilter = 'Fuel Type');
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Right: Filter Options
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (selectedFilter == 'Vehicle Type')
-                              _buildMultiSelectFilterSection(
-                                'Vehicle Type',
-                                _vehicleTypes,
-                                _selectedVehicleTypes,
-                                setModalState,
+                            const Text(
+                              'Filter Bikes & Others',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                            if (selectedFilter == 'Price Range')
-                              _buildSingleSelectFilterSection(
-                                'Price Range',
-                                _priceRanges,
-                                _selectedPriceRange,
-                                (value) => setModalState(() => _selectedPriceRange = value),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  _selectedVehicleTypes.clear();
+                                  _selectedPriceRange = 'all';
+                                  _selectedCondition = 'all';
+                                  _selectedFuelTypes.clear();
+                                });
+                              },
+                              child: const Text(
+                                'Clear All',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
                               ),
-                            if (selectedFilter == 'Condition')
-                              _buildSingleSelectFilterSection(
-                                'Condition',
-                                _conditions,
-                                _selectedCondition,
-                                (value) => setModalState(() => _selectedCondition = value),
-                              ),
-                            if (selectedFilter == 'Fuel Type')
-                              _buildMultiSelectFilterSection(
-                                'Fuel Type',
-                                _fuelTypes,
-                                _selectedFuelTypes,
-                                setModalState,
-                              ),
-                            const SizedBox(height: 20),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              // Bottom buttons
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primarypink,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      const Divider(height: 1),
+                      // Two-column layout
+                      Expanded(
+                        child: Row(
+                          children: [
+                            // Left: Filter Categories
+                            Container(
+                              width: 140,
+                              color: Palette.primaryblue,
+                              child: ListView(
+                                children: [
+                                  _buildFilterCategoryTile(
+                                    title: 'Vehicle Type',
+                                    isSelected:
+                                        selectedFilter == 'Vehicle Type',
+                                    onTap: () {
+                                      setModalState(
+                                        () => selectedFilter = 'Vehicle Type',
+                                      );
+                                    },
+                                  ),
+                                  _buildFilterCategoryTile(
+                                    title: 'Price Range',
+                                    isSelected: selectedFilter == 'Price Range',
+                                    onTap: () {
+                                      setModalState(
+                                        () => selectedFilter = 'Price Range',
+                                      );
+                                    },
+                                  ),
+                                  _buildFilterCategoryTile(
+                                    title: 'Condition',
+                                    isSelected: selectedFilter == 'Condition',
+                                    onTap: () {
+                                      setModalState(
+                                        () => selectedFilter = 'Condition',
+                                      );
+                                    },
+                                  ),
+                                  _buildFilterCategoryTile(
+                                    title: 'Fuel Type',
+                                    isSelected: selectedFilter == 'Fuel Type',
+                                    onTap: () {
+                                      setModalState(
+                                        () => selectedFilter = 'Fuel Type',
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Right: Filter Options
+                            Expanded(
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (selectedFilter == 'Vehicle Type')
+                                      _buildMultiSelectFilterSection(
+                                        'Vehicle Type',
+                                        _vehicleTypes,
+                                        _selectedVehicleTypes,
+                                        setModalState,
+                                      ),
+                                    if (selectedFilter == 'Price Range')
+                                      _buildSingleSelectFilterSection(
+                                        'Price Range',
+                                        _priceRanges,
+                                        _selectedPriceRange,
+                                        (value) => setModalState(
+                                          () => _selectedPriceRange = value,
+                                        ),
+                                      ),
+                                    if (selectedFilter == 'Condition')
+                                      _buildSingleSelectFilterSection(
+                                        'Condition',
+                                        _conditions,
+                                        _selectedCondition,
+                                        (value) => setModalState(
+                                          () => _selectedCondition = value,
+                                        ),
+                                      ),
+                                    if (selectedFilter == 'Fuel Type')
+                                      _buildMultiSelectFilterSection(
+                                        'Fuel Type',
+                                        _fuelTypes,
+                                        _selectedFuelTypes,
+                                        setModalState,
+                                      ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {});
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Palette.primaryblue,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      // Bottom buttons
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border(
+                            top: BorderSide(color: Colors.grey.shade200),
                           ),
                         ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primarypink,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setState(() {});
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Palette.primaryblue,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Apply Filters',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                    ],
+                  ),
+            ),
           ),
-        ),
-      ),
     );
   }
 
- Widget _buildFilterCategoryTile({
+  Widget _buildFilterCategoryTile({
     required String title,
     required bool isSelected,
     required VoidCallback onTap,
@@ -822,12 +843,19 @@ class _OthersPageState extends State<OthersPage> {
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  color:
+                      isSelected
+                          ? Palette.primarypink.withOpacity(0.1)
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    color:
+                        isSelected ? Palette.primarypink : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -855,8 +883,10 @@ class _OthersPageState extends State<OthersPage> {
                       child: Text(
                         option,
                         style: TextStyle(
-                          color: isSelected ? Palette.primarypink : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color:
+                              isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                           fontSize: 12,
                         ),
                       ),
@@ -897,12 +927,19 @@ class _OthersPageState extends State<OthersPage> {
               onTap: () => onChanged(option),
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  color:
+                      isSelected
+                          ? Palette.primarypink.withOpacity(0.1)
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    color:
+                        isSelected ? Palette.primarypink : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -921,8 +958,10 @@ class _OthersPageState extends State<OthersPage> {
                       child: Text(
                         displayText,
                         style: TextStyle(
-                          color: isSelected ? Palette.primarypink : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color:
+                              isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                           fontSize: 12,
                         ),
                       ),
@@ -937,7 +976,6 @@ class _OthersPageState extends State<OthersPage> {
     );
   }
 
- 
   int _getActiveFilterCount() {
     int count = 0;
     if (_selectedVehicleTypes.isNotEmpty) count++;
@@ -1072,57 +1110,63 @@ class _OthersPageState extends State<OthersPage> {
     }
   }
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
-    backgroundColor: Colors.white,
-    appBar: AppBar(
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
-      elevation: 0,
-      leading: IconButton(
-        onPressed: () => Navigator.pop(context),
-        icon: const Icon(Icons.arrow_back, color: Colors.black87),
-      ),
-      title: _showAppBarSearch ? _buildAppBarSearchField() : const Text('Bikes & Others'),
-      actions: [
-        Stack(
-          children: [
-            IconButton(
-              onPressed: _showFilterBottomSheet,
-              icon: const Icon(Icons.tune, color: Colors.black87),
-            ),
-            if (_getActiveFilterCount() > 0)
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '${_getActiveFilterCount()}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+        ),
+        title:
+            _showAppBarSearch
+                ? _buildAppBarSearchField()
+                : const Text('Bikes & Others'),
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                onPressed: _showFilterBottomSheet,
+                icon: const Icon(Icons.tune, color: Colors.black87),
+              ),
+              if (_getActiveFilterCount() > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${_getActiveFilterCount()}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
-        _isLoadingLocations
-            ? const CircularProgressIndicator()
-            : PopupMenuButton<String>(
+            ],
+          ),
+          _isLoadingLocations
+              ? const CircularProgressIndicator()
+              : PopupMenuButton<String>(
                 icon: const Icon(Icons.location_on, color: Colors.black87),
                 onSelected: (String value) {
                   setState(() {
-                    _selectedLocation = value == 'all'
-                        ? 'all'
-                        : _locations.firstWhere((loc) => loc.name == value).id;
+                    _selectedLocation =
+                        value == 'all'
+                            ? 'all'
+                            : _locations
+                                .firstWhere((loc) => loc.name == value)
+                                .id;
                     _fetchBikes();
                   });
                 },
@@ -1133,14 +1177,22 @@ Widget build(BuildContext context) {
                       child: Row(
                         children: [
                           if (_selectedLocation ==
-                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
                             const Icon(
                               Icons.check,
                               color: Colors.blue,
                               size: 16,
                             ),
                           if (_selectedLocation ==
-                              (city == 'all' ? 'all' : _locations.firstWhere((loc) => loc.name == city).id))
+                              (city == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == city)
+                                      .id))
                             const SizedBox(width: 8),
                           Text(city == 'all' ? 'All Kerala' : city),
                         ],
@@ -1149,110 +1201,116 @@ Widget build(BuildContext context) {
                   }).toList();
                 },
               ),
-      ],
-    ),
-    body: GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverToBoxAdapter(
-            child: _isLoadingLocations
-                ? const Center(child: CircularProgressIndicator())
-                : Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Column(
-                      children: [
-                        if (!_showAppBarSearch) _buildSearchField(),
-                        if (_searchQuery.isNotEmpty) // Show SearchResultsWidget when typing
-                          SearchResultsPage(searchQuery: _searchQuery,),
-                      ],
-                    ),
-                  ),
-          ),
-          if (!_isLoadingLocations && _searchQuery.isEmpty) // Hide posts when searching
-            _isLoading
-                ? const SliverToBoxAdapter(
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : _errorMessage != null
-                    ? SliverToBoxAdapter(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error,
-                                size: 64,
-                                color: Colors.grey.shade400,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error: $_errorMessage',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _fetchBikes,
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : filteredBikes.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.search_off,
-                                    size: 64,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No bikes found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Try adjusting your filters or search terms',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final bike = filteredBikes[index];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: _buildBikeCard(bike),
-                                );
-                              },
-                              childCount: filteredBikes.length,
-                            ),
-                          ),
         ],
       ),
-    ),
-  );
-}
+      body: GestureDetector(
+        onTap:
+            () =>
+                FocusScope.of(
+                  context,
+                ).unfocus(), // Dismiss keyboard on tap outside
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child:
+                  _isLoadingLocations
+                      ? const Center(child: CircularProgressIndicator())
+                      : Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Column(
+                          children: [
+                            if (!_showAppBarSearch) _buildSearchField(),
+                            if (_searchQuery
+                                .isNotEmpty) // Show SearchResultsWidget when typing
+                              SearchResultsWidget(searchQuery: _searchQuery),
+                          ],
+                        ),
+                      ),
+            ),
+            if (!_isLoadingLocations &&
+                _searchQuery.isEmpty) // Hide posts when searching
+              _isLoading
+                  ? const SliverToBoxAdapter(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                  : _errorMessage != null
+                  ? SliverToBoxAdapter(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: $_errorMessage',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchBikes,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  : filteredBikes.isEmpty
+                  ? SliverToBoxAdapter(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No bikes found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try adjusting your filters or search terms',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  : SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final bike = filteredBikes[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildBikeCard(bike),
+                      );
+                    }, childCount: filteredBikes.length),
+                  ),
+            SliverToBoxAdapter(child: const SizedBox(height: 80)),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<String> get _keralaCities {
     return ['all', ..._locations.map((loc) => loc.name)];
   }

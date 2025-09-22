@@ -349,9 +349,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
   // New method for relevance scoring
   double _calculateRelevanceScore(MarketplacePost post, String query) {
     double score = 0;
-    final propertyType = post.filters['propertyType']?.isNotEmpty ?? false
-        ? post.filters['propertyType']!.first.toLowerCase()
-        : '';
+    final propertyType =
+        post.filters['propertyType']?.isNotEmpty ?? false
+            ? post.filters['propertyType']!.first.toLowerCase()
+            : '';
     final sellerType = post.byDealer == '1' ? 'dealer' : 'owner';
 
     if (post.title.toLowerCase().contains(query)) score += 3.0;
@@ -368,117 +369,125 @@ class _RealEstatePageState extends State<RealEstatePage> {
   List<MarketplacePost> get filteredPosts {
     if (!_filtersChanged) return _filteredPostsCache;
 
-    final filtered = _posts.where((post) {
-      final propertyType = post.filters['propertyType']?.isNotEmpty ?? false
-          ? post.filters['propertyType']!.first
-          : 'N/A';
-      final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+    final filtered =
+        _posts.where((post) {
+          final propertyType =
+              post.filters['propertyType']?.isNotEmpty ?? false
+                  ? post.filters['propertyType']!.first
+                  : 'N/A';
+          final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
 
-      // Search query filtering
-      if (_searchQuery.trim().isNotEmpty) {
-        final query = _searchQuery.toLowerCase().trim();
-        final searchableText = [
-          post.title.toLowerCase(),
-          propertyType.toLowerCase(),
-          _getLocationName(post.parentZoneId).toLowerCase(),
-          post.description.toLowerCase(),
-          sellerType.toLowerCase(),
-        ].join(' ');
-        if (!searchableText.contains(query)) return false;
-      }
+          // Search query filtering
+          if (_searchQuery.trim().isNotEmpty) {
+            final query = _searchQuery.toLowerCase().trim();
+            final searchableText = [
+              post.title.toLowerCase(),
+              propertyType.toLowerCase(),
+              _getLocationName(post.parentZoneId).toLowerCase(),
+              post.description.toLowerCase(),
+              sellerType.toLowerCase(),
+            ].join(' ');
+            if (!searchableText.contains(query)) return false;
+          }
 
-      // Location filter
-      if (_selectedLocation != 'all' && post.parentZoneId != _selectedLocation)
-        return false;
+          // Location filter
+          if (_selectedLocation != 'all' &&
+              post.parentZoneId != _selectedLocation)
+            return false;
 
-      // Listing type filter
-      if (_listingType == 'auction' && post.ifAuction != '1') return false;
-      if (_listingType == 'sale' && post.ifAuction != '0') return false;
+          // Listing type filter
+          if (_listingType == 'auction' && post.ifAuction != '1') return false;
+          if (_listingType == 'sale' && post.ifAuction != '0') return false;
 
-      // Property type filter
-      if (_selectedPropertyTypes.isNotEmpty &&
-          !(_selectedPropertyTypes.contains(propertyType)))
-        return false;
+          // Property type filter
+          if (_selectedPropertyTypes.isNotEmpty &&
+              !(_selectedPropertyTypes.contains(propertyType)))
+            return false;
 
-      // Price range filter
-      if (_selectedPriceRange != 'all') {
-        int price = post.ifAuction == '1'
-            ? (int.tryParse(post.auctionStartingPrice) ?? 0)
-            : (int.tryParse(post.price) ?? 0);
-        switch (_selectedPriceRange) {
-          case 'Under 50L':
-            if (price >= 5000000) return false;
-            break;
-          case '50L-1Cr':
-            if (price < 5000000 || price >= 10000000) return false;
-            break;
-          case '1Cr-2Cr':
-            if (price < 10000000 || price >= 20000000) return false;
-            break;
-          case '2Cr-5Cr':
-            if (price < 20000000 || price >= 50000000) return false;
-            break;
-          case 'Above 5Cr':
-            if (price < 50000000) return false;
-            break;
-        }
-      }
+          // Price range filter
+          if (_selectedPriceRange != 'all') {
+            int price =
+                post.ifAuction == '1'
+                    ? (int.tryParse(post.auctionStartingPrice) ?? 0)
+                    : (int.tryParse(post.price) ?? 0);
+            switch (_selectedPriceRange) {
+              case 'Under 50L':
+                if (price >= 5000000) return false;
+                break;
+              case '50L-1Cr':
+                if (price < 5000000 || price >= 10000000) return false;
+                break;
+              case '1Cr-2Cr':
+                if (price < 10000000 || price >= 20000000) return false;
+                break;
+              case '2Cr-5Cr':
+                if (price < 20000000 || price >= 50000000) return false;
+                break;
+              case 'Above 5Cr':
+                if (price < 50000000) return false;
+                break;
+            }
+          }
 
-      // Bedroom range filter
-      final bedrooms = post.filters['bedrooms']?.isNotEmpty ?? false
-          ? post.filters['bedrooms']!.first
-          : 'N/A';
-      if (_selectedBedroomRange != 'all' && bedrooms != _selectedBedroomRange)
-        return false;
+          // Bedroom range filter
+          final bedrooms =
+              post.filters['bedrooms']?.isNotEmpty ?? false
+                  ? post.filters['bedrooms']!.first
+                  : 'N/A';
+          if (_selectedBedroomRange != 'all' &&
+              bedrooms != _selectedBedroomRange)
+            return false;
 
-      // Area range filter
-      final areaStr = post.filters['area']?.isNotEmpty ?? false
-          ? post.filters['area']!.first
-          : '0';
-      int area = int.tryParse(areaStr) ?? 0;
-      if (_selectedAreaRange != 'all') {
-        switch (_selectedAreaRange) {
-          case 'Under 500 sq ft':
-            if (area >= 500) return false;
-            break;
-          case '500-1000 sq ft':
-            if (area < 500 || area >= 1000) return false;
-            break;
-          case '1000-1500 sq ft':
-            if (area < 1000 || area >= 1500) return false;
-            break;
-          case '1500-2000 sq ft':
-            if (area < 1500 || area >= 2000) return false;
-            break;
-          case 'Above 2000 sq ft':
-            if (area < 2000) return false;
-            break;
-        }
-      }
+          // Area range filter
+          final areaStr =
+              post.filters['area']?.isNotEmpty ?? false
+                  ? post.filters['area']!.first
+                  : '0';
+          int area = int.tryParse(areaStr) ?? 0;
+          if (_selectedAreaRange != 'all') {
+            switch (_selectedAreaRange) {
+              case 'Under 500 sq ft':
+                if (area >= 500) return false;
+                break;
+              case '500-1000 sq ft':
+                if (area < 500 || area >= 1000) return false;
+                break;
+              case '1000-1500 sq ft':
+                if (area < 1000 || area >= 1500) return false;
+                break;
+              case '1500-2000 sq ft':
+                if (area < 1500 || area >= 2000) return false;
+                break;
+              case 'Above 2000 sq ft':
+                if (area < 2000) return false;
+                break;
+            }
+          }
 
-      // Furnishing filter
-      final furnishing = post.filters['furnishing']?.isNotEmpty ?? false
-          ? post.filters['furnishing']!.first
-          : 'N/A';
-      if (_selectedFurnishings.isNotEmpty &&
-          !_selectedFurnishings.contains(furnishing))
-        return false;
+          // Furnishing filter
+          final furnishing =
+              post.filters['furnishing']?.isNotEmpty ?? false
+                  ? post.filters['furnishing']!.first
+                  : 'N/A';
+          if (_selectedFurnishings.isNotEmpty &&
+              !_selectedFurnishings.contains(furnishing))
+            return false;
 
-      // Posted by filter
-      if (_selectedPostedBy != 'all') {
-        switch (_selectedPostedBy) {
-          case 'Owner':
-            if (sellerType != 'Owner') return false;
-            break;
-          case 'Builder':
-          case 'Agent':
-            if (sellerType != 'Dealer') return false;
-            break;
-        }
-      }
+          // Posted by filter
+          if (_selectedPostedBy != 'all') {
+            switch (_selectedPostedBy) {
+              case 'Owner':
+                if (sellerType != 'Owner') return false;
+                break;
+              case 'Builder':
+              case 'Agent':
+                if (sellerType != 'Dealer') return false;
+                break;
+            }
+          }
 
-      return true;
-    }).toList();
+          return true;
+        }).toList();
 
     // Sort posts based on search query relevance if search query exists
     if (_searchQuery.trim().isNotEmpty) {
@@ -618,24 +627,27 @@ class _RealEstatePageState extends State<RealEstatePage> {
                               width: 100,
                               color: Palette.primaryblue,
                               child: ListView.builder(
-                                itemCount: [
-                                  'Property Type',
-                                  'Price Range',
-                                  'Bedrooms',
-                                  'Area',
-                                  'Furnishing',
-                                  'Posted By'
-                                ].length,
+                                itemCount:
+                                    [
+                                      'Property Type',
+                                      'Price Range',
+                                      'Bedrooms',
+                                      'Area',
+                                      'Furnishing',
+                                      'Posted By',
+                                    ].length,
                                 itemBuilder: (context, index) {
-                                  final category = [
-                                    'Property Type',
-                                    'Price Range',
-                                    'Bedrooms',
-                                    'Area',
-                                    'Furnishing',
-                                    'Posted By'
-                                  ][index];
-                                  final isSelected = _selectedCategory == category;
+                                  final category =
+                                      [
+                                        'Property Type',
+                                        'Price Range',
+                                        'Bedrooms',
+                                        'Area',
+                                        'Furnishing',
+                                        'Posted By',
+                                      ][index];
+                                  final isSelected =
+                                      _selectedCategory == category;
                                   return GestureDetector(
                                     onTap: () {
                                       setModalState(() {
@@ -648,14 +660,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                         horizontal: 12,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? Colors.white
-                                            : Colors.transparent,
+                                        color:
+                                            isSelected
+                                                ? Colors.white
+                                                : Colors.transparent,
                                         border: Border(
                                           left: BorderSide(
-                                            color: isSelected
-                                                ? Palette.primaryblue
-                                                : Colors.transparent,
+                                            color:
+                                                isSelected
+                                                    ? Palette.primaryblue
+                                                    : Colors.transparent,
                                             width: 4,
                                           ),
                                         ),
@@ -664,12 +678,14 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                         category,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: isSelected
-                                              ? FontWeight.w600
-                                              : FontWeight.normal,
-                                          color: isSelected
-                                              ? Palette.primaryblue
-                                              : Colors.white,
+                                          fontWeight:
+                                              isSelected
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                          color:
+                                              isSelected
+                                                  ? Palette.primaryblue
+                                                  : Colors.white,
                                         ),
                                       ),
                                     ),
@@ -703,7 +719,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 onPressed: () => Navigator.pop(context),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primarypink,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -856,7 +874,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primaryblue,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -914,12 +934,19 @@ class _RealEstatePageState extends State<RealEstatePage> {
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  color:
+                      isSelected
+                          ? Palette.primarypink.withOpacity(0.1)
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    color:
+                        isSelected ? Palette.primarypink : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -947,8 +974,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       child: Text(
                         option,
                         style: TextStyle(
-                          color: isSelected ? Palette.primarypink : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color:
+                              isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                           fontSize: 12,
                         ),
                       ),
@@ -998,7 +1027,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Min Price',
-                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    labelStyle: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -1007,7 +1039,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       borderRadius: BorderRadius.circular(6),
                       borderSide: const BorderSide(color: Palette.primarypink),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
@@ -1030,7 +1065,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Max Price',
-                    labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    labelStyle: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(6),
                       borderSide: BorderSide(color: Colors.grey.shade300),
@@ -1039,7 +1077,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       borderRadius: BorderRadius.circular(6),
                       borderSide: const BorderSide(color: Palette.primarypink),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
@@ -1070,10 +1111,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
               margin: const EdgeInsets.symmetric(vertical: 2),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: _selectedPriceRange == 'all' ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                color:
+                    _selectedPriceRange == 'all'
+                        ? Palette.primarypink.withOpacity(0.1)
+                        : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _selectedPriceRange == 'all' ? Palette.primarypink : Colors.grey.shade300,
+                  color:
+                      _selectedPriceRange == 'all'
+                          ? Palette.primarypink
+                          : Colors.grey.shade300,
                   width: 1,
                 ),
               ),
@@ -1143,12 +1190,19 @@ class _RealEstatePageState extends State<RealEstatePage> {
               onTap: () => onChanged(option),
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? Palette.primarypink.withOpacity(0.1) : Colors.grey.shade50,
+                  color:
+                      isSelected
+                          ? Palette.primarypink.withOpacity(0.1)
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isSelected ? Palette.primarypink : Colors.grey.shade300,
+                    color:
+                        isSelected ? Palette.primarypink : Colors.grey.shade300,
                     width: 1,
                   ),
                 ),
@@ -1167,8 +1221,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       child: Text(
                         displayText,
                         style: TextStyle(
-                          color: isSelected ? Palette.primarypink : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color:
+                              isSelected ? Palette.primarypink : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                           fontSize: 12,
                         ),
                       ),
@@ -1198,9 +1254,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
           _priceRanges,
           _selectedPriceRange,
           (value) => setState(() => _selectedPriceRange = value),
-          subtitle: _listingType == 'auction'
-              ? 'Filter by starting bid price'
-              : 'Filter by sale price',
+          subtitle:
+              _listingType == 'auction'
+                  ? 'Filter by starting bid price'
+                  : 'Filter by sale price',
         );
       case 'Bedrooms':
         return _buildSingleSelectFilterSection(
@@ -1246,7 +1303,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return count;
   }
 
- Widget _buildAppBarSearchField() {
+  Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -1259,26 +1316,28 @@ class _RealEstatePageState extends State<RealEstatePage> {
         autofillHints: null, // Disable autofill
         enableSuggestions: false, // Disable suggestions
         enableInteractiveSelection: true,
-        onChanged: (value) => setState(() {
-          _searchQuery = value;
-          _filtersChanged = true;
-        }),
+        onChanged:
+            (value) => setState(() {
+              _searchQuery = value;
+              _filtersChanged = true;
+            }),
         decoration: InputDecoration(
           hintText: 'Search properties...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -1286,8 +1345,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
-
- Widget _buildSearchField() {
+  Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
@@ -1298,6 +1356,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
             _filtersChanged = true;
           });
         },
+
         autofillHints: null, 
         enableSuggestions: false, 
         enableInteractiveSelection: true, 
@@ -1305,18 +1364,19 @@ class _RealEstatePageState extends State<RealEstatePage> {
           hintText: 'Search by property type, location, features...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade200),
@@ -1363,13 +1423,18 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
     return location.name;
   }
- @override
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
       body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard on tap outside
+        onTap:
+            () =>
+                FocusScope.of(
+                  context,
+                ).unfocus(), // Dismiss keyboard on tap outside
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
@@ -1383,9 +1448,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.black87),
               ),
-              title: _showAppBarSearch
-                  ? _buildAppBarSearchField()
-                  : const Text('Real Estate'),
+              title:
+                  _showAppBarSearch
+                      ? _buildAppBarSearchField()
+                      : const Text('Real Estate'),
               actions: [
                 Stack(
                   children: [
@@ -1418,140 +1484,148 @@ class _RealEstatePageState extends State<RealEstatePage> {
                 _isLoadingLocations
                     ? const CircularProgressIndicator()
                     : PopupMenuButton<String>(
-                        icon: const Icon(Icons.location_on, color: Colors.black87),
-                        onSelected: (String value) {
-                          setState(() {
-                            _selectedLocation = value == 'all'
-                                ? 'all'
-                                : _locations.firstWhere((loc) => loc.name == value).id;
-                            _filtersChanged = true;
-                            _fetchPosts();
-                          });
-                        },
-                        itemBuilder: (BuildContext context) {
-                          return _keralaCities.map((String city) {
-                            return PopupMenuItem<String>(
-                              value: city,
-                              child: Row(
-                                children: [
-                                  if (_selectedLocation ==
-                                      (city == 'all'
-                                          ? 'all'
-                                          : _locations
-                                              .firstWhere((loc) => loc.name == city)
-                                              .id))
-                                    const Icon(
-                                      Icons.check,
-                                      color: Colors.blue,
-                                      size: 16,
-                                    ),
-                                  if (_selectedLocation ==
-                                      (city == 'all'
-                                          ? 'all'
-                                          : _locations
-                                              .firstWhere((loc) => loc.name == city)
-                                              .id))
-                                    const SizedBox(width: 8),
-                                  Text(city == 'all' ? 'All Kerala' : city),
-                                ],
-                              ),
-                            );
-                          }).toList();
-                        },
+                      icon: const Icon(
+                        Icons.location_on,
+                        color: Colors.black87,
                       ),
+                      onSelected: (String value) {
+                        setState(() {
+                          _selectedLocation =
+                              value == 'all'
+                                  ? 'all'
+                                  : _locations
+                                      .firstWhere((loc) => loc.name == value)
+                                      .id;
+                          _filtersChanged = true;
+                          _fetchPosts();
+                        });
+                      },
+                      itemBuilder: (BuildContext context) {
+                        return _keralaCities.map((String city) {
+                          return PopupMenuItem<String>(
+                            value: city,
+                            child: Row(
+                              children: [
+                                if (_selectedLocation ==
+                                    (city == 'all'
+                                        ? 'all'
+                                        : _locations
+                                            .firstWhere(
+                                              (loc) => loc.name == city,
+                                            )
+                                            .id))
+                                  const Icon(
+                                    Icons.check,
+                                    color: Colors.blue,
+                                    size: 16,
+                                  ),
+                                if (_selectedLocation ==
+                                    (city == 'all'
+                                        ? 'all'
+                                        : _locations
+                                            .firstWhere(
+                                              (loc) => loc.name == city,
+                                            )
+                                            .id))
+                                  const SizedBox(width: 8),
+                                Text(city == 'all' ? 'All Kerala' : city),
+                              ],
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
               ],
             ),
             SliverToBoxAdapter(
-              child: _isLoadingLocations
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        if (!_showAppBarSearch) _buildSearchField(),
-                      ],
-                    ),
+              child:
+                  _isLoadingLocations
+                      ? const Center(child: CircularProgressIndicator())
+                      : Column(
+                        children: [if (!_showAppBarSearch) _buildSearchField()],
+                      ),
             ),
             if (!_isLoadingLocations)
               _isLoading
                   ? const SliverToBoxAdapter(
-                      child: Center(child: CircularProgressIndicator()),
-                    )
+                    child: Center(child: CircularProgressIndicator()),
+                  )
                   : _errorMessage != null
-                      ? SliverToBoxAdapter(
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.error,
-                                  size: 64,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Error: $_errorMessage',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _fetchPosts,
-                                  child: const Text('Retry'),
-                                ),
-                              ],
+                  ? SliverToBoxAdapter(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error: $_errorMessage',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
                             ),
                           ),
-                        )
-                      : filteredPosts.isEmpty
-                          ? SliverToBoxAdapter(
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.search_off,
-                                      size: 64,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'No properties found',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        color: Colors.grey.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Try adjusting your filters or search terms',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final post = filteredPosts[index];
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 16),
-                                    child: _buildPostCard(post),
-                                  );
-                                },
-                                childCount: filteredPosts.length,
-                              ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchPosts,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  : filteredPosts.isEmpty
+                  ? SliverToBoxAdapter(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No properties found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try adjusting your filters or search terms',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  : SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final post = filteredPosts[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildPostCard(post),
+                      );
+                    }, childCount: filteredPosts.length),
+                  ),
+            SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         ),
       ),
     );
   }
+
   String getImageUrl(String imagePath) {
     final cleanedPath =
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
@@ -1731,9 +1805,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     children: [
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.only(
-                           top: 3
-                          ),
+                          padding: const EdgeInsets.only(top: 3),
                           decoration: BoxDecoration(
                             color:
                                 isAuction
