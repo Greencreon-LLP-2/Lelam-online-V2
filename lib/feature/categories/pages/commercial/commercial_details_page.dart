@@ -85,6 +85,8 @@ class _CommercialProductDetailsPageState
   String _bannerError = '';
    late LoggedUserProvider _userProvider;
 
+   
+
  String _moveToAuctionButtonText = 'Move to Auction';
 
   @override

@@ -134,21 +134,23 @@ class _MarketPlaceProductDetailsPageState
   @override
   void initState() {
     super.initState();
-
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-
-
- _fetchLocations();
-     _fetchSellerComments();
-     _fetchSellerInfo();
-     _checkShortlistStatus();
-     _fetchGalleryImages();
-     _fetchBannerImage();
-
-     _fetchContainerInfo();
+    // Initialize auction status (adjust field names based on your MarketplacePost model)
+    _isWaitingForApproval =
+        widget.product.ifAuction == '1' || widget.product.status == 'pending';
+    _moveToAuctionButtonText =
+        _isWaitingForApproval
+            ? 'Waiting for Admin Approval'
+            : 'Move to Auction';
+    _fetchLocations();
+    _fetchSellerComments();
+    _fetchSellerInfo();
+    _checkShortlistStatus();
+    _fetchGalleryImages();
+    _fetchBannerImage();
+    _fetchContainerInfo();
     _isCheckingShortlist = true;
   }
-
 
   // Add this method to your MarketplaceService2 class
   Future<void> _fetchContainerInfo() async {
@@ -171,122 +173,122 @@ class _MarketPlaceProductDetailsPageState
     }
   }
 
-Widget _buildContainerInfo() {
-  if (_isLoadingContainerInfo) {
-    return const Center(child: CircularProgressIndicator());
-  }
+  Widget _buildContainerInfo() {
+    if (_isLoadingContainerInfo) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  if (_containerInfoError.isNotEmpty) {
-    return Center(
-      child: Text(
-        _containerInfoError,
-        style: const TextStyle(color: Colors.red),
+    if (_containerInfoError.isNotEmpty) {
+      return Center(
+        child: Text(
+          _containerInfoError,
+          style: const TextStyle(color: Colors.red),
+        ),
+      );
+    }
+
+    if (_containerInfo.isEmpty) {
+      return const Center(child: Text('Loading.......'));
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(1, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // First row: 3 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 0)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[0].icon),
+                            _containerInfo[0].value,
+                          ),
+                        if (_containerInfo.length > 1)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[1].icon),
+                            _containerInfo[1].value,
+                          ),
+                        if (_containerInfo.length > 2)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[2].icon),
+                            _containerInfo[2].value,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Second row: 2 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 3)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[3].icon),
+                            _containerInfo[3].value,
+                          ),
+                        if (_containerInfo.length > 4)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[4].icon),
+                            _containerInfo[4].value,
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  if (_containerInfo.isEmpty) {
-    return const Center(child: Text('Loading.......'));
-  }
-
-return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.30),
-          blurRadius: 10,
-          spreadRadius: 1,
-          offset: const Offset(1, 1),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildContainerDetailItem(IconData icon, String text) {
+    return Container(
+      width: 110, // Fixed width for consistent alignment across rows
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
-            'Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // First row: 3 items
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 0)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[0].icon),
-                          _containerInfo[0].value,
-                        ),
-                      if (_containerInfo.length > 1)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[1].icon),
-                          _containerInfo[1].value,
-                        ),
-                      if (_containerInfo.length > 2)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[2].icon),
-                          _containerInfo[2].value,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Second row: 2 items
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 3)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[3].icon),
-                          _containerInfo[3].value,
-                        ),
-                      if (_containerInfo.length > 4)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[4].icon),
-                          _containerInfo[4].value,
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            },
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
           ),
         ],
       ),
-    ),
-  );
-}
-
-Widget _buildContainerDetailItem(IconData icon, String text) {
-  return Container(
-    width: 110, // Fixed width for consistent alignment across rows
-    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(icon, size: 14, color: Colors.grey[700]),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: const TextStyle(fontSize: 14, color: Colors.black),
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   IconData _getIconFromBootstrap(String bootstrapIcon) {
     final iconMap = {
@@ -371,9 +373,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
               return false;
             }
           } else {
-            print(
-              'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
-            );
+            print('Failed to accept terms: HTTP ${acceptResponse.statusCode}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -392,9 +392,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         }
         return termsAccepted;
       } else {
-        print(
-          'Failed to check auction terms: HTTP ${response.statusCode}',
-        );
+        print('Failed to check auction terms: HTTP ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -589,24 +587,13 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
         setState(() {
           _isLoadingBid = false;
         });
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   const SnackBar(
-        //     content: Text('You must accept the auction terms to proceed.'),
-        //     backgroundColor: Colors.red,
-        //     behavior: SnackBarBehavior.floating,
-        //     shape: RoundedRectangleBorder(
-        //      // borderRadius: BorderRadius.circular(8),
-        //     ),
-        //     margin: EdgeInsets.all(16),
-        //   ),
-        // );
         return;
       }
 
       print('Terms accepted, proceeding to move to auction');
       final headers = {'token': MarketplaceService2.token};
       final url =
-          '${MarketplaceService2.baseUrl}/sell-move-to-auction.php?token=${MarketplaceService2.token}&post_id=$id';
+          '${MarketplaceService2.baseUrl}/sell-move-to-auction.php?token=${MarketplaceService2.token}&post_id=$id&user_id=${_userProvider.userId}';
       print('Moving to auction: $url');
 
       final request = http.Request('GET', Uri.parse(url));
@@ -620,35 +607,39 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(responseBody);
-        final bool isSuccess =
-            responseData['status'] == 'true' &&
-            responseData['data'] is List &&
-            responseData['data'].isNotEmpty &&
-            responseData['data'][0]['check'] == 1;
+        final bool isSuccess = responseData['status'] == 'true';
         final String message =
-            responseData['data']?[0]['message']?.toString() ?? '';
+            responseData['data']?[0]['message']?.toString() ??
+            'Successfully moved to auction';
 
         if (isSuccess) {
-          print('Successfully moved to auction');
-          setState(() {
-            _moveToAuctionButtonText = 'Auction Waiting for Approval';
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                message.isNotEmpty ? message : 'Successfully moved to auction',
+          print('Successfully moved to auction: $message');
+          if (mounted) {
+            setState(() {
+              _moveToAuctionButtonText = 'Waiting for Approval';
+              _isWaitingForApproval = true;
+              _isLoadingBid = false;
+            });
+            print('Showing auction confirmation dialog');
+            await _showAuctionConfirmationDialog();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  message.isNotEmpty
+                      ? message
+                      : 'Successfully moved to auction',
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                margin: const EdgeInsets.all(16),
               ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-          Navigator.pop(context);
+            );
+          }
         } else {
-          throw Exception('');
+          throw Exception('Failed to move to auction: $message');
         }
       } else {
         throw Exception(
@@ -657,20 +648,184 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       }
     } catch (e) {
       print('Error moving to auction: $e');
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text('Error: $e'),
-      //     backgroundColor: Colors.red,
-      //     behavior: SnackBarBehavior.floating,
-      //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      //     margin: const EdgeInsets.all(16),
-      //   ),
-      // );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to move to auction: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoadingBid = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingBid = false;
+        });
+      }
     }
+  }
+
+  Future<void> _showAuctionConfirmationDialog() async {
+    if (!mounted) {
+      print('Widget not mounted, cannot show auction confirmation dialog');
+      return;
+    }
+    if (_isBidDialogOpen || _isMeetingDialogOpen) {
+      print(
+        'Another dialog is open (bid: $_isBidDialogOpen, meeting: $_isMeetingDialogOpen), skipping auction confirmation dialog',
+      );
+      return;
+    }
+
+    print('Showing auction confirmation dialog');
+    const String supportPhoneNumber = '+918089308048';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        print('Building auction confirmation dialog');
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: Colors.white,
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Thank You',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, size: 28, color: Colors.grey[700]),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                splashRadius: 24,
+                onPressed: () {
+                  print('Closing auction confirmation dialog');
+                  Navigator.of(dialogContext).pop();
+                },
+                tooltip: 'Close dialog',
+              ),
+            ],
+          ),
+          content: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'Thank you for showing interest in Auction. Your product will be in the upcoming auction soon. You will receive a callback before the auction, or you can check status in My Ads or call support.',
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      print('Navigating to MyAdsWidget from auction dialog');
+                      Navigator.of(dialogContext).pop();
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const MyAdsWidget(),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Check Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      print('Initiating call to support: $supportPhoneNumber');
+                      final Uri phoneUri = Uri(
+                        scheme: 'tel',
+                        path: supportPhoneNumber,
+                      );
+                      if (await canLaunchUrl(phoneUri)) {
+                        await launchUrl(phoneUri);
+                      } else {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Unable to initiate call. Please try again.',
+                              ),
+                              backgroundColor: Colors.red[800],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Call Support',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          actionsPadding: const EdgeInsets.all(16),
+        );
+      },
+    );
+    print('Auction confirmation dialog closed');
   }
 
   Future<void> _fetchSellerComments() async {
@@ -820,9 +975,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
             });
             print('Successfully fetched highest bid: $dataValue');
           } else {
-            print(
-              'API returned non-numeric data (possible error): $dataValue',
-            );
+            print('API returned non-numeric data (possible error): $dataValue');
             setState(() {
               _currentHighestBid = 'Error: $dataValue';
             });
@@ -834,9 +987,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
           });
         }
       } else {
-        print(
-          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
-        );
+        print('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
         setState(() {
           _currentHighestBid = '0';
         });
@@ -1042,9 +1193,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
   }
 
   Future<void> _fetchBannerImage() async {
-    print(
-      'MarketPlaceProductDetailsPage - _fetchBannerImage: Starting',
-    );
+    print('MarketPlaceProductDetailsPage - _fetchBannerImage: Starting');
     try {
       setState(() {
         _isLoadingBanner = true;
@@ -1108,9 +1257,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       setState(() {
         _isLoadingBanner = false;
       });
-      print(
-        'MarketPlaceProductDetailsPage - _fetchBannerImage: Completed',
-      );
+      print('MarketPlaceProductDetailsPage - _fetchBannerImage: Completed');
     }
   }
 
@@ -1153,27 +1300,26 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     );
   }
 
-void _showLoginPromptDialog(BuildContext context, String action) {
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      return LoginDialog(
-        onSuccess: () {
-         _fetchLocations();
-     _fetchSellerComments();
-     _fetchSellerInfo();
-     _checkShortlistStatus();
-     _fetchGalleryImages();
-     _fetchBannerImage();
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return LoginDialog(
+          onSuccess: () {
+            _fetchLocations();
+            _fetchSellerComments();
+            _fetchSellerInfo();
+            _checkShortlistStatus();
+            _fetchGalleryImages();
+            _fetchBannerImage();
 
-     _fetchContainerInfo();
-       
-        },
-      );
-    },
-  );
-}
+            _fetchContainerInfo();
+          },
+        );
+      },
+    );
+  }
 
   void showProductBidDialog(BuildContext context) async {
     if (!_userProvider.isLoggedIn) {
@@ -2173,7 +2319,8 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => MyMeetingsWidget(showAppBar: true,),
+                            builder:
+                                (context) => MyMeetingsWidget(showAppBar: true),
                           ),
                         );
                       }
@@ -2505,71 +2652,72 @@ void _showLoginPromptDialog(BuildContext context, String action) {
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'You are the first one to ask question',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'You are the first one to ask question',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  barrierDismissible: true,
-                  builder: (dialogContext) {
-                    return LoginDialog(
-                      onSuccess: () {
-                        if (mounted) {
-                          Navigator.of(dialogContext).pop();
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => ReviewDialog(postId: id),
-                          );
-                        }
-                      },
-                    );
-                  },
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
                 );
-              } else {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (dialogContext) {
+                      return LoginDialog(
+                        onSuccess: () {
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
             ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
+          ],
+        ),
+      ],
+    );
+  }
+
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
@@ -2970,7 +3118,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
               bottom: 0,
               child: Container(
                 padding: const EdgeInsets.all(10),
-                
+
                 child: Row(
                   children: [
                     if (_userProvider.userId == widget.product.createdBy) ...[
@@ -2999,29 +3147,28 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                       Expanded(
                         child: ElevatedButton(
                           onPressed:
-                              _isWaitingForApproval ? null : _moveToAuction,
+                              _isWaitingForApproval || _isLoadingBid
+                                  ? null
+                                  : _moveToAuction,
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                                 _isWaitingForApproval
-                                    ? Colors
-                                        .white // White background when waiting
-                                    : Palette
-                                        .primaryblue, // Original blue when active
+                                    ? Colors.grey[800]
+                                    : Palette.primaryblue,
                             foregroundColor:
                                 _isWaitingForApproval
-                                    ? Colors
-                                        .black // Black text when waiting
-                                    : Colors.white, // White text when active
+                                    ? Colors.black
+                                    : Colors.white,
                             side:
                                 _isWaitingForApproval
                                     ? const BorderSide(
                                       color: Colors.black,
                                       width: 1,
-                                    ) // Black border when waiting
-                                    : BorderSide.none, // No border when active
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
+                                    )
+                                    : BorderSide.none,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           child:
@@ -3040,12 +3187,11 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                                     _moveToAuctionButtonText,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 16,
                                       color:
                                           _isWaitingForApproval
-                                              ? Colors
-                                                  .black // Black text when waiting
-                                              : Colors
-                                                  .white, // White text when active
+                                              ? Colors.black
+                                              : Colors.white,
                                     ),
                                   ),
                         ),

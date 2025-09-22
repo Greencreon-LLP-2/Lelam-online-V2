@@ -645,7 +645,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                         });
                       },
                       child: Container(
-                        width: 150,
+                        width: 120,
                         height: 180,
                         decoration: BoxDecoration(
                           color: Colors.brown.shade100,

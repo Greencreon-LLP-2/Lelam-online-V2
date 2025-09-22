@@ -513,7 +513,11 @@ class _AdPostPageState extends State<AdPostPage> {
   }
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) _formKey.currentState!.save();
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
+      final adPostForm = _formKey.currentState?.widget as AdPostForm?;
+      adPostForm?.onSubmit();
+    }
   }
 
   @override
@@ -532,6 +536,42 @@ class _AdPostPageState extends State<AdPostPage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          // Add Post/Update button in AppBar
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: ElevatedButton(
+              onPressed: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false
+                  ? null
+                  : _submitForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              child: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      _adData != null ? 'Update Ad' : 'Post Ad',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
       body: AdPostForm(
         formKey: _formKey,
@@ -539,6 +579,7 @@ class _AdPostPageState extends State<AdPostPage> {
         userId: _userProvider.userId!,
         adData: _adData,
         onSubmit: _submitForm,
+        isSaving: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false,
       ),
     );
   }
@@ -549,6 +590,7 @@ class AdPostForm extends StatefulWidget {
   final String categoryId, userId;
   final Map<String, dynamic>? adData;
   final VoidCallback onSubmit;
+  final bool isSaving; // Added to expose isSaving to parent
 
   const AdPostForm({
     super.key,
@@ -557,6 +599,7 @@ class AdPostForm extends StatefulWidget {
     required this.userId,
     this.adData,
     required this.onSubmit,
+    required this.isSaving,
   });
 
   @override
@@ -596,19 +639,18 @@ class _AdPostFormState extends State<AdPostForm>
   String? _selectedDistrict;
 
   List<String> _getRequiredAttributes() => switch (widget.categoryId) {
-    '1' => [
-      'Year',
-      'No of owners',
-      'Fuel Type',
-      'Transmission',
-      'KM Range',
-      'Sold by',
-    ],
-    '2' => ['Plot Area', 'Facing',  'Listed By'],
-    // '3' => ['Vehicle Type', 'Year', 'Fuel Type'],
-    // '4' => ['Item Type', 'Condition'],
-    _ => [],
-  };
+        '1' => [
+            'Year',
+            'No of owners',
+            'Fuel Type',
+            'Transmission',
+            'KM Range',
+            'Sold by',
+          ],
+        '2' => ['Plot Area', 'Facing', 'Listed By'],
+        _ => [],
+      };
+
   void _showToast(String msg, Color color) {
     Fluttertoast.showToast(
       msg: msg,
@@ -658,7 +700,6 @@ class _AdPostFormState extends State<AdPostForm>
       _attributeControllers.clear();
     });
 
-    // Pre-fill form
     if (widget.adData != null) {
       final ad = widget.adData!;
       _controllers['listPrice']!.text = ad['price'] ?? '';
@@ -673,25 +714,24 @@ class _AdPostFormState extends State<AdPostForm>
       await _loadImages(ad);
     }
 
-    // Fetch districts and brands
     _districts = [
-  {
-    'id': '0', // Use a unique ID for "All Kerala"
-    'name': 'All Kerala',
-    'slug': 'all-kerala',
-    'parent_id': '0',
-    'image': '',
-    'description': '',
-    'latitude': '',
-    'longitude': '',
-    'popular': '0',
-    'status': '1',
-    'allstore_onoff': '1',
-    'created_on': '',
-    'updated_on': '',
-  },
-  ...await AttributeValueService.fetchDistricts()
-];
+      {
+        'id': '0',
+        'name': 'All Kerala',
+        'slug': 'all-kerala',
+        'parent_id': '0',
+        'image': '',
+        'description': '',
+        'latitude': '',
+        'longitude': '',
+        'popular': '0',
+        'status': '1',
+        'allstore_onoff': '1',
+        'created_on': '',
+        'updated_on': '',
+      },
+      ...await AttributeValueService.fetchDistricts()
+    ];
     _brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
       _selectedDistrict ??= 'District'; 
@@ -699,23 +739,21 @@ class _AdPostFormState extends State<AdPostForm>
       if (widget.adData?['brand'] != null) {
         _selectedBrand = _brands.firstWhere(
           (b) => b.id == widget.adData!['brand'],
-          orElse:
-              () => Brand(
-                id: '',
-                slug: '',
-                categoryId: '',
-                name: '',
-                image: '',
-                status: '',
-                createdOn: '',
-                updatedOn: '',
-              ),
+          orElse: () => Brand(
+            id: '',
+            slug: '',
+            categoryId: '',
+            name: '',
+            image: '',
+            status: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
         );
         if (_selectedBrand!.id.isEmpty) _selectedBrand = null;
       }
     });
 
-    // Fetch brand models
     if (_selectedBrand != null) {
       _brandModels = await AttributeValueService.fetchBrandModels(
         _selectedBrand!.id,
@@ -725,23 +763,21 @@ class _AdPostFormState extends State<AdPostForm>
         if (widget.adData?['model'] != null) {
           _selectedBrandModel = _brandModels.firstWhere(
             (m) => m.id == widget.adData!['model'],
-            orElse:
-                () => BrandModel(
-                  id: '',
-                  brandId: '',
-                  slug: '',
-                  name: '',
-                  image: '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
+            orElse: () => BrandModel(
+              id: '',
+              brandId: '',
+              slug: '',
+              name: '',
+              image: '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
           );
           if (_selectedBrandModel!.id.isEmpty) _selectedBrandModel = null;
         }
       });
 
-      // Fetch model variations
       if (_selectedBrandModel != null) {
         final variations = await AttributeValueService.fetchModelVariations(
           _selectedBrandModel!.id,
@@ -752,18 +788,17 @@ class _AdPostFormState extends State<AdPostForm>
           if (widget.adData?['model_variation'] != null) {
             _selectedModelVariation = _modelVariations.firstWhere(
               (v) => v.id == widget.adData!['model_variation'],
-              orElse:
-                  () => ModelVariation(
-                    id: '',
-                    slug: '',
-                    brandId: '',
-                    brandModelId: '',
-                    name: '',
-                    image: '',
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
+              orElse: () => ModelVariation(
+                id: '',
+                slug: '',
+                brandId: '',
+                brandModelId: '',
+                name: '',
+                image: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
             );
             if (_selectedModelVariation!.id.isEmpty) {
               _selectedModelVariation = null;
@@ -773,7 +808,6 @@ class _AdPostFormState extends State<AdPostForm>
       }
     }
 
-    // Fetch attributes
     _attributes = await AttributeValueService.fetchAttributes(
       widget.categoryId,
     );
@@ -793,15 +827,12 @@ class _AdPostFormState extends State<AdPostForm>
               _selectedAttributes[attr.name] = filters[attr.id][0].toString();
             }
           }
-
         } catch (e, stack) {
-            developer.log(e.toString());
-
+          developer.log('Error parsing filters: $e', stackTrace: stack);
         }
       }
     });
 
-    // Fetch attribute variations
     for (var attr in _attributes) {
       final variations = await AttributeValueService.fetchAttributeVariations(
         attr.id,
@@ -811,15 +842,14 @@ class _AdPostFormState extends State<AdPostForm>
         if (_selectedAttributes[attr.name] != null) {
           final variation = variations.firstWhere(
             (v) => v.id == _selectedAttributes[attr.name],
-            orElse:
-                () => AttributeVariation(
-                  id: '',
-                  attributeId: attr.id,
-                  name: _selectedAttributes[attr.name] ?? '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
+            orElse: () => AttributeVariation(
+              id: '',
+              attributeId: attr.id,
+              name: _selectedAttributes[attr.name] ?? '',
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
           );
           _selectedAttributes[attr.name] =
               variation.name.isNotEmpty
@@ -913,11 +943,10 @@ class _AdPostFormState extends State<AdPostForm>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder:
-          (context) => ImageSourceBottomSheetWidget(
-            onCameraTap: () => _pickImage(ImageSource.camera),
-            onGalleryTap: () => _pickImage(ImageSource.gallery),
-          ),
+      builder: (context) => ImageSourceBottomSheetWidget(
+        onCameraTap: () => _pickImage(ImageSource.camera),
+        onGalleryTap: () => _pickImage(ImageSource.gallery),
+      ),
     );
   }
 
@@ -929,15 +958,14 @@ class _AdPostFormState extends State<AdPostForm>
         final variation =
             variations?.firstWhere(
               (v) => v.name == value,
-              orElse:
-                  () => AttributeVariation(
-                    id: '',
-                    attributeId: _attributeIdMap[attrName] ?? '',
-                    name: value,
-                    status: '',
-                    createdOn: '',
-                    updatedOn: '',
-                  ),
+              orElse: () => AttributeVariation(
+                id: '',
+                attributeId: _attributeIdMap[attrName] ?? '',
+                name: value,
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
             ) ??
             AttributeVariation(
               id: '',
@@ -973,10 +1001,9 @@ class _AdPostFormState extends State<AdPostForm>
       return;
     }
 
-    // Brand/model validations
     if (widget.categoryId == '1' || widget.categoryId == '2') {
       if (_selectedBrand == null || _selectedBrandModel == null) {
-        _showSnackBar('Category/Brand', Colors.red);
+        _showSnackBar('Please select Category/Brand', Colors.red);
         return;
       }
     }
@@ -1003,7 +1030,6 @@ class _AdPostFormState extends State<AdPostForm>
       return;
     }
 
-    // Validate attributes
     final requiredAttributes = _getRequiredAttributes();
     final missingAttributes =
         requiredAttributes
@@ -1018,7 +1044,6 @@ class _AdPostFormState extends State<AdPostForm>
       return;
     }
 
-    // Build filters properly (attributeId -> variationId/value)
     final filters = <String, List<String>>{};
     _selectedAttributes.forEach((attrName, value) {
       if (value != null && value.isNotEmpty) {
@@ -1027,22 +1052,20 @@ class _AdPostFormState extends State<AdPostForm>
           final variations = _attributeVariations[attrName] ?? [];
           final variation = variations.firstWhere(
             (v) => v.name == value,
-            orElse:
-                () => AttributeVariation(
-                  id: '',
-                  attributeId: attrId,
-                  name: value,
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
+            orElse: () => AttributeVariation(
+              id: '',
+              attributeId: attrId,
+              name: value,
+              status: '',
+              createdOn: '',
+              updatedOn: '',
+            ),
           );
           filters[attrId] = [variation.id.isNotEmpty ? variation.id : value];
         }
       }
     });
 
-    // Special cases for category 1
     if (widget.categoryId == '1') {
       if (_controllers['registration']!.text.isNotEmpty) {
         filters[_attributeIdMap['Registration valid till'] ?? '27'] = [
@@ -1106,9 +1129,7 @@ class _AdPostFormState extends State<AdPostForm>
     };
 
     try {
-      setState(() {
-        isSaving = true;
-      });
+      setState(() => isSaving = true);
       final apiService = ApiService();
       final response = await apiService.postInfinityMultipart(
         url: "$baseUrl/flutter-add-post.php",
@@ -1147,72 +1168,69 @@ class _AdPostFormState extends State<AdPostForm>
         throw Exception(response['message'] ?? 'Failed to save ad');
       }
     } catch (e, stack) {
-      print(stack);
+      developer.log('Error saving ad: $e', stackTrace: stack);
       _showSnackBar('Error saving ad: $e', Colors.red);
     } finally {
-      setState(() {
-        isSaving = false;
-      });
+      setState(() => isSaving = false);
     }
   }
 
   Widget _buildImagePicker() => Column(
-    children: [
-      Container(
-        width: 120,
-        height: 150,
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: _showImageSourceBottomSheet,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.add_photo_alternate_outlined,
-                  size: 36,
-                  color: AppTheme.primaryColor,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add Photo (${_selectedImages.length}/$_maxImages)',
-                  style: TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
+        children: [
+          Container(
+            width: 120,
+            height: 150,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  spreadRadius: 1,
                 ),
               ],
             ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _showImageSourceBottomSheet,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 36,
+                      color: AppTheme.primaryColor,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add Photo (${_selectedImages.length}/$_maxImages)',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
-      if (_selectedImages.isNotEmpty)
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.8,
-          ),
-          itemCount: _selectedImages.length,
-          itemBuilder:
-              (context, index) => Container(
+          if (_selectedImages.isNotEmpty)
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.8,
+              ),
+              itemCount: _selectedImages.length,
+              itemBuilder: (context, index) => Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
@@ -1283,16 +1301,14 @@ class _AdPostFormState extends State<AdPostForm>
                                           ? Colors.yellow
                                           : Colors.white,
                                 ),
-                                onPressed:
-                                    () => setState(
-                                      () => _coverImageIndex = index,
-                                    ),
+                                onPressed: () => setState(
+                                  () => _coverImageIndex = index,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-
                       Positioned(
                         top: 8,
                         right: 8,
@@ -1311,19 +1327,18 @@ class _AdPostFormState extends State<AdPostForm>
                                   size: 20,
                                   color: Colors.white,
                                 ),
-                                onPressed:
-                                    () => setState(() {
-                                      _selectedImages.removeAt(index);
-                                      if (_selectedImages.isNotEmpty) {
-                                        if (index < _coverImageIndex) {
-                                          _coverImageIndex--;
-                                        } else if (index == _coverImageIndex) {
-                                          _coverImageIndex = 0;
-                                        }
-                                      } else {
-                                        _coverImageIndex = 0;
-                                      }
-                                    }),
+                                onPressed: () => setState(() {
+                                  _selectedImages.removeAt(index);
+                                  if (_selectedImages.isNotEmpty) {
+                                    if (index < _coverImageIndex) {
+                                      _coverImageIndex--;
+                                    } else if (index == _coverImageIndex) {
+                                      _coverImageIndex = 0;
+                                    }
+                                  } else {
+                                    _coverImageIndex = 0;
+                                  }
+                                }),
                               ),
                             ),
                           ),
@@ -1333,329 +1348,311 @@ class _AdPostFormState extends State<AdPostForm>
                   ),
                 ),
               ),
-        ),
-      if (_imageError)
-        Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Text(
-            'Please add at least one photo',
-            style: TextStyle(color: Colors.red[700], fontSize: 12),
-          ),
-        ),
-    ],
-  );
+            ),
+          if (_imageError)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                'Please add at least one photo',
+                style: TextStyle(color: Colors.red[700], fontSize: 12),
+              ),
+            ),
+        ],
+      );
 
   Widget _buildImageSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'Add Photos',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 16),
-      _selectedImages.isEmpty
-          ? Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [_buildImagePicker()],
-          )
-          : _buildImagePicker(),
-      const SizedBox(height: 24),
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Add Photos',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _selectedImages.isEmpty
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [_buildImagePicker()],
+                )
+              : _buildImagePicker(),
+          const SizedBox(height: 24),
+        ],
+      );
 
   Widget _buildKeyInfoSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'Key Information',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-      const SizedBox(height: 16),
-      CustomDropdownWidget<Brand>(
-        label: widget.categoryId == '2' ? 'Property Developer' : 'Brand',
-        value: _selectedBrand,
-        items: _brands,
-        onChanged: (newValue) async {
-          setState(() {
-            _selectedBrand = newValue;
-            _selectedBrandModel = _selectedModelVariation = null;
-            _brandModels = [];
-          });
-          if (newValue != null) {
-            final List<BrandModel> result =
-                await AttributeValueService.fetchBrandModels(
-                  newValue.id,
-                  widget.categoryId,
-                );
-            setState(() => _brandModels = result);
-          }
-        },
-        isRequired: true,
-        itemToString: (item) => item.name,
-        validator:
-            (value) =>
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Key Information',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 16),
+          CustomDropdownWidget<Brand>(
+            label: widget.categoryId == '2' ? 'Property Developer' : 'Brand',
+            value: _selectedBrand,
+            items: _brands,
+            onChanged: (newValue) async {
+              setState(() {
+                _selectedBrand = newValue;
+                _selectedBrandModel = _selectedModelVariation = null;
+                _brandModels = [];
+              });
+              if (newValue != null) {
+                final List<BrandModel> result =
+                    await AttributeValueService.fetchBrandModels(
+                      newValue.id,
+                      widget.categoryId,
+                    );
+                setState(() => _brandModels = result);
+              }
+            },
+            isRequired: true,
+            itemToString: (item) => item.name,
+            validator: (value) =>
                 value == null
                     ? 'Please select a ${widget.categoryId == '2' ? 'property developer' : 'brand'}'
                     : null,
-        hintText: '',
-      ),
-      if (_brandModels.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        CustomDropdownWidget<BrandModel>(
-          label: widget.categoryId == '2' ? 'Project' : 'Model',
-          value: _selectedBrandModel,
-          items: _brandModels,
-          onChanged: (newValue) async {
-            setState(() {
-              _selectedBrandModel = newValue;
-              _selectedModelVariation = null;
-              _modelVariations = [];
-            });
-            if (newValue != null) {
-              setState(
-                () async =>
-                    _modelVariations =
+            hintText: '',
+          ),
+          if (_brandModels.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            CustomDropdownWidget<BrandModel>(
+              label: widget.categoryId == '2' ? 'Project' : 'Model',
+              value: _selectedBrandModel,
+              items: _brandModels,
+              onChanged: (newValue) async {
+                setState(() {
+                  _selectedBrandModel = newValue;
+                  _selectedModelVariation = null;
+                  _modelVariations = [];
+                });
+                if (newValue != null) {
+                  setState(
+                    () async => _modelVariations =
                         (await AttributeValueService.fetchModelVariations(
                           newValue.id,
                           widget.categoryId,
                         )).toSet().toList(),
-              );
-            }
-          },
-          isRequired: true,
-          itemToString: (item) => item.name,
-          validator:
-              (value) =>
+                  );
+                }
+              },
+              isRequired: true,
+              itemToString: (item) => item.name,
+              validator: (value) =>
                   value == null
                       ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
                       : null,
-          hintText: '',
-        ),
-      ],
-      if (_modelVariations.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        CustomDropdownWidget<ModelVariation>(
-          label: 'Model Variation',
-          value: _selectedModelVariation,
-          items: _modelVariations,
-          onChanged:
-              (newValue) => setState(() => _selectedModelVariation = newValue),
-          isRequired: false,
-          itemToString: (item) => item.name,
-          hintText: 'Select a variation',
-        ),
-      ],
-      const SizedBox(height: 12),
-      CustomFormField(
-        controller: _controllers['listPrice']!,
-        label: 'List Price',
-        isNumberInput: true,
-        isRequired: true,
-        validator: (value) {
-          if (value?.isEmpty ?? true) return 'Please enter the list price';
-          final listPrice = double.tryParse(value!);
-          if (listPrice == null) return 'Please enter a valid number';
-          final offerPrice = double.tryParse(
-            _controllers['offerPrice']?.text ?? '',
-          );
-          if (offerPrice != null && offerPrice > listPrice) {
-            return 'List price must be greater than or equal to offer price';
-          }
-          return null;
-        },
-      ),
-      const SizedBox(height: 12),
-      CustomDropdownWidget<String>(
-        label: 'District',
-        value: _selectedDistrict,
-        items:
-            _districts.isNotEmpty
+              hintText: '',
+            ),
+          ],
+          if (_modelVariations.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            CustomDropdownWidget<ModelVariation>(
+              label: 'Model Variation',
+              value: _selectedModelVariation,
+              items: _modelVariations,
+              onChanged: (newValue) => setState(() => _selectedModelVariation = newValue),
+              isRequired: false,
+              itemToString: (item) => item.name,
+              hintText: 'Select a variation',
+            ),
+          ],
+          const SizedBox(height: 12),
+          CustomFormField(
+            controller: _controllers['listPrice']!,
+            label: 'List Price',
+            isNumberInput: true,
+            isRequired: true,
+            validator: (value) {
+              if (value?.isEmpty ?? true) return 'Please enter the list price';
+              final listPrice = double.tryParse(value!);
+              if (listPrice == null) return 'Please enter a valid number';
+              final offerPrice = double.tryParse(
+                _controllers['offerPrice']?.text ?? '',
+              );
+              if (offerPrice != null && offerPrice > listPrice) {
+                return 'List price must be greater than or equal to offer price';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          CustomDropdownWidget<String>(
+            label: 'District',
+            value: _selectedDistrict,
+            items: _districts.isNotEmpty
                 ? _districts.map((d) => d['name'] as String).toList()
                 : ['No districts available'],
-        onChanged: (newValue) {
-          if (newValue != null && newValue != 'No districts available') {
-            setState(() => _selectedDistrict = newValue);
-          }
-        },
-        isRequired: true,
-        itemToString: (item) => item,
-        validator:
-            (value) =>
+            onChanged: (newValue) {
+              if (newValue != null && newValue != 'No districts available') {
+                setState(() => _selectedDistrict = newValue);
+              }
+            },
+            isRequired: true,
+            itemToString: (item) => item,
+            validator: (value) =>
                 value == null || value == 'No districts available'
                     ? 'Please select a district'
                     : null,
-        hintText: '',
-      ),
-      const SizedBox(height: 12),
-      CustomFormField(
-        controller: _controllers['landMark']!,
-        label: 'Landmark',
-        alignLabelWithHint: true,
-      ),
-      // if (widget.categoryId == '1') ...[
-      //   const SizedBox(height: 12),
-      //   CustomFormField(
-      //     controller: _controllers['registration']!,
-      //     label: 'Registration Valid Till',
-      //   ),
-      //   const SizedBox(height: 12),
-      //   CustomFormField(
-      //     controller: _controllers['insurance']!,
-      //     label: 'Insurance Upto',
-      //   ),
-      // ],
-      const SizedBox(height: 12),
-      CustomFormField(
-        controller: _controllers['description']!,
-        label: 'Description',
-        alignLabelWithHint: true,
-        maxLines: 5,
-      ),
-    ],
-  );
+            hintText: '',
+          ),
+          const SizedBox(height: 12),
+          CustomFormField(
+            controller: _controllers['landMark']!,
+            label: 'Landmark',
+            alignLabelWithHint: true,
+          ),
+          const SizedBox(height: 12),
+          CustomFormField(
+            controller: _controllers['description']!,
+            label: 'Description',
+            alignLabelWithHint: true,
+            maxLines: 5,
+          ),
+        ],
+      );
 
-  Widget _buildMoreInfoSection() =>
-      _attributes.isEmpty
-          ? const SizedBox.shrink()
-          : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 24),
-              const Text(
-                'More Info',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+  Widget _buildMoreInfoSection() => _attributes.isEmpty
+      ? const SizedBox.shrink()
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            const Text(
+              'More Info',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ..._attributes.map((attr) {
+              final isRequired = _getRequiredAttributes().contains(attr.name);
+              final hasVariations =
+                  _attributeVariations[attr.name]?.isNotEmpty ?? false;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: hasVariations
+                    ? CustomDropdownWidget<String>(
+                        label: attr.name,
+                        value: _selectedAttributes[attr.name],
+                        items: _attributeVariations[attr.name]
+                                ?.map((v) => v.name)
+                                .toList() ??
+                            ['No options available'],
+                        onChanged: (newValue) {
+                          if (newValue != null &&
+                              newValue != 'No options available') {
+                            setState(
+                              () => _selectedAttributes[attr.name] = newValue,
+                            );
+                          }
+                        },
+                        isRequired: isRequired,
+                        itemToString: (item) => item,
+                        validator: isRequired
+                            ? (value) =>
+                                value == null ||
+                                value.isEmpty ||
+                                value == 'No options available'
+                                    ? 'Please select ${attr.name}'
+                                    : null
+                            : null,
+                        hintText: '',
+                      )
+                    : CustomFormField(
+                        controller: _attributeControllers[attr.name]!,
+                        label: attr.name,
+                        isRequired: isRequired,
+                        validator: isRequired
+                            ? (value) =>
+                                value?.isEmpty ?? true
+                                    ? 'Please enter ${attr.name}'
+                                    : null
+                            : null,
+                        onChanged: (value) => setState(
+                          () => _selectedAttributes[attr.name] = value,
+                        ),
+                      ),
+              );
+            }),
+          ],
+        );
+
+  Widget _buildSubmitButton() => SafeArea(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isSaving ? null : widget.onSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: isSaving
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      widget.adData != null ? 'Update Ad' : 'Post Ad',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      );
+
+@override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _fadeAnimation,
+        child: Stack(
+          children: [
+            // Scrollable form content with bottom padding to avoid button overlap
+            SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 100), // Increased bottom padding
+                child: Form(
+                  key: widget.formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _buildImageSection(),
+                      _buildKeyInfoSection(),
+                      _buildMoreInfoSection(),
+                      // Removed _buildSubmitButton from here
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              ..._attributes.map((attr) {
-                final isRequired = _getRequiredAttributes().contains(attr.name);
-                final hasVariations =
-                    _attributeVariations[attr.name]?.isNotEmpty ?? false;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child:
-                      hasVariations
-                          ? CustomDropdownWidget<String>(
-                            label: attr.name,
-                            value: _selectedAttributes[attr.name],
-                            items:
-                                _attributeVariations[attr.name]
-                                    ?.map((v) => v.name)
-                                    .toList() ??
-                                ['No options available'],
-                            onChanged: (newValue) {
-                              if (newValue != null &&
-                                  newValue != 'No options available') {
-                                setState(
-                                  () =>
-                                      _selectedAttributes[attr.name] = newValue,
-                                );
-                              }
-                            },
-                            isRequired: isRequired,
-                            itemToString: (item) => item,
-                            validator:
-                                isRequired
-                                    ? (value) =>
-                                        value == null ||
-                                                value.isEmpty ||
-                                                value == 'No options available'
-                                            ? 'Please select ${attr.name}'
-                                            : null
-                                    : null,
-                            hintText: '',
-                          )
-                          : CustomFormField(
-                            controller: _attributeControllers[attr.name]!,
-                            label: attr.name,
-                            isRequired: isRequired,
-                            validator:
-                                isRequired
-                                    ? (value) =>
-                                        value?.isEmpty ?? true
-                                            ? 'Please enter ${attr.name}'
-                                            : null
-                                    : null,
-                            onChanged:
-                                (value) => setState(
-                                  () => _selectedAttributes[attr.name] = value,
-                                ),
-                          ),
-                );
-              }),
-            ],
-          );
-
-  Widget _buildSubmitButton() => Column(
-    children: [
-      const SizedBox(height: 24),
-      SizedBox(
-        width: double.infinity,
-        height: 56,
-        child: ElevatedButton(
-          onPressed: isSaving ? null : _submitForm, // disable while saving
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: const RoundedRectangleBorder(),
-          ),
-          child:
-              isSaving
-                  ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                  : Text(
-                    widget.adData != null ? 'Update Ad' : 'Post Ad',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            ),
+            // Fixed submit button at the bottom
+            _buildSubmitButton(),
+          ],
         ),
-      ),
-      const SizedBox(height: 24),
-    ],
-  );
-
-  @override
-  Widget build(BuildContext context) => FadeTransition(
-    opacity: _fadeAnimation,
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: widget.formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _buildImageSection(),
-              _buildKeyInfoSection(),
-              _buildMoreInfoSection(),
-              _buildSubmitButton(),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
+      );
   @override
   void dispose() {
     for (var c in _controllers.values) {

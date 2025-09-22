@@ -4,6 +4,7 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'dart:convert';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -25,7 +26,8 @@ class ReviewDialogState extends State<ReviewDialog> {
   late final LoggedUserProvider _userProvider;
   final _storage = const FlutterSecureStorage();
   String? userId;
-  final String _token = ApiConstant.token; // Use hardcoded token from ApiConstant
+  final String _token =
+      ApiConstant.token; // Use hardcoded token from ApiConstant
 
   @override
   void initState() {
@@ -47,13 +49,17 @@ class ReviewDialogState extends State<ReviewDialog> {
       String? providerUserId = _userProvider.userData?.userId;
       String? storageUserId = await _storage.read(key: 'userId');
 
-      if (providerUserId != null && providerUserId.isNotEmpty && providerUserId != 'Unknown') {
+      if (providerUserId != null &&
+          providerUserId.isNotEmpty &&
+          providerUserId != 'Unknown') {
         setState(() {
           userId = providerUserId;
         });
         await _storage.write(key: 'userId', value: providerUserId);
         debugPrint('Loaded userId from provider: $userId');
-      } else if (storageUserId != null && storageUserId.isNotEmpty && storageUserId != 'Unknown') {
+      } else if (storageUserId != null &&
+          storageUserId.isNotEmpty &&
+          storageUserId != 'Unknown') {
         setState(() {
           userId = storageUserId;
         });
@@ -119,7 +125,8 @@ class ReviewDialogState extends State<ReviewDialog> {
           // Clean the response to handle PHP notices
           final cleanedResponse = _cleanResponse(response.body);
           final decodedBody = jsonDecode(cleanedResponse);
-          final bool isSuccess = decodedBody['status'] == true || decodedBody['status'] == 'true';
+          final bool isSuccess =
+              decodedBody['status'] == true || decodedBody['status'] == 'true';
           if (isSuccess && decodedBody['code'] == 0) {
             return true;
           } else {
@@ -127,7 +134,9 @@ class ReviewDialogState extends State<ReviewDialog> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Failed to submit review: ${decodedBody['data']}'),
+                  content: Text(
+                    'Failed to submit review: ${decodedBody['data']}',
+                  ),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -139,7 +148,9 @@ class ReviewDialogState extends State<ReviewDialog> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Unauthorized: Invalid or expired token. Please log in again.'),
+                content: Text(
+                  'Unauthorized: Invalid or expired token. Please log in again.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
@@ -153,7 +164,9 @@ class ReviewDialogState extends State<ReviewDialog> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Failed to submit review after $maxRetries attempts: HTTP ${response.statusCode}'),
+                  content: Text(
+                    'Failed to submit review after $maxRetries attempts: HTTP ${response.statusCode}',
+                  ),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -169,7 +182,9 @@ class ReviewDialogState extends State<ReviewDialog> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error submitting review after $maxRetries attempts: $e'),
+                content: Text(
+                  'Error submitting review after $maxRetries attempts: $e',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
@@ -182,30 +197,31 @@ class ReviewDialogState extends State<ReviewDialog> {
     return false;
   }
 
- void _showLoginPromptDialog(BuildContext context, String action) {
-  debugPrint('Showing login prompt for action: $action, userId: $userId');
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      return LoginDialog(
-        onSuccess: () async {
-          // Reload user ID after login
-          await _loadUserId();
-          // Re-show the ReviewDialog to allow the user to ask a question
-          if (mounted) {
-            Navigator.of(dialogContext).pop(); // Close login dialog
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => ReviewDialog(postId: widget.postId),
-            );
-          }
-        },
-      );
-    },
-  );
-}
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    debugPrint('Showing login prompt for action: $action, userId: $userId');
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return LoginDialog(
+          onSuccess: () async {
+            // Reload user ID after login
+            await _loadUserId();
+            // Re-show the ReviewDialog to allow the user to ask a question
+            if (mounted) {
+              Navigator.of(dialogContext).pop(); // Close login dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => ReviewDialog(postId: widget.postId),
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -244,57 +260,96 @@ class ReviewDialogState extends State<ReviewDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: _isSubmitting
-              ? null
-              : () async {
-                  if (_reviewController.text.isNotEmpty) {
-                    setState(() {
-                      _isSubmitting = true;
-                    });
-
-                    debugPrint('Before hiding keyboard: mounted=$mounted');
-                    _hideKeyboard(context);
-                    debugPrint('After hiding keyboard: mounted=$mounted');
-                    await Future.delayed(const Duration(milliseconds: 300));
-                    debugPrint('After delay: mounted=$mounted');
-
-                    final success = await _submitReview();
-
-                    if (mounted) {
+          onPressed:
+              _isSubmitting
+                  ? null
+                  : () async {
+                    if (_reviewController.text.isNotEmpty) {
                       setState(() {
-                        _isSubmitting = false;
+                        _isSubmitting = true;
                       });
 
-                      Navigator.of(context).pop();
+                      debugPrint('Before hiding keyboard: mounted=$mounted');
+                      _hideKeyboard(context);
+                      debugPrint('After hiding keyboard: mounted=$mounted');
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      debugPrint('After delay: mounted=$mounted');
 
-                      if (success) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Question submitted successfully.'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                      final success = await _submitReview();
+                      debugPrint('Review submission result: $success');
+
+                      if (mounted) {
+                        setState(() {
+                          _isSubmitting = false;
+                        });
+
+                        Navigator.of(context).pop(); // Close the ReviewDialog
+
+                        if (success) {
+                          // Show success dialog
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder:
+                                (dialogContext) => AlertDialog(
+                                  backgroundColor: Colors.white,
+                                  content: const Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Your question has been sent. Admin will answer your question soon.',
+                                        style: TextStyle(fontSize: 16.0),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () =>
+                                              Navigator.of(dialogContext).pop(),
+                                      child: const Text('OK'),
+                                    ),
+                                    CallSupportButton(
+                                      label: 'Call Support',
+                                      phoneNumber:
+                                          '+918089308048', // Replace with your support number
+                                    ),
+                                  ],
+                                ),
+                          );
+
+                          // Show success SnackBar
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Question submitted successfully.'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
                       }
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Please write a question before submitting.',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please write a question before submitting.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Text('Submit'),
+                  },
+          child:
+              _isSubmitting
+                  ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                  : const Text('Submit'),
         ),
       ],
     );

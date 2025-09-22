@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:lelamonline_flutter/feature/categories/models/product_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/commercial/commercial_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
@@ -241,6 +242,12 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
+
+List<Product> _products = [];
+List<Product> _filteredProducts = [];
+Map<String, Map<String, String>> _postAttributeValuesCache = {};
+bool _filtersChanged = true;
+String _listingType = 'Marketplace'; // Default to Marketplace
 
   @override
   void initState() {

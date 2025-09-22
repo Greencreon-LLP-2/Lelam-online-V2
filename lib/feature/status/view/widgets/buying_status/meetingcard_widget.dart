@@ -583,7 +583,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                             child: SizedBox(
                                               height: 30,
                                               child: CallSupportButton(
-                                                label: 'Call Support',
+                                                label: 'Call Support', onPressed: () {  },
                                               ),
                                             ),
                                           ),
