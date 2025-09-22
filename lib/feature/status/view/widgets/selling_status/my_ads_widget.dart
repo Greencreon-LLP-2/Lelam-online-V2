@@ -76,7 +76,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
               fetchedAds.add(widget.adData!);
               _expandedImages[passedAdId] = false;
             } else {
-
               print('Passed ad already exists in fetched ads');
 
               final adIndex = fetchedAds.indexWhere(
@@ -154,7 +153,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     }
   }
 
-
   Future<void> _checkApprovalStatus(String postId) async {
     try {
       final response = await http.get(
@@ -164,7 +162,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Approval status response for post $postId: $responseData');
+        developer.log(
+          'Approval status response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final statusData = responseData['data'][0];
           if (statusData['admin_approval'] == '1') {
@@ -301,7 +301,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Move to auction response for post $postId: $responseData');
+        developer.log(
+          'Move to auction response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -352,7 +354,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
-        developer.log('Mark as delivered response for post $postId: $responseData');
+        developer.log(
+          'Mark as delivered response for post $postId: $responseData',
+        );
         if (responseData['status'] == 'true') {
           setState(() {
             final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
@@ -403,7 +407,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         },
         body: {'id': adId, 'action': 'delete'},
       );
-
 
       developer.log(
         'Delete ad request URL: $baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
@@ -463,7 +466,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
         imageUrl = '$getImagePostImageUrl${ad['image'] as String}';
       } else {
         imageUrl =
-
             '$getImagePostImageUrl${ad['image'].startsWith('/') ? ad['image'].substring(1) : ad['image']}';
       }
     } else {
@@ -473,7 +475,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
       );
     }
     final isExpanded = _expandedImages[ad['id']] ?? false;
-
 
     developer.log(imageUrl);
 
@@ -544,12 +545,9 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 Icon(Icons.comment, size: 18, color: Colors.grey.shade600),
                 const SizedBox(width: 4),
                 const Text('0', style: TextStyle(fontSize: 13)),
-                
-               
               ],
             ),
 
-           
             const SizedBox(height: 10),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -577,11 +575,11 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                       ),
                       _adDetail('Price', '₹${ad['price']}', highlight: true),
                       _adDetail(
-                        'Category',
+                        'Category                ',
                         _getCategoryName(ad['category_id'] as String),
                       ),
                       _adDetail(
-                        'Item In',
+                        'Item In                   ',
                         ad['if_auction'] == '1' ? 'Auction' : 'Market Place',
                       ),
                       _adDetail(
@@ -593,73 +591,76 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                         ad['auction_starting_price'] ?? 'N/A',
                       ),
                       _adDetail('Meetings Done', '0'),
-                      _adDetail('Location', ad['district'] ?? 'Unknown'),
+                      _adDetail(
+                        'Location                ',
+                        ad['district'] ?? 'Unknown',
+                      ),
                     ],
                   ),
-                  
                 ),
                 Column(
                   children: [
-                     GestureDetector(
-              onTap: () {
-                setState(() {
-                  _expandedImages[ad['id']] = !isExpanded;
-                  developer.log(
-                    'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
-                  );
-                });
-              },
-              child: Container(
-                width: 110,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.brown.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child:
-
-                    imageUrl != null
-                        ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          httpHeaders: {'token': token},
-                          fit: BoxFit.cover,
-                          placeholder:
-                              (context, url) => Shimmer.fromColors(
-                                baseColor: Colors.grey[300]!,
-                                highlightColor: Colors.grey[100]!,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                          errorWidget: (context, url, error) {
-
-                            developer.log(
-                              'Error loading image for ad ${ad['id']}: $error',
-                            );
-                            Fluttertoast.showToast(
-                              msg: 'Failed to load image for ad ${ad['id']}',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                              backgroundColor: Colors.red,
-                              textColor: Colors.white,
-                            );
-                            return Image.asset(
-                              'assets/placeholder_image.png',
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        )
-                        : Image.asset(
-                          'assets/placeholder_image.png',
-                          fit: BoxFit.cover,
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _expandedImages[ad['id']] = !isExpanded;
+                          developer.log(
+                            'Toggled image expansion for ad ${ad['id']}: ${!isExpanded}',
+                          );
+                        });
+                      },
+                      child: Container(
+                        width: 110,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          color: Colors.brown.shade100,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                         ),
-                     ),
+                        child:
+                            imageUrl != null
+                                ? CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  httpHeaders: {'token': token},
+                                  fit: BoxFit.cover,
+                                  placeholder:
+                                      (context, url) => Shimmer.fromColors(
+                                        baseColor: Colors.grey[300]!,
+                                        highlightColor: Colors.grey[100]!,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  errorWidget: (context, url, error) {
+                                    developer.log(
+                                      'Error loading image for ad ${ad['id']}: $error',
+                                    );
+                                    Fluttertoast.showToast(
+                                      msg:
+                                          'Failed to load image for ad ${ad['id']}',
+                                      toastLength: Toast.LENGTH_SHORT,
+                                      gravity: ToastGravity.BOTTOM,
+                                      backgroundColor: Colors.red,
+                                      textColor: Colors.white,
+                                    );
+                                    return Image.asset(
+                                      'assets/placeholder_image.png',
+                                      fit: BoxFit.cover,
+                                    );
+                                  },
+                                )
+                                : Image.asset(
+                                  'assets/placeholder_image.png',
+                                  fit: BoxFit.cover,
+                                ),
+                      ),
+                    ),
                   ],
-                )
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -687,49 +688,44 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 ),
               ],
             ),
-            SizedBox(height: 15,),
-             Container(color: Colors.grey, height: 1.5,width: double.infinity,),
-           Row(
-           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [  
-            if (ad['rejectionMsg'] != null) ...[
-              const SizedBox(height: 1),
-              Center(
-                child: Text(
-                  ad['rejectionMsg'] as String,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          
-            
-            SizedBox(
-              width: 1,
-            ),               
-            if (_adStatuses[ad['id']] != null &&
-                _adStatuses[ad['id']]!.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 0.0),
-                child: Center(
-                  child: Text(
-                    _adStatuses[ad['id']]!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
+            SizedBox(height: 15),
+            Container(color: Colors.grey, height: 1.5, width: double.infinity),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (ad['rejectionMsg'] != null) ...[
+                  const SizedBox(height: 1),
+                  Center(
+                    child: Text(
+                      ad['rejectionMsg'] as String,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
+                ],
 
-              ),
-              
-            ],
-             PopupMenuButton<String>(
+                SizedBox(width: 1),
+                if (_adStatuses[ad['id']] != null &&
+                    _adStatuses[ad['id']]!.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 0.0),
+                    child: Center(
+                      child: Text(
+                        _adStatuses[ad['id']]!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                PopupMenuButton<String>(
                   icon: Icon(Icons.menu, color: Colors.grey.shade600),
-                  
+
                   position: PopupMenuPosition.over,
                   onSelected: (value) {
                     if (value == 'edit') {
@@ -771,10 +767,10 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                           ),
                       ],
                 ),
-            ],
+              ],
             ),
-            Container(color: Colors.grey, height: 1.5,width: double.infinity,),
-           
+            Container(color: Colors.grey, height: 1.5, width: double.infinity),
+
             SizedBox(
               height: 250,
               child: SellerTabBarWidget(adData: ad, postId: ad['id'] as String),
@@ -896,13 +892,22 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
   }
 
   Widget _adDetail(String label, String value, {bool highlight = false}) {
+    const double labelWidth = 100.0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label: ',
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+          SizedBox(
+            width: labelWidth,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.black54),
+            ),
+          ),
+          const Text(
+            ': ',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
           Expanded(
             child: Text(
@@ -912,6 +917,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: highlight ? Colors.green : Colors.black87,
                 fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
               ),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -976,7 +982,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );
@@ -998,7 +1003,6 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 color: Colors.grey[600],
               ),
             ),
-
           ],
         ),
       );

@@ -421,7 +421,7 @@ class MeetingCard extends StatelessWidget {
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
-                                                'App Id: ${meeting['appId'] ?? 'LAD_${meeting['post_id']}'}',
+                                                'App Id    : ${meeting['appId'] ?? 'LAD_${meeting['post_id']}'}',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey[600],
