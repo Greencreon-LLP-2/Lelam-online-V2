@@ -694,7 +694,7 @@ class _AdPostFormState extends State<AdPostForm>
 ];
     _brands = await AttributeValueService.fetchBrands(widget.categoryId);
     setState(() {
-      _selectedDistrict ??= 'All Kerala'; 
+      _selectedDistrict ??= 'District'; 
           _districts.isNotEmpty ? _districts[0]['name'] : null;
       if (widget.adData?['brand'] != null) {
         _selectedBrand = _brands.firstWhere(

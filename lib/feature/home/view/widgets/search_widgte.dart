@@ -134,58 +134,58 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-  void _openProductDetails(Product product) {
-    final featureListModel = FeatureListModel(
-      id: product.id,
-      title: product.title,
-      price: product.price,
-      image: product.image ?? "",
-      ifAuction: product.ifAuction,
-      auctionStartingPrice: product.auctionStartingPrice,
-      slug: '',
-      categoryId: '',
-      brand: '',
-      model: '',
-      modelVariation: product.modelVariation,
-      description: '',
-      auctionPriceIntervel: '',
-      attributeId: [],
-      attributeVariationsId: [],
-      filters: {},
-      latitude: '',
-      longitude: '',
-      userZoneId: '',
-      parentZoneId: product.parentZoneId,
-      zoneId: '',
-      landMark: '',
-      auctionStatus: '',
-      auctionStartin: '',
-      auctionEndin: '',
-      auctionAttempt: product.auctionAttempt,
-      adminApproval: '',
-      ifFinance: product.ifFinance,
-      ifExchange: product.ifExchange,
-      feature: product.feature,
-      status: '',
-      visiterCount: '',
-      ifSold: '',
-      ifExpired: '',
-      byDealer: '',
-      createdBy: '',
-      createdOn: '',
-      updatedOn: '',
-    );
+void _openProductDetails(Product product) {
+  final featureListModel = FeatureListModel(
+    id: product.id,
+    title: product.title,
+    price: product.price,
+    image: product.image ?? "",
+    ifAuction: product.ifAuction,
+    auctionStartingPrice: product.auctionStartingPrice,
+    slug: '',
+    categoryId: '',
+    brand: '',
+    model: '',
+    modelVariation: product.modelVariation,
+    description: '',
+    auctionPriceIntervel: '',
+    attributeId: [],
+    attributeVariationsId: [],
+    filters: {},
+    latitude: '',
+    longitude: '',
+    userZoneId: '',
+    parentZoneId: product.parentZoneId,
+    zoneId: '',
+    landMark: '',
+    auctionStatus: '',
+    auctionStartin: '',
+    auctionEndin: '',
+    auctionAttempt: product.auctionAttempt,
+    adminApproval: '',
+    ifFinance: product.ifFinance,
+    ifExchange: product.ifExchange,
+    feature: product.feature,
+    status: '',
+    visiterCount: '',
+    ifSold: '',
+    ifExpired: '',
+    byDealer: '',
+    createdBy: product.createdBy ?? '', // Add this line to pass createdBy
+    createdOn: '',
+    updatedOn: '',
+  );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductDetailsPage(
-          product: featureListModel,
-          isAuction: featureListModel.ifAuction == "1",
-        ),
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ProductDetailsPage(
+        product: featureListModel,
+        isAuction: featureListModel.ifAuction == "1",
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all' || zoneId.isEmpty) return 'All Kerala';
