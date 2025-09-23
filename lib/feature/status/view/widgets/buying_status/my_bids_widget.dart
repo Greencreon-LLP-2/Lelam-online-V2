@@ -469,7 +469,7 @@ Future<void> _proccedWithoutBid(BuildContext context, String postId) async {
         context.pushNamed(
           RouteNames.buyingStatusPage,
           queryParameters: {
-            'initialTab': '1', // My Meetings tab
+            'initialTab': '0', // My Meetings tab
             'initialStatus': 'Date Fixed', // Date Fixed tab in MyMeetingsWidget
             'postId': postId,
           },

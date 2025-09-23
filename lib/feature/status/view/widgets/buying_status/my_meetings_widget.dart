@@ -832,140 +832,157 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     );
   }
 
-  Future<void> _proceedWithBid(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    print('Proceed with Bid called for meeting ${meeting['id']}');
-    if (_userId == null || _userId == 'Unknown') {
-      print('Invalid user ID');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-
-    final TextEditingController bidController = TextEditingController();
-    double? bidAmount;
-
-    await showDialog<bool>(
-      context: context,
-      builder:
-          (dialogContext) => AlertDialog(
-            title: const Text('Enter Bid Amount'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: bidController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Bid Amount (₹)',
-                    hintText: 'Enter your bid amount',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) {
-                    bidAmount = double.tryParse(value);
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (bidAmount == null || bidAmount! <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid bid amount'),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(dialogContext, true);
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+ Future<void> _proceedWithBid(
+  BuildContext context,
+  Map<String, dynamic> meeting,
+) async {
+  print('Proceed with Bid called for meeting ${meeting['id']} from tab ${statuses[selectedIndex]}');
+  if (_userId == null || _userId == 'Unknown') {
+    print('Invalid user ID');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid user ID. Please log in again.')),
     );
-
-    if (bidAmount == null || bidAmount! <= 0) {
-      print('Invalid or no bid amount entered');
-      return;
-    }
-
-    try {
-      final response = await retry(
-        () => http.get(
-          Uri.parse(
-            '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=$bidAmount',
-          ),
-          headers: {
-            'token': widget.token,
-            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          },
-        ),
-        maxAttempts: 3,
-        delayFactor: const Duration(seconds: 2),
-        randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying proceed with bid: $e');
-        },
-      );
-      print('my-meeting-proceed-with-bid.php response: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Proceeded with bid of ₹${NumberFormat('#,##0').format(bidAmount)} successfully',
-              ),
-            ),
-          );
-          // Switch to Meeting Request tab
-          setState(() {
-            selectedIndex = 1; // Index 1 is 'Meeting Request' in statuses list
-            print('Switched to Meeting Request tab after successful bid');
-          });
-          await _loadMeetings();
-          widget.onRefreshMeetings?.call();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to proceed with bid: ${data['message'] ?? 'Unknown error'}',
-              ),
-            ),
-          );
-        }
-      } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for proceed with bid');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Too many requests. Please try again later.'),
-          ),
-        );
-      } else {
-        print(
-          'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to proceed with bid')),
-        );
-      }
-    } catch (e) {
-      print('Error proceeding with bid: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error proceeding with bid')),
-      );
-    }
+    return;
   }
 
+  final TextEditingController bidController = TextEditingController();
+  double? bidAmount;
+
+  await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Enter Bid Amount'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: bidController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Bid Amount (₹)',
+              hintText: 'Enter your bid amount',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (value) {
+              bidAmount = double.tryParse(value);
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (bidAmount == null || bidAmount! <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please enter a valid bid amount'),
+                ),
+              );
+              return;
+            }
+            Navigator.pop(dialogContext, true);
+          },
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+
+  if (bidAmount == null || bidAmount! <= 0) {
+    print('Invalid or no bid amount entered');
+    return;
+  }
+
+  try {
+    final response = await retry(
+      () => http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=$bidAmount',
+        ),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
+      ),
+      maxAttempts: 3,
+      delayFactor: const Duration(seconds: 2),
+      randomizationFactor: 0.25,
+      onRetry: (e) {
+        print('Retrying proceed with bid: $e');
+      },
+    );
+    print('my-meeting-proceed-with-bid.php response: ${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == true || data['status'] == 'true') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Proceeded with bid of ₹${NumberFormat('#,##0').format(bidAmount)} successfully',
+            ),
+          ),
+        );
+        // Update the meeting in the meetings list with the new bid_amount
+        setState(() {
+          final meetingIndex = meetings.indexWhere((m) => m['id'] == meeting['id']);
+          if (meetingIndex != -1) {
+            meetings[meetingIndex] = {
+              ...meetings[meetingIndex],
+              'bid_amount': bidAmount.toString(),
+              'bidPrice': bidAmount.toString(),
+              'with_bid': '1',
+            };
+            print('Updated meeting ${meeting['id']} in meetings list: bid_amount=$bidAmount, with_bid=1');
+          } else {
+            print('Meeting ${meeting['id']} not found in meetings list');
+          }
+        });
+        // Only switch to Meeting Request tab if not in Date Fixed
+        if (selectedIndex != 0) { // Date Fixed is index 0
+          setState(() {
+            selectedIndex = 1; // Index 1 is 'Meeting Request'
+            print('Switched to Meeting Request tab after successful bid');
+          });
+        } else {
+          print('Remaining in Date Fixed tab after successful bid');
+        }
+        await _loadMeetings();
+        widget.onRefreshMeetings?.call();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to proceed with bid: ${data['message'] ?? 'Unknown error'}',
+            ),
+          ),
+        );
+      }
+    } else if (response.statusCode == 429) {
+      print('Rate limit exceeded for proceed with bid');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Too many requests. Please try again later.'),
+        ),
+      );
+    } else {
+      print(
+        'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to proceed with bid')),
+      );
+    }
+  } catch (e) {
+    print('Error proceeding with bid: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Error proceeding with bid')),
+    );
+  }
+}
   // Future<void> _increaseBid(
   //   BuildContext context,
   //   Map<String, dynamic> meeting,
