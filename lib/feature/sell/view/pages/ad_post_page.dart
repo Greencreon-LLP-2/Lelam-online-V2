@@ -215,11 +215,11 @@ class AttributeValueService {
       final responseBody = await response.stream.bytesToString();
       if (response.statusCode == 200) {
         final data = jsonDecode(responseBody);
-        developer.log('Districts API response: $data');
+        print('Districts API response: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           return List<Map<String, dynamic>>.from(data['data']);
         }
-        developer.log('No districts found');
+        print('No districts found');
         return [
           {
             "id": "1",
@@ -238,7 +238,7 @@ class AttributeValueService {
           },
         ];
       }
-      developer.log(
+      print(
         'Failed to fetch districts: ${response.statusCode} $responseBody',
       );
       return [
@@ -259,7 +259,7 @@ class AttributeValueService {
         },
       ];
     } catch (e) {
-      developer.log('Error fetching districts: $e');
+      print('Error fetching districts: $e');
       return [
         {
           "id": "1",
@@ -293,27 +293,27 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        developer.log('Brands API response for category_id $categoryId: $data');
+        print('Brands API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           final brands =
               (data['data'] as List)
                   .map((e) => Brand.fromJson(e))
                   .where((brand) => brand.categoryId == categoryId)
                   .toList();
-          developer.log(
+          print(
             'Filtered brands for category_id $categoryId: ${brands.map((b) => b.name).toList()}',
           );
           return brands;
         }
-        developer.log('No brands found for category_id: $categoryId');
+        print('No brands found for category_id: $categoryId');
         return [];
       }
-      developer.log(
+      print(
         'Failed to fetch brands: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      developer.log('Error fetching brands: $e');
+      print('Error fetching brands: $e');
       return [];
     }
   }
@@ -334,7 +334,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        developer.log(
+        print(
           'Brand models API response for brand_id $brandId, category_id $categoryId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -342,22 +342,22 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => BrandModel.fromJson(e))
                   .toList();
-          developer.log(
+          print(
             'Fetched brand models: ${models.map((m) => m.name).toList()}',
           );
           return models;
         }
-        developer.log(
+        print(
           'No brand models found for brand_id: $brandId, category_id: $categoryId',
         );
         return [];
       }
-      developer.log(
+      print(
         'Failed to fetch brand models: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      developer.log('Error fetching brand models: $e');
+      print('Error fetching brand models: $e');
       return [];
     }
   }
@@ -378,7 +378,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        developer.log(
+        print(
           'Model variations API response for brands_model_id $brandModelId, category_id $categoryId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -386,25 +386,25 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => ModelVariation.fromJson(e))
                   .toList();
-          developer.log(
+          print(
             'Model variations IDs: ${variations.map((v) => v.id).toSet()}',
           );
-          developer.log(
+          print(
             'Model variations names: ${variations.map((v) => v.name).toSet()}',
           );
           return variations;
         }
-        developer.log(
+        print(
           'No model variations found for brands_model_id: $brandModelId, category_id: $categoryId',
         );
         return [];
       }
-      developer.log(
+      print(
         'Failed to fetch model variations: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      developer.log('Error fetching model variations: $e');
+      print('Error fetching model variations: $e');
       return [];
     }
   }
@@ -422,7 +422,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        developer.log(
+        print(
           'Attributes API response for category_id $categoryId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -430,15 +430,15 @@ class AttributeValueService {
               .map((e) => Attribute.fromJson(e))
               .toList();
         }
-        developer.log('No attributes found for category_id: $categoryId');
+        print('No attributes found for category_id: $categoryId');
         return [];
       }
-      developer.log(
+      print(
         'Failed to fetch attributes: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      developer.log('Error fetching attributes: $e');
+      print('Error fetching attributes: $e');
       return [];
     }
   }
@@ -458,7 +458,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        developer.log(
+        print(
           'Attribute variations API response for attribute_id $attributeId: $data',
         );
         if (data['status'] == 'true' && data['data'] is List) {
@@ -466,15 +466,15 @@ class AttributeValueService {
               .map((e) => AttributeVariation.fromJson(e))
               .toList();
         }
-        developer.log('No variations found for attribute_id: $attributeId');
+        print('No variations found for attribute_id: $attributeId');
         return [];
       }
-      developer.log(
+      print(
         'Failed to fetch attribute variations: ${response.statusCode} ${response.body}',
       );
       return [];
     } catch (e) {
-      developer.log(
+      print(
         'Error fetching attribute variations for attribute_id $attributeId: $e',
       );
       return [];
@@ -492,9 +492,9 @@ class AdPostPage extends StatefulWidget {
 
 class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
-  final _adPostFormKey =
-      GlobalKey<_AdPostFormState>(); // New GlobalKey for AdPostFormState
+  final _adPostFormKey = GlobalKey<_AdPostFormState>();
   String? _categoryId;
+  String? _postId;
   Map<String, dynamic>? _adData;
   late final LoggedUserProvider _userProvider;
 
@@ -504,12 +504,19 @@ class _AdPostPageState extends State<AdPostPage> {
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     if (widget.extra != null) {
       _categoryId = widget.extra!['categoryId']?.toString();
+      _postId = widget.extra!['postId']?.toString();
       _adData = widget.extra!['adData'] as Map<String, dynamic>?;
       if (_categoryId == null) {
         showToast('Invalid category ID', Colors.red);
       }
+      if (_postId != null && _adData == null) {
+        showToast('Ad data is missing for editing', Colors.red);
+      }
+    }
+    if (_postId != null) {
+      _fetchGalleryImages(_postId!);
     } else {
-      showToast('No category or user ID provided', Colors.red);
+     
     }
   }
 
@@ -525,11 +532,42 @@ class _AdPostPageState extends State<AdPostPage> {
   }
 
   void _submitForm() {
-    developer.log('AdPostPage _submitForm called'); // Debug log
+    print('AdPostPage _submitForm called');
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      _adPostFormKey.currentState
-          ?._submitForm(); // Directly call _submitForm from AdPostFormState
+      _adPostFormKey.currentState?._submitForm();
+    }
+  }
+
+  Future<void> _fetchGalleryImages(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/post-gallery.php?token=$token&post_id=$postId'),
+        headers: {'token': token},
+      );
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Gallery API response: $responseData');
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          setState(() {
+            if (_adData == null) _adData = {};
+            _adData!['gallery_images'] = List<Map<String, dynamic>>.from(
+              responseData['data'],
+            );
+          });
+        } else {
+          throw Exception(
+            responseData['message'] ?? 'Failed to fetch gallery images',
+          );
+        }
+      } else {
+        throw Exception(
+          'Failed to fetch gallery images: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      print('Error fetching gallery images: $e');
+      showToast('Failed to load gallery images', Colors.red);
     }
   }
 
@@ -541,12 +579,8 @@ class _AdPostPageState extends State<AdPostPage> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         title: Text(
-          _adData != null ? 'Edit Ad' : 'Post your Ad',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
+          _adData != null ? 'Update' : 'Post',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
         actions: [
@@ -596,10 +630,11 @@ class _AdPostPageState extends State<AdPostPage> {
         ],
       ),
       body: AdPostForm(
-        key: _adPostFormKey, // Assign GlobalKey to AdPostForm
+        key: _adPostFormKey,
         formKey: _formKey,
         categoryId: _categoryId ?? '',
         userId: _userProvider.userId!,
+        postId: _postId,
         adData: _adData,
         onSubmit: _submitForm,
         isSaving: _adPostFormKey.currentState?.isSaving ?? false,
@@ -611,6 +646,7 @@ class _AdPostPageState extends State<AdPostPage> {
 class AdPostForm extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final String categoryId, userId;
+  final String? postId;
   final Map<String, dynamic>? adData;
   final VoidCallback onSubmit;
   final bool isSaving;
@@ -620,6 +656,7 @@ class AdPostForm extends StatefulWidget {
     required this.formKey,
     required this.categoryId,
     required this.userId,
+    this.postId,
     this.adData,
     required this.onSubmit,
     required this.isSaving,
@@ -652,6 +689,8 @@ class _AdPostFormState extends State<AdPostForm>
   Map<String, String> _attributeIdMap = {};
   List<Attribute> _attributes = [];
   final List<XFile> _selectedImages = [];
+  final List<Map<String, dynamic>> _existingImages = []; // Store id and path
+  final List<String> _deleteGalleryIds = [];
   final _imagePicker = ImagePicker();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -706,7 +745,7 @@ class _AdPostFormState extends State<AdPostForm>
 
   Future<void> _fetchInitialData() async {
     if (widget.categoryId.isEmpty) {
-      _showToast('Error: No category selected', Colors.red);
+      _showToast("post your ad", const Color.fromARGB(255, 82, 244, 54));
       return;
     }
 
@@ -721,17 +760,20 @@ class _AdPostFormState extends State<AdPostForm>
       _attributeIdMap = {};
       _selectedAttributes = {};
       _attributeControllers.clear();
+      _existingImages.clear();
+      _deleteGalleryIds.clear();
     });
 
     if (widget.adData != null) {
       final ad = widget.adData!;
-      _controllers['listPrice']!.text = ad['price'] ?? '';
-      _controllers['description']!.text = ad['description'] ?? '';
-      _controllers['landMark']!.text = ad['land_mark'] ?? '';
-      _controllers['registration']!.text = ad['registration_valid_till'] ?? '';
-      _controllers['insurance']!.text = ad['insurance_upto'] ?? '';
+      _controllers['listPrice']!.text = ad['price']?.toString() ?? '';
+      _controllers['description']!.text = ad['description']?.toString() ?? '';
+      _controllers['landMark']!.text = ad['land_mark']?.toString() ?? '';
+      _controllers['registration']!.text =
+          ad['registration_valid_till']?.toString() ?? '';
+      _controllers['insurance']!.text = ad['insurance_upto']?.toString() ?? '';
       _selectedDistrict =
-          ad['district'] ??
+          ad['district']?.toString() ??
           (_districts.isNotEmpty ? _districts[0]['name'] : null);
       _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
       await _loadImages(ad);
@@ -826,9 +868,8 @@ class _AdPostFormState extends State<AdPostForm>
                     updatedOn: '',
                   ),
             );
-            if (_selectedModelVariation!.id.isEmpty) {
+            if (_selectedModelVariation!.id.isEmpty)
               _selectedModelVariation = null;
-            }
           }
         });
       }
@@ -853,8 +894,8 @@ class _AdPostFormState extends State<AdPostForm>
               _selectedAttributes[attr.name] = filters[attr.id][0].toString();
             }
           }
-        } catch (e, stack) {
-          developer.log('Error parsing filters: $e', stackTrace: stack);
+        } catch (e) {
+          print('Error parsing filters: $e', );
         }
       }
     });
@@ -890,33 +931,73 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   Future<void> _loadImages(Map<String, dynamic> ad) async {
-    if (ad['imagePathList']?.isNotEmpty ?? false) {
-      _selectedImages.addAll(
-        (ad['imagePathList'] as List).map((path) => XFile(path)),
-      );
-    } else if (ad['imageBase64List']?.isNotEmpty ?? false) {
-      final tempDir = await getTemporaryDirectory();
-      for (var img in ad['imageBase64List']) {
-        final bytes = base64Decode(img);
-        final file = File(
-          '${tempDir.path}/ad_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-        await file.writeAsBytes(bytes);
-        _selectedImages.add(XFile(file.path));
+    setState(() {
+      _existingImages.clear();
+      _selectedImages.clear();
+      _deleteGalleryIds.clear(); // Clear to avoid stale IDs
+    });
+
+    // Handle main image
+    if (ad['image']?.isNotEmpty ?? false) {
+      String imageUrl = ad['image'];
+      if (!imageUrl.startsWith('http')) {
+        imageUrl =
+            '$getImagePostImageUrl${imageUrl.startsWith('/') ? imageUrl.substring(1) : imageUrl}';
       }
-    } else if (ad['imagePath']?.isNotEmpty ?? false) {
-      _selectedImages.add(XFile(ad['imagePath']));
-    } else if (ad['imageBase64']?.isNotEmpty ?? false) {
-      final tempDir = await getTemporaryDirectory();
-      final bytes = base64Decode(ad['imageBase64']);
-      final file = File(
-        '${tempDir.path}/ad_${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      await file.writeAsBytes(bytes);
-      _selectedImages.add(XFile(file.path));
+      _existingImages.add({'id': null, 'path': imageUrl, 'isMain': true});
+      print('Loaded main image: $imageUrl');
     }
+
+    // Handle gallery images
+    if (ad['gallery_images']?.isNotEmpty ?? false) {
+      _existingImages.addAll(
+        (ad['gallery_images'] as List).map(
+          (img) => {
+            'id': img['id']?.toString(),
+            'path':
+                img['image'].startsWith('http')
+                    ? img['image']
+                    : '$getImagePostImageUrl${img['image'].startsWith('/') ? img['image'].substring(1) : img['image']}',
+            'isMain': false,
+          },
+        ),
+      );
+      print(
+        'Loaded gallery images: ${_existingImages.where((img) => !img['isMain']).map((e) => 'ID: ${e['id']}, Path: ${e['path']}').toList()}',
+      );
+    } else {
+      print('No gallery images found in adData');
+    }
+
+    for (var img in _existingImages) {
+      try {
+        final response = await http.get(
+          Uri.parse(img['path']),
+          headers: {'token': AttributeValueService.token},
+        );
+        if (response.statusCode == 200) {
+          final tempDir = await getTemporaryDirectory();
+          final file = File(
+            '${tempDir.path}/ad_${img['id'] ?? 'main'}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+          await file.writeAsBytes(response.bodyBytes);
+          _selectedImages.add(XFile(file.path));
+          print('Downloaded image: ${img['path']}');
+        } else {
+          print(
+            'Failed to download image: ${img['path']}, status: ${response.statusCode}',
+          );
+        }
+      } catch (e) {
+        print('Error downloading image ${img['path']}: $e');
+      }
+    }
+
     setState(() {
       if (_coverImageIndex >= _selectedImages.length) _coverImageIndex = 0;
+      if (_selectedImages.isEmpty && _existingImages.isNotEmpty) {
+        _showSnackBar('Failed to load some images', Colors.orange);
+      }
     });
   }
 
@@ -998,7 +1079,7 @@ class _AdPostFormState extends State<AdPostForm>
             ) ??
             AttributeVariation(
               id: '',
-              attributeId: '',
+              attributeId: _attributeIdMap[attrName] ?? '',
               name: value,
               status: '',
               createdOn: '',
@@ -1073,52 +1154,15 @@ class _AdPostFormState extends State<AdPostForm>
       return;
     }
 
-    final filters = <String, List<String>>{};
-    _selectedAttributes.forEach((attrName, value) {
-      if (value != null && value.isNotEmpty) {
-        final attrId = _attributeIdMap[attrName];
-        if (attrId != null && attrId.isNotEmpty) {
-          final variations = _attributeVariations[attrName] ?? [];
-          final variation = variations.firstWhere(
-            (v) => v.name == value,
-            orElse:
-                () => AttributeVariation(
-                  id: '',
-                  attributeId: attrId,
-                  name: value,
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          filters[attrId] = [variation.id.isNotEmpty ? variation.id : value];
-        }
-      }
-    });
-
-    if (widget.categoryId == '1') {
-      if (_controllers['registration']!.text.isNotEmpty) {
-        filters[_attributeIdMap['Registration valid till'] ?? '27'] = [
-          _controllers['registration']!.text,
-        ];
-      }
-      if (_controllers['insurance']!.text.isNotEmpty) {
-        filters[_attributeIdMap['Insurance Upto'] ?? '28'] = [
-          _controllers['insurance']!.text,
-        ];
-      }
-    }
-
+    final filters = getFilters();
     final formData = {
       'user_id': widget.userId,
       'title': _generateTitle(),
       'category_id': widget.categoryId,
-      'brand': _selectedBrand?.id,
-      'brand_name': _selectedBrand?.name,
-      'model': _selectedBrandModel?.id,
-      'model_name': _selectedBrandModel?.name,
+      'brand': _selectedBrand?.id ?? '',
+      'model': _selectedBrandModel?.id ?? '',
       'model_variation': _selectedModelVariation?.id ?? '',
-      'description': _controllers['description']?.text,
+      'description': _controllers['description']?.text ?? '',
       'price': _controllers['listPrice']!.text,
       'filters': jsonEncode(filters),
       'parent_zone_id':
@@ -1134,74 +1178,101 @@ class _AdPostFormState extends State<AdPostForm>
         'registration_valid_till': _controllers['registration']!.text,
         'insurance_upto': _controllers['insurance']!.text,
       },
-      'if_offer_price': '0',
-      'offer_price': '0.00',
-      'auction_price_intervel': '0.00',
-      'auction_starting_price': '0.00',
-      'latitude': '',
-      'longitude': '',
-      'user_zone_id': '0',
-      'zone_id': '0',
-      'if_auction': '0',
-      'auction_status': '0',
-      'auction_startin': '0000-00-00 00:00:00',
-      'auction_endin': '0000-00-00 00:00:00',
-      'auction_attempt': '0',
-      'if_finance': '0',
-      'if_exchange': '0',
-      'feature': '0',
-      'status': '1',
-      'visiter_count': '0',
-      'if_sold': '0',
-      'if_expired': '0',
-      'if_verifyed': '0',
-      'by_dealer': '0',
     };
 
     try {
-      setState(() => isSaving = true);
-      final apiService = ApiService();
-      final response = await apiService.postInfinityMultipart(
-        url: "$baseUrl/flutter-add-post.php",
-        fields: formData,
-        mainImagePath: _selectedImages[_coverImageIndex].path,
-        galleryImagePaths:
-            _selectedImages
-                .asMap()
-                .entries
-                .where((e) => e.key != _coverImageIndex)
-                .map((e) => e.value.path)
-                .toList(),
-      );
+    setState(() => isSaving = true);
+    final apiService = ApiService();
+    Map<String, dynamic> response;
 
-      if (response['status'] == 'true') {
-        final postId =
-            response['data']?[0]['id']?.toString() ??
-            'new_${DateTime.now().millisecondsSinceEpoch}';
-
-        _showSnackBar(
-          widget.adData != null
-              ? 'Ad updated successfully'
-              : 'Ad posted successfully',
-          Colors.green,
-        );
-        context.pushNamed(
-          RouteNames.sellingstatuspage,
-          extra: {
-            'userId': widget.userId,
-            'adData': {'id': postId},
-          },
-        );
-      } else {
-        throw Exception(response['message'] ?? 'Failed to save ad');
+    if (widget.postId != null && widget.adData != null) {
+      print('Calling edit API: ${AttributeValueService.baseUrl}/flutter-edit-post.php');
+      formData['post_id'] = widget.postId!;
+      formData['token'] = AttributeValueService.token;
+      if (_deleteGalleryIds.isNotEmpty) {
+        formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
+        print('Sending delete_gallery: $_deleteGalleryIds');
       }
-    } catch (e, stack) {
-      developer.log('Error saving ad: $e', stackTrace: stack);
-      _showSnackBar('Error saving ad: $e', Colors.red);
-    } finally {
-      setState(() => isSaving = false);
+      final newImages = _selectedImages
+          .asMap()
+          .entries
+          .where((e) => !_existingImages.any((img) => img['path'] == e.value.path))
+          .map((e) => e.value.path)
+          .toList();
+      final mainImage = _selectedImages[_coverImageIndex].path;
+      response = await apiService.postInfinityMultipart(
+        url: "${AttributeValueService.baseUrl}/flutter-edit-post.php",
+        fields: formData,
+        mainImagePath: mainImage,
+        galleryImagePaths: newImages.where((path) => path != mainImage).toList(),
+      );
+    } else {
+        // Creating a new post
+        response = await apiService.postInfinityMultipart(
+          url: "${AttributeValueService.baseUrl}/flutter-add-post.php",
+          fields: {
+            ...formData,
+            'if_offer_price': '0',
+            'offer_price': '0.00',
+            'auction_price_intervel': '0.00',
+            'auction_starting_price': '0.00',
+            'latitude': '',
+            'longitude': '',
+            'user_zone_id': '0',
+            'zone_id': '0',
+            'if_auction': '0',
+            'auction_status': '0',
+            'auction_startin': '0000-00-00 00:00:00',
+            'auction_endin': '0000-00-00 00:00:00',
+            'auction_attempt': '0',
+            'if_finance': '0',
+            'if_exchange': '0',
+            'feature': '0',
+            'status': '1',
+            'visiter_count': '0',
+            'if_sold': '0',
+            'if_expired': '0',
+            'if_verifyed': '0',
+            'by_dealer': '0',
+          },
+          mainImagePath: _selectedImages[_coverImageIndex].path,
+          galleryImagePaths:
+              _selectedImages
+                  .asMap()
+                  .entries
+                  .where((e) => e.key != _coverImageIndex)
+                  .map((e) => e.value.path)
+                  .toList(),
+        );
+      }
+      if (widget.postId != null && widget.adData != null) {
+        formData['post_id'] = widget.postId!;
+        formData['token'] = AttributeValueService.token;
+        if (_deleteGalleryIds.isNotEmpty) {
+          formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
+          print('Deleting gallery images: $_deleteGalleryIds');
+        }
+        // Rest of the edit API logic...
+      }
+      if (response['status'] == 'true') {
+      _showSnackBar('Ad updated successfully', Colors.green);
+      context.pushNamed(
+        RouteNames.sellingstatuspage,
+        extra: {
+          'userId': widget.userId,
+          'adData': {'id': widget.postId},
+        },
+      );
+    } else {
+      throw Exception(response['message'] ?? 'Failed to update ad');
     }
+  } catch (e) {
+    print('Error saving ad: $e', );
+    _showSnackBar('Error saving ad: $e', Colors.red);
+  } finally {
+    setState(() => isSaving = false);
   }
+}
 
   Widget _buildImagePicker() => Column(
     children: [
@@ -1352,24 +1423,51 @@ class _AdPostFormState extends State<AdPostForm>
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: IconButton(
-                                icon: const Icon(
-                                  Icons.close,
-                                  size: 20,
-                                  color: Colors.white,
-                                ),
-                                onPressed:
-                                    () => setState(() {
-                                      _selectedImages.removeAt(index);
-                                      if (_selectedImages.isNotEmpty) {
-                                        if (index < _coverImageIndex) {
-                                          _coverImageIndex--;
-                                        } else if (index == _coverImageIndex) {
-                                          _coverImageIndex = 0;
-                                        }
-                                      } else {
+                                onPressed: () {
+                                  setState(() {
+                                    final removedImage = _selectedImages[index];
+                                    _selectedImages.removeAt(index);
+                                    final existingImage = _existingImages
+                                        .firstWhere(
+                                          (img) =>
+                                              img['path'] == removedImage.path,
+                                          orElse: () => {},
+                                        );
+                                    if (existingImage.isNotEmpty &&
+                                        existingImage['id'] != null) {
+                                      _deleteGalleryIds.add(
+                                        existingImage['id'],
+                                      );
+                                      _showSnackBar(
+                                        'Image ID ${existingImage['id']} marked for deletion',
+                                        Colors.orange,
+                                      );
+                                      print(
+                                        'Marked image ID ${existingImage['id']} for deletion from post ${widget.postId}',
+                                      );
+                                    } else {
+                                      print(
+                                        'No gallery ID for removed image: ${removedImage.path}',
+                                      );
+                                    }
+                                    _existingImages.removeWhere(
+                                      (img) => img['path'] == removedImage.path,
+                                    );
+                                    if (_selectedImages.isNotEmpty) {
+                                      if (index < _coverImageIndex) {
+                                        _coverImageIndex--;
+                                      } else if (index == _coverImageIndex) {
                                         _coverImageIndex = 0;
                                       }
-                                    }),
+                                    } else {
+                                      _coverImageIndex = 0;
+                                    }
+                                  });
+                                },
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.red,
+                                ),
                               ),
                             ),
                           ),
@@ -1455,31 +1553,34 @@ class _AdPostFormState extends State<AdPostForm>
       ),
       if (_brandModels.isNotEmpty) ...[
         const SizedBox(height: 12),
-       CustomDropdownWidget<BrandModel>(
-  label: widget.categoryId == '2' ? 'Project' : 'Model',
-  value: _selectedBrandModel,
-  items: _brandModels,
-  onChanged: (newValue) async {
-    setState(() {
-      _selectedBrandModel = newValue;
-      _selectedModelVariation = null;
-      _modelVariations = [];
-    });
-    if (newValue != null) {
-      final variations = await AttributeValueService.fetchModelVariations(
-        newValue.id,
-        widget.categoryId,
-      );
-      setState(() {
-        _modelVariations = variations.toSet().toList();
-      });
-    }
-  },
-  isRequired: true,
-  itemToString: (item) => item.name,
-  validator: (value) => value == null ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}' : null,
-  hintText: '',
-),
+        CustomDropdownWidget<BrandModel>(
+          label: widget.categoryId == '2' ? 'Project' : 'Model',
+          value: _selectedBrandModel,
+          items: _brandModels,
+          onChanged: (newValue) async {
+            setState(() {
+              _selectedBrandModel = newValue;
+              _selectedModelVariation = null;
+              _modelVariations = [];
+            });
+            if (newValue != null) {
+              final variations =
+                  await AttributeValueService.fetchModelVariations(
+                    newValue.id,
+                    widget.categoryId,
+                  );
+              setState(() => _modelVariations = variations.toSet().toList());
+            }
+          },
+          isRequired: true,
+          itemToString: (item) => item.name,
+          validator:
+              (value) =>
+                  value == null
+                      ? 'Please select a ${widget.categoryId == '2' ? 'project' : 'model'}'
+                      : null,
+          hintText: '',
+        ),
       ],
       if (_modelVariations.isNotEmpty) ...[
         const SizedBox(height: 12),
@@ -1504,12 +1605,6 @@ class _AdPostFormState extends State<AdPostForm>
           if (value?.isEmpty ?? true) return 'Please enter the list price';
           final listPrice = double.tryParse(value!);
           if (listPrice == null) return 'Please enter a valid number';
-          final offerPrice = double.tryParse(
-            _controllers['offerPrice']?.text ?? '',
-          );
-          if (offerPrice != null && offerPrice > listPrice) {
-            return 'List price must be greater than or equal to offer price';
-          }
           return null;
         },
       ),
@@ -1654,7 +1749,7 @@ class _AdPostFormState extends State<AdPostForm>
                     ),
                   )
                   : Text(
-                    widget.adData != null ? 'Update Ad' : 'Post Ad',
+                    widget.postId != null ? 'Update Ad' : 'Post Ad',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -1670,15 +1765,9 @@ class _AdPostFormState extends State<AdPostForm>
     opacity: _fadeAnimation,
     child: Stack(
       children: [
-        // Scrollable form content with bottom padding to avoid button overlap
         SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              24,
-              24,
-              24,
-              100,
-            ), // Increased bottom padding
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
             child: Form(
               key: widget.formKey,
               child: Column(
@@ -1687,17 +1776,16 @@ class _AdPostFormState extends State<AdPostForm>
                   _buildImageSection(),
                   _buildKeyInfoSection(),
                   _buildMoreInfoSection(),
-                  // Removed _buildSubmitButton from here
                 ],
               ),
             ),
           ),
         ),
-        // Fixed submit button at the bottom
         _buildSubmitButton(),
       ],
     ),
   );
+
   @override
   void dispose() {
     for (var c in _controllers.values) {

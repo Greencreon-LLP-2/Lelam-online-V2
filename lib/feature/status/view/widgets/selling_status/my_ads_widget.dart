@@ -758,50 +758,39 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                     ),
                   ),
                 ],
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.menu, color: Colors.grey.shade600),
-
-                  position: PopupMenuPosition.over,
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      context.pushNamed(
-                        RouteNames.adPostPage,
-                        extra: {
-                          'categoryId': ad['category_id']?.toString() ?? '',
-                          'adData': ad,
-                        },
-                      );
-
-                      developer.log(
-                        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}',
-                      );
-                    } else if (value == 'delete') {
-                      _deleteAd(ad['id'] as String);
-                    } else if (value == 'mark_delivered') {
-                      _markAsDelivered(ad['id'] as String);
-                    } else if (value == 'check_auction') {
-                      _checkAuctionTerms(ad['id'] as String);
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Delete'),
-                        ),
-                        if (ad['status'] == '1')
-                          const PopupMenuItem(
-                            value: 'mark_delivered',
-                            child: Text('Mark as Delivered'),
-                          ),
-                        if (ad['status'] == '1' && ad['if_auction'] == '0')
-                          const PopupMenuItem(
-                            value: 'check_auction',
-                            child: Text('Move to Auction'),
-                          ),
-                      ],
-                ),
+             PopupMenuButton<String>(
+  icon: Icon(Icons.menu, color: Colors.grey.shade600),
+  position: PopupMenuPosition.over,
+  onSelected: (value) {
+    if (value == 'edit') {
+      context.pushNamed(
+        RouteNames.adPostPage,
+        extra: {
+          'categoryId': ad['category_id']?.toString() ?? '',
+          'postId': ad['id']?.toString() ?? '', 
+          'adData': ad,
+        },
+      );
+      developer.log(
+        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}, postId: ${ad['id']}',
+      );
+    } else if (value == 'delete') {
+      _deleteAd(ad['id'] as String);
+    } else if (value == 'mark_delivered') {
+      _markAsDelivered(ad['id'] as String);
+    } else if (value == 'check_auction') {
+      _checkAuctionTerms(ad['id'] as String);
+    }
+  },
+  itemBuilder: (context) => [
+    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+    if (ad['status'] == '1')
+      const PopupMenuItem(value: 'mark_delivered', child: Text('Mark as Delivered')),
+    if (ad['status'] == '1' && ad['if_auction'] == '0')
+      const PopupMenuItem(value: 'check_auction', child: Text('Move to Auction')),
+  ],
+),
               ],
             ),
             Container(color: Colors.grey, height: 1.5, width: double.infinity),
