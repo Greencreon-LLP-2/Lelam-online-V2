@@ -376,7 +376,7 @@ class _MeetingCardState extends State<MeetingCard> {
                           'Schedule meeting',
               'footerStatus_data':
                   widget.meeting['footerStatus_data'] ??
-                  'Click call support for full details',
+                  'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': widget.meeting['timer'] ?? '0',
             };
         return FutureBuilder<String>(

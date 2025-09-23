@@ -445,44 +445,57 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     );
   }
 
-  Future<void> _proccedWithoutBid(BuildContext context, String postId) async {
-    final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/procced-meeting-without-bid.php?token=${widget.token}&user_id=$_userId&post_id=$postId&meeting_date=$meetingDate',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
-        },
-      );
-      print('procced-meeting-without-bid.php response: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Meeting scheduled successfully')),
-          );
-          await _loadBids();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
-              ),
+Future<void> _proccedWithoutBid(BuildContext context, String postId) async {
+  final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '${widget.baseUrl}/procced-meeting-without-bid.php?token=${widget.token}&user_id=$_userId&post_id=$postId&meeting_date=$meetingDate',
+      ),
+      headers: {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+      },
+    );
+    print('procced-meeting-without-bid.php response: ${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == true || data['status'] == 'true') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Meeting scheduled successfully')),
+        );
+        await _loadBids();
+        print('Meeting without bid scheduled, navigating to My Meetings tab with Date Fixed');
+        context.pushNamed(
+          RouteNames.buyingStatusPage,
+          queryParameters: {
+            'initialTab': '1', // My Meetings tab
+            'initialStatus': 'Date Fixed', // Date Fixed tab in MyMeetingsWidget
+            'postId': postId,
+          },
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
             ),
-          );
-        }
+          ),
+        );
       }
-    } catch (e) {
-      print('Error scheduling meeting without bid: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error scheduling meeting')));
+    } else {
+      print('procced-meeting-without-bid.php failed with status ${response.statusCode}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to schedule meeting')),
+      );
     }
+  } catch (e) {
+    print('Error scheduling meeting without bid: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Error scheduling meeting')),
+    );
   }
-
+}
   Future<void> _increaseBid(
     BuildContext context,
     String postId,

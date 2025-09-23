@@ -82,12 +82,14 @@ class PillConnector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        
         Transform.scale(
-          scaleX: 1.5, 
-        child: Icon(Icons.arrow_forward,
-        size:14 ,
-        color: isActive ? activeColor:inactiveColor,))
+          scaleX: 1.5,
+          child: Icon(
+            Icons.arrow_forward,
+            size: 14,
+            color: isActive ? activeColor : inactiveColor,
+          ),
+        ),
       ],
     );
   }
@@ -156,7 +158,6 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         }
       });
     }
-
   }
 
   @override
@@ -410,7 +411,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                   statusData['middle_status']?.toString() ?? 'Schedule meeting',
               'footerStatus_data':
                   statusData['Footer_status']?.toString() ??
-                  'Click call support for full details',
+                  'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': statusData['timer']?.toString() ?? '0',
             };
           }
@@ -424,14 +425,18 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       print('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Click call support for full details',
+        'footerStatus_data':
+            'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
+
         'timer': '0',
       };
     } catch (e) {
       print('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Click call support for full details',
+        'footerStatus_data':
+            'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
+
         'timer': '0',
       };
     }
@@ -573,7 +578,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
                   statusData?['middleStatus_data'] ?? 'Schedule meeting',
               'footerStatus_data':
                   statusData?['footerStatus_data'] ??
-                  'Click call support for full details',
+                  'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': statusData?['timer'] ?? '0',
             };
             print('Added meeting ${meeting['id']} to list: $meetingData');
@@ -640,7 +645,6 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
           if (status == 'Date Fixed') {
             return meeting['status'] == '1' &&
                 meeting['meeting_done'] == '0' &&
-
                 meeting['if_location_request'] == '0' &&
                 meeting['seller_approvel'] == '1' &&
                 meeting['admin_approvel'] == '1' &&
@@ -1317,83 +1321,81 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<void> _sendLocationRequest(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    try {
-      final response = await retry(
-        () => http.get(
-          Uri.parse(
-            '${widget.baseUrl}/my-meeting-send-location-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
-          ),
-          headers: {
-            'token': widget.token,
-            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          },
+Future<void> _sendLocationRequest(
+  BuildContext context,
+  Map<String, dynamic> meeting,
+) async {
+  if (_userId == null || _userId == 'Unknown') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid user ID. Please log in again.')),
+    );
+    return;
+  }
+  try {
+    final response = await retry(
+      () => http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-meeting-send-location-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
         ),
-        maxAttempts: 3,
-        delayFactor: const Duration(seconds: 2),
-        randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying send location request: $e');
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
         },
-      );
-      print('my-meeting-send-location-request.php response: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location request sent successfully')),
-          );
-
-          final statusData = await _fetchMeetingStatus(
-            meeting['id'],
-            'Awaiting Location',
-          );
-          if (statusData != null && statusData['if_location_request'] == '1') {
-            _onLocationRequestSent(meeting['id']);
-          }
+      ),
+      maxAttempts: 3,
+      delayFactor: const Duration(seconds: 2),
+      randomizationFactor: 0.25,
+      onRetry: (e) {
+        print('Retrying send location request: $e');
+      },
+    );
+    print('my-meeting-send-location-request.php response: ${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == true || data['status'] == 'true') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location request sent successfully')),
+        );
+        // Switch to Awaiting Location tab
+        if (mounted) {
+          setState(() {
+            selectedIndex = 2; // Awaiting Location tab
+            print('Switched to Awaiting Location tab for meeting ${meeting['id']}');
+          });
           await _loadMeetings();
           widget.onRefreshMeetings?.call();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to send location request: ${data['message'] ?? 'Unknown error'}',
-              ),
-            ),
-          );
         }
-      } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for send location request');
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Too many requests. Please try again later.'),
+          SnackBar(
+            content: Text(
+              'Failed to send location request: ${data['message'] ?? 'Unknown error'}',
+            ),
           ),
         );
-      } else {
-        print(
-          'my-meeting-send-location-request.php failed with status ${response.statusCode}',
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to send location request')),
-        );
       }
-    } catch (e) {
-      print('Error sending location request: $e');
+    } else if (response.statusCode == 429) {
+      print('Rate limit exceeded for send location request');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error sending location request')),
+        const SnackBar(
+          content: Text('Too many requests. Please try again later.'),
+        ),
+      );
+    } else {
+      print(
+        'my-meeting-send-location-request.php failed with status ${response.statusCode}',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send location request')),
       );
     }
+  } catch (e) {
+    print('Error sending location request: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Error sending location request')),
+    );
   }
-
+}
   // Future<void> _cancelMeeting(
   //   BuildContext context,
   //   Map<String, dynamic> meeting,
