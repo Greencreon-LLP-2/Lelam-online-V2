@@ -284,6 +284,145 @@ class _RealEstatePageState extends State<RealEstatePage> {
     super.dispose();
   }
 
+  Future<void> _fetchFilterListings() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _filteredPostsCache = []; // Clear filtered cache
+    });
+
+    final Map<String, String> queryParams = {};
+
+    // Property Types
+    if (_selectedPropertyTypes.isNotEmpty) {
+      queryParams['property_types'] = _selectedPropertyTypes.join(',');
+    }
+
+    // Price Range
+    if (_selectedPriceRange != 'all') {
+      if (_minPriceController.text.isNotEmpty &&
+          _maxPriceController.text.isNotEmpty) {
+        queryParams['min_price'] = _minPriceController.text.trim();
+        queryParams['max_price'] = _maxPriceController.text.trim();
+      } else {
+        switch (_selectedPriceRange) {
+          case 'Under 50L':
+            queryParams['min_price'] = '0';
+            queryParams['max_price'] = '5000000';
+            break;
+          case '50L-1Cr':
+            queryParams['min_price'] = '5000000';
+            queryParams['max_price'] = '10000000';
+            break;
+          case '1Cr-2Cr':
+            queryParams['min_price'] = '10000000';
+            queryParams['max_price'] = '20000000';
+            break;
+          case '2Cr-5Cr':
+            queryParams['min_price'] = '20000000';
+            queryParams['max_price'] = '50000000';
+            break;
+          case 'Above 5Cr':
+            queryParams['min_price'] = '50000000';
+            break;
+        }
+      }
+    }
+
+    // Bedrooms
+    if (_selectedBedroomRange != 'all') {
+      queryParams['bedrooms'] =
+          _selectedBedroomRange == '5+' ? '5_plus' : _selectedBedroomRange;
+    }
+
+    // Area
+    if (_selectedAreaRange != 'all') {
+      switch (_selectedAreaRange) {
+        case 'Under 500 sq ft':
+          queryParams['min_area'] = '0';
+          queryParams['max_area'] = '500';
+          break;
+        case '500-1000 sq ft':
+          queryParams['min_area'] = '500';
+          queryParams['max_area'] = '1000';
+          break;
+        case '1000-1500 sq ft':
+          queryParams['min_area'] = '1000';
+          queryParams['max_area'] = '1500';
+          break;
+        case '1500-2000 sq ft':
+          queryParams['min_area'] = '1500';
+          queryParams['max_area'] = '2000';
+          break;
+        case 'Above 2000 sq ft':
+          queryParams['min_area'] = '2000';
+          break;
+      }
+    }
+
+    // Furnishing
+    if (_selectedFurnishings.isNotEmpty) {
+      queryParams['furnishing'] = _selectedFurnishings.join(',');
+    }
+
+    // Posted By
+    if (_selectedPostedBy != 'all') {
+      switch (_selectedPostedBy) {
+        case 'Owner':
+          queryParams['by_dealer'] = '0';
+          break;
+        case 'Builder':
+        case 'Agent':
+          queryParams['by_dealer'] = '1';
+          break;
+      }
+    }
+
+    // Location
+    if (_selectedLocation != 'all') {
+      queryParams['user_zone_id'] = _selectedLocation;
+    }
+
+    // Listing type
+    queryParams['listing_type'] =
+        _listingType == 'auction' ? 'auction' : 'sale';
+
+    try {
+      final apiService = ApiService();
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url:
+            "https://lelamonline.com/admin/api/v1/filter-realestate-listings.php",
+        fields: queryParams,
+      );
+
+      developer.log(
+        'Filter API response: $response',
+      ); // Log response for debugging
+
+      final dataList = response['data'] as List<dynamic>? ?? [];
+      final finalPosts =
+          dataList
+              .map(
+                (item) =>
+                    MarketplacePost.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
+
+      setState(() {
+        _posts = finalPosts;
+        _filteredPostsCache = finalPosts; // Update filtered cache
+        _filtersChanged = true;
+        _isLoading = false;
+      });
+    } catch (e) {
+      developer.log("Error while fetching filter listings: $e");
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load filtered properties. Please try again.';
+      });
+    }
+  }
+
   void _handleScroll() {
     if (_scrollController.offset > 100 && !_showAppBarSearch) {
       setState(() => _showAppBarSearch = true);
@@ -369,129 +508,29 @@ class _RealEstatePageState extends State<RealEstatePage> {
   List<MarketplacePost> get filteredPosts {
     if (!_filtersChanged) return _filteredPostsCache;
 
-    final filtered =
-        _posts.where((post) {
-          final propertyType =
-              post.filters['propertyType']?.isNotEmpty ?? false
-                  ? post.filters['propertyType']!.first
-                  : 'N/A';
-          final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+    List<MarketplacePost> filtered = _posts;
 
-          // Search query filtering
-          if (_searchQuery.trim().isNotEmpty) {
-            final query = _searchQuery.toLowerCase().trim();
-            final searchableText = [
-              post.title.toLowerCase(),
-              propertyType.toLowerCase(),
-              _getLocationName(post.parentZoneId).toLowerCase(),
-              post.description.toLowerCase(),
-              sellerType.toLowerCase(),
-            ].join(' ');
-            if (!searchableText.contains(query)) return false;
-          }
-
-          // Location filter
-          if (_selectedLocation != 'all' &&
-              post.parentZoneId != _selectedLocation)
-            return false;
-
-          // Listing type filter
-          if (_listingType == 'auction' && post.ifAuction != '1') return false;
-          if (_listingType == 'sale' && post.ifAuction != '0') return false;
-
-          // Property type filter
-          if (_selectedPropertyTypes.isNotEmpty &&
-              !(_selectedPropertyTypes.contains(propertyType)))
-            return false;
-
-          // Price range filter
-          if (_selectedPriceRange != 'all') {
-            int price =
-                post.ifAuction == '1'
-                    ? (int.tryParse(post.auctionStartingPrice) ?? 0)
-                    : (int.tryParse(post.price) ?? 0);
-            switch (_selectedPriceRange) {
-              case 'Under 50L':
-                if (price >= 5000000) return false;
-                break;
-              case '50L-1Cr':
-                if (price < 5000000 || price >= 10000000) return false;
-                break;
-              case '1Cr-2Cr':
-                if (price < 10000000 || price >= 20000000) return false;
-                break;
-              case '2Cr-5Cr':
-                if (price < 20000000 || price >= 50000000) return false;
-                break;
-              case 'Above 5Cr':
-                if (price < 50000000) return false;
-                break;
-            }
-          }
-
-          // Bedroom range filter
-          final bedrooms =
-              post.filters['bedrooms']?.isNotEmpty ?? false
-                  ? post.filters['bedrooms']!.first
-                  : 'N/A';
-          if (_selectedBedroomRange != 'all' &&
-              bedrooms != _selectedBedroomRange)
-            return false;
-
-          // Area range filter
-          final areaStr =
-              post.filters['area']?.isNotEmpty ?? false
-                  ? post.filters['area']!.first
-                  : '0';
-          int area = int.tryParse(areaStr) ?? 0;
-          if (_selectedAreaRange != 'all') {
-            switch (_selectedAreaRange) {
-              case 'Under 500 sq ft':
-                if (area >= 500) return false;
-                break;
-              case '500-1000 sq ft':
-                if (area < 500 || area >= 1000) return false;
-                break;
-              case '1000-1500 sq ft':
-                if (area < 1000 || area >= 1500) return false;
-                break;
-              case '1500-2000 sq ft':
-                if (area < 1500 || area >= 2000) return false;
-                break;
-              case 'Above 2000 sq ft':
-                if (area < 2000) return false;
-                break;
-            }
-          }
-
-          // Furnishing filter
-          final furnishing =
-              post.filters['furnishing']?.isNotEmpty ?? false
-                  ? post.filters['furnishing']!.first
-                  : 'N/A';
-          if (_selectedFurnishings.isNotEmpty &&
-              !_selectedFurnishings.contains(furnishing))
-            return false;
-
-          // Posted by filter
-          if (_selectedPostedBy != 'all') {
-            switch (_selectedPostedBy) {
-              case 'Owner':
-                if (sellerType != 'Owner') return false;
-                break;
-              case 'Builder':
-              case 'Agent':
-                if (sellerType != 'Dealer') return false;
-                break;
-            }
-          }
-
-          return true;
-        }).toList();
-
-    // Sort posts based on search query relevance if search query exists
+    // Apply search query filtering if present
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
+      filtered =
+          filtered.where((post) {
+            final propertyType =
+                post.filters['propertyType']?.isNotEmpty ?? false
+                    ? post.filters['propertyType']!.first.toLowerCase()
+                    : '';
+            final sellerType = post.byDealer == '1' ? 'dealer' : 'owner';
+            final searchableText = [
+              post.title.toLowerCase(),
+              propertyType,
+              _getLocationName(post.parentZoneId).toLowerCase(),
+              post.description.toLowerCase(),
+              sellerType,
+            ].join(' ');
+            return searchableText.contains(query);
+          }).toList();
+
+      // Sort by relevance
       filtered.sort((a, b) {
         final aScore = _calculateRelevanceScore(a, query);
         final bScore = _calculateRelevanceScore(b, query);
@@ -501,7 +540,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     _filteredPostsCache = filtered;
     _filtersChanged = false;
-    return filtered;
+    developer.log('Filtered posts count: ${_filteredPostsCache.length}');
+    return _filteredPostsCache;
   }
 
   final List<String> _propertyTypes = [
@@ -603,7 +643,16 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                   _minPriceController.clear();
                                   _maxPriceController.clear();
                                 });
-                                _fetchPosts();
+                                setState(() {
+                                  _selectedPropertyTypes.clear();
+                                  _selectedPriceRange = 'all';
+                                  _selectedBedroomRange = 'all';
+                                  _selectedAreaRange = 'all';
+                                  _selectedFurnishings.clear();
+                                  _selectedPostedBy = 'all';
+                                  _filtersChanged = true;
+                                });
+                                _fetchPosts(); // Reset to original posts
                               },
                               child: const Text(
                                 'Clear All',
@@ -697,7 +746,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             Expanded(
                               child: SingleChildScrollView(
                                 padding: const EdgeInsets.all(16),
-                                child: _buildOptionsSection(),
+                                child: _buildOptionsSection(setModalState),
                               ),
                             ),
                           ],
@@ -739,138 +788,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () async {
-                                  final Map<String, String> queryParams = {};
-
-                                  // Property Types
-                                  if (_selectedPropertyTypes.isNotEmpty) {
-                                    queryParams['property_types'] =
-                                        _selectedPropertyTypes.join(',');
-                                  }
-
-                                  // Price Range
-                                  if (_selectedPriceRange != 'all') {
-                                    switch (_selectedPriceRange) {
-                                      case 'Under 50L':
-                                        queryParams['min_price'] = '0';
-                                        queryParams['max_price'] = '5000000';
-                                        break;
-                                      case '50L-1Cr':
-                                        queryParams['min_price'] = '5000000';
-                                        queryParams['max_price'] = '10000000';
-                                        break;
-                                      case '1Cr-2Cr':
-                                        queryParams['min_price'] = '10000000';
-                                        queryParams['max_price'] = '20000000';
-                                        break;
-                                      case '2Cr-5Cr':
-                                        queryParams['min_price'] = '20000000';
-                                        queryParams['max_price'] = '50000000';
-                                        break;
-                                      case 'Above 5Cr':
-                                        queryParams['min_price'] = '50000000';
-                                        break;
-                                    }
-                                  }
-
-                                  // Bedrooms
-                                  if (_selectedBedroomRange != 'all') {
-                                    switch (_selectedBedroomRange) {
-                                      case '1':
-                                        queryParams['bedrooms'] = '1';
-                                        break;
-                                      case '2':
-                                        queryParams['bedrooms'] = '2';
-                                        break;
-                                      case '3':
-                                        queryParams['bedrooms'] = '3';
-                                        break;
-                                      case '4':
-                                        queryParams['bedrooms'] = '4';
-                                        break;
-                                      case '5+':
-                                        queryParams['bedrooms'] = '5_plus';
-                                        break;
-                                    }
-                                  }
-
-                                  // Area
-                                  if (_selectedAreaRange != 'all') {
-                                    switch (_selectedAreaRange) {
-                                      case 'Under 500 sq ft':
-                                        queryParams['min_area'] = '0';
-                                        queryParams['max_area'] = '500';
-                                        break;
-                                      case '500-1000 sq ft':
-                                        queryParams['min_area'] = '500';
-                                        queryParams['max_area'] = '1000';
-                                        break;
-                                      case '1000-1500 sq ft':
-                                        queryParams['min_area'] = '1000';
-                                        queryParams['max_area'] = '1500';
-                                        break;
-                                      case '1500-2000 sq ft':
-                                        queryParams['min_area'] = '1500';
-                                        queryParams['max_area'] = '2000';
-                                        break;
-                                      case 'Above 2000 sq ft':
-                                        queryParams['min_area'] = '2000';
-                                        break;
-                                    }
-                                  }
-
-                                  // Furnishing
-                                  if (_selectedFurnishings.isNotEmpty) {
-                                    queryParams['furnishing'] =
-                                        _selectedFurnishings.join(',');
-                                  }
-
-                                  // Posted By
-                                  if (_selectedPostedBy != 'all') {
-                                    switch (_selectedPostedBy) {
-                                      case 'Owner':
-                                        queryParams['by_dealer'] = '0';
-                                        break;
-                                      case 'Builder':
-                                      case 'Agent':
-                                        queryParams['by_dealer'] = '1';
-                                        break;
-                                    }
-                                  }
-
-                                  // Listing type (auction / sale)
-                                  queryParams['listing_type'] = categoryId;
-
-                                  try {
-                                    setState(() => _isLoading = true);
-                                    final apiService = ApiService();
-                                    final Map<String, dynamic>
-                                    response = await apiService.postMultipart(
-                                      url:
-                                          "$baseUrl/filter-realestate-listings.php",
-                                      fields: queryParams,
-                                    );
-
-                                    final dataList =
-                                        response['data'] as List<dynamic>? ??
-                                        [];
-                                    final finalPosts =
-                                        dataList.map((item) {
-                                          final json =
-                                              item as Map<String, dynamic>;
-                                          return MarketplacePost.fromJson(json);
-                                        }).toList();
-
-                                    setState(() {
-                                      _posts = finalPosts;
-                                      _filtersChanged = true;
-                                      _isLoading = false;
-                                    });
-                                  } catch (e) {
-                                    setState(() => _isLoading = false);
-                                  }
-
+                                onPressed: () {
                                   Navigator.pop(context);
+                                  _fetchFilterListings(); // Apply filters via API
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Palette.primaryblue,
@@ -931,6 +851,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     selectedValues.add(option);
                   }
                 });
+                setState(() {
+                  if (title == 'Property Type') {
+                    _selectedPropertyTypes = List.from(selectedValues);
+                  } else if (title == 'Furnishing') {
+                    _selectedFurnishings = List.from(selectedValues);
+                  }
+                });
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
@@ -960,6 +887,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             selectedValues.add(option);
                           } else {
                             selectedValues.remove(option);
+                          }
+                        });
+                        setState(() {
+                          if (title == 'Property Type') {
+                            _selectedPropertyTypes = List.from(selectedValues);
+                          } else if (title == 'Furnishing') {
+                            _selectedFurnishings = List.from(selectedValues);
                           }
                         });
                       },
@@ -996,7 +930,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
     String title,
     List<String> options,
     String selectedValue,
-    ValueChanged<String> onChanged, {
+    ValueChanged<String> onChanged,
+    StateSetter setModalState, {
     String? subtitle,
   }) {
     if (title == 'Price Range') {
@@ -1046,14 +981,19 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
+                    setModalState(() {
+                      _selectedPriceRange =
+                          value.isNotEmpty &&
+                                  _maxPriceController.text.isNotEmpty
+                              ? '$value-${_maxPriceController.text}'
+                              : 'all';
+                    });
                     setState(() {
-                      final min = _minPriceController.text;
-                      final max = _maxPriceController.text;
-                      if (min.isNotEmpty && max.isNotEmpty) {
-                        _selectedPriceRange = '$min-$max';
-                      } else {
-                        _selectedPriceRange = 'all';
-                      }
+                      _selectedPriceRange =
+                          value.isNotEmpty &&
+                                  _maxPriceController.text.isNotEmpty
+                              ? '$value-${_maxPriceController.text}'
+                              : 'all';
                     });
                   },
                 ),
@@ -1084,14 +1024,19 @@ class _RealEstatePageState extends State<RealEstatePage> {
                   ),
                   style: const TextStyle(fontSize: 12),
                   onChanged: (value) {
+                    setModalState(() {
+                      _selectedPriceRange =
+                          _minPriceController.text.isNotEmpty &&
+                                  value.isNotEmpty
+                              ? '${_minPriceController.text}-$value'
+                              : 'all';
+                    });
                     setState(() {
-                      final min = _minPriceController.text;
-                      final max = _maxPriceController.text;
-                      if (min.isNotEmpty && max.isNotEmpty) {
-                        _selectedPriceRange = '$min-$max';
-                      } else {
-                        _selectedPriceRange = 'all';
-                      }
+                      _selectedPriceRange =
+                          _minPriceController.text.isNotEmpty &&
+                                  value.isNotEmpty
+                              ? '${_minPriceController.text}-$value'
+                              : 'all';
                     });
                   },
                 ),
@@ -1099,61 +1044,86 @@ class _RealEstatePageState extends State<RealEstatePage> {
             ],
           ),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedPriceRange = 'all';
-                _minPriceController.clear();
-                _maxPriceController.clear();
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color:
-                    _selectedPriceRange == 'all'
-                        ? Palette.primarypink.withOpacity(0.1)
-                        : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color:
-                      _selectedPriceRange == 'all'
-                          ? Palette.primarypink
-                          : Colors.grey.shade300,
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Radio<String>(
-                    value: 'all',
-                    groupValue: _selectedPriceRange,
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _selectedPriceRange = value;
-                          _minPriceController.clear();
-                          _maxPriceController.clear();
-                        });
-                      }
-                    },
-                    activeColor: Palette.primarypink,
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: options.length,
+            itemBuilder: (context, index) {
+              final option = options[index];
+              final isSelected = selectedValue == option;
+              final displayText = option == 'all' ? 'Any $title' : option;
+              return GestureDetector(
+                onTap: () {
+                  setModalState(() => onChanged(option));
+                  setState(() {
+                    onChanged(option);
+                    if (option == 'all') {
+                      _minPriceController.clear();
+                      _maxPriceController.clear();
+                    }
+                  });
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Any Price Range',
-                      style: TextStyle(
-                        color: Palette.primarypink,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
+                  decoration: BoxDecoration(
+                    color:
+                        isSelected
+                            ? Palette.primarypink.withOpacity(0.1)
+                            : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color:
+                          isSelected
+                              ? Palette.primarypink
+                              : Colors.grey.shade300,
+                      width: 1,
                     ),
                   ),
-                ],
-              ),
-            ),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: option,
+                        groupValue: selectedValue,
+                        onChanged: (value) {
+                          if (value != null) {
+                            setModalState(() => onChanged(value));
+                            setState(() {
+                              onChanged(value);
+                              if (value == 'all') {
+                                _minPriceController.clear();
+                                _maxPriceController.clear();
+                              }
+                            });
+                          }
+                        },
+                        activeColor: Palette.primarypink,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          displayText,
+                          style: TextStyle(
+                            color:
+                                isSelected
+                                    ? Palette.primarypink
+                                    : Colors.black87,
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       );
@@ -1187,7 +1157,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
             final isSelected = selectedValue == option;
             final displayText = option == 'all' ? 'Any $title' : option;
             return GestureDetector(
-              onTap: () => onChanged(option),
+              onTap: () {
+                setModalState(() => onChanged(option));
+                setState(() => onChanged(option));
+              },
               child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
                 padding: const EdgeInsets.symmetric(
@@ -1212,7 +1185,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
                       value: option,
                       groupValue: selectedValue,
                       onChanged: (value) {
-                        if (value != null) onChanged(value);
+                        if (value != null) {
+                          setModalState(() => onChanged(value));
+                          setState(() => onChanged(value));
+                        }
                       },
                       activeColor: Palette.primarypink,
                     ),
@@ -1239,21 +1215,25 @@ class _RealEstatePageState extends State<RealEstatePage> {
     );
   }
 
-  Widget _buildOptionsSection() {
+  Widget _buildOptionsSection(StateSetter setModalState) {
     switch (_selectedCategory) {
       case 'Property Type':
         return _buildMultiSelectFilterSection(
           'Property Type',
           _propertyTypes,
           _selectedPropertyTypes,
-          setState,
+          setModalState,
         );
       case 'Price Range':
         return _buildSingleSelectFilterSection(
           'Price Range',
           _priceRanges,
           _selectedPriceRange,
-          (value) => setState(() => _selectedPriceRange = value),
+          (value) {
+            setModalState(() => _selectedPriceRange = value);
+            setState(() => _selectedPriceRange = value);
+          },
+          setModalState,
           subtitle:
               _listingType == 'auction'
                   ? 'Filter by starting bid price'
@@ -1264,28 +1244,40 @@ class _RealEstatePageState extends State<RealEstatePage> {
           'Bedrooms',
           _bedroomRanges,
           _selectedBedroomRange,
-          (value) => setState(() => _selectedBedroomRange = value),
+          (value) {
+            setModalState(() => _selectedBedroomRange = value);
+            setState(() => _selectedBedroomRange = value);
+          },
+          setModalState,
         );
       case 'Area':
         return _buildSingleSelectFilterSection(
           'Area',
           _areaRanges,
           _selectedAreaRange,
-          (value) => setState(() => _selectedAreaRange = value),
+          (value) {
+            setModalState(() => _selectedAreaRange = value);
+            setState(() => _selectedAreaRange = value);
+          },
+          setModalState,
         );
       case 'Furnishing':
         return _buildMultiSelectFilterSection(
           'Furnishing',
           _furnishings,
           _selectedFurnishings,
-          setState,
+          setModalState,
         );
       case 'Posted By':
         return _buildSingleSelectFilterSection(
           'Posted By',
           _postedByOptions,
           _selectedPostedBy,
-          (value) => setState(() => _selectedPostedBy = value),
+          (value) {
+            setModalState(() => _selectedPostedBy = value);
+            setState(() => _selectedPostedBy = value);
+          },
+          setModalState,
         );
       default:
         return const SizedBox.shrink();
@@ -1357,9 +1349,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
           });
         },
 
-        autofillHints: null, 
-        enableSuggestions: false, 
-        enableInteractiveSelection: true, 
+        autofillHints: null,
+        enableSuggestions: false,
+        enableInteractiveSelection: true,
         decoration: InputDecoration(
           hintText: 'Search by property type, location, features...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
@@ -1426,6 +1418,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
   @override
   Widget build(BuildContext context) {
+    print ('Building UI: isLoading=$_isLoading, filteredPosts=${filteredPosts.length}, posts=${_posts.length}, errorMessage=$_errorMessage');
     return Scaffold(
       resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
@@ -1611,6 +1604,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                     ),
                   )
                   : SliverList(
+                    key: ValueKey(
+                      filteredPosts.length,
+                    ), // Force rebuild on list change
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final post = filteredPosts[index];
                       return Padding(
