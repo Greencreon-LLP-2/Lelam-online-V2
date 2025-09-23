@@ -223,18 +223,23 @@ class CommercialVehiclesPage extends StatefulWidget {
 }
 
 class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
-  String _searchQuery = '';
+ String _searchQuery = '';
   final String categoryId = '3';
   String _selectedLocation = 'all';
   final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
   final List<String> _selectedFuelTypes = [];
+  List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _filteredProducts = [];
+  Map<String, List<String>> _postAttributeValuesCache = {};
+  bool _filtersChanged = false;
 
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
 
   List<MarketplacePost> _posts = [];
+  List<MarketplacePost> _filteredPostsCache = []; // Added for caching
   List<LocationData> _locations = [];
   bool _isLoading = true;
   bool _isLoadingLocations = true;
@@ -242,12 +247,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
-
-List<Product> _products = [];
-List<Product> _filteredProducts = [];
-Map<String, Map<String, String>> _postAttributeValuesCache = {};
-bool _filtersChanged = true;
-String _listingType = 'Marketplace'; // Default to Marketplace
+  String _listingType = 'Marketplace';// Default to Marketplace
 
   @override
   void initState() {
@@ -278,6 +278,7 @@ String _listingType = 'Marketplace'; // Default to Marketplace
     setState(() {
       _isLoadingLocations = true;
       _errorMessage = null;
+      _filtersChanged = true;
     });
 
     try {
@@ -306,10 +307,100 @@ String _listingType = 'Marketplace'; // Default to Marketplace
     }
   }
 
+double _calculateRelevanceScore(MarketplacePost post, String query) {
+    double score = 0;
+    final vehicleType = post.filters['type']?.isNotEmpty ?? false
+        ? post.filters['type']!.first.toLowerCase()
+        : '';
+    final brand = post.brand.toLowerCase();
+    final model = post.model.toLowerCase();
+    final modelVariation = post.modelVariation.toLowerCase();
+    final sellerType = post.byDealer == '1' ? 'dealer' : 'owner';
+
+    if (post.title.toLowerCase().contains(query)) score += 3.0;
+    if (vehicleType.contains(query)) score += 2.0;
+    if (brand.contains(query)) score += 2.0;
+    if (model.contains(query)) score += 2.0;
+    if (modelVariation.contains(query)) score += 1.5;
+    if (post.description.toLowerCase().contains(query)) score += 1.5;
+    if (_getLocationName(post.parentZoneId).toLowerCase().contains(query)) score += 1.0;
+    if (sellerType.contains(query)) score += 0.5;
+
+    return score;
+  }
+
+
+List<MarketplacePost> get filteredPosts {
+  if (!_filtersChanged) return _filteredPostsCache;
+
+  final filtered = _posts.where((post) {
+    final vehicleType = post.filters['type']?.isNotEmpty ?? false
+        ? post.filters['type']!.first
+        : 'N/A';
+    final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+    final condition = post.filters['condition']?.isNotEmpty ?? false
+        ? post.filters['condition']!.first
+        : 'N/A';
+    final fuelType = post.filters['fuel_type']?.isNotEmpty ?? false
+        ? post.filters['fuel_type']!.first
+        : 'N/A';
+
+    // Search query filtering
+    if (_searchQuery.trim().isNotEmpty) {
+      final query = _searchQuery.toLowerCase().trim();
+      final searchableText = [
+        post.title.toLowerCase(),
+        vehicleType.toLowerCase(),
+        post.brand.toLowerCase(),
+        post.model.toLowerCase(),
+        post.modelVariation.toLowerCase(),
+        post.description.toLowerCase(),
+        _getLocationName(post.parentZoneId).toLowerCase(),
+        sellerType.toLowerCase(),
+        condition.toLowerCase(),
+        fuelType.toLowerCase(),
+      ].join(' ');
+      if (!searchableText.contains(query)) return false;
+    }
+
+    // Apply existing filters without modifying filter logic
+    if (_selectedLocation != 'all' && post.parentZoneId != _selectedLocation) return false;
+    if (_selectedVehicleTypes.isNotEmpty && !_selectedVehicleTypes.contains(vehicleType)) return false;
+    if (_selectedPriceRange != 'all') {
+      final price = int.tryParse(post.price) ?? 0;
+      final range = _priceRangeMap[_selectedPriceRange];
+      if (range != null) {
+        if (price < range['min']! || price >= range['max']!) return false;
+      }
+    }
+    if (_selectedCondition != 'all' && condition != _selectedCondition) return false;
+    if (_selectedFuelTypes.isNotEmpty && !_selectedFuelTypes.contains(fuelType)) return false;
+
+    return true;
+  }).toList();
+
+  // Sort posts by relevance if search query exists
+  if (_searchQuery.trim().isNotEmpty) {
+    final query = _searchQuery.toLowerCase().trim();
+    filtered.sort((a, b) {
+      final aScore = _calculateRelevanceScore(a, query);
+      final bScore = _calculateRelevanceScore(b, query);
+      return bScore.compareTo(aScore); // Higher score comes first
+    });
+  }
+
+  _filteredPostsCache = filtered;
+  _filtersChanged = false;
+  return filtered;
+}
+
+
+  
   Future<void> _fetchPosts() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _filtersChanged = true;
     });
     try {
       final posts = await _marketplaceService.fetchPosts(
@@ -569,78 +660,92 @@ String _listingType = 'Marketplace'; // Default to Marketplace
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final Map<String, String> queryParams = {};
-                            if (_selectedVehicleTypes.isNotEmpty) {
-                              queryParams['brands'] = _selectedVehicleTypes
-                                  .join(',');
-                            }
-                            if (_selectedPriceRange != 'all') {
-                              final range = _priceRangeMap[_selectedPriceRange];
-                              if (range != null) {
-                                queryParams['min_price'] =
-                                    range['min'].toString();
-                                queryParams['max_price'] =
-                                    range['max'].toString();
-                              }
-                            }
-                            if (_selectedCondition != 'all') {
-                              queryParams['sold_by'] = _selectedCondition;
-                            }
-                            if (_selectedFuelTypes.isNotEmpty) {
-                              queryParams['fuel_types'] = _selectedFuelTypes
-                                  .join(',');
-                            }
-                            queryParams['listing_type'] = categoryId;
-                            try {
-                              setState(() => _isLoading = true);
-                              final apiService = ApiService();
-                              final Map<String, dynamic>
-                              response = await apiService.postMultipart(
-                                url:
-                                    "$baseUrl/filter-comercial-cars-listings.php",
-                                fields: queryParams,
-                              );
+                        child:ElevatedButton(
+  onPressed: () async {
+    try {
+      setState(() => _isLoading = true);
+      final apiService = ApiService();
+      final Map<String, String> queryParams = {};
 
-                              final dataList =
-                                  response['data'] as List<dynamic>? ?? [];
-                              final finalPosts =
-                                  dataList.map((item) {
-                                    final json = item as Map<String, dynamic>;
-                                    return MarketplacePost.fromJson(json);
-                                  }).toList();
+      if (_selectedVehicleTypes.isNotEmpty) {
+        queryParams['vehicle_types'] = _selectedVehicleTypes.join(',');
+      }
+      if (_selectedPriceRange != 'all') {
+        switch (_selectedPriceRange) {
+          case '0-1L':
+            queryParams['min_price'] = '0';
+            queryParams['max_price'] = '100000';
+            break;
+          case '1-3L':
+            queryParams['min_price'] = '100000';
+            queryParams['max_price'] = '300000';
+            break;
+          case '3-6L':
+            queryParams['min_price'] = '300000';
+            queryParams['max_price'] = '600000';
+            break;
+          case '6-10L':
+            queryParams['min_price'] = '600000';
+            queryParams['max_price'] = '1000000';
+            break;
+          case '10-20L':
+            queryParams['min_price'] = '1000000';
+            queryParams['max_price'] = '2000000';
+            break;
+          case '20-50L':
+            queryParams['min_price'] = '2000000';
+            queryParams['max_price'] = '5000000';
+            break;
+          case 'Above 50L':
+            queryParams['min_price'] = '5000000';
+            break;
+        }
+      }
+      if (_selectedCondition != 'all') {
+        queryParams['condition'] = _selectedCondition;
+      }
+      if (_selectedFuelTypes.isNotEmpty) {
+        queryParams['fuel_type'] = _selectedFuelTypes.join(',');
+      }
+      queryParams['listing_type'] = _listingType;
 
-                              setState(() {
-                                _posts = finalPosts;
-                                _isLoading = false;
-                              });
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url: "https://lelamonline.com/admin/api/v1/filter-comercial-cars-listings.php",
+        fields: queryParams,
+      );
 
-                              print('Filter applied successfully');
-                              print(response as String);
-                            } catch (e) {
-                              print("Error while applying filters: $e");
-                              setState(() => _isLoading = false);
-                            }
+      final dataList = response['data'] as List<dynamic>? ?? [];
+      final finalPosts = dataList.map((item) {
+        final json = item as Map<String, dynamic>;
+        return MarketplacePost.fromJson(json);
+      }).toList();
 
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            'Apply Filters',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+      setState(() {
+        _posts = finalPosts;
+        _filtersChanged = true; // Invalidate search cache
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+    Navigator.pop(context);
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Palette.primaryblue,
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    ),
+  ),
+  child: const Text(
+    'Apply Filters',
+    style: TextStyle(
+      color: Colors.white,
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+)
                       ),
                     ],
                   ),
@@ -868,7 +973,7 @@ String _listingType = 'Marketplace'; // Default to Marketplace
     return count;
   }
 
-  Widget _buildAppBarSearchField() {
+Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -878,69 +983,79 @@ String _listingType = 'Marketplace'; // Default to Marketplace
       child: TextField(
         controller: _searchController,
         autofocus: false,
+        autofillHints: null,
+        enableSuggestions: false,
+        enableInteractiveSelection: true,
+        onChanged: (value) => setState(() {
+          _searchQuery = value;
+          _filtersChanged = true; // Trigger re-filtering
+        }),
         decoration: InputDecoration(
           hintText: 'Search vehicles...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                  : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.only(top: 10),
-        ),
-        onChanged: (value) => setState(() => _searchQuery = value),
-      ),
-    );
-  }
-
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchController,
-      onChanged: (value) {
-        setState(() => _searchQuery = value);
-      },
-      decoration: InputDecoration(
-        hintText: 'Search by vehicle type, brand, location...',
-        hintStyle: TextStyle(color: Colors.grey.shade500),
-        prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-        suffixIcon:
-            _searchQuery.isNotEmpty
-                ? IconButton(
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
                   icon: Icon(Icons.clear, color: Colors.grey.shade400),
                   onPressed: () {
                     setState(() {
                       _searchQuery = '';
                       _searchController.clear();
+                      _filtersChanged = true;
                     });
                   },
                 )
-                : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.only(top: 10),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.blue),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+      ),
+    );
+  }
+
+ Widget _buildSearchField() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) => setState(() {
+          _searchQuery = value;
+          _filtersChanged = true; // Trigger re-filtering
+        }),
+        autofillHints: null,
+        enableSuggestions: false,
+        enableInteractiveSelection: true,
+        decoration: InputDecoration(
+          hintText: 'Search by vehicle type, brand, location...',
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+          prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    setState(() {
+                      _searchQuery = '';
+                      _searchController.clear();
+                      _filtersChanged = true;
+                    });
+                  },
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.blue),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
@@ -951,6 +1066,8 @@ String _listingType = 'Marketplace'; // Default to Marketplace
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
+
+
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';

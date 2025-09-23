@@ -741,7 +741,7 @@ class _MarketPlaceProductDetailsPageState
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const MyAdsWidget(),
+                            builder: (context) => const SellingStatusPage(),
                           ),
                         );
                       }

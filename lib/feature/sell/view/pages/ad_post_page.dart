@@ -482,6 +482,7 @@ class AdPostPage extends StatefulWidget {
 
 class _AdPostPageState extends State<AdPostPage> {
   final _formKey = GlobalKey<FormState>();
+  final _adPostFormKey = GlobalKey<_AdPostFormState>(); // New GlobalKey for AdPostFormState
   String? _categoryId;
   Map<String, dynamic>? _adData;
   late final LoggedUserProvider _userProvider;
@@ -513,10 +514,10 @@ class _AdPostPageState extends State<AdPostPage> {
   }
 
   void _submitForm() {
+    developer.log('AdPostPage _submitForm called'); // Debug log
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      final adPostForm = _formKey.currentState?.widget as AdPostForm?;
-      adPostForm?.onSubmit();
+      _adPostFormKey.currentState?._submitForm(); // Directly call _submitForm from AdPostFormState
     }
   }
 
@@ -537,49 +538,50 @@ class _AdPostPageState extends State<AdPostPage> {
         ),
         centerTitle: true,
         actions: [
-          // Add Post/Update button in AppBar
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: ElevatedButton(
-              onPressed: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false
-                  ? null
-                  : _submitForm,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 120),
+              child: ElevatedButton(
+                onPressed: _adPostFormKey.currentState?.isSaving ?? false ? null : _submitForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: _adPostFormKey.currentState?.isSaving ?? false
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        _adData != null ? 'Update' : 'Post',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
-              child: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Text(
-                      _adData != null ? 'Update Ad' : 'Post Ad',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
             ),
           ),
         ],
       ),
       body: AdPostForm(
+        key: _adPostFormKey, // Assign GlobalKey to AdPostForm
         formKey: _formKey,
         categoryId: _categoryId ?? '',
         userId: _userProvider.userId!,
         adData: _adData,
         onSubmit: _submitForm,
-        isSaving: (_formKey.currentState?.widget as AdPostForm?)?.isSaving ?? false,
+        isSaving: _adPostFormKey.currentState?.isSaving ?? false,
       ),
     );
   }
@@ -590,17 +592,17 @@ class AdPostForm extends StatefulWidget {
   final String categoryId, userId;
   final Map<String, dynamic>? adData;
   final VoidCallback onSubmit;
-  final bool isSaving; // Added to expose isSaving to parent
+  final bool isSaving;
 
   const AdPostForm({
-    super.key,
+    Key? key,
     required this.formKey,
     required this.categoryId,
     required this.userId,
     this.adData,
     required this.onSubmit,
     required this.isSaving,
-  });
+  }) : super(key: key);
 
   @override
   State<AdPostForm> createState() => _AdPostFormState();
