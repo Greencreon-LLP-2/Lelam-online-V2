@@ -238,9 +238,7 @@ class AttributeValueService {
           },
         ];
       }
-      print(
-        'Failed to fetch districts: ${response.statusCode} $responseBody',
-      );
+      print('Failed to fetch districts: ${response.statusCode} $responseBody');
       return [
         {
           "id": "1",
@@ -308,9 +306,7 @@ class AttributeValueService {
         print('No brands found for category_id: $categoryId');
         return [];
       }
-      print(
-        'Failed to fetch brands: ${response.statusCode} ${response.body}',
-      );
+      print('Failed to fetch brands: ${response.statusCode} ${response.body}');
       return [];
     } catch (e) {
       print('Error fetching brands: $e');
@@ -342,9 +338,7 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => BrandModel.fromJson(e))
                   .toList();
-          print(
-            'Fetched brand models: ${models.map((m) => m.name).toList()}',
-          );
+          print('Fetched brand models: ${models.map((m) => m.name).toList()}');
           return models;
         }
         print(
@@ -386,9 +380,7 @@ class AttributeValueService {
               (data['data'] as List)
                   .map((e) => ModelVariation.fromJson(e))
                   .toList();
-          print(
-            'Model variations IDs: ${variations.map((v) => v.id).toSet()}',
-          );
+          print('Model variations IDs: ${variations.map((v) => v.id).toSet()}');
           print(
             'Model variations names: ${variations.map((v) => v.name).toSet()}',
           );
@@ -422,9 +414,7 @@ class AttributeValueService {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print(
-          'Attributes API response for category_id $categoryId: $data',
-        );
+        print('Attributes API response for category_id $categoryId: $data');
         if (data['status'] == 'true' && data['data'] is List) {
           return (data['data'] as List)
               .map((e) => Attribute.fromJson(e))
@@ -515,9 +505,7 @@ class _AdPostPageState extends State<AdPostPage> {
     }
     if (_postId != null) {
       _fetchGalleryImages(_postId!);
-    } else {
-     
-    }
+    } else {}
   }
 
   void showToast(String msg, Color color) {
@@ -567,7 +555,7 @@ class _AdPostPageState extends State<AdPostPage> {
       }
     } catch (e) {
       print('Error fetching gallery images: $e');
-      showToast('Failed to load gallery images', Colors.red);
+      // showToast('Failed to load gallery images', Colors.red);
     }
   }
 
@@ -588,43 +576,7 @@ class _AdPostPageState extends State<AdPostPage> {
             padding: const EdgeInsets.only(right: 8.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 120),
-              child: ElevatedButton(
-                onPressed:
-                    _adPostFormKey.currentState?.isSaving ?? false
-                        ? null
-                        : _submitForm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                child:
-                    _adPostFormKey.currentState?.isSaving ?? false
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
-                        )
-                        : Text(
-                          _adData != null ? 'Update' : 'Post',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-              ),
+              
             ),
           ),
         ],
@@ -895,7 +847,7 @@ class _AdPostFormState extends State<AdPostForm>
             }
           }
         } catch (e) {
-          print('Error parsing filters: $e', );
+          print('Error parsing filters: $e');
         }
       }
     });
@@ -1180,12 +1132,13 @@ class _AdPostFormState extends State<AdPostForm>
       },
     };
 
-    try {
+   try {
     setState(() => isSaving = true);
     final apiService = ApiService();
     Map<String, dynamic> response;
 
     if (widget.postId != null && widget.adData != null) {
+      // Edit existing post
       print('Calling edit API: ${AttributeValueService.baseUrl}/flutter-edit-post.php');
       formData['post_id'] = widget.postId!;
       formData['token'] = AttributeValueService.token;
@@ -1207,67 +1160,83 @@ class _AdPostFormState extends State<AdPostForm>
         galleryImagePaths: newImages.where((path) => path != mainImage).toList(),
       );
     } else {
-        // Creating a new post
-        response = await apiService.postInfinityMultipart(
-          url: "${AttributeValueService.baseUrl}/flutter-add-post.php",
-          fields: {
-            ...formData,
-            'if_offer_price': '0',
-            'offer_price': '0.00',
-            'auction_price_intervel': '0.00',
-            'auction_starting_price': '0.00',
-            'latitude': '',
-            'longitude': '',
-            'user_zone_id': '0',
-            'zone_id': '0',
-            'if_auction': '0',
-            'auction_status': '0',
-            'auction_startin': '0000-00-00 00:00:00',
-            'auction_endin': '0000-00-00 00:00:00',
-            'auction_attempt': '0',
-            'if_finance': '0',
-            'if_exchange': '0',
-            'feature': '0',
-            'status': '1',
-            'visiter_count': '0',
-            'if_sold': '0',
-            'if_expired': '0',
-            'if_verifyed': '0',
-            'by_dealer': '0',
-          },
-          mainImagePath: _selectedImages[_coverImageIndex].path,
-          galleryImagePaths:
-              _selectedImages
-                  .asMap()
-                  .entries
-                  .where((e) => e.key != _coverImageIndex)
-                  .map((e) => e.value.path)
-                  .toList(),
-        );
-      }
-      if (widget.postId != null && widget.adData != null) {
-        formData['post_id'] = widget.postId!;
-        formData['token'] = AttributeValueService.token;
-        if (_deleteGalleryIds.isNotEmpty) {
-          formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
-          print('Deleting gallery images: $_deleteGalleryIds');
-        }
-        // Rest of the edit API logic...
-      }
-      if (response['status'] == 'true') {
-      _showSnackBar('Ad updated successfully', Colors.green);
+      // Create new post
+      response = await apiService.postInfinityMultipart(
+        url: "${AttributeValueService.baseUrl}/flutter-add-post.php",
+        fields: {
+          ...formData,
+          'if_offer_price': '0',
+          'offer_price': '0.00',
+          'auction_price_intervel': '0.00',
+          'auction_starting_price': '0.00',
+          'latitude': '',
+          'longitude': '',
+          'user_zone_id': '0',
+          'zone_id': '0',
+          'if_auction': '0',
+          'auction_status': '0',
+          'auction_startin': '0000-00-00 00:00:00',
+          'auction_endin': '0000-00-00 00:00:00',
+          'auction_attempt': '0',
+          'if_finance': '0',
+          'if_exchange': '0',
+          'feature': '0',
+          'status': '1',
+          'visiter_count': '0',
+          'if_sold': '0',
+          'if_expired': '0',
+          'if_verifyed': '0',
+          'by_dealer': '0',
+        },
+        mainImagePath: _selectedImages[_coverImageIndex].path,
+        galleryImagePaths: _selectedImages
+            .asMap()
+            .entries
+            .where((e) => e.key != _coverImageIndex)
+            .map((e) => e.value.path)
+            .toList(),
+      );
+    }
+
+    if (response['status'] == 'true') {
+      // Construct complete adData to pass to MyAdsWidget
+      final newAdData = {
+        'id': widget.postId ?? response['post_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        'title': _generateTitle(),
+        'category_id': widget.categoryId,
+        'price': _controllers['listPrice']!.text,
+        'description': _controllers['description']!.text,
+        'image': response['image'] ?? '', // Use server-provided image URL if available
+        'district': _selectedDistrict,
+        'status': '0', // Assume pending until approved
+        'created_on': DateTime.now().toIso8601String(),
+        'admin_approval': '0',
+        'if_auction': '0',
+        'auction_status': '0',
+        'auction_attempt': '0',
+        'visiter_count': '0',
+        'if_sold': '0',
+        'land_mark': _controllers['landMark']!.text,
+        'filters': jsonEncode(getFilters()),
+        'brand': _selectedBrand?.id ?? '',
+        'model': _selectedBrandModel?.id ?? '',
+        'model_variation': _selectedModelVariation?.id ?? '',
+        // Add any other fields expected by MyAdsWidget
+      };
+
+      _showSnackBar('Ad ${widget.postId != null ? 'updated' : 'posted'} successfully', Colors.green);
       context.pushNamed(
         RouteNames.sellingstatuspage,
         extra: {
           'userId': widget.userId,
-          'adData': {'id': widget.postId},
+          'adData': newAdData, // Pass complete adData
         },
       );
     } else {
-      throw Exception(response['message'] ?? 'Failed to update ad');
+      throw Exception(response['message'] ?? 'Failed to ${widget.postId != null ? 'update' : 'post'} ad');
     }
   } catch (e) {
-    print('Error saving ad: $e', );
+    print('Error saving ad: $e');
     _showSnackBar('Error saving ad: $e', Colors.red);
   } finally {
     setState(() => isSaving = false);
@@ -1490,26 +1459,43 @@ class _AdPostFormState extends State<AdPostForm>
   );
 
   Widget _buildImageSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'Add Photos',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Add Photos',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
-      ),
-      const SizedBox(height: 16),
-      _selectedImages.isEmpty
-          ? Row(
+        GestureDetector(
+  onTap: () => context.pop(),
+  child: const Text(
+    'Cancel',
+    style: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: Colors.black87,
+    ),
+  ),
+)
+
+      ],
+    ),
+    const SizedBox(height: 16),
+    _selectedImages.isEmpty
+        ? Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [_buildImagePicker()],
           )
-          : _buildImagePicker(),
-      const SizedBox(height: 24),
-    ],
-  );
+        : _buildImagePicker(),
+    const SizedBox(height: 24),
+  ],
+);
 
   Widget _buildKeyInfoSection() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

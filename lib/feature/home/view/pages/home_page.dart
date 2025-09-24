@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'package:lelamonline_flutter/core/router/route_names.dart';
@@ -9,10 +12,7 @@ import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:provider/provider.dart';
-import 'dart:developer' as developer;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -21,29 +21,39 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  final TextEditingController _searchController = TextEditingController();
+class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin, RouteAware {
+  final FocusNode _searchFocusNode = FocusNode();
   String? _selectedDistrict;
-  String? userId;
-  late final LoggedUserProvider _userProvider;
   List<String> _districts = ['All Kerala'];
   bool _isLoading = false;
   String? _errorMessage;
 
   @override
-  void initState() {
-    super.initState();
-    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    if (kDebugMode) {
-      developer.log('HomePage initialized, userId: ${_userProvider.userData?.userId}');
+  bool get wantKeepAlive => true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute? route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
     }
-    _fetchDistricts();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    routeObserver.unsubscribe(this);
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPushNext() {
+    SearchState().resetOnNavigation();
+    _searchFocusNode.unfocus();
+    if (kDebugMode) {
+      developer.log('Navigating away from HomePage, cleared search state');
+    }
   }
 
   Future<void> _fetchDistricts() async {
@@ -98,9 +108,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _onRefresh() async {
     if (kDebugMode) {
-      developer.log(
-        'Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict',
-      );
+      developer.log('Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict');
     }
     try {
       await _fetchDistricts();
@@ -123,100 +131,132 @@ class _HomePageState extends State<HomePage> {
 
   void _onSearch(String query) {
     if (query.isNotEmpty) {
+      SearchState().resetOnNavigation();
+      _searchFocusNode.unfocus();
       context.pushNamed('searchResults', queryParameters: {'query': query});
       if (kDebugMode) {
-        developer.log('Navigating to search results with query: $query');
+        developer.log('Navigating to search results with query: $query, search state cleared');
+      }
+    }
+  }
+
+  void _handleTapOutside() {
+    if (_searchFocusNode.hasFocus) {
+      SearchState().resetOnNavigation();
+      _searchFocusNode.unfocus();
+      if (kDebugMode) {
+        developer.log('Tapped outside search bar (general), cleared search state and unfocused');
+      }
+    }
+  }
+
+  void _handleInteractiveTap(String source) {
+    if (_searchFocusNode.hasFocus) {
+      SearchState().resetOnNavigation();
+      _searchFocusNode.unfocus();
+      if (kDebugMode) {
+        developer.log('Tapped on $source, cleared search state and unfocused');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    final userProvider = context.watch<LoggedUserProvider>();
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _onRefresh,
-          color: Theme.of(context).primaryColor,
-          backgroundColor: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Top section (Location and Notification)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on),
-                            const SizedBox(width: 8),
-                            _isLoading
-                                ? const CircularProgressIndicator()
-                                : _errorMessage != null
-                                    ? const Text('Error loading locations')
-                                    : DropdownButton<String>(
-                                        value: _selectedDistrict,
-                                        hint: const Text('All Kerala'),
-                                        items: _districts.map((district) {
-                                          return DropdownMenuItem<String>(
-                                            value: district,
-                                            child: Text(district),
-                                          );
-                                        }).toList(),
-                                        onChanged: (String? newValue) {
-                                          if (mounted) {
-                                            setState(() {
-                                              _selectedDistrict = newValue;
-                                            });
-                                            if (kDebugMode) {
-                                              developer.log(
-                                                'Selected district: $_selectedDistrict',
-                                              );
+        child: GestureDetector(
+          onTap: _handleTapOutside,
+          child: RefreshIndicator(
+            onRefresh: _onRefresh,
+            color: Theme.of(context).primaryColor,
+            backgroundColor: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on),
+                              const SizedBox(width: 8),
+                              _isLoading
+                                  ? const CircularProgressIndicator()
+                                  : _errorMessage != null
+                                      ? const Text('Error loading locations')
+                                      : DropdownButton<String>(
+                                          value: _selectedDistrict,
+                                          hint: const Text('All Kerala'),
+                                          items: _districts.map((district) {
+                                            return DropdownMenuItem<String>(
+                                              value: district,
+                                              child: Text(district),
+                                            );
+                                          }).toList(),
+                                          onChanged: (String? newValue) {
+                                            if (mounted) {
+                                              setState(() {
+                                                _selectedDistrict = newValue;
+                                              });
+                                              _handleInteractiveTap('location dropdown');
+                                              if (kDebugMode) {
+                                                developer.log('Selected district: $_selectedDistrict');
+                                              }
                                             }
-                                          }
-                                        },
-                                        underline: const SizedBox(),
-                                        icon: const SizedBox.shrink(),
-                                      ),
-                          ],
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: () {
-                            context.pushNamed(RouteNames.notificationPage);
-                            if (kDebugMode) {
-                              developer.log('Navigating to notification page');
-                            }
-                          },
-                          icon: const Icon(Icons.notifications),
-                        ),
-                      ],
+                                          },
+                                          underline: const SizedBox(),
+                                          icon: const SizedBox.shrink(),
+                                        ),
+                            ],
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: () {
+                              SearchState().resetOnNavigation();
+                              _searchFocusNode.unfocus();
+                              context.pushNamed(RouteNames.notificationPage);
+                              if (kDebugMode) {
+                                developer.log('Navigating to notification page, search state cleared');
+                              }
+                            },
+                            icon: const Icon(Icons.notifications),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  if (_userProvider.isLoggedIn) const SizedBox(height: 8),
-                  // Search Bar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SearchButtonWidget(
-                      controller: _searchController,
-                      onSearch: _onSearch,
+                    if (userProvider.isLoggedIn) const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SearchButtonWidget(
+                        focusNode: _searchFocusNode,
+                        onSearch: _onSearch,
+                      ),
                     ),
-                  ),
-                  // Other widgets
-                  const SizedBox(height: 5),
-                  const BannerWidget(),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: CategoryWidget(),
-                  ),
-                  const SizedBox(height: 5),
-                  ProductSectionWidget(searchQuery: ''),
-                ],
+                    const SizedBox(height: 5),
+                    const BannerWidget(),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: TapRegion(
+                        onTapInside: (_) => _handleInteractiveTap('category widget'),
+                        child: CategoryWidget(),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    TapRegion(
+                      onTapInside: (_) => _handleInteractiveTap('product section'),
+                      child: ProductSectionWidget(searchQuery: ''),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -225,3 +265,5 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();

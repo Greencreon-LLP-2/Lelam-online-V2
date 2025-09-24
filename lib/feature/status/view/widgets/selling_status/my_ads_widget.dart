@@ -39,98 +39,98 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     _loadAds();
   }
 
-  Future<void> _loadAds() async {
+Future<void> _loadAds() async {
+  setState(() {
+    isLoading = true;
+    errorMessage = null;
+  });
+
+  // If adData is passed, add it to the ads list immediately
+  if (widget.adData != null) {
     setState(() {
-      isLoading = true;
-      errorMessage = null;
+      final passedAdId = widget.adData!['id'];
+      if (!ads.any((ad) => ad['id'] == passedAdId)) {
+        ads.add(widget.adData!);
+        _expandedImages[passedAdId] = false;
+        print('Added passed adData to ads list: ${widget.adData}');
+      } else {
+        final adIndex = ads.indexWhere((ad) => ad['id'] == passedAdId);
+        ads[adIndex] = {...ads[adIndex], ...widget.adData!};
+        print('Updated existing ad with passed adData: ${widget.adData}');
+      }
+      isLoading = false; // Show the ad immediately
     });
+  }
 
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
-        ),
+  // Fetch ads from API with a slight delay to allow server processing
+  await Future.delayed(const Duration(seconds: 2)); // Adjust delay as needed
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}'),
+      headers: {'token': token},
+    );
 
-        headers: {'token': token},
-      );
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      print('API response: $responseData');
+      if (responseData['status'] == 'true' && responseData['data'] is List) {
+        final fetchedAds = List<Map<String, dynamic>>.from(responseData['data']);
 
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        print('API response: $responseData');
-        if (responseData['status'] == 'true' && responseData['data'] is List) {
-          final fetchedAds = List<Map<String, dynamic>>.from(
-            responseData['data'],
-          );
-
-          for (var ad in fetchedAds) {
-            _expandedImages[ad['id']] = false;
+        // Merge passed adData with fetched ads
+        if (widget.adData != null) {
+          final passedAdId = widget.adData!['id'];
+          final isAlreadyIncluded = fetchedAds.any((ad) => ad['id'] == passedAdId);
+          if (!isAlreadyIncluded) {
+            fetchedAds.add(widget.adData!);
+            print('Added passed adData to fetched ads: ${widget.adData}');
+          } else {
+            final adIndex = fetchedAds.indexWhere((ad) => ad['id'] == passedAdId);
+            fetchedAds[adIndex] = {...fetchedAds[adIndex], ...widget.adData!};
+            print('Updated fetched ad with passed adData: ${widget.adData}');
           }
+        }
 
-          if (widget.adData != null) {
-            final passedAdId = widget.adData!['id'];
-            final isAlreadyIncluded = fetchedAds.any(
-              (ad) => ad['id'] == passedAdId,
-            );
-            if (!isAlreadyIncluded) {
-              print('Adding passed ad data: ${widget.adData}');
-              fetchedAds.add(widget.adData!);
-              _expandedImages[passedAdId] = false;
-            } else {
-              print('Passed ad already exists in fetched ads');
-
-              final adIndex = fetchedAds.indexWhere(
-                (ad) => ad['id'] == passedAdId,
-              );
-              if (adIndex != -1) {
-                fetchedAds[adIndex] = {
-                  ...fetchedAds[adIndex],
-                  ...widget.adData!,
-                };
-              }
-            }
+        // Sort ads by created_on date (newest first)
+        fetchedAds.sort((a, b) {
+          try {
+            final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+            final dateA = dateFormat.parse(a['created_on'] as String);
+            final dateB = dateFormat.parse(b['created_on'] as String);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            print('Error parsing dates for sorting: $e');
+            return 0;
           }
+        });
 
-          fetchedAds.sort((a, b) {
-            try {
-              final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-              final dateA = dateFormat.parse(a['created_on'] as String);
-              final dateB = dateFormat.parse(b['created_on'] as String);
-              return dateB.compareTo(dateA);
-            } catch (e) {
-              print('Error parsing dates for sorting: $e');
-              return 0;
-            }
-          });
+        setState(() {
+          ads = fetchedAds;
+          _expandedImages = {for (var ad in ads) ad['id']: false};
+          isLoading = false;
+        });
+        print('Fetched ${ads.length} ads');
 
-          setState(() {
-            ads = fetchedAds;
-            isLoading = false;
-          });
-          print('Fetched ${ads.length} ads');
-
-          for (var ad in ads) {
-            if (ad['admin_approval'] == '0') {
-              _checkApprovalStatus(ad['id']);
-            }
+        // Check approval and status for each ad
+        for (var ad in ads) {
+          if (ad['admin_approval'] == '0') {
+            _checkApprovalStatus(ad['id']);
           }
-
-          for (var ad in ads) {
-            _loadAdStatus(ad['id']);
-          }
-        } else {
-          throw Exception(responseData['message'] ?? 'No ads found');
+          _loadAdStatus(ad['id']);
         }
       } else {
-        throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
+        throw Exception(responseData['message'] ?? 'No ads found');
       }
-    } catch (e) {
-      print('No ads Found');
-      setState(() {
-        errorMessage = '$e';
-        isLoading = false;
-      });
+    } else {
+      throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
     }
+  } catch (e) {
+    print('Error fetching ads: $e');
+    setState(() {
+      errorMessage = '$e';
+      isLoading = false;
+    });
   }
+}
 
   Future<void> _loadAdStatus(String postId) async {
     try {
@@ -674,14 +674,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                                     print(
                                       'Error loading image for ad ${ad['id']}: $error',
                                     );
-                                    Fluttertoast.showToast(
-                                      msg:
-                                          'Failed to load image for ad ${ad['id']}',
-                                      toastLength: Toast.LENGTH_SHORT,
-                                      gravity: ToastGravity.BOTTOM,
-                                      backgroundColor: Colors.red,
-                                      textColor: Colors.white,
-                                    );
+                                    
                                     return Image.asset(
                                       'assets/placeholder_image.png',
                                       fit: BoxFit.cover,
