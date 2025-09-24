@@ -44,27 +44,32 @@ class SellingStatusPage extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: const Text(
-            'Selling Status',
-            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-          ),
-        
-          backgroundColor: AppTheme.primaryColor,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          bottom: const TabBar(
-            dividerColor: Colors.transparent,
-            isScrollable: false,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: TextStyle(fontSize: 14),
-            tabs: [Tab(text: 'My Ads'), Tab(text: 'Sold')],
-          ),
-        ),
+   appBar: AppBar(
+  centerTitle: true,
+  title: const Text(
+    'Selling Status',
+    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+  ),
+  backgroundColor: AppTheme.primaryColor,
+  elevation: 0,
+  iconTheme: const IconThemeData(color: Colors.white),
+  leading: GoRouterState.of(context).matchedLocation != '/${RouteNames.mainscaffold}'
+      ? IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.goNamed(RouteNames.mainscaffold),
+        )
+      : null, // Hide back arrow when in MainScaffold
+  bottom: const TabBar(
+    dividerColor: Colors.transparent,
+    isScrollable: false,
+    indicatorColor: Colors.white,
+    labelColor: Colors.white,
+    unselectedLabelColor: Colors.white70,
+    labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    unselectedLabelStyle: TextStyle(fontSize: 14),
+    tabs: [Tab(text: 'My Ads'), Tab(text: 'Sold')],
+  ),
+),
         backgroundColor: Colors.grey[50],
         body: TabBarView(
           children: [

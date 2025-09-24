@@ -696,7 +696,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     'Hybrid',
   ];
 
-  final List<String> _transmissions = ['Manual', 'Automatic', 'CVT'];
+  final List<String> _transmissions = ['Manual', 'Automatic', ];
 
   final List<String> _kmRanges = [
     'all',
@@ -1676,118 +1676,101 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return value;
   }
 
-  Future<void> _fetchFilterListings() async {
-    for (final product in _products) {
-      if (!_postAttributeValuesCache.containsKey(product.id) &&
-          !_fetchingPostIds.contains(product.id)) {
+Future<void> _fetchFilterListings() async {
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+    _filteredProductsCache = [];
+    _postAttributeValuesCache.clear();
+    _fetchingPostIds.clear();
+  });
+
+  final Map<String, String> queryParams = {};
+  if (_selectedBrands.isNotEmpty) {
+    queryParams['brands'] = _selectedBrands.join(',');
+  }
+  if (_selectedPriceRange != 'all') {
+    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+    if (parts.length == 2) {
+      queryParams['min_price'] = parts[0].replaceAll(' Lakh', '').trim();
+      queryParams['max_price'] = parts[1].replaceAll(' Lakh', '').trim();
+    } else if (_selectedPriceRange.contains('Under')) {
+      queryParams['max_price'] = '2';
+    } else if (_selectedPriceRange.contains('Above')) {
+      queryParams['min_price'] = '20';
+    }
+  }
+  if (_selectedYearRange != 'all') {
+    final parts = _selectedYearRange.split('-');
+    if (parts.length == 2) {
+      queryParams['min_year'] = parts[0].trim();
+      queryParams['max_year'] = parts[1].trim();
+    } else if (_selectedYearRange.contains('Above')) {
+      queryParams['min_year'] = '2020';
+    } else if (_selectedYearRange.contains('Below')) {
+      queryParams['max_year'] = '2010';
+    }
+  }
+  if (_selectedOwnersRange != 'all') {
+    queryParams['owners'] = _selectedOwnersRange.replaceAll(' Owner', '').replaceAll('4+', '4').trim();
+  }
+  if (_selectedFuelTypes.isNotEmpty) {
+    queryParams['fuel_types'] = _selectedFuelTypes.join(',');
+  }
+  if (_selectedTransmissions.isNotEmpty) {
+    queryParams['transmissions'] = _selectedTransmissions.join(',');
+  }
+  if (_selectedKmRange != 'all') {
+    final parts = _selectedKmRange.replaceAll('K', '').split('-');
+    if (parts.length == 2) {
+      queryParams['min_km'] = parts[0].trim();
+      queryParams['max_km'] = parts[1].trim();
+    } else if (_selectedKmRange.contains('Under')) {
+      queryParams['max_km'] = '10';
+    } else if (_selectedKmRange.contains('Above')) {
+      queryParams['min_km'] = '80';
+    }
+  }
+  if (_selectedSoldBy != 'all') {
+    queryParams['sold_by'] = _selectedSoldBy;
+  }
+  queryParams['listing_type'] = _listingType;
+
+  try {
+    final apiService = ApiService();
+    final Map<String, dynamic> response = await apiService.postMultipart(
+      url: "$baseUrl/filter-used-cars-listings.php",
+      fields: queryParams,
+    );
+
+    developer.log('Filter API response: $response');
+
+    final dataList = response['data'] as List<dynamic>? ?? [];
+    final finalPosts = dataList.map((item) => MarketplacePost.fromJson(item as Map<String, dynamic>)).toList();
+    final List<Product> products = finalPosts.map((post) => post.toProduct()).toList();
+
+    setState(() {
+      _products = products;
+      _filteredProductsCache = products;
+      _filtersChanged = true;
+      _isLoading = false;
+    });
+
+    // Fetch attributes for all products
+    for (final product in _products) { // Changed 'products' to '_products'
+      if (!_postAttributeValuesCache.containsKey(product.id) && !_fetchingPostIds.contains(product.id)) {
         _fetchPostAttributes(product.id);
       }
-      if (!_modelVariationsCache.containsKey(product.id) &&
-          !_fetchingModelVariationIds.contains(product.id)) {
+      if (!_modelVariationsCache.containsKey(product.id) && !_fetchingModelVariationIds.contains(product.id)) {
         _fetchModelVariation(product.id);
       }
     }
-
+  } catch (e) {
+    developer.log("Error while fetching filter listings: $e");
     setState(() {
-      _isLoading = true; // Show loading indicator
-      _errorMessage = null; // Clear previous errors
-      _filteredProductsCache = []; // Clear filtered cache
-      _postAttributeValuesCache.clear(); // Clear attribute cache
-      _fetchingPostIds.clear(); // Clear fetching IDs
+      _isLoading = false;
+      _errorMessage = 'Failed to load filtered cars. Please try again.';
     });
-
-    final Map<String, String> queryParams = {};
-    if (_selectedBrands.isNotEmpty) {
-      queryParams['brands'] = _selectedBrands.join(',');
-    }
-    if (_selectedPriceRange != 'all') {
-      final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-      if (parts.length == 2) {
-        queryParams['min_price'] = parts[0].replaceAll(' Lakh', '').trim();
-        queryParams['max_price'] = parts[1].replaceAll(' Lakh', '').trim();
-      } else if (_selectedPriceRange.contains('Under')) {
-        queryParams['max_price'] = '2';
-      } else if (_selectedPriceRange.contains('Above')) {
-        queryParams['min_price'] = '20';
-      }
-    }
-    if (_selectedYearRange != 'all') {
-      final parts = _selectedYearRange.split('-');
-      if (parts.length == 2) {
-        queryParams['min_year'] = parts[0].trim();
-        queryParams['max_year'] = parts[1].trim();
-      } else if (_selectedYearRange.contains('Above')) {
-        queryParams['min_year'] = '2020';
-      } else if (_selectedYearRange.contains('Below')) {
-        queryParams['max_year'] = '2010';
-      }
-    }
-    if (_selectedOwnersRange != 'all') {
-      queryParams['owners'] =
-          _selectedOwnersRange
-              .replaceAll(' Owner', '')
-              .replaceAll('4+', '4')
-              .trim();
-    }
-    if (_selectedFuelTypes.isNotEmpty) {
-      queryParams['fuel_types'] = _selectedFuelTypes.join(',');
-    }
-    if (_selectedTransmissions.isNotEmpty) {
-      queryParams['transmissions'] = _selectedTransmissions.join(',');
-    }
-    if (_selectedKmRange != 'all') {
-      final parts = _selectedKmRange.replaceAll('K', '').split('-');
-      if (parts.length == 2) {
-        queryParams['min_km'] = parts[0].trim();
-        queryParams['max_km'] = parts[1].trim();
-      } else if (_selectedKmRange.contains('Under')) {
-        queryParams['max_km'] = '10';
-      } else if (_selectedKmRange.contains('Above')) {
-        queryParams['min_km'] = '80';
-      }
-    }
-    if (_selectedSoldBy != 'all') {
-      queryParams['sold_by'] = _selectedSoldBy;
-    }
-    queryParams['listing_type'] = _listingType;
-
-    try {
-      final apiService = ApiService();
-      final Map<String, dynamic> response = await apiService.postMultipart(
-        url: "$baseUrl/filter-used-cars-listings.php",
-        fields: queryParams,
-      );
-
-      developer.log(
-        'Filter API response: $response',
-      ); // Log response for debugging
-
-      final dataList = response['data'] as List<dynamic>? ?? [];
-      final finalPosts =
-          dataList
-              .map(
-                (item) =>
-                    MarketplacePost.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
-      final List<Product> products =
-          finalPosts.map((post) => post.toProduct()).toList();
-
-      setState(() {
-        _products = products;
-        _filteredProductsCache =
-            products; // Initialize filtered cache with new products
-        _filtersChanged = true; // Trigger filteredProducts getter
-        _isLoading = false; // Hide loading indicator
-      });
-
-      // Fetch attributes for visible products
-    } catch (e) {
-      developer.log("Error while fetching filter listings: $e");
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load filtered cars. Please try again.';
-      });
-    }
   }
+}
 }

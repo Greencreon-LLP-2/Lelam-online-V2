@@ -14,6 +14,7 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
+import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
@@ -558,41 +559,47 @@ class _AdPostPageState extends State<AdPostPage> {
       // showToast('Failed to load gallery images', Colors.red);
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        title: Text(
-          _adData != null ? 'Update' : 'Post',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 120),
-              
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.grey[50],
+    appBar: AppBar(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      title: Text(
+        _adData != null ? 'Update Post' : 'Add Post',
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+      ),
+      centerTitle: true,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12.0),
+          child: GestureDetector(
+            onTap: () => context.pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Palette.primaryblue,
+              ),
             ),
           ),
-        ],
-      ),
-      body: AdPostForm(
-        key: _adPostFormKey,
-        formKey: _formKey,
-        categoryId: _categoryId ?? '',
-        userId: _userProvider.userId!,
-        postId: _postId,
-        adData: _adData,
-        onSubmit: _submitForm,
-        isSaving: _adPostFormKey.currentState?.isSaving ?? false,
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+    body: AdPostForm(
+      key: _adPostFormKey,
+      formKey: _formKey,
+      categoryId: _categoryId ?? '',
+      userId: _userProvider.userId!,
+      postId: _postId,
+      adData: _adData,
+      onSubmit: _submitForm,
+      isSaving: _adPostFormKey.currentState?.isSaving ?? false,
+    ),
+  );
+}
 }
 
 class AdPostForm extends StatefulWidget {
@@ -1132,116 +1139,137 @@ class _AdPostFormState extends State<AdPostForm>
       },
     };
 
-   try {
-    setState(() => isSaving = true);
-    final apiService = ApiService();
-    Map<String, dynamic> response;
+    try {
+      setState(() => isSaving = true);
+      final apiService = ApiService();
+      Map<String, dynamic> response;
 
-    if (widget.postId != null && widget.adData != null) {
-      // Edit existing post
-      print('Calling edit API: ${AttributeValueService.baseUrl}/flutter-edit-post.php');
-      formData['post_id'] = widget.postId!;
-      formData['token'] = AttributeValueService.token;
-      if (_deleteGalleryIds.isNotEmpty) {
-        formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
-        print('Sending delete_gallery: $_deleteGalleryIds');
+      if (widget.postId != null && widget.adData != null) {
+        // Edit existing post
+        print(
+          'Calling edit API: ${AttributeValueService.baseUrl}/flutter-edit-post.php',
+        );
+        formData['post_id'] = widget.postId!;
+        formData['token'] = AttributeValueService.token;
+        if (_deleteGalleryIds.isNotEmpty) {
+          formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
+          print('Sending delete_gallery: $_deleteGalleryIds');
+        }
+        final newImages =
+            _selectedImages
+                .asMap()
+                .entries
+                .where(
+                  (e) =>
+                      !_existingImages.any(
+                        (img) => img['path'] == e.value.path,
+                      ),
+                )
+                .map((e) => e.value.path)
+                .toList();
+        final mainImage = _selectedImages[_coverImageIndex].path;
+        response = await apiService.postInfinityMultipart(
+          url: "${AttributeValueService.baseUrl}/flutter-edit-post.php",
+          fields: formData,
+          mainImagePath: mainImage,
+          galleryImagePaths:
+              newImages.where((path) => path != mainImage).toList(),
+        );
+      } else {
+        // Create new post
+        response = await apiService.postInfinityMultipart(
+          url: "${AttributeValueService.baseUrl}/flutter-add-post.php",
+          fields: {
+            ...formData,
+            'if_offer_price': '0',
+            'offer_price': '0.00',
+            'auction_price_intervel': '0.00',
+            'auction_starting_price': '0.00',
+            'latitude': '',
+            'longitude': '',
+            'user_zone_id': '0',
+            'zone_id': '0',
+            'if_auction': '0',
+            'auction_status': '0',
+            'auction_startin': '0000-00-00 00:00:00',
+            'auction_endin': '0000-00-00 00:00:00',
+            'auction_attempt': '0',
+            'if_finance': '0',
+            'if_exchange': '0',
+            'feature': '0',
+            'status': '1',
+            'visiter_count': '0',
+            'if_sold': '0',
+            'if_expired': '0',
+            'if_verifyed': '0',
+            'by_dealer': '0',
+          },
+          mainImagePath: _selectedImages[_coverImageIndex].path,
+          galleryImagePaths:
+              _selectedImages
+                  .asMap()
+                  .entries
+                  .where((e) => e.key != _coverImageIndex)
+                  .map((e) => e.value.path)
+                  .toList(),
+        );
       }
-      final newImages = _selectedImages
-          .asMap()
-          .entries
-          .where((e) => !_existingImages.any((img) => img['path'] == e.value.path))
-          .map((e) => e.value.path)
-          .toList();
-      final mainImage = _selectedImages[_coverImageIndex].path;
-      response = await apiService.postInfinityMultipart(
-        url: "${AttributeValueService.baseUrl}/flutter-edit-post.php",
-        fields: formData,
-        mainImagePath: mainImage,
-        galleryImagePaths: newImages.where((path) => path != mainImage).toList(),
-      );
-    } else {
-      // Create new post
-      response = await apiService.postInfinityMultipart(
-        url: "${AttributeValueService.baseUrl}/flutter-add-post.php",
-        fields: {
-          ...formData,
-          'if_offer_price': '0',
-          'offer_price': '0.00',
-          'auction_price_intervel': '0.00',
-          'auction_starting_price': '0.00',
-          'latitude': '',
-          'longitude': '',
-          'user_zone_id': '0',
-          'zone_id': '0',
+
+      if (response['status'] == 'true') {
+        // Construct complete adData to pass to MyAdsWidget
+        final newAdData = {
+          'id':
+              widget.postId ??
+              response['post_id'] ??
+              DateTime.now().millisecondsSinceEpoch.toString(),
+          'title': _generateTitle(),
+          'category_id': widget.categoryId,
+          'price': _controllers['listPrice']!.text,
+          'description': _controllers['description']!.text,
+          'image':
+              response['image'] ??
+              '', // Use server-provided image URL if available
+          'district': _selectedDistrict,
+          'status': '0', // Assume pending until approved
+          'created_on': DateTime.now().toIso8601String(),
+          'admin_approval': '0',
           'if_auction': '0',
           'auction_status': '0',
-          'auction_startin': '0000-00-00 00:00:00',
-          'auction_endin': '0000-00-00 00:00:00',
           'auction_attempt': '0',
-          'if_finance': '0',
-          'if_exchange': '0',
-          'feature': '0',
-          'status': '1',
           'visiter_count': '0',
           'if_sold': '0',
-          'if_expired': '0',
-          'if_verifyed': '0',
-          'by_dealer': '0',
-        },
-        mainImagePath: _selectedImages[_coverImageIndex].path,
-        galleryImagePaths: _selectedImages
-            .asMap()
-            .entries
-            .where((e) => e.key != _coverImageIndex)
-            .map((e) => e.value.path)
-            .toList(),
-      );
-    }
+          'land_mark': _controllers['landMark']!.text,
+          'filters': jsonEncode(getFilters()),
+          'brand': _selectedBrand?.id ?? '',
+          'model': _selectedBrandModel?.id ?? '',
+          'model_variation': _selectedModelVariation?.id ?? '',
+          // Add any other fields expected by MyAdsWidget
+        };
 
-    if (response['status'] == 'true') {
-      // Construct complete adData to pass to MyAdsWidget
-      final newAdData = {
-        'id': widget.postId ?? response['post_id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        'title': _generateTitle(),
-        'category_id': widget.categoryId,
-        'price': _controllers['listPrice']!.text,
-        'description': _controllers['description']!.text,
-        'image': response['image'] ?? '', // Use server-provided image URL if available
-        'district': _selectedDistrict,
-        'status': '0', // Assume pending until approved
-        'created_on': DateTime.now().toIso8601String(),
-        'admin_approval': '0',
-        'if_auction': '0',
-        'auction_status': '0',
-        'auction_attempt': '0',
-        'visiter_count': '0',
-        'if_sold': '0',
-        'land_mark': _controllers['landMark']!.text,
-        'filters': jsonEncode(getFilters()),
-        'brand': _selectedBrand?.id ?? '',
-        'model': _selectedBrandModel?.id ?? '',
-        'model_variation': _selectedModelVariation?.id ?? '',
-        // Add any other fields expected by MyAdsWidget
-      };
-
-      _showSnackBar('Ad ${widget.postId != null ? 'updated' : 'posted'} successfully', Colors.green);
-      context.pushNamed(
-        RouteNames.sellingstatuspage,
-        extra: {
-          'userId': widget.userId,
-          'adData': newAdData, // Pass complete adData
-        },
-      );
-    } else {
-      throw Exception(response['message'] ?? 'Failed to ${widget.postId != null ? 'update' : 'post'} ad');
+        _showSnackBar(
+          'Ad ${widget.postId != null ? 'updated' : 'posted'} successfully',
+          Colors.green,
+        );
+        context.pushNamed(
+          RouteNames.sellingstatuspage,
+          extra: {
+            'userId': widget.userId,
+            'adData': newAdData, // Pass complete adData
+          },
+        );
+      } else {
+        throw Exception(
+          response['message'] ??
+              'Failed to ${widget.postId != null ? 'update' : 'post'} ad',
+        );
+      }
+    } catch (e) {
+      print('Error saving ad: $e');
+      _showSnackBar('Error saving ad: $e', Colors.red);
+    } finally {
+      setState(() => isSaving = false);
     }
-  } catch (e) {
-    print('Error saving ad: $e');
-    _showSnackBar('Error saving ad: $e', Colors.red);
-  } finally {
-    setState(() => isSaving = false);
   }
-}
 
   Widget _buildImagePicker() => Column(
     children: [
@@ -1435,7 +1463,7 @@ class _AdPostFormState extends State<AdPostForm>
                                 },
                                 icon: const Icon(
                                   Icons.close,
-                                  color: Colors.red,
+                                  color: Colors.blue,
                                 ),
                               ),
                             ),
@@ -1459,43 +1487,31 @@ class _AdPostFormState extends State<AdPostForm>
   );
 
   Widget _buildImageSection() => Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text(
-          'Add Photos',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Add Photos',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
-        ),
-        GestureDetector(
-  onTap: () => context.pop(),
-  child: const Text(
-    'Cancel',
-    style: TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
-      color: Colors.black87,
-    ),
-  ),
-)
-
-      ],
-    ),
-    const SizedBox(height: 16),
-    _selectedImages.isEmpty
-        ? Row(
+        ],
+      ),
+      const SizedBox(height: 16),
+      _selectedImages.isEmpty
+          ? Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [_buildImagePicker()],
           )
-        : _buildImagePicker(),
-    const SizedBox(height: 24),
-  ],
-);
+          : _buildImagePicker(),
+      const SizedBox(height: 24),
+    ],
+  );
 
   Widget _buildKeyInfoSection() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1711,18 +1727,18 @@ class _AdPostFormState extends State<AdPostForm>
     child: Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
         width: double.infinity,
         child: ElevatedButton(
           onPressed: isSaving ? null : widget.onSubmit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
+            backgroundColor: Palette.primaryblue,
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(vertical: 5),
           ),
           child:
               isSaving
