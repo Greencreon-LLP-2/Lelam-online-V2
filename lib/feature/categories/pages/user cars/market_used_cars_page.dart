@@ -134,7 +134,7 @@ class _MarketPlaceProductDetailsPageState
 
   List<PostReview> reviews = [];
 bool isLoadingReviews = false;
-String reviewsError = '';
+String reviewsError = "No answers available";
 
   @override
   void initState() {
@@ -212,7 +212,7 @@ Future<void> _fetchReviews() async {
     print('Error fetching reviews: $e');
     setState(() {
       reviews = [];
-      reviewsError = 'Failed to load reviews: $e';
+      reviewsError = 'No message fount';
       isLoadingReviews = false;
     });
   }
@@ -2720,11 +2720,6 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      // const Text(
-      //   'Questions',
-      //   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      // ),
-      SizedBox(height: 12),
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -2762,7 +2757,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.question_answer, color: Colors.white, size: 20.0),
@@ -2773,8 +2768,9 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
           ),
         ],
       ),
-      SizedBox(height: 12),
+      const SizedBox(height: 12),
       Container(
+        width: double.infinity, // Ensure full screen width
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -2783,37 +2779,54 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
               color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
               spreadRadius: 1,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
           border: Border.all(color: Colors.grey[300]!),
         ),
-        padding: EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Answers',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             if (isLoadingReviews)
-              Center(child: CircularProgressIndicator())
+              const Center(child: CircularProgressIndicator())
             else if (reviewsError.isNotEmpty)
               Column(
+                crossAxisAlignment: CrossAxisAlignment.center, // Align left
                 children: [
-                  Text(reviewsError, style: TextStyle(color: Colors.red)),
-                  TextButton(
-                    onPressed: _fetchReviews,
-                    child: Text('Retry'),
+                  Text(
+                    "No reply messages found",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                   // semanticsLabel: 'Error loading answers',
                   ),
+                  // TextButton(
+                  //   onPressed: _fetchReviews,
+                  //   child: const Text('Retry'),
+                  // ),
                 ],
               )
             else if (reviews.isEmpty)
-              Text(
-                'No message',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-                semanticsLabel: 'No answers available',
+              Container(
+                width: double.infinity, // Ensure full width for "No message"
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: const Text(
+                  'No message',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  semanticsLabel: 'No answers available',
+                  textAlign: TextAlign.center, // Center the text
+                ),
               )
             else
               Column(
