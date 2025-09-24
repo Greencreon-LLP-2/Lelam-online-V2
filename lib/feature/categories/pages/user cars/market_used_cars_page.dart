@@ -2797,7 +2797,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
               const Center(child: CircularProgressIndicator())
             else if (reviewsError.isNotEmpty)
               Column(
-                crossAxisAlignment: CrossAxisAlignment.center, // Align left
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     "No reply messages found",
@@ -2805,7 +2805,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                       fontSize: 16,
                       color: Color.fromARGB(255, 192, 187, 187),
                     ),
-                   // semanticsLabel: 'Error loading answers',
+                 
                   ),
                   // TextButton(
                   //   onPressed: _fetchReviews,

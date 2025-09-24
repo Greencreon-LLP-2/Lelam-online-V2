@@ -1,8 +1,12 @@
-// ...existing code...
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
+import 'package:dio/dio.dart'; // For downloading PDF
+import 'package:open_file/open_file.dart'; // For opening PDF
+import 'package:path_provider/path_provider.dart'; // For temporary storage
+import 'package:path/path.dart' as path; // For file extension handling
+import 'dart:io';
 
 class FAQPage extends StatefulWidget {
   const FAQPage({super.key});
@@ -30,7 +34,6 @@ class _FAQPageState extends State<FAQPage> {
     try {
       final Map<String, dynamic> data = await apiService.get(url: faqUrl);
 
-      // keep compatibility with different API formats ('true' string, boolean true, 1, '1')
       final statusRaw = data['status'];
       final bool success = statusRaw == true ||
           statusRaw == 'true' ||
@@ -64,23 +67,19 @@ class _FAQPageState extends State<FAQPage> {
     try {
       if (value is int) {
         final s = value.toString();
-        // seconds -> 10 digits, milliseconds -> 13 digits
         if (s.length == 10) return DateTime.fromMillisecondsSinceEpoch(value * 1000);
         return DateTime.fromMillisecondsSinceEpoch(value);
       }
       if (value is String) {
         if (value.isEmpty) return null;
-        // try ISO
         final iso = DateTime.tryParse(value);
         if (iso != null) return iso;
-        // numeric string?
         final asInt = int.tryParse(value);
         if (asInt != null) {
           final s = value;
           if (s.length == 10) return DateTime.fromMillisecondsSinceEpoch(asInt * 1000);
           return DateTime.fromMillisecondsSinceEpoch(asInt);
         }
-        // try common formats (fallback)
         try {
           return DateFormat.yMd().parseLoose(value);
         } catch (_) {}
@@ -99,6 +98,70 @@ class _FAQPageState extends State<FAQPage> {
     return 'Inactive';
   }
 
+  Future<void> _openPDF(String? pdfUrl) async {
+    if (pdfUrl == null || pdfUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No PDF available')),
+      );
+      return;
+    }
+
+    // Optional: Show a loading dialog for better UX during download
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Downloading PDF...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Get temporary directory
+      final dir = await getTemporaryDirectory();
+      
+      // Generate a safe filename: Use last part of URL, ensure .pdf extension
+      String fileName = path.basename(pdfUrl);
+      if (!fileName.toLowerCase().endsWith('.pdf')) {
+        // If no .pdf extension, append it (common for generic URLs)
+        fileName = '$fileName.pdf';
+      }
+      final filePath = path.join(dir.path, fileName);
+      final file = File(filePath);
+
+      // Download the PDF
+      await Dio().download(pdfUrl, filePath);
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Open the downloaded PDF with explicit MIME type
+      final result = await OpenFile.open(
+        filePath,
+        type: 'application/pdf',  // Explicit MIME type to force PDF viewer
+      );
+      if (result.type != ResultType.done) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open PDF: ${result.message}')),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      debugPrint('Error downloading or opening PDF: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error opening PDF. Please check your connection.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy');
@@ -112,7 +175,6 @@ class _FAQPageState extends State<FAQPage> {
         ),
         title: const Text('FAQ', style: TextStyle(color: Colors.white)),
       ),
-      // Always provide a scrollable to RefreshIndicator
       body: RefreshIndicator(
         onRefresh: fetchFAQs,
         child: ListView(
@@ -155,7 +217,7 @@ class _FAQPageState extends State<FAQPage> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ExpansionTile(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     collapsedBackgroundColor: Colors.white,
                     backgroundColor: Colors.white,
@@ -171,7 +233,6 @@ class _FAQPageState extends State<FAQPage> {
                       question,
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
-                    
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -188,16 +249,12 @@ class _FAQPageState extends State<FAQPage> {
                                 if (pdf != null && pdf.toString().isNotEmpty)
                                   ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade700,
+                                      backgroundColor: Colors.red.shade500,
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Feature is coming soon')),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.picture_as_pdf),
-                                    label: const Text('View Attachment'),
+                                    onPressed: () => _openPDF(pdf),
+                                    icon: const Icon(Icons.picture_as_pdf,color: Colors.white,),
+                                    label: const Text('View PDF' , style: TextStyle(color: Colors.white),),
                                   ),
                                 const Spacer(),
                                 Text(
@@ -219,4 +276,3 @@ class _FAQPageState extends State<FAQPage> {
     );
   }
 }
-// ...existing code...

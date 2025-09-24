@@ -33,6 +33,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer' as developer;
 
+
+
 class RealEstateProductDetailsPage extends StatefulWidget {
   final MarketplacePost product;
   final bool isAuction;
