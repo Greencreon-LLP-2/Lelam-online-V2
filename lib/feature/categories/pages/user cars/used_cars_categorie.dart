@@ -213,8 +213,44 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Timer? _debounceTimer;
   List<Product> _filteredProductsCache = [];
   bool _filtersChanged = false;
+String? _auctionStatus;
+
+
   Map<String, ModelVariation?> _modelVariationsCache = {};
   Set<String> _fetchingModelVariationIds = {};
+  List<Map<String, String>> _ownerVariations = [
+    {'id': '56', 'name': '1st Owner'},
+    {'id': '57', 'name': '2nd Owner'},
+    {'id': '58', 'name': '3rd Owner'},
+    {'id': '59', 'name': '4th Owner'},
+    {'id': '60', 'name': '5th Owner'},
+    {'id': '61', 'name': '6th Owner'},
+    {'id': '62', 'name': '7th Owner'},
+    {'id': '63', 'name': '8th Owner'},
+    {'id': '196', 'name': '9+ Owners'},
+  ];
+  List<Map<String, String>> _kmRangeVariations = [
+    {'id': '66', 'name': '0 - 10000 KM'},
+    {'id': '67', 'name': '10000 - 20000 KM'},
+    {'id': '68', 'name': '20000 - 30000 KM'},
+    {'id': '69', 'name': '30000 - 40000 KM'},
+    {'id': '70', 'name': '40000 - 50000 KM'},
+    {'id': '71', 'name': '50000 - 60000 KM'},
+    {'id': '72', 'name': '60000 - 70000 KM'},
+    {'id': '73', 'name': '70000 - 80000 KM'},
+    {'id': '74', 'name': '80000 - 90000 KM'},
+    {'id': '75', 'name': '90000 - 100000 KM'},
+    {'id': '76', 'name': '100000 - 110000 KM'},
+    {'id': '77', 'name': '110000 - 120000 KM'},
+    {'id': '78', 'name': '120000 - 130000 KM'},
+    {'id': '79', 'name': '130000 - 140000 KM'},
+    {'id': '80', 'name': '140000 - 150000 KM'},
+    {'id': '81', 'name': '150000 KM Above'},
+  ];
+  Map<String, String> _ownerIdMap = {};
+  Map<String, String> _kmRangeIdMap = {};
+  List<String> _ownerRanges = [];
+  List<String> _kmRanges = [];
 
  @override
   void initState() {
@@ -225,8 +261,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _listingType = widget.showAuctions ? 'auction' : 'Marketplace';
     _checkLoginStatus().then((_) {
       _fetchProducts();
+      _initializeVariations();
     });
     _fetchLocations();
+
 
     // Sync _searchQuery with TextEditingController without rebuilds
     _searchController.addListener(() {
@@ -238,7 +276,16 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _fetchVisibleAttributes();
     });
   }
-
+ void _initializeVariations() {
+    setState(() {
+      _ownerIdMap = { for (var v in _ownerVariations) v['name']!: v['id']! };
+      _kmRangeIdMap = { for (var v in _kmRangeVariations) v['name']!: v['id']! };
+      _ownerRanges = ['all', ..._ownerVariations.map((v) => v['name']!).toList()];
+      _kmRanges = ['all', ..._kmRangeVariations.map((v) => v['name']!).toList()];
+    });
+    developer.log('Owner ID map: $_ownerIdMap');
+    developer.log('KM Range ID map: $_kmRangeIdMap');
+  }
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
@@ -696,13 +743,6 @@ Future<void> _fetchLocations() async {
     'Below 2010',
   ];
 
-  final List<String> _ownerRanges = [
-    'all',
-    '1st Owner',
-    '2nd Owner',
-    '3rd Owner',
-    '4+ Owners',
-  ];
 
   final List<String> _fuelTypes = [
     'Petrol',
@@ -714,15 +754,7 @@ Future<void> _fetchLocations() async {
 
   final List<String> _transmissions = ['Manual', 'Automatic'];
 
-  final List<String> _kmRanges = [
-    'all',
-    'Under 10K',
-    '10K-30K',
-    '30K-50K',
-    '50K-80K',
-    'Above 80K',
-  ];
-
+ 
   final List<String> _soldByOptions = [
     'all',
     'Dealer',
@@ -947,48 +979,49 @@ Future<void> _fetchLocations() async {
       ),
     );
   }
+Widget _buildListingTypeButtons() {
 
-  Widget _buildListingTypeButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (_listingType != 'Marketplace') {
-                  setState(() {
-                    _listingType = 'Marketplace';
-                    _products = [];
-                    _postAttributeValuesCache.clear();
-                    _fetchingPostIds.clear();
-                    _filteredProductsCache.clear();
-                    _filtersChanged = true;
-                  });
-                  _fetchProducts(forceRefresh: true);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _listingType == 'Marketplace'
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade200,
-                foregroundColor:
-                    _listingType == 'Marketplace'
-                        ? Colors.white
-                        : Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Marketplace',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  bool showAuctionButton = _auctionStatus == "1";
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () {
+              if (_listingType != 'Marketplace') {
+                setState(() {
+                  _listingType = 'Marketplace';
+                  _products = [];
+                  _postAttributeValuesCache.clear();
+                  _fetchingPostIds.clear();
+                  _filteredProductsCache.clear();
+                  _filtersChanged = true;
+                });
+                _fetchProducts(forceRefresh: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _listingType == 'Marketplace'
+                  ? Colors.grey.shade700
+                  : Colors.grey.shade200,
+              foregroundColor: _listingType == 'Marketplace'
+                  ? Colors.white
+                  : Colors.black87,
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
+            child: const Text(
+              'Marketplace',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
           ),
+        ),
+        if (showAuctionButton) ...[
           const SizedBox(width: 16),
           Expanded(
             child: ElevatedButton(
@@ -1006,10 +1039,9 @@ Future<void> _fetchLocations() async {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _listingType == 'auction'
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade200,
+                backgroundColor: _listingType == 'auction'
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade200,
                 foregroundColor:
                     _listingType == 'auction' ? Colors.white : Colors.black87,
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1024,9 +1056,10 @@ Future<void> _fetchLocations() async {
             ),
           ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1598,62 +1631,126 @@ Future<void> _fetchLocations() async {
     );
   }
 
-  Widget _buildFinanceExchangeInfo(
-    bool isFinanceAvailable,
-    bool isExchangeAvailable,
-  ) {
-    List<Widget> children = [];
-    if (isFinanceAvailable) {
-      children.add(
-        Row(
-          children: [
-            const Icon(Icons.account_balance, size: 10, color: Colors.black),
-            const SizedBox(width: 4),
-            const Text(
-              'Finance Available',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    if (isExchangeAvailable) {
-      if (children.isNotEmpty) children.add(const SizedBox(width: 8));
-      children.add(
-        Row(
-          children: [
-            const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-            const SizedBox(width: 4),
-            const Text(
-              'Exchange Available',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+Widget _buildFinanceExchangeInfo(
+  bool isFinanceAvailable,
+  bool isExchangeAvailable,
+) {
+  // Show only one on left if only one is available
+  if (!isFinanceAvailable && !isExchangeAvailable) {
+    return const SizedBox.shrink();
+  }
+  
+  if (isFinanceAvailable && !isExchangeAvailable) {
+    // Only finance - show on left
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color:
-            (isFinanceAvailable || isExchangeAvailable)
-                ? Palette.primarylightblue
-                : Colors.grey.shade50,
+        color: Palette.primarylightblue,
         // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
       ),
-      child: Row(children: children),
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          const Icon(Icons.account_balance, size: 10, color: Colors.black),
+          const SizedBox(width: 4),
+          const Text(
+            'Finance Available',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
-
+  
+  if (!isFinanceAvailable && isExchangeAvailable) {
+    // Only exchange - show on left
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Palette.primarylightblue,
+        // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 4),
+          const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+          const SizedBox(width: 4),
+          const Text(
+            'Exchange Available',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.black,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Both available - show with divider in center
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Palette.primarylightblue,
+      // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+    ),
+    child: Row(
+      children: [
+        // Finance on left
+        Expanded(
+          child: Row(
+            children: [
+              const SizedBox(width: 4),
+              const Icon(Icons.account_balance, size: 10, color: Colors.black),
+              const SizedBox(width: 4),
+              const Text(
+                'Finance Available',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Black vertical divider
+        Container(
+          width: 1,
+          height: 10, // Explicit height to ensure visibility
+          color: Colors.black,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        // Exchange on right
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              const Text(
+                'Exchange Available',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
   String _getOwnerText(String owners) {
     if (owners.contains('1st')) return '1st Owner';
     if (owners.contains('2nd')) return '2nd Owner';
@@ -1684,115 +1781,127 @@ Future<void> _fetchLocations() async {
     return value;
   }
 
-  Future<void> _fetchFilterListings() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-      _filteredProductsCache = [];
-      _postAttributeValuesCache.clear();
-      _fetchingPostIds.clear();
-    });
+Future<void> _fetchFilterListings() async {
+  setState(() {
+    _isLoading = true;
+    _errorMessage = null;
+    _filteredProductsCache = [];
+    _postAttributeValuesCache.clear();
+    _fetchingPostIds.clear();
+  });
 
-    final Map<String, String> queryParams = {};
-    if (_selectedBrands.isNotEmpty) {
-      queryParams['brands'] = _selectedBrands.join(',');
-    }
-    if (_selectedPriceRange != 'all') {
-      final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-      if (parts.length == 2) {
-        queryParams['min_price'] = parts[0].replaceAll(' Lakh', '').trim();
-        queryParams['max_price'] = parts[1].replaceAll(' Lakh', '').trim();
-      } else if (_selectedPriceRange.contains('Under')) {
-        queryParams['max_price'] = '2';
-      } else if (_selectedPriceRange.contains('Above')) {
-        queryParams['min_price'] = '20';
-      }
-    }
-    if (_selectedYearRange != 'all') {
-      final parts = _selectedYearRange.split('-');
-      if (parts.length == 2) {
-        queryParams['min_year'] = parts[0].trim();
-        queryParams['max_year'] = parts[1].trim();
-      } else if (_selectedYearRange.contains('Above')) {
-        queryParams['min_year'] = '2020';
-      } else if (_selectedYearRange.contains('Below')) {
-        queryParams['max_year'] = '2010';
-      }
-    }
-    if (_selectedOwnersRange != 'all') {
-      queryParams['owners'] =
-          _selectedOwnersRange
-              .replaceAll(' Owner', '')
-              .replaceAll('4+', '4')
-              .trim();
-    }
-    if (_selectedFuelTypes.isNotEmpty) {
-      queryParams['fuel_types'] = _selectedFuelTypes.join(',');
-    }
-    if (_selectedTransmissions.isNotEmpty) {
-      queryParams['transmissions'] = _selectedTransmissions.join(',');
-    }
-    if (_selectedKmRange != 'all') {
-      final parts = _selectedKmRange.replaceAll('K', '').split('-');
-      if (parts.length == 2) {
-        queryParams['min_km'] = parts[0].trim();
-        queryParams['max_km'] = parts[1].trim();
-      } else if (_selectedKmRange.contains('Under')) {
-        queryParams['max_km'] = '10';
-      } else if (_selectedKmRange.contains('Above')) {
-        queryParams['min_km'] = '80';
-      }
-    }
-    if (_selectedSoldBy != 'all') {
-      queryParams['sold_by'] = _selectedSoldBy;
-    }
-    queryParams['listing_type'] = _listingType;
+  final Map<String, String> queryParams = {
+    'category_id': '1',
+    'user_zone_id': _selectedLocation == 'all' ? '0' : _selectedLocation,
+    'listing_type': _listingType.toLowerCase(),
+    'user_id': _userId ?? '647', // Match your form-data
+  };
 
-    try {
-      final apiService = ApiService();
-      final Map<String, dynamic> response = await apiService.postMultipart(
-        url: "$baseUrl/filter-used-cars-listings.php",
-        fields: queryParams,
-      );
+  // Construct attributes map for owners, KM range, and years
+  Map<String, List<String>> attributes = {};
 
-      developer.log('Filter API response: $response');
+  // Owners filter
+  if (_selectedOwnersRange != 'all') {
+    attributes['2'] = [_ownerIdMap[_selectedOwnersRange] ?? ''];
+  }
 
-      final dataList = response['data'] as List<dynamic>? ?? [];
-      final finalPosts =
-          dataList
-              .map(
-                (item) =>
-                    MarketplacePost.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
-      final List<Product> products =
-          finalPosts.map((post) => post.toProduct()).toList();
+  // KM range filter
+  if (_selectedKmRange != 'all') {
+    attributes['10'] = [_kmRangeIdMap[_selectedKmRange] ?? ''];
+  }
 
-      setState(() {
-        _products = products;
-        _filteredProductsCache = products;
-        _filtersChanged = true;
-        _isLoading = false;
-      });
-
-      // Fetch attributes for all products
-      for (final product in _products) {
-        // Changed 'products' to '_products'
-        if (!_postAttributeValuesCache.containsKey(product.id) &&
-            !_fetchingPostIds.contains(product.id)) {
-          _fetchPostAttributes(product.id);
-        }
-        if (!_modelVariationsCache.containsKey(product.id) &&
-            !_fetchingModelVariationIds.contains(product.id)) {
-          _fetchModelVariation(product.id);
-        }
-      }
-    } catch (e) {
-      developer.log("Error while fetching filter listings: $e");
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load filtered cars. Please try again.';
-      });
+  // Year filter
+  if (_selectedYearRange != 'all') {
+    List<String> yearIds = [];
+    if (_selectedYearRange == '2020 & Above') {
+      yearIds = ['1', '2', '3', '4', '5', '6']; // 2025–2020
+    } else if (_selectedYearRange == '2018-2019') {
+      yearIds = ['7', '8']; // 2019–2018
+    } else if (_selectedYearRange == '2015-2017') {
+      yearIds = ['9', '10', '11']; // 2017–2015
+    } else if (_selectedYearRange == '2010-2014') {
+      yearIds = ['12', '13', '14', '15', '16']; // 2014–2010
+    } else if (_selectedYearRange == 'Below 2010') {
+      yearIds = List.generate(41 - 16 + 1, (index) => (41 - index).toString()); // 1985–2009
+    }
+    if (yearIds.isNotEmpty) {
+      attributes['1'] = yearIds; // Attribute ID "1" for Year
     }
   }
+
+  // Encode attributes as JSON string
+  if (attributes.isNotEmpty) {
+    queryParams['attributes'] = jsonEncode(attributes);
+  }
+
+  // Other filters
+  if (_selectedBrands.isNotEmpty) {
+    queryParams['brands'] = _selectedBrands.join(',');
+  }
+  if (_selectedPriceRange != 'all') {
+    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+    if (parts.length == 2) {
+      queryParams['min_price'] = (double.parse(parts[0].replaceAll(' Lakh', '').trim()) * 100000).toStringAsFixed(0);
+      queryParams['max_price'] = (double.parse(parts[1].replaceAll(' Lakh', '').trim()) * 100000).toStringAsFixed(0);
+    } else if (_selectedPriceRange.contains('Under')) {
+      queryParams['max_price'] = '200000';
+    } else if (_selectedPriceRange.contains('Above')) {
+      queryParams['min_price'] = '2000000';
+    }
+  }
+  if (_selectedFuelTypes.isNotEmpty) {
+    queryParams['fuel_types'] = _selectedFuelTypes.map((fuel) => fuel.toLowerCase()).join(',');
+  }
+  if (_selectedTransmissions.isNotEmpty) {
+    queryParams['transmissions'] = _selectedTransmissions.map((trans) => trans.toLowerCase()).join(',');
+  }
+  if (_selectedSoldBy != 'all') {
+    queryParams['sold_by'] = _selectedSoldBy.toLowerCase().replaceAll(' ', '_');
+  }
+
+  try {
+    final apiService = ApiService();
+    final Map<String, dynamic> response = await apiService.postMultipart(
+      url: "$baseUrl/filter-used-cars-listings.php",
+      fields: queryParams,
+    );
+
+    developer.log('Filter API query params: $queryParams', name: 'API.Request');
+    developer.log('Filter API raw response: $response', name: 'API.Response');
+
+    final dataList = response['data'] as List<dynamic>? ?? [];
+    final finalPosts = dataList
+        .map((item) => MarketplacePost.fromJson(item as Map<String, dynamic>))
+        .toList();
+
+    final List<Product> products = finalPosts.map((post) => post.toProduct()).toList();
+
+    setState(() {
+      _products = products;
+      _filteredProductsCache = products;
+      _filtersChanged = true;
+      _isLoading = false;
+    });
+
+    // Fetch attributes for all products
+    for (final product in _products) {
+      if (!_postAttributeValuesCache.containsKey(product.id) &&
+          !_fetchingPostIds.contains(product.id)) {
+        _fetchPostAttributes(product.id);
+      }
+      if (!_modelVariationsCache.containsKey(product.id) &&
+          !_fetchingModelVariationIds.contains(product.id)) {
+        _fetchModelVariation(product.id);
+      }
+    }
+  } catch (e) {
+    developer.log('Error while fetching filter listings: $e', name: 'API.Error');
+    setState(() {
+      _isLoading = false;
+      _errorMessage = 'Failed to load filtered cars. Please try again.';
+    });
+  }
 }
+}
+
+

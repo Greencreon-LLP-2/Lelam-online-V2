@@ -13,6 +13,7 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
+import 'package:lelamonline_flutter/feature/categories/models/post_review.model.dart';
 
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart'
@@ -131,6 +132,10 @@ class _MarketPlaceProductDetailsPageState
   List<ContainerInfo> _containerInfo = [];
   String _containerInfoError = '';
 
+  List<PostReview> reviews = [];
+bool isLoadingReviews = false;
+String reviewsError = '';
+
   @override
   void initState() {
     super.initState();
@@ -149,9 +154,69 @@ class _MarketPlaceProductDetailsPageState
     _fetchGalleryImages();
     _fetchBannerImage();
     _fetchContainerInfo();
+    _fetchReviews();
     _isCheckingShortlist = true;
   }
+  
+Future<void> _fetchReviews() async {
+  setState(() {
+    isLoadingReviews = true;
+    reviewsError = '';
+  });
 
+  try {
+    final headers = {'token': token};
+    final url = '$baseUrl/post-reviews.php?token=$token&post_id=$id';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      print('Reviews API response: $responseData'); // Debug log
+
+      // Check if responseData is valid and contains expected fields
+      if (responseData['status'] == 'true' && responseData['data'] != null) {
+        // Handle case where data is a List
+        if (responseData['data'] is List) {
+          final reviewsResponse = PostReviewsResponse.fromJson(responseData);
+          setState(() {
+            reviews = reviewsResponse.data;
+            isLoadingReviews = false;
+          });
+        } else {
+          // Handle case where data is a String or other type
+          print('Unexpected data type: ${responseData['data'].runtimeType}');
+          setState(() {
+            reviews = [];
+            reviewsError = responseData['data'] is String
+                ? responseData['data']
+                : 'Invalid reviews data format';
+            isLoadingReviews = false;
+          });
+        }
+      } else {
+        // Handle invalid status or missing data
+        setState(() {
+          reviews = [];
+          reviewsError = responseData['data']?.toString() ?? 'No reviews available';
+          isLoadingReviews = false;
+        });
+      }
+    } else {
+      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    }
+  } catch (e) {
+    print('Error fetching reviews: $e');
+    setState(() {
+      reviews = [];
+      reviewsError = 'Failed to load reviews: $e';
+      isLoadingReviews = false;
+    });
+  }
+}
   // Add this method to your MarketplaceService2 class
   Future<void> _fetchContainerInfo() async {
     setState(() {
@@ -735,16 +800,7 @@ class _MarketPlaceProductDetailsPageState
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      print('Navigating to MyAdsWidget from auction dialog');
-                      Navigator.of(dialogContext).pop();
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SellingStatusPage(),
-                          ),
-                        );
-                      }
+                      context.pushNamed(RouteNames.sellStatusPage);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[200],
@@ -2280,13 +2336,25 @@ class _MarketPlaceProductDetailsPageState
             borderRadius: BorderRadius.circular(16.0),
           ),
           backgroundColor: Colors.white,
-          title: Text(
-            'Meeting Scheduled',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
-            ),
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Meeting Scheduled',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(); // Close dialog
+                },
+              ),
+            ],
           ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -2296,14 +2364,11 @@ class _MarketPlaceProductDetailsPageState
               children: [
                 Text(
                   'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}.\n\n'
-                  'For further information, check My Bids in Status or call support.',
+                  'For further proceeding,you will receive a call back soon or call support now',
                   style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
                     fontSize: 16,
                     color: Colors.grey[800],
                   ),
-                  semanticsLabel:
-                      'Your meeting is scheduled for ${DateFormat('EEEE, MMMM d, yyyy').format(selectedDate)}. '
-                      'For further information, check My Bids in Status or call support.',
                 ),
               ],
             ),
@@ -2651,73 +2716,169 @@ class _MarketPlaceProductDetailsPageState
           ),
         );
   }
-
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'You are the first one to ask question',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // const Text(
+      //   'Questions',
+      //   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+      // ),
+      SizedBox(height: 12),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'Ask a question about this product',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: true,
-                    builder: (dialogContext) {
-                      return LoginDialog(
-                        onSuccess: () {
-                          if (mounted) {
-                            Navigator.of(dialogContext).pop();
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (context) => ReviewDialog(postId: id),
-                            );
-                          }
-                        },
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  builder: (dialogContext) => LoginDialog(
+                    onSuccess: () {
+                      Navigator.of(dialogContext).pop();
+                      showDialog(
+                        context: context,
+                        builder: (context) => ReviewDialog(postId: id),
                       );
                     },
-                  );
-                } else {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
+                  ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  builder: (context) => ReviewDialog(postId: id),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
+              ],
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 12),
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: Offset(0, 2),
             ),
           ],
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        padding: EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Answers',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            if (isLoadingReviews)
+              Center(child: CircularProgressIndicator())
+            else if (reviewsError.isNotEmpty)
+              Column(
+                children: [
+                  Text(reviewsError, style: TextStyle(color: Colors.red)),
+                  TextButton(
+                    onPressed: _fetchReviews,
+                    child: Text('Retry'),
+                  ),
+                ],
+              )
+            else if (reviews.isEmpty)
+              Text(
+                'No message',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                semanticsLabel: 'No answers available',
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: reviews
+                    .where((review) => review.parentId == '0')
+                    .map((parent) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildReviewItem(parent, isReply: false),
+                            ...reviews
+                                .where((reply) => reply.parentId == parent.id)
+                                .map((reply) => _buildReviewItem(reply, isReply: true))
+                                .toList(),
+                          ],
+                        ))
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildReviewItem(PostReview review, {required bool isReply}) {
+  return Padding(
+    padding: EdgeInsets.only(
+      left: isReply ? 16.0 : 0.0,
+      bottom: 8.0,
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
+          size: 16,
+          color: Colors.grey[700],
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                review.comment,
+                style: TextStyle(
+                  fontSize: isReply ? 14 : 16,
+                  color: Colors.black,
+                  fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
+                ),
+                semanticsLabel: 'Comment: ${review.comment}',
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Posted on: ${review.createdOn}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
         ),
       ],
-    );
-  }
-
+    ),
+  );
+}
   // Build seller comments section using the new API
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
@@ -3125,12 +3286,7 @@ class _MarketPlaceProductDetailsPageState
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SellingStatusPage(),
-                              ),
-                            );
+                            context.pushNamed(RouteNames.sellStatusPage);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,

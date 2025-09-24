@@ -193,6 +193,15 @@ GoRoute(
         );
       },
     ),
+    GoRoute(
+  name: RouteNames.sellStatusPage,
+  path: RouteNames.sellStatusPage,
+  builder: (context, state) {
+    final adData = state.extra as Map<String, dynamic>?;
+    return SellingStatusPage(adData: adData);
+  },
+),
+
   ],
 
   /// Error fallback

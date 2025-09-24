@@ -21,7 +21,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin, RouteAware {
+class _HomePageState extends State<HomePage>
+    with AutomaticKeepAliveClientMixin, RouteAware {
   final FocusNode _searchFocusNode = FocusNode();
   String? _selectedDistrict;
   List<String> _districts = ['All Kerala'];
@@ -31,7 +32,11 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
   @override
   bool get wantKeepAlive => true;
 
-
+  @override
+  void initState() {
+    super.initState();
+    _fetchDistricts(); // Add this: Load districts on init
+  }
 
   @override
   void didChangeDependencies() {
@@ -59,58 +64,114 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
   }
 
   Future<void> _fetchDistricts() async {
+    if (!mounted) return; // Prevent setState on unmounted widget
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
+    // Validate token
+    if (ApiConstant.token.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'API token is missing. Check ApiConstant.token.';
+      });
+      developer.log('Error: Empty token in ApiConstant');
+      return;
+    }
+
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConstant.baseUrl}/list-location.php?token=${ApiConstant.token}'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final url =
+          '${ApiConstant.baseUrl}/list-location.php?token=${ApiConstant.token}';
+      developer.log('Fetching districts from: $url'); // Log the full URL
+
+      final response = await http
+          .get(Uri.parse(url), headers: {'Content-Type': 'application/json'})
+          .timeout(
+            const Duration(seconds: 10),
+          ); // Add timeout to prevent hanging
+
+      developer.log('Response Status: ${response.statusCode}'); // Log status
+      developer.log(
+        'Response Body: ${response.body}',
+      ); // Log full body for debugging
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
+        developer.log('Parsed Response Data: $responseData'); // Log parsed data
+
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final List<dynamic> data = responseData['data'];
-          setState(() {
-            _districts = ['All Kerala'] +
-                data
-                    .where((item) => item['status'] == '1')
-                    .map((item) => item['name'].toString())
-                    .toList();
-            _isLoading = false;
-          });
-          if (kDebugMode) {
-            developer.log('Districts fetched: $_districts');
+          developer.log('Raw data length: ${data.length}'); // Log data size
+
+          final filteredData =
+              data.where((item) => item['status'] == '1').toList();
+          developer.log(
+            'Filtered data (status=1) length: ${filteredData.length}',
+          ); // Log after filter
+
+          if (mounted) {
+            setState(() {
+              _districts =
+                  ['All Kerala'] +
+                  filteredData.map((item) => item['name'].toString()).toList();
+              _isLoading = false;
+            });
+            developer.log('Updated districts: $_districts');
           }
         } else {
-          throw Exception('Invalid response: ${responseData['status']}');
+          // Handle unexpected format without throwing
+          developer.log(
+            'Unexpected format: status=${responseData['status']}, data type=${responseData['data'].runtimeType}',
+          );
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Invalid API response format. Check logs.';
+          });
         }
       } else {
-        throw Exception('Failed to load districts: ${response.statusCode}');
+        // Handle non-200 statuses
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              'API error: ${response.statusCode} - ${response.reasonPhrase}';
+        });
+        developer.log(
+          'Non-200 status: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load districts: $e';
-      });
-      if (kDebugMode) {
-        developer.log('Error fetching districts: $e');
+      developer.log(
+        'Full error in _fetchDistricts: $e',
+      ); // Log full stack trace
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load districts: $e';
+        });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_errorMessage ?? 'Failed to load districts'),
-          backgroundColor: Colors.red.withOpacity(0.8),
-        ),
-      );
+      // Show snackbar only if not already shown
+      if (_errorMessage != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: Colors.red.withOpacity(0.8),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: _fetchDistricts, // Add retry button
+            ),
+          ),
+        );
+      }
     }
   }
 
   Future<void> _onRefresh() async {
     if (kDebugMode) {
-      developer.log('Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict');
+      developer.log(
+        'Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict',
+      );
     }
     try {
       await _fetchDistricts();
@@ -137,7 +198,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
       _searchFocusNode.unfocus();
       context.pushNamed('searchResults', queryParameters: {'query': query});
       if (kDebugMode) {
-        developer.log('Navigating to search results with query: $query, search state cleared');
+        developer.log(
+          'Navigating to search results with query: $query, search state cleared',
+        );
       }
     }
   }
@@ -147,7 +210,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
       SearchState().resetOnNavigation();
       _searchFocusNode.unfocus();
       if (kDebugMode) {
-        developer.log('Tapped outside search bar (general), cleared search state and unfocused');
+        developer.log(
+          'Tapped outside search bar (general), cleared search state and unfocused',
+        );
       }
     }
   }
@@ -162,7 +227,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
     }
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     super.build(context);
     final userProvider = context.watch<LoggedUserProvider>();
@@ -192,9 +257,22 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                               const Icon(Icons.location_on),
                               const SizedBox(width: 8),
                               _isLoading
-                                  ? const CircularProgressIndicator()
+                                  ? const SizedBox(
+                                      width: 120,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ) // Smaller spinner for dropdown area
                                   : _errorMessage != null
-                                      ? const Text('Error loading locations')
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Text('Error loading locations'),
+                                            IconButton(
+                                              icon: const Icon(Icons.refresh, size: 16),
+                                              onPressed: _fetchDistricts, // Retry button
+                                            ),
+                                          ],
+                                        )
                                       : DropdownButton<String>(
                                           value: _selectedDistrict,
                                           hint: const Text('All Kerala'),
@@ -204,18 +282,19 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                                               child: Text(district),
                                             );
                                           }).toList(),
-                                          onChanged: (String? newValue) {
-                                            if (mounted) {
-                                              setState(() {
-                                                _selectedDistrict = newValue;
-                                              });
-                                              _handleInteractiveTap('location dropdown');
-                                              if (kDebugMode) {
-                                                developer.log('Selected district: $_selectedDistrict');
-                                              }
-                                            }
-                                          },
-                                          
+                                          onChanged: _isLoading
+                                              ? null // Disable dropdown while loading
+                                              : (String? newValue) {
+                                                  if (mounted) {
+                                                    setState(() {
+                                                      _selectedDistrict = newValue;
+                                                    });
+                                                    _handleInteractiveTap('location dropdown');
+                                                    if (kDebugMode) {
+                                                      developer.log('Selected district: $_selectedDistrict');
+                                                    }
+                                                  }
+                                                },
                                           underline: const SizedBox(),
                                           icon: const SizedBox.shrink(),
                                         ),
@@ -228,7 +307,9 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                               _searchFocusNode.unfocus();
                               context.pushNamed(RouteNames.notificationPage);
                               if (kDebugMode) {
-                                developer.log('Navigating to notification page, search state cleared');
+                                developer.log(
+                                  'Navigating to notification page, search state cleared',
+                                );
                               }
                             },
                             icon: const Icon(Icons.notifications),
@@ -246,20 +327,21 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                     ),
                     const SizedBox(height: 10),
                     const BannerWidget(),
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Padding(
                       padding: const EdgeInsets.only(left: 0),
                       child: TapRegion(
-                        onTapInside: (_) => _handleInteractiveTap('category widget'),
+                        onTapInside:
+                            (_) => _handleInteractiveTap('category widget'),
                         child: CategoryWidget(),
                       ),
                     ),
                     const SizedBox(height: 10),
                     TapRegion(
-                      onTapInside: (_) => _handleInteractiveTap('product section'),
+                      onTapInside:
+                          (_) => _handleInteractiveTap('product section'),
                       child: ProductSectionWidget(searchQuery: ''),
                     ),
-                    
                   ],
                 ),
               ),

@@ -120,3 +120,6 @@ const String attemptsOver = '$baseUrl/sell-junk-attemps-over.php';
 const String inActive = '$baseUrl/sell-junk-inactive.php';
 const String canceled = '$baseUrl/sell-junk-canceled.php';
 const String soldout = '$baseUrl/sell-junk-sold-out.php';
+
+
+

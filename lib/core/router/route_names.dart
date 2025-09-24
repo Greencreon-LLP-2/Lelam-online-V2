@@ -27,5 +27,6 @@ class RouteNames {
   static const String splashPage = '/';
    static const String searchResults = 'searchResults';
     static const String productDetails = 'productDetails';
+    static const String sellStatusPage = '/selling-status';
    
 }

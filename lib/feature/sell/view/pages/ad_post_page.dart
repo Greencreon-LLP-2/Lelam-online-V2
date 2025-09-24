@@ -1250,11 +1250,11 @@ class _AdPostFormState extends State<AdPostForm>
           'Ad ${widget.postId != null ? 'updated' : 'posted'} successfully',
           Colors.green,
         );
-        context.pushNamed(
+        context.pushReplacement(
           RouteNames.sellingstatuspage,
           extra: {
             'userId': widget.userId,
-            'adData': newAdData, // Pass complete adData
+            'adData': newAdData, 
           },
         );
       } else {
@@ -1727,7 +1727,7 @@ class _AdPostFormState extends State<AdPostForm>
     child: Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
         width: double.infinity,
         child: ElevatedButton(
           onPressed: isSaving ? null : widget.onSubmit,
@@ -1736,9 +1736,9 @@ class _AdPostFormState extends State<AdPostForm>
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(0),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 5),
+            padding: const EdgeInsets.symmetric(vertical: 0),
           ),
           child:
               isSaving

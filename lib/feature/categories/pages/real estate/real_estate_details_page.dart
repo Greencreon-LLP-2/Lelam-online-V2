@@ -3014,13 +3014,8 @@ class _RealEstateProductDetailsPageState
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SellingStatusPage(),
-                            ),
-                          );
-                        },
+                      context.pushNamed(RouteNames.sellStatusPage);
+                    },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,

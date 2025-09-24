@@ -452,6 +452,36 @@ Future<void> _loadAds() async {
       );
     }
   }
+Color _getContainerColor(Map<String, dynamic> ad) {
+  if (ad['if_expired'] == '1') return Colors.grey;
+  if (ad['admin_approval'] == '0') return Colors.yellow.shade700;
+  if (ad['admin_approval'] == '2') return Colors.red;
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return Colors.yellow.shade700;
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return Colors.red;
+  if (ad['admin_approval'] == '1') return Colors.blue;
+  return Colors.blue.shade100;
+}
+
+String _getStatusText(Map<String, dynamic> ad) {
+  if (ad['if_expired'] == '1') return 'Expired';
+  if (ad['admin_approval'] == '0') return 'Pending';
+  if (ad['admin_approval'] == '2') return 'Rejected';
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return 'Waiting for Auction Approval';
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return 'Post Now On Auction';
+  if (ad['admin_approval'] == '1') return 'Live';
+  return ad['status'] == '1' ? 'Live' : 'Sold';
+}
+
+Color _getTextColor(Map<String, dynamic> ad) {
+  if (ad['if_expired'] == '1') return Colors.white;
+  if (ad['admin_approval'] == '0') return Colors.black;
+  if (ad['admin_approval'] == '2') return Colors.white;
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return Colors.black;
+  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return Colors.white;
+  if (ad['status'] == '0') return Colors.red;
+  return Colors.white;
+}
+
 
   Widget _buildAdCard(Map<String, dynamic> ad) {
     String? imageUrl;
@@ -494,36 +524,19 @@ Future<void> _loadAds() async {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        ad['admin_approval'] == '0'
-                            ? Colors.red
-                            : ad['status'] == '1'
-                            ? Colors.blue
-                            : Colors.blue.shade100,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    ad['admin_approval'] == '0'
-                        ? 'Pending' 
-                        : ad['status'] == '1'
-                        ? 'Live' 
-                        : 'Sold',
-                    style: TextStyle(
-                      color:
-                          ad['status'] == '0'
-                              ? Colors.red
-                              : ad['status'] == '1'
-                              ? Colors.white
-                              : Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  decoration: BoxDecoration(
+    color: _getContainerColor(ad),
+    borderRadius: BorderRadius.circular(6),
+  ),
+  child: Text(
+    _getStatusText(ad),
+    style: TextStyle(
+      color: _getTextColor(ad),
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+),
                 const Spacer(),
                 Icon(
                   Icons.remove_red_eye,
