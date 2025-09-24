@@ -500,18 +500,18 @@ Future<void> _loadAds() async {
                   ),
                   decoration: BoxDecoration(
                     color:
-                        ad['status'] == '0'
-                            ? Colors.red.shade100
+                        ad['admin_approval'] == '0'
+                            ? Colors.red
                             : ad['status'] == '1'
                             ? Colors.blue
                             : Colors.blue.shade100,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    ad['status'] == '0'
-                        ? 'Pending'
+                    ad['admin_approval'] == '0'
+                        ? 'Pending' 
                         : ad['status'] == '1'
-                        ? 'Live'
+                        ? 'Live' 
                         : 'Sold',
                     style: TextStyle(
                       color:

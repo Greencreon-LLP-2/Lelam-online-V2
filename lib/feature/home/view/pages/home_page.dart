@@ -31,6 +31,8 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
   @override
   bool get wantKeepAlive => true;
 
+
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -213,6 +215,7 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                                               }
                                             }
                                           },
+                                          
                                           underline: const SizedBox(),
                                           icon: const SizedBox.shrink(),
                                         ),
@@ -241,20 +244,22 @@ class _HomePageState extends State<HomePage> with AutomaticKeepAliveClientMixin,
                         onSearch: _onSearch,
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 10),
                     const BannerWidget(),
+                      const SizedBox(height: 10),
                     Padding(
-                      padding: const EdgeInsets.only(left: 16),
+                      padding: const EdgeInsets.only(left: 0),
                       child: TapRegion(
                         onTapInside: (_) => _handleInteractiveTap('category widget'),
                         child: CategoryWidget(),
                       ),
                     ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 10),
                     TapRegion(
                       onTapInside: (_) => _handleInteractiveTap('product section'),
                       child: ProductSectionWidget(searchQuery: ''),
                     ),
+                    
                   ],
                 ),
               ),

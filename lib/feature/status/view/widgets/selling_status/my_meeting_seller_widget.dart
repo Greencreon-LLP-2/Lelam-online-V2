@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -15,6 +17,7 @@ class StatusPill extends StatelessWidget {
   final Color inactiveColor;
   final VoidCallback? onTap;
   final String? postId;
+  final bool showError;
 
   const StatusPill({
     super.key,
@@ -24,6 +27,7 @@ class StatusPill extends StatelessWidget {
     this.inactiveColor = Colors.grey,
     this.onTap,
     this.postId,
+    this.showError = false,
   });
 
   @override
@@ -50,6 +54,35 @@ class StatusPill extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class PillConnector extends StatelessWidget {
+  final bool isActive;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const PillConnector({
+    super.key,
+    this.isActive = false,
+    this.activeColor = Colors.green,
+    this.inactiveColor = Colors.grey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Transform.scale(
+          scaleX: 1.5,
+          child: Icon(
+            Icons.arrow_forward,
+            size: 14,
+            color: isActive ? activeColor : inactiveColor,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -88,6 +121,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
   bool isLoading = true;
   String? _userId;
   String locationText = '';
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -98,6 +132,61 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       selectedIndex = statuses.indexOf(widget.initialStatus!);
     }
     _loadUserId();
+
+    if (selectedIndex == 2) {
+      // Awaiting Location
+      Timer.periodic(const Duration(minutes: 5), (timer) {
+        if (mounted && selectedIndex == 2) {
+          print('Periodic refresh for Awaiting Location');
+          _loadMeetings();
+        } else {
+          timer.cancel();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  List<Widget> _buildPillRow() {
+    List<Widget> pillRow = [];
+    for (var i = 0; i < statuses.length; i++) {
+      final bool isThisActive = i <= selectedIndex;
+      final bool showErrorOnThis = false;
+
+      pillRow.add(
+        StatusPill(
+          label: statuses[i],
+          isActive: isThisActive,
+          activeColor: Colors.blue,
+          showError: showErrorOnThis,
+          onTap: () {
+            if (mounted) {
+              setState(() {
+                selectedIndex = i;
+                print('Selected tab: ${statuses[i]}');
+              });
+              _loadMeetings();
+            }
+          },
+        ),
+      );
+
+      if (i != statuses.length - 1) {
+        pillRow.add(
+          PillConnector(
+            isActive: i < selectedIndex,
+            activeColor: Colors.blue,
+            inactiveColor: Colors.grey,
+          ),
+        );
+      }
+    }
+    return pillRow;
   }
 
   Future<void> _loadUserId() async {
@@ -601,32 +690,32 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children:
-                    statuses.map((status) {
-                      final index = statuses.indexOf(status);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: StatusPill(
-                          label: status,
-                          isActive: index == selectedIndex,
-                          activeColor: AppTheme.primaryColor,
-                          inactiveColor: Colors.grey,
-                          onTap: () {
-                            debugPrint(
-                              'StatusPill tapped: $status (index: $index)',
-                            );
-                            if (mounted) {
-                              setState(() {
-                                selectedIndex = index;
-                                locationText = '';
-                                debugPrint('Selected tab: $status');
-                              });
-                              _loadMeetings();
-                            }
-                          },
-                        ),
-                      );
-                    }).toList(),
+                children: _buildPillRow(),
+                // statuses.map((status) {
+                //   final index = statuses.indexOf(status);
+                //   return Padding(
+                //     padding: const EdgeInsets.symmetric(horizontal: 4),
+                //     child: StatusPill(
+                //       label: status,
+                //       isActive: index == selectedIndex,
+                //       activeColor: AppTheme.primaryColor,
+                //       inactiveColor: Colors.grey,
+                //       onTap: () {
+                //         debugPrint(
+                //           'StatusPill tapped: $status (index: $index)',
+                //         );
+                //         if (mounted) {
+                //           setState(() {
+                //             selectedIndex = index;
+                //             locationText = '';
+                //             debugPrint('Selected tab: $status');
+                //           });
+                //           _loadMeetings();
+                //         }
+                //       },
+                //     ),
+                //   );
+                // }).toList(),
               ),
             ),
           ),
@@ -648,7 +737,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              
                               const SizedBox(height: 12),
                               Text(
                                 errorMessage!,

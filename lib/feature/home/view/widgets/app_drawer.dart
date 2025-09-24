@@ -150,11 +150,23 @@ class AppDrawerWidget extends StatelessWidget {
                     _showContactOptions(context, supportPhone);
                   },
                 ),
-                _buildDrawerItem(
-                  icon: Icons.help_outline,
-                  title: 'Help & Support',
-                  onTap: () => Navigator.pop(context),
-                ),
+               _buildDrawerItem(
+  icon: Icons.help_outline,
+  title: 'Help & Support',
+  onTap: () async {
+    Navigator.pop(context); 
+    final Uri url = Uri.parse('https://greencreon.com/contact/'); 
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not launch $url')),
+        );
+      }
+    }
+  },
+),
                 _buildDrawerItem(
                   icon: Icons.settings,
                   title: 'Settings',

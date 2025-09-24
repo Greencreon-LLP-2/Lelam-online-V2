@@ -186,10 +186,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String? _userId;
   String _searchQuery = '';
   String _selectedLocation = 'all';
-  String _listingType = 'Marketpalce';
+  String _listingType = 'Marketplace';
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService2 _marketplaceService = MarketplaceService2();
   final _storage = const FlutterSecureStorage();
+  final FocusNode _searchFocusNode = FocusNode();
   List<Product> _products = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -215,7 +216,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Map<String, ModelVariation?> _modelVariationsCache = {};
   Set<String> _fetchingModelVariationIds = {};
 
-  @override
+ @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
@@ -226,6 +227,16 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _fetchProducts();
     });
     _fetchLocations();
+
+    // Sync _searchQuery with TextEditingController without rebuilds
+    _searchController.addListener(() {
+      _searchQuery = _searchController.text;
+    });
+
+    // Fetch attributes for visible items on initial load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchVisibleAttributes();
+    });
   }
 
   @override
@@ -233,24 +244,41 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose(); // Dispose FocusNode
     _debounceTimer?.cancel();
     super.dispose();
   }
 
-  void _handleScroll() {
+ void _onSearchSubmitted(String value) {
+    FocusScope.of(context).unfocus(); // Dismiss keyboard on Enter
+    if (mounted) {
+      setState(() {
+        _searchQuery = value;
+        _filtersChanged = true;
+      });
+      _fetchVisibleAttributes(); // Fetch attributes for filtered products
+    }
+  }
+
+ void _handleScroll() {
     if (_scrollController.offset > 100 && !_showAppBarSearch) {
       setState(() {
         _showAppBarSearch = true;
         _showMainSearch = false;
+        FocusScope.of(context).requestFocus(_searchFocusNode); // Retain focus
       });
     } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
       setState(() {
         _showAppBarSearch = false;
         _showMainSearch = true;
+        FocusScope.of(context).requestFocus(_searchFocusNode); // Retain focus
       });
     }
+    _fetchVisibleAttributes(); // Fetch attributes for visible items on scroll
   }
 
+
+  
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
     String termsHtml = '';
@@ -378,15 +406,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  Future<void> _fetchLocations() async {
+Future<void> _fetchLocations() async {
     setState(() {
       _isLoadingLocations = true;
     });
 
     try {
-      final Map<String, dynamic> response = await ApiService().get(
-        url: locations,
-      );
+      final Map<String, dynamic> response = await ApiService().get(url: locations);
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
         setState(() {
@@ -407,24 +433,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  Future<void> _fetchProducts({bool forceRefresh = false}) async {
+ Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' &&
         (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
-      developer.log(
-        'Showing login dialog: userId=$_userId, listingType=$_listingType',
-      );
+      developer.log('Showing login dialog: userId=$_userId, listingType=$_listingType');
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder:
-            (BuildContext dialogContext) => LoginDialog(
-              onSuccess: () async {
-                await _checkLoginStatus(); // Update userId after login
-                await _fetchProducts(
-                  forceRefresh: true,
-                ); // Fetch products after login
-              },
-            ),
+        builder: (BuildContext dialogContext) => LoginDialog(
+          onSuccess: () async {
+            await _checkLoginStatus();
+            await _fetchProducts(forceRefresh: true);
+          },
+        ),
       );
       setState(() {
         _isLoading = false;
@@ -437,6 +458,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _postAttributeValuesCache.clear();
       _fetchingPostIds.clear();
       _filteredProductsCache.clear();
+      _modelVariationsCache.clear();
+      _fetchingModelVariationIds.clear();
     }
     setState(() {
       _isLoading = true;
@@ -455,9 +478,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _filtersChanged = true;
         _isLoading = false;
       });
-      // Fetch attributes and model variations for all products
-      for (final product in _products) {
-        // Changed 'products' to '_products'
+
+      // Fetch attributes and variations for initial visible products
+      final initialVisibleCount = 10; // Adjust based on screen size or preference
+      final initialProducts = products.take(initialVisibleCount).toList();
+      for (final product in initialProducts) {
         if (!_postAttributeValuesCache.containsKey(product.id) &&
             !_fetchingPostIds.contains(product.id)) {
           _fetchPostAttributes(product.id);
@@ -474,14 +499,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           await _fetchProducts();
         } else {
           setState(() {
-            _errorMessage =
-                'You must accept the auction terms to view auctions.';
+            _errorMessage = 'You must accept the auction terms to view auctions.';
             _isLoading = false;
           });
         }
-      } else if (e.toString().contains(
-        'Unexpected data format: Data not found',
-      )) {
+      } else if (e.toString().contains('Unexpected data format: Data not found')) {
         setState(() {
           _products = [];
           _filteredProductsCache = [];
@@ -498,15 +520,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchPostAttributes(String postId) async {
-    if (_postAttributeValuesCache.containsKey(postId) ||
-        _fetchingPostIds.contains(postId)) {
+    if (_postAttributeValuesCache.containsKey(postId) || _fetchingPostIds.contains(postId)) {
       return;
     }
     _fetchingPostIds.add(postId);
     try {
-      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(
-        postId,
-      );
+      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(postId);
       if (mounted) {
         setState(() {
           _postAttributeValuesCache[postId] = attributes;
@@ -520,12 +539,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           _fetchingPostIds.remove(postId);
         });
       }
+      developer.log('Error fetching attributes for post $postId: $e');
     }
   }
 
   Future<void> _fetchModelVariation(String postId) async {
-    if (_modelVariationsCache.containsKey(postId) ||
-        _fetchingModelVariationIds.contains(postId)) {
+    if (_modelVariationsCache.containsKey(postId) || _fetchingModelVariationIds.contains(postId)) {
       return;
     }
     _fetchingModelVariationIds.add(postId);
@@ -544,30 +563,28 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           _fetchingModelVariationIds.remove(postId);
         });
       }
+      developer.log('Error fetching model variation for post $postId: $e');
     }
   }
 
-  void _fetchVisibleAttributes() {
+ void _fetchVisibleAttributes() {
     if (_debounceTimer?.isActive ?? false) return;
-    if (!_scrollController.hasClients)
-      return; // Check if ScrollController is attached
+    if (!_scrollController.hasClients) return;
 
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (!_scrollController.hasClients)
-        return; // Double-check before accessing offset
+      if (!_scrollController.hasClients) return;
       final screenHeight = MediaQuery.of(context).size.height;
       final scrollOffset = _scrollController.offset;
       const itemHeight = 180.0;
       final firstVisibleIndex = (scrollOffset / itemHeight).floor();
-      final lastVisibleIndex =
-          ((scrollOffset + screenHeight) / itemHeight).ceil();
+      final lastVisibleIndex = ((scrollOffset + screenHeight) / itemHeight).ceil();
 
-      for (
-        int i = firstVisibleIndex;
-        i <= lastVisibleIndex && i < _filteredProductsCache.length;
-        i++
-      ) {
-        final product = _filteredProductsCache[i];
+      final visibleProducts = filteredProducts.sublist(
+        firstVisibleIndex.clamp(0, filteredProducts.length),
+        (lastVisibleIndex + 2).clamp(0, filteredProducts.length), // Preload 2 extra items
+      );
+
+      for (final product in visibleProducts) {
         if (!_postAttributeValuesCache.containsKey(product.id) &&
             !_fetchingPostIds.contains(product.id)) {
           _fetchPostAttributes(product.id);
@@ -579,7 +596,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       }
     });
   }
-
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
@@ -696,7 +712,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     'Hybrid',
   ];
 
-  final List<String> _transmissions = ['Manual', 'Automatic', ];
+  final List<String> _transmissions = ['Manual', 'Automatic'];
 
   final List<String> _kmRanges = [
     'all',
@@ -720,7 +736,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   List<Product> get filteredProducts {
     if (_filtersChanged || _filteredProductsCache.isEmpty) {
-      _filteredProductsCache = _products; // Start with all products
+      _filteredProductsCache = _products;
       if (_searchQuery.isNotEmpty) {
         final searchService = ProductSearchService(
           products: _products,
@@ -741,12 +757,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _filteredProductsCache = searchService.searchProducts();
       }
       _filtersChanged = false;
-      developer.log(
-        'Filtered products count: ${_filteredProductsCache.length}',
-      );
+      developer.log('Filtered products count: ${_filteredProductsCache.length}');
     }
     return _filteredProductsCache;
   }
+
 
   double _calculateRelevanceScore(Product product, String query) {
     final attributeValues = _postAttributeValuesCache[product.id] ?? {};
@@ -846,7 +861,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return count;
   }
 
-  Widget _buildAppBarSearchField() {
+ Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -855,68 +870,61 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       ),
       child: TextField(
         controller: _searchController,
+        focusNode: _searchFocusNode,
         autofocus: false,
+        onSubmitted: _onSearchSubmitted,
         decoration: InputDecoration(
           hintText: 'Search cars...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                        _filtersChanged = true;
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                    setState(() {
+                      _searchQuery = '';
+                      _filtersChanged = true;
+                    });
+                  },
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
-        onChanged:
-            (value) => setState(() {
-              _searchQuery = value;
-              _filtersChanged = true;
-            }),
       ),
     );
   }
 
-  Widget _buildSearchField() {
+
+ Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-            _filtersChanged = true;
-          });
-        },
-        // Add these lines
-        autofillHints: null, // Disable autofill entirely
-        enableSuggestions: false, // Optional: Disable suggestions/autocomplete
-        enableInteractiveSelection: true, // Keep selection enabled
+        focusNode: _searchFocusNode,
+        onSubmitted: _onSearchSubmitted,
+        autofillHints: null,
+        enableSuggestions: false,
+        enableInteractiveSelection: true,
         decoration: InputDecoration(
           hintText: 'Search by brand, model, location, fuel type...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                    onPressed: () {
-                      setState(() {
-                        _searchQuery = '';
-                        _searchController.clear();
-                        _filtersChanged = true;
-                      });
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                    setState(() {
+                      _searchQuery = '';
+                      _filtersChanged = true;
+                    });
+                  },
+                )
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade200),
@@ -964,7 +972,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     _listingType == 'Marketplace'
-                        ? Colors.grey.shade400
+                        ? Colors.grey.shade700
                         : Colors.grey.shade200,
                 foregroundColor:
                     _listingType == 'Marketplace'
@@ -1000,7 +1008,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     _listingType == 'auction'
-                        ? Colors.grey.shade400
+                        ? Colors.grey.shade700
                         : Colors.grey.shade200,
                 foregroundColor:
                     _listingType == 'auction' ? Colors.white : Colors.black87,
@@ -1676,101 +1684,115 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     return value;
   }
 
-Future<void> _fetchFilterListings() async {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-    _filteredProductsCache = [];
-    _postAttributeValuesCache.clear();
-    _fetchingPostIds.clear();
-  });
-
-  final Map<String, String> queryParams = {};
-  if (_selectedBrands.isNotEmpty) {
-    queryParams['brands'] = _selectedBrands.join(',');
-  }
-  if (_selectedPriceRange != 'all') {
-    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-    if (parts.length == 2) {
-      queryParams['min_price'] = parts[0].replaceAll(' Lakh', '').trim();
-      queryParams['max_price'] = parts[1].replaceAll(' Lakh', '').trim();
-    } else if (_selectedPriceRange.contains('Under')) {
-      queryParams['max_price'] = '2';
-    } else if (_selectedPriceRange.contains('Above')) {
-      queryParams['min_price'] = '20';
-    }
-  }
-  if (_selectedYearRange != 'all') {
-    final parts = _selectedYearRange.split('-');
-    if (parts.length == 2) {
-      queryParams['min_year'] = parts[0].trim();
-      queryParams['max_year'] = parts[1].trim();
-    } else if (_selectedYearRange.contains('Above')) {
-      queryParams['min_year'] = '2020';
-    } else if (_selectedYearRange.contains('Below')) {
-      queryParams['max_year'] = '2010';
-    }
-  }
-  if (_selectedOwnersRange != 'all') {
-    queryParams['owners'] = _selectedOwnersRange.replaceAll(' Owner', '').replaceAll('4+', '4').trim();
-  }
-  if (_selectedFuelTypes.isNotEmpty) {
-    queryParams['fuel_types'] = _selectedFuelTypes.join(',');
-  }
-  if (_selectedTransmissions.isNotEmpty) {
-    queryParams['transmissions'] = _selectedTransmissions.join(',');
-  }
-  if (_selectedKmRange != 'all') {
-    final parts = _selectedKmRange.replaceAll('K', '').split('-');
-    if (parts.length == 2) {
-      queryParams['min_km'] = parts[0].trim();
-      queryParams['max_km'] = parts[1].trim();
-    } else if (_selectedKmRange.contains('Under')) {
-      queryParams['max_km'] = '10';
-    } else if (_selectedKmRange.contains('Above')) {
-      queryParams['min_km'] = '80';
-    }
-  }
-  if (_selectedSoldBy != 'all') {
-    queryParams['sold_by'] = _selectedSoldBy;
-  }
-  queryParams['listing_type'] = _listingType;
-
-  try {
-    final apiService = ApiService();
-    final Map<String, dynamic> response = await apiService.postMultipart(
-      url: "$baseUrl/filter-used-cars-listings.php",
-      fields: queryParams,
-    );
-
-    developer.log('Filter API response: $response');
-
-    final dataList = response['data'] as List<dynamic>? ?? [];
-    final finalPosts = dataList.map((item) => MarketplacePost.fromJson(item as Map<String, dynamic>)).toList();
-    final List<Product> products = finalPosts.map((post) => post.toProduct()).toList();
-
+  Future<void> _fetchFilterListings() async {
     setState(() {
-      _products = products;
-      _filteredProductsCache = products;
-      _filtersChanged = true;
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
+      _filteredProductsCache = [];
+      _postAttributeValuesCache.clear();
+      _fetchingPostIds.clear();
     });
 
-    // Fetch attributes for all products
-    for (final product in _products) { // Changed 'products' to '_products'
-      if (!_postAttributeValuesCache.containsKey(product.id) && !_fetchingPostIds.contains(product.id)) {
-        _fetchPostAttributes(product.id);
-      }
-      if (!_modelVariationsCache.containsKey(product.id) && !_fetchingModelVariationIds.contains(product.id)) {
-        _fetchModelVariation(product.id);
+    final Map<String, String> queryParams = {};
+    if (_selectedBrands.isNotEmpty) {
+      queryParams['brands'] = _selectedBrands.join(',');
+    }
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+      if (parts.length == 2) {
+        queryParams['min_price'] = parts[0].replaceAll(' Lakh', '').trim();
+        queryParams['max_price'] = parts[1].replaceAll(' Lakh', '').trim();
+      } else if (_selectedPriceRange.contains('Under')) {
+        queryParams['max_price'] = '2';
+      } else if (_selectedPriceRange.contains('Above')) {
+        queryParams['min_price'] = '20';
       }
     }
-  } catch (e) {
-    developer.log("Error while fetching filter listings: $e");
-    setState(() {
-      _isLoading = false;
-      _errorMessage = 'Failed to load filtered cars. Please try again.';
-    });
+    if (_selectedYearRange != 'all') {
+      final parts = _selectedYearRange.split('-');
+      if (parts.length == 2) {
+        queryParams['min_year'] = parts[0].trim();
+        queryParams['max_year'] = parts[1].trim();
+      } else if (_selectedYearRange.contains('Above')) {
+        queryParams['min_year'] = '2020';
+      } else if (_selectedYearRange.contains('Below')) {
+        queryParams['max_year'] = '2010';
+      }
+    }
+    if (_selectedOwnersRange != 'all') {
+      queryParams['owners'] =
+          _selectedOwnersRange
+              .replaceAll(' Owner', '')
+              .replaceAll('4+', '4')
+              .trim();
+    }
+    if (_selectedFuelTypes.isNotEmpty) {
+      queryParams['fuel_types'] = _selectedFuelTypes.join(',');
+    }
+    if (_selectedTransmissions.isNotEmpty) {
+      queryParams['transmissions'] = _selectedTransmissions.join(',');
+    }
+    if (_selectedKmRange != 'all') {
+      final parts = _selectedKmRange.replaceAll('K', '').split('-');
+      if (parts.length == 2) {
+        queryParams['min_km'] = parts[0].trim();
+        queryParams['max_km'] = parts[1].trim();
+      } else if (_selectedKmRange.contains('Under')) {
+        queryParams['max_km'] = '10';
+      } else if (_selectedKmRange.contains('Above')) {
+        queryParams['min_km'] = '80';
+      }
+    }
+    if (_selectedSoldBy != 'all') {
+      queryParams['sold_by'] = _selectedSoldBy;
+    }
+    queryParams['listing_type'] = _listingType;
+
+    try {
+      final apiService = ApiService();
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url: "$baseUrl/filter-used-cars-listings.php",
+        fields: queryParams,
+      );
+
+      developer.log('Filter API response: $response');
+
+      final dataList = response['data'] as List<dynamic>? ?? [];
+      final finalPosts =
+          dataList
+              .map(
+                (item) =>
+                    MarketplacePost.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
+      final List<Product> products =
+          finalPosts.map((post) => post.toProduct()).toList();
+
+      setState(() {
+        _products = products;
+        _filteredProductsCache = products;
+        _filtersChanged = true;
+        _isLoading = false;
+      });
+
+      // Fetch attributes for all products
+      for (final product in _products) {
+        // Changed 'products' to '_products'
+        if (!_postAttributeValuesCache.containsKey(product.id) &&
+            !_fetchingPostIds.contains(product.id)) {
+          _fetchPostAttributes(product.id);
+        }
+        if (!_modelVariationsCache.containsKey(product.id) &&
+            !_fetchingModelVariationIds.contains(product.id)) {
+          _fetchModelVariation(product.id);
+        }
+      }
+    } catch (e) {
+      developer.log("Error while fetching filter listings: $e");
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load filtered cars. Please try again.';
+      });
+    }
   }
-}
 }

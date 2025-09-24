@@ -23,7 +23,7 @@ class SettingsPage extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSettingsSection(context),
             const SizedBox(height: 24),
-            _buildDangerSection(context),
+          //  _buildDangerSection(context),
           ],
         ),
       ),
@@ -141,138 +141,138 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDangerSection(BuildContext context) {
-    final userProvider = context.watch<LoggedUserProvider>();
-    return Card(
-      elevation: 2,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              'Danger Zone',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
-              ),
-            ),
-          ),
-          _buildSettingsTile(
-            icon: Icons.logout,
-            title: 'Logout',
-            textColor: Colors.red,
-           onTap: () {
-              final userProvider = context.read<LoggedUserProvider>();
-              final outerContext = context;
-              showDialog(
-                context: outerContext,
-                builder: (dialogContext) => Dialog(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 8,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(Icons.logout, size: 36, color: Colors.red.shade700),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Logout',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Are you sure you want to logout? You will need to login again to access your account.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.of(dialogContext).pop(),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.grey.shade300),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: const Text('Cancel', style: TextStyle(color: Colors.black87)),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  Navigator.of(dialogContext).pop();
-                                  await userProvider.clearUser(); // clear tokens/hive
-                                  outerContext.goNamed(RouteNames.loginPage); // navigate to login
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade700,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: const Text('Logout', style: TextStyle(color: Colors.white)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          _buildSettingsTile(
-            icon: Icons.delete_forever,
-            title: 'Delete Account',
-            textColor: Colors.red,
-            onTap: () {
-              showDialog(
-                context: context,
-                builder:
-                    (context) => AlertDialog(
-                      title: const Text('Delete Account'),
-                      content: const Text(
-                        'Are you sure you want to delete your account? This action cannot be undone.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // Handle account deletion
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'Delete',
-                            style: TextStyle(color: Colors.red),
-                       ),
-                     ),
-                   ],
-                 ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _buildDangerSection(BuildContext context) {
+  //   final userProvider = context.watch<LoggedUserProvider>();
+  //   return Card(
+  //     elevation: 2,
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         const Padding(
+  //           padding: EdgeInsets.all(16),
+  //           child: Text(
+  //             'Danger Zone',
+  //             style: TextStyle(
+  //               fontSize: 18,
+  //               fontWeight: FontWeight.bold,
+  //               color: Colors.red,
+  //             ),
+  //           ),
+  //         ),
+  //         _buildSettingsTile(
+  //           icon: Icons.logout,
+  //           title: 'Logout',
+  //           textColor: Colors.red,
+  //          onTap: () {
+  //             final userProvider = context.read<LoggedUserProvider>();
+  //             final outerContext = context;
+  //             showDialog(
+  //               context: outerContext,
+  //               builder: (dialogContext) => Dialog(
+  //                 shape: RoundedRectangleBorder(
+  //                   borderRadius: BorderRadius.circular(16),
+  //                 ),
+  //                 elevation: 8,
+  //                 child: Padding(
+  //                   padding: const EdgeInsets.all(20),
+  //                   child: Column(
+  //                     mainAxisSize: MainAxisSize.min,
+  //                     children: [
+  //                       Container(
+  //                         decoration: BoxDecoration(
+  //                           color: Colors.red.shade50,
+  //                           shape: BoxShape.circle,
+  //                         ),
+  //                         padding: const EdgeInsets.all(12),
+  //                         child: Icon(Icons.logout, size: 36, color: Colors.red.shade700),
+  //                       ),
+  //                       const SizedBox(height: 12),
+  //                       const Text(
+  //                         'Logout',
+  //                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  //                       ),
+  //                       const SizedBox(height: 8),
+  //                       Text(
+  //                         'Are you sure you want to logout? You will need to login again to access your account.',
+  //                         textAlign: TextAlign.center,
+  //                         style: TextStyle(color: Colors.grey[700]),
+  //                       ),
+  //                       const SizedBox(height: 18),
+  //                       Row(
+  //                         children: [
+  //                           Expanded(
+  //                             child: OutlinedButton(
+  //                               onPressed: () => Navigator.of(dialogContext).pop(),
+  //                               style: OutlinedButton.styleFrom(
+  //                                 side: BorderSide(color: Colors.grey.shade300),
+  //                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //                                 padding: const EdgeInsets.symmetric(vertical: 12),
+  //                               ),
+  //                               child: const Text('Cancel', style: TextStyle(color: Colors.black87)),
+  //                             ),
+  //                           ),
+  //                           const SizedBox(width: 12),
+  //                           Expanded(
+  //                             child: ElevatedButton(
+  //                               onPressed: () async {
+  //                                 Navigator.of(dialogContext).pop();
+  //                                 await userProvider.clearUser(); // clear tokens/hive
+  //                                 outerContext.goNamed(RouteNames.loginPage); // navigate to login
+  //                               },
+  //                               style: ElevatedButton.styleFrom(
+  //                                 backgroundColor: Colors.red.shade700,
+  //                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //                                 padding: const EdgeInsets.symmetric(vertical: 12),
+  //                               ),
+  //                               child: const Text('Logout', style: TextStyle(color: Colors.white)),
+  //                             ),
+  //                           ),
+  //                         ],
+  //                       ),
+  //                     ],
+  //                   ),
+  //                 ),
+  //               ),
+  //             );
+  //           },
+  //         ),
+  //         _buildSettingsTile(
+  //           icon: Icons.delete_forever,
+  //           title: 'Delete Account',
+  //           textColor: Colors.red,
+  //           onTap: () {
+  //             showDialog(
+  //               context: context,
+  //               builder:
+  //                   (context) => AlertDialog(
+  //                     title: const Text('Delete Account'),
+  //                     content: const Text(
+  //                       'Are you sure you want to delete your account? This action cannot be undone.',
+  //                     ),
+  //                     actions: [
+  //                       TextButton(
+  //                         onPressed: () => Navigator.pop(context),
+  //                         child: const Text('Cancel'),
+  //                       ),
+  //                       TextButton(
+  //                         onPressed: () {
+  //                           // Handle account deletion
+  //                           Navigator.pop(context);
+  //                         },
+  //                         child: const Text(
+  //                           'Delete',
+  //                           style: TextStyle(color: Colors.red),
+  //                      ),
+  //                    ),
+  //                  ],
+  //                ),
+  //             );
+  //           },
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildSettingsTile({
     required IconData icon,
