@@ -2401,14 +2401,31 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                     SafeArea(
                       child: Row(
                         children: [
-                          IconButton(
+                          SizedBox(width: 10),
+                        Container(
+                        width: 35,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
                             onPressed: () => Navigator.pop(context),
                             icon: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: Colors.black,
+                              size: 20,
                             ),
                             tooltip: 'Go back',
                           ),
+                        ),
                           const Spacer(),
                           _isLoadingShortlist
                               ? const SizedBox(
@@ -2421,7 +2438,21 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                                   ),
                                 ),
                               )
-                              : IconButton(
+                              : Container(
+                              width: 35,
+                              height: 35,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
                                 tooltip:
                                     _isShortlisted
                                         ? 'Remove from Shortlist'
@@ -2441,8 +2472,8 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                                     color:
                                         _isShortlisted
                                             ? Colors.red
-                                            : Colors.white,
-                                    size: 28,
+                                            : Colors.black,
+                                    size: 20,
                                     semanticLabel:
                                         _isShortlisted
                                             ? 'Remove from Shortlist'
@@ -2451,13 +2482,31 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                                 ),
                                 onPressed: _toggleShortlist,
                               ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
+                          ),
+                          SizedBox(width: 10),
+                          Container(
+                            width: 35,
+                            height: 35,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                            icon: const Icon(Icons.share, color: Colors.black,size: 20,),
                             tooltip: 'Share',
                             onPressed: () {
                               // Share functionality
                             },
                           ),
+                          ),
+                          SizedBox(width: 10),
                         ],
                       ),
                     ),

@@ -2869,24 +2869,40 @@ class _MarketPlaceProductDetailsPageState
                       CustomSafeArea(
                         child: Row(
                           children: [
-                            IconButton(
-                              onPressed: () {
-                                if (_isBidDialogOpen) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please close the bid dialog first',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                Navigator.pop(context);
-                              },
-                              icon: const Icon(
-                                Icons.arrow_back,
+                            SizedBox(width: 10),
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
                                 color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                iconSize: 20,
+                                onPressed: () {
+                                  if (_isBidDialogOpen) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Please close the bid dialog first'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  Navigator.pop(context);
+                                },
+                                icon: const Icon(
+                                  Icons.arrow_back,
+                                  color: Colors.black,
+                                ),
                               ),
                             ),
                             const Spacer(),
@@ -2901,7 +2917,23 @@ class _MarketPlaceProductDetailsPageState
                                     ),
                                   ),
                                 )
-                                : IconButton(
+                                : Container(
+                              width: 35,
+                              height: 35,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                padding: const EdgeInsets.all(5),
+                                iconSize: 20,
                                   tooltip:
                                       _isFavorited
                                           ? 'Remove from Shortlist'
@@ -2921,8 +2953,8 @@ class _MarketPlaceProductDetailsPageState
                                       color:
                                           _isFavorited
                                               ? Colors.red
-                                              : Colors.white,
-                                      size: 28,
+                                              : Colors.black,
+                                      size: 20,
                                       semanticLabel:
                                           _isFavorited
                                               ? 'Remove from Shortlist'
@@ -2931,15 +2963,35 @@ class _MarketPlaceProductDetailsPageState
                                   ),
                                   onPressed: _toggleFavorite,
                                 ),
-                            IconButton(
+                            ),
+                            SizedBox(width: 10),
+                            Container(
+                              width: 35, // ✅ Reduced width
+                              height: 35, // ✅ Reduced height
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                padding: const EdgeInsets.all(5), // ✅ Remove extra padding
+                                iconSize: 20, // ✅ Smaller icon
                               icon: const Icon(
                                 Icons.share,
-                                color: Colors.white,
+                                color: Colors.black,
                               ),
                               onPressed: () {
                                 // Share functionality
                               },
                             ),
+                            ),
+                            SizedBox(width: 10),
                           ],
                         ),
                       ),
