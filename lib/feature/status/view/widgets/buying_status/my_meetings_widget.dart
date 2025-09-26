@@ -586,7 +586,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
             );
             meetings.add(meetingData);
-            await Future.delayed(const Duration(milliseconds: 200));
+          
           }
         } else {
           developer.log(

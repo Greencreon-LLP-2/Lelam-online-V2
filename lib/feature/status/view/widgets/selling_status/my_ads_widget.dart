@@ -62,8 +62,7 @@ Future<void> _loadAds() async {
     });
   }
 
-  // Fetch ads from API with a slight delay to allow server processing
-  await Future.delayed(const Duration(seconds: 2)); // Adjust delay as needed
+
   try {
     final response = await http.get(
       Uri.parse('$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}'),
@@ -418,7 +417,7 @@ Future<void> _loadAds() async {
           print('Decoded delete ad response: $responseData');
           if (responseData['status'] == 'true' && responseData['code'] != 4) {
             print('Deleted ad $adId via API');
-            await Future.delayed(const Duration(milliseconds: 100));
+           
             await _loadAds();
             Fluttertoast.showToast(
               msg: 'Ad deleted successfully',

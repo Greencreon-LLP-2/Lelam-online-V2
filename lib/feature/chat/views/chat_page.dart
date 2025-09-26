@@ -268,7 +268,6 @@ class ChatPage extends HookWidget {
     final scrollController = useScrollController();
 
     Future<void> scrollToBottom() async {
-      await Future.delayed(const Duration(milliseconds: 100));
       if (scrollController.hasClients) {
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,

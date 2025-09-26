@@ -22,9 +22,7 @@ import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/feature/status/view/pages/buying_status_page.dart';
-import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
-import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_ads_widget.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
@@ -1875,7 +1873,6 @@ Future<void> _fetchReviews() async {
       },
     );
 
-    await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
     _bidController.dispose();
 
@@ -3287,11 +3284,12 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
               ),
             ),
             Positioned(
+             
               left: 0,
               right: 0,
-              bottom: 0,
+              bottom: 00,
               child: Container(
-                padding: const EdgeInsets.all(10),
+               
 
                 child: Row(
                   children: [
@@ -3312,7 +3310,7 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                           child: const Text('Edit'),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                     
                       Expanded(
                         child: ElevatedButton(
                           onPressed:
@@ -3335,9 +3333,9 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                                       width: 1,
                                     )
                                     : BorderSide.none,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.zero,
                             ),
                           ),
                           child:
@@ -3380,7 +3378,7 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                           child: const Text('Place Bid'),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                     
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () => _showMeetingDialog(context),

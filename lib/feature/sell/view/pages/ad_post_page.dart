@@ -859,34 +859,55 @@ class _AdPostFormState extends State<AdPostForm>
       }
     });
 
-    for (var attr in _attributes) {
-      final variations = await AttributeValueService.fetchAttributeVariations(
-        attr.id,
-      );
-      setState(() {
-        _attributeVariations[attr.name] = variations;
-        if (_selectedAttributes[attr.name] != null) {
-          final variation = variations.firstWhere(
-            (v) => v.id == _selectedAttributes[attr.name],
-            orElse:
-                () => AttributeVariation(
-                  id: '',
-                  attributeId: attr.id,
-                  name: _selectedAttributes[attr.name] ?? '',
-                  status: '',
-                  createdOn: '',
-                  updatedOn: '',
-                ),
-          );
-          _selectedAttributes[attr.name] =
-              variation.name.isNotEmpty
-                  ? variation.name
-                  : _selectedAttributes[attr.name];
-          _attributeControllers[attr.name]?.text =
-              _selectedAttributes[attr.name] ?? '';
+for (var attr in _attributes) {
+  var variations = await AttributeValueService.fetchAttributeVariations(attr.id);
+  // Sort and filter variations for "Year" and "No of owners"
+  if (attr.name == 'Year' || attr.name == 'No of owners') {
+    if (attr.name == 'Year') {
+      // Filter years to include only 2000 to 2025
+      variations = variations.where((v) {
+        final year = int.tryParse(v.name);
+        return year != null && year >= 2000 && year <= 2025;
+      }).toList();
+      // Sort in descending order
+      variations.sort((a, b) {
+        final aYear = int.tryParse(a.name)!;
+        final bYear = int.tryParse(b.name)!;
+        return bYear.compareTo(aYear); // Descending: 2025, 2024, ..., 2000
+      });
+    } else {
+      // For No of owners, handle numeric and non-numeric cases
+      variations.sort((a, b) {
+        final aValue = int.tryParse(a.name);
+        final bValue = int.tryParse(b.name);
+        if (aValue != null && bValue != null) {
+          return aValue.compareTo(bValue); // Ascending: 1, 2, 3
+        } else {
+          return a.name.compareTo(b.name);
         }
       });
     }
+  }
+  setState(() {
+    _attributeVariations[attr.name] = variations;
+    if (_selectedAttributes[attr.name] != null) {
+      final variation = variations.firstWhere(
+        (v) => v.id == _selectedAttributes[attr.name],
+        orElse: () => AttributeVariation(
+          id: '',
+          attributeId: attr.id,
+          name: _selectedAttributes[attr.name] ?? '',
+          status: '',
+          createdOn: '',
+          updatedOn: '',
+        ),
+      );
+      _selectedAttributes[attr.name] =
+          variation.name.isNotEmpty ? variation.name : _selectedAttributes[attr.name];
+      _attributeControllers[attr.name]?.text = _selectedAttributes[attr.name] ?? '';
+    }
+  });
+}
   }
 
   Future<void> _loadImages(Map<String, dynamic> ad) async {
@@ -960,40 +981,43 @@ class _AdPostFormState extends State<AdPostForm>
     });
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    if (_selectedImages.length >= _maxImages) {
-      _showSnackBar('Maximum $_maxImages images allowed', Colors.red);
-      return;
-    }
-    try {
-      if (source == ImageSource.camera) {
-        final image = await _imagePicker.pickImage(
-          source: source,
-          imageQuality: 80,
-        );
-        if (image != null) {
-          setState(() {
-            _selectedImages.add(image);
-            _imageError = false;
-            if (_selectedImages.length == 1) _coverImageIndex = 0;
-          });
-        }
-      } else {
-        final images = await _imagePicker.pickMultiImage(imageQuality: 80);
-        if (images.isNotEmpty) {
-          setState(() {
-            _selectedImages.addAll(
-              images.take(_maxImages - _selectedImages.length),
-            );
-            _imageError = false;
-            if (_selectedImages.length == images.length) _coverImageIndex = 0;
-          });
-        }
-      }
-    } catch (e) {
-      _showSnackBar('Error picking image: $e', Colors.red);
-    }
+Future<void> _pickImage(BuildContext bottomSheetContext, ImageSource source) async {
+  if (_selectedImages.length >= _maxImages) {
+    _showSnackBar('Maximum $_maxImages images allowed', Colors.red);
+    Navigator.pop(bottomSheetContext); // Close the bottom sheet
+    return;
   }
+  try {
+    if (source == ImageSource.camera) {
+      final image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedImages.add(image);
+          _imageError = false;
+          if (_selectedImages.length == 1) _coverImageIndex = 0;
+        });
+      }
+    } else {
+      final images = await _imagePicker.pickMultiImage(imageQuality: 80);
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages.addAll(
+            images.take(_maxImages - _selectedImages.length),
+          );
+          _imageError = false;
+          if (_selectedImages.length == images.length) _coverImageIndex = 0;
+        });
+      }
+    }
+    Navigator.pop(bottomSheetContext); // Close the bottom sheet
+  } catch (e) {
+    _showSnackBar('Error picking image: $e', Colors.red);
+    Navigator.pop(bottomSheetContext); // Close the bottom sheet on error
+  }
+}
 
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1007,16 +1031,15 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   void _showImageSourceBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => ImageSourceBottomSheetWidget(
-            onCameraTap: () => _pickImage(ImageSource.camera),
-            onGalleryTap: () => _pickImage(ImageSource.gallery),
-          ),
-    );
-  }
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (bottomSheetContext) => ImageSourceBottomSheetWidget(
+      onCameraTap: () => _pickImage(bottomSheetContext, ImageSource.camera),
+      onGalleryTap: () => _pickImage(bottomSheetContext, ImageSource.gallery),
+    ),
+  );
+}
 
   Map<String, List<String>> getFilters() {
     final filters = <String, List<String>>{};

@@ -11,6 +11,7 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
+import 'package:lelamonline_flutter/feature/categories/models/post_review.model.dart';
 import 'package:lelamonline_flutter/feature/categories/models/seller_comment_model.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/user%20cars/market_used_cars_page.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/seller_info_page.dart';
@@ -97,22 +98,85 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   List<ContainerInfo> _containerInfo = [];
   String _containerInfoError = '';
 
+    List<PostReview> reviews = [];
+bool isLoadingReviews = false;
+String reviewsError = "No answers available";
+
   @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeData();
+       _fetchReviews();
     });
   }
+
+Future<void> _fetchReviews() async {
+  setState(() {
+    isLoadingReviews = true;
+    reviewsError = '';
+  });
+
+  try {
+    final headers = {'token': token};
+    final url = '$baseUrl/post-reviews.php?token=$token&post_id=$id';
+    final request = http.Request('GET', Uri.parse(url));
+    request.headers.addAll(headers);
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(responseBody);
+      print('Reviews API response: $responseData'); // Debug log
+
+      // Check if responseData is valid and contains expected fields
+      if (responseData['status'] == 'true' && responseData['data'] != null) {
+        // Handle case where data is a List
+        if (responseData['data'] is List) {
+          final reviewsResponse = PostReviewsResponse.fromJson(responseData);
+          setState(() {
+            reviews = reviewsResponse.data;
+            isLoadingReviews = false;
+          });
+        } else {
+          // Handle case where data is a String or other type
+          print('Unexpected data type: ${responseData['data'].runtimeType}');
+          setState(() {
+            reviews = [];
+            reviewsError = responseData['data'] is String
+                ? responseData['data']
+                : 'Invalid reviews data format';
+            isLoadingReviews = false;
+          });
+        }
+      } else {
+        // Handle invalid status or missing data
+        setState(() {
+          reviews = [];
+          reviewsError = responseData['data']?.toString() ?? 'No reviews available';
+          isLoadingReviews = false;
+        });
+      }
+    } else {
+      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    }
+  } catch (e) {
+    print('Error fetching reviews: $e');
+    setState(() {
+      reviews = [];
+      reviewsError = 'No message fount';
+      isLoadingReviews = false;
+    });
+  }
+}
 
   Future<void> _initializeData() async {
     setState(() => isLoadingDetails = true);
     try {
       await _loadUserId(); // Ensure userId is loaded first
-      await Future.wait([
-       _fetchAllData()
-      ]);
+      await Future.wait([_fetchAllData()]);
     } catch (e, stackTrace) {
       debugPrint('Error in _initializeData: $e\n$stackTrace');
       if (mounted) {
@@ -131,19 +195,18 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   Future<void> _fetchAllData() async {
     await _fetchLocations();
 
-    await Future.delayed(Duration(milliseconds: 200));
     await _fetchContainerInfo();
-        await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchLocations();
-    await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchShortlistStatus();
-    await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchGalleryImages();
-    await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchBannerImage();
-    await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchAttributesData();
-    await Future.delayed(Duration(milliseconds: 200));
+
     await _fetchSellerInfo();
   }
 
@@ -174,122 +237,122 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
-Widget _buildContainerInfo() {
-  if (_isLoadingContainerInfo) {
-    return const Center(child: CircularProgressIndicator());
-  }
+  Widget _buildContainerInfo() {
+    if (_isLoadingContainerInfo) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  if (_containerInfoError.isNotEmpty) {
-    return Center(
-      child: Text(
-        _containerInfoError,
-        style: const TextStyle(color: Colors.red),
+    if (_containerInfoError.isNotEmpty) {
+      return Center(
+        child: Text(
+          _containerInfoError,
+          style: const TextStyle(color: Colors.red),
+        ),
+      );
+    }
+
+    if (_containerInfo.isEmpty) {
+      return const Center(child: Text('Loading.......'));
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 10,
+            spreadRadius: 1,
+            offset: const Offset(1, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Details',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // First row: 3 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 0)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[0].icon),
+                            _containerInfo[0].value,
+                          ),
+                        if (_containerInfo.length > 1)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[1].icon),
+                            _containerInfo[1].value,
+                          ),
+                        if (_containerInfo.length > 2)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[2].icon),
+                            _containerInfo[2].value,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Second row: 2 items
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_containerInfo.length > 3)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[3].icon),
+                            _containerInfo[3].value,
+                          ),
+                        if (_containerInfo.length > 4)
+                          _buildContainerDetailItem(
+                            _getIconFromBootstrap(_containerInfo[4].icon),
+                            _containerInfo[4].value,
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  if (_containerInfo.isEmpty) {
-    return const Center(child: Text('Loading.......'));
-  }
-
-return Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.30),
-          blurRadius: 10,
-          spreadRadius: 1,
-          offset: const Offset(1, 1),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildContainerDetailItem(IconData icon, String text) {
+    return Container(
+      width: 110, // Fixed width for consistent alignment across rows
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text(
-            'Details',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // First row: 3 items
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 0)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[0].icon),
-                          _containerInfo[0].value,
-                        ),
-                      if (_containerInfo.length > 1)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[1].icon),
-                          _containerInfo[1].value,
-                        ),
-                      if (_containerInfo.length > 2)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[2].icon),
-                          _containerInfo[2].value,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Second row: 2 items
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      if (_containerInfo.length > 3)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[3].icon),
-                          _containerInfo[3].value,
-                        ),
-                      if (_containerInfo.length > 4)
-                        _buildContainerDetailItem(
-                          _getIconFromBootstrap(_containerInfo[4].icon),
-                          _containerInfo[4].value,
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            },
+          Icon(icon, size: 14, color: Colors.grey[700]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 14, color: Colors.black),
+            ),
           ),
         ],
       ),
-    ),
-  );
-}
-
-Widget _buildContainerDetailItem(IconData icon, String text) {
-  return Container(
-    width: 110, // Fixed width for consistent alignment across rows
-    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(icon, size: 14, color: Colors.grey[700]),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: const TextStyle(fontSize: 14, color: Colors.black),
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   IconData _getIconFromBootstrap(String bootstrapIcon) {
     final iconMap = {
@@ -1142,7 +1205,7 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
       },
     );
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    
     FocusScope.of(context).unfocus();
     _bidController.dispose();
 
@@ -1286,7 +1349,8 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => MyMeetingsWidget(showAppBar: true),
+                            builder:
+                                (context) => MyMeetingsWidget(showAppBar: true),
                           ),
                         );
                       }
@@ -1883,157 +1947,162 @@ Widget _buildContainerDetailItem(IconData icon, String text) {
     );
   }
 
-void _showMeetingDialog(BuildContext context) {
-  if (_isMeetingDialogOpen) {
-    debugPrint('Meeting dialog already open');
-    return;
-  }
+  void _showMeetingDialog(BuildContext context) {
+    if (_isMeetingDialogOpen) {
+      debugPrint('Meeting dialog already open');
+      return;
+    }
 
-  final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-  if (!userProvider.isLoggedIn) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return LoginDialog(
-          onSuccess: () {
-            if (mounted) {
-              Navigator.of(dialogContext).pop(); // Close login dialog
-              _showMeetingDialog(context); // Re-open meeting dialog
-            }
-          },
-        );
-      },
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
     );
-    return;
-  }
-
-  setState(() {
-    _isMeetingDialogOpen = true;
-  });
-
-  DateTime selectedDate = DateTime.now();
-
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            content: Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(
-                      Icons.calendar_today,
-                      color: AppTheme.primaryColor,
-                    ),
-                    title: const Text('Select Date'),
-                    subtitle: Text(
-                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                      style: const TextStyle(color: AppTheme.primaryColor),
-                    ),
-                    onTap: () async {
-                      final DateTime? picked = await showDatePicker(
-                        context: dialogContext,
-                        initialDate: selectedDate,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(
-                          const Duration(days: 30),
-                        ),
-                      );
-                      if (picked != null && picked != selectedDate) {
-                        setDialogState(() {
-                          selectedDate = picked;
-                        });
-                      }
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[300]!),
-                    ),
-                  ),
-                  if (_isSchedulingMeeting)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () => Navigator.of(dialogContext).pop(),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                ),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _isSchedulingMeeting
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          _isSchedulingMeeting = true;
-                        });
-                        try {
-                          await _fixMeeting(selectedDate);
-                          if (mounted) {
-                            Navigator.of(dialogContext).pop();
-                          }
-                        } finally {
-                          setDialogState(() {
-                            _isSchedulingMeeting = false;
-                          });
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-                child: const Text(
-                  'Schedule Meeting',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    if (!userProvider.isLoggedIn) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return LoginDialog(
+            onSuccess: () {
+              if (mounted) {
+                Navigator.of(dialogContext).pop(); // Close login dialog
+                _showMeetingDialog(context); // Re-open meeting dialog
+              }
+            },
           );
         },
       );
-    },
-  ).whenComplete(() {
-    if (mounted) {
-      setState(() {
-        _isMeetingDialogOpen = false;
-      });
+      return;
     }
-  });
-}
+
+    setState(() {
+      _isMeetingDialogOpen = true;
+    });
+
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              content: Container(
+                constraints: const BoxConstraints(maxWidth: 300),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppTheme.primaryColor,
+                      ),
+                      title: const Text('Select Date'),
+                      subtitle: Text(
+                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        style: const TextStyle(color: AppTheme.primaryColor),
+                      ),
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: dialogContext,
+                          initialDate: selectedDate,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 30),
+                          ),
+                        );
+                        if (picked != null && picked != selectedDate) {
+                          setDialogState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                    if (_isSchedulingMeeting)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () => Navigator.of(dialogContext).pop(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed:
+                      _isSchedulingMeeting
+                          ? null
+                          : () async {
+                            setDialogState(() {
+                              _isSchedulingMeeting = true;
+                            });
+                            try {
+                              await _fixMeeting(selectedDate);
+                              if (mounted) {
+                                Navigator.of(dialogContext).pop();
+                              }
+                            } finally {
+                              setDialogState(() {
+                                _isSchedulingMeeting = false;
+                              });
+                            }
+                          },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                  ),
+                  child: const Text(
+                    'Schedule Meeting',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isMeetingDialogOpen = false;
+        });
+      }
+    });
+  }
 
   void _launchPhoneCall() async {
     const phoneNumber = 'tel:+918089308048';
@@ -2079,8 +2148,6 @@ void _showMeetingDialog(BuildContext context) {
     final formatter = NumberFormat.decimalPattern('en_IN');
     return formatter.format(number);
   }
-
-
 
   Widget _buildSellerCommentItem(String label, String value) {
     return Padding(
@@ -2179,39 +2246,29 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
         children: [
           Expanded(
             child: Text(
-              'You are the first one to ask question',
+              'Ask a question about this product',
               style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
           ),
           ElevatedButton(
             onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
+              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
               if (!userProvider.isLoggedIn) {
                 showDialog(
                   context: context,
-                  barrierDismissible: true,
-                  builder: (dialogContext) {
-                    return LoginDialog(
-                      onSuccess: () {
-                        if (mounted) {
-                          Navigator.of(dialogContext).pop();
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => ReviewDialog(postId: id),
-                          );
-                        }
-                      },
-                    );
-                  },
+                  builder: (dialogContext) => LoginDialog(
+                    onSuccess: () {
+                      Navigator.of(dialogContext).pop();
+                      showDialog(
+                        context: context,
+                        builder: (context) => ReviewDialog(postId: id),
+                      );
+                    },
+                  ),
                 );
               } else {
                 showDialog(
                   context: context,
-                  barrierDismissible: false,
                   builder: (context) => ReviewDialog(postId: id),
                 );
               }
@@ -2222,7 +2279,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
             ),
             child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.question_answer, color: Colors.white, size: 20.0),
                 SizedBox(width: 8.0),
@@ -2232,24 +2289,146 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
           ),
         ],
       ),
+      const SizedBox(height: 12),
+      Container(
+        width: double.infinity, // Ensure full screen width
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Answers',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if (isLoadingReviews)
+              const Center(child: CircularProgressIndicator())
+            else if (reviewsError.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    "No reply messages found",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                 
+                  ),
+                  // TextButton(
+                  //   onPressed: _fetchReviews,
+                  //   child: const Text('Retry'),
+                  // ),
+                ],
+              )
+            else if (reviews.isEmpty)
+              Container(
+                width: double.infinity, // Ensure full width for "No message"
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: const Text(
+                  'No message',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  semanticsLabel: 'No answers available',
+                  textAlign: TextAlign.center, // Center the text
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: reviews
+                    .where((review) => review.parentId == '0')
+                    .map((parent) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildReviewItem(parent, isReply: false),
+                            ...reviews
+                                .where((reply) => reply.parentId == parent.id)
+                                .map((reply) => _buildReviewItem(reply, isReply: true))
+                                .toList(),
+                          ],
+                        ))
+                    .toList(),
+              ),
+          ],
+        ),
+      ),
     ],
   );
 }
 
-void _showLoginPromptDialog(BuildContext context, String action) {
-  showDialog(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) {
-      return LoginDialog(
-        onSuccess: () {
-        
-          _fetchAllData();
-        },
-      );
-    },
+Widget _buildReviewItem(PostReview review, {required bool isReply}) {
+  return Padding(
+    padding: EdgeInsets.only(
+      left: isReply ? 16.0 : 0.0,
+      bottom: 8.0,
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
+          size: 16,
+          color: Colors.grey[700],
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                review.comment,
+                style: TextStyle(
+                  fontSize: isReply ? 14 : 16,
+                  color: Colors.black,
+                  fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
+                ),
+                semanticsLabel: 'Comment: ${review.comment}',
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Posted on: ${review.createdOn}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
+ 
+
+  void _showLoginPromptDialog(BuildContext context, String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return LoginDialog(
+          onSuccess: () {
+            _fetchAllData();
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSellerCommentsSection() {
     if (isLoadingSellerComments) {
       return const Center(child: CircularProgressIndicator());
@@ -2582,7 +2761,7 @@ void _showLoginPromptDialog(BuildContext context, String action) {
                 ),
                 const Divider(),
                 _buildContainerInfo(),
-                  const Divider(),
+                const Divider(),
 
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -2635,7 +2814,6 @@ void _showLoginPromptDialog(BuildContext context, String action) {
             bottom: 0,
             child: CustomSafeArea(
               child: Container(
-                padding: const EdgeInsets.all(10),
                 decoration: const BoxDecoration(
                   boxShadow: [
                     BoxShadow(

@@ -115,10 +115,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   Future<void> _fetchAllData() async {
     await _fetchLocations();
 
-    await Future.delayed(Duration(milliseconds: 500));
+   
     await _fetchSellerInfo();
 
-    await Future.delayed(Duration(milliseconds: 200));
+   
     await _fetchData();
     await _fetchContainerInfo();
   }

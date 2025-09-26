@@ -175,7 +175,6 @@ class _HomePageState extends State<HomePage>
     }
     try {
       await _fetchDistricts();
-      await Future.delayed(const Duration(seconds: 1));
       if (kDebugMode) {
         developer.log('Refresh completed');
       }
@@ -258,7 +257,7 @@ class _HomePageState extends State<HomePage>
                               const SizedBox(width: 8),
                               _isLoading
                                   ? const SizedBox(
-                                      width: 120,
+                                      width: 20,
                                       height: 20,
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     ) // Smaller spinner for dropdown area

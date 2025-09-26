@@ -28,11 +28,74 @@ import 'package:lelamonline_flutter/feature/status/view/pages/selling_status_pag
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer' as developer;
+
+class PostReview {
+  final String id;
+  final String parentId;
+  final String postId;
+  final String userId;
+  final String rating;
+  final String comment;
+  final String status;
+  final String createdOn;
+  final String updatedOn;
+
+  PostReview({
+    required this.id,
+    required this.parentId,
+    required this.postId,
+    required this.userId,
+    required this.rating,
+    required this.comment,
+    required this.status,
+    required this.createdOn,
+    required this.updatedOn,
+  });
+
+  factory PostReview.fromJson(Map<String, dynamic> json) {
+    return PostReview(
+      id: json['id']?.toString() ?? '',
+      parentId: json['parent_id']?.toString() ?? '0',
+      postId: json['post_id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      rating: json['rateing']?.toString() ?? '0.0',
+      comment: json['comment']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      createdOn: json['created_on']?.toString() ?? '',
+      updatedOn: json['updated_on']?.toString() ?? '',
+    );
+  }
+}
+
+class PostReviewResponse {
+  final bool status;
+  final List<PostReview> data;
+  final String code;
+
+  PostReviewResponse({
+    required this.status,
+    required this.data,
+    required this.code,
+  });
+
+  factory PostReviewResponse.fromJson(Map<String, dynamic> json) {
+    return PostReviewResponse(
+      status: json['status'] == 'true',
+      data:
+          (json['data'] as List<dynamic>?)
+              ?.map((item) => PostReview.fromJson(item))
+              .toList() ??
+          [],
+      code: json['code']?.toString() ?? '0',
+    );
+  }
+}
 
 class CommercialProductDetailsPage extends StatefulWidget {
   final MarketplacePost post;
@@ -80,23 +143,74 @@ class _CommercialProductDetailsPageState
   bool _isSchedulingMeeting = false;
 
   String? userId;
- bool _isLoadingBanner = false;
+  bool _isLoadingBanner = false;
   String? _bannerImageUrl;
   String _bannerError = '';
-   late LoggedUserProvider _userProvider;
+  late LoggedUserProvider _userProvider;
 
-   
+  bool isLoadingReviews = false;
+  String reviewsError = "No answers available";
 
- String _moveToAuctionButtonText = 'Move to Auction';
+  List<PostReview> reviews = [];
+
+  List<PostReview> _questions = [];
+  bool _isLoadingQuestions = true;
+  String _questionsError = '';
+
+  String _moveToAuctionButtonText = 'Move to Auction';
 
   @override
   void initState() {
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     super.initState();
     _initialize();
+    _fetchQuestions();
   }
 
-Future<bool> _checkAuctionTermsStatus() async {
+  Future<void> _fetchQuestions() async {
+    setState(() {
+      _isLoadingQuestions = true;
+      _questionsError = '';
+    });
+
+    try {
+      final url =
+          '$_baseUrl/post-reviews.php?token=$_token&post_id=${widget.post.id}';
+      print('Fetching questions: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'token': _token},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final reviewResponse = PostReviewResponse.fromJson(responseData);
+
+        if (reviewResponse.status) {
+          setState(() {
+            _questions = reviewResponse.data;
+            _isLoadingQuestions = false;
+          });
+          print('Fetched ${_questions.length} questions');
+        } else {
+          throw Exception('API returned status false: ${responseData['code']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      print('Error fetching questions: $e');
+      setState(() {
+        _questionsError = 'Failed to load questions: $e';
+        _isLoadingQuestions = false;
+      });
+    }
+  }
+
+  Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
       print('User not logged in, cannot check auction terms.');
       return false;
@@ -166,9 +280,7 @@ Future<bool> _checkAuctionTermsStatus() async {
               return false;
             }
           } else {
-            print(
-              'Failed to accept terms: HTTP ${acceptResponse.statusCode}',
-            );
+            print('Failed to accept terms: HTTP ${acceptResponse.statusCode}');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
@@ -187,9 +299,7 @@ Future<bool> _checkAuctionTermsStatus() async {
         }
         return termsAccepted;
       } else {
-        print(
-          'Failed to check auction terms: HTTP ${response.statusCode}',
-        );
+        print('Failed to check auction terms: HTTP ${response.statusCode}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -467,18 +577,17 @@ Future<bool> _checkAuctionTermsStatus() async {
     }
   }
 
-
-
   Future<void> _initialize() async {
     _loadUserId();
     await Future.wait([
       _fetchLocations(),
       _fetchDetailsData(),
       _fetchSellerInfo(),
-       _fetchBannerImage(),
+      _fetchBannerImage(),
       if (userId != null && userId != 'Unknown') _checkShortlistStatus(),
     ]);
   }
+
   Future<void> _fetchBannerImage() async {
     try {
       setState(() {
@@ -678,7 +787,9 @@ Future<bool> _checkAuctionTermsStatus() async {
               ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               margin: const EdgeInsets.all(16),
             ),
           );
@@ -688,7 +799,9 @@ Future<bool> _checkAuctionTermsStatus() async {
               content: Text('Failed to update shortlist: $message'),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               margin: const EdgeInsets.all(16),
             ),
           );
@@ -699,7 +812,9 @@ Future<bool> _checkAuctionTermsStatus() async {
             content: Text('Error: ${response.reasonPhrase}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             margin: const EdgeInsets.all(16),
           ),
         );
@@ -823,9 +938,7 @@ Future<bool> _checkAuctionTermsStatus() async {
           });
         }
       } else {
-        print(
-          'HTTP error: ${response.statusCode} - ${response.reasonPhrase}',
-        );
+        print('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
         setState(() {
           _currentHighestBid = '0';
         });
@@ -1307,8 +1420,6 @@ Future<bool> _checkAuctionTermsStatus() async {
         );
       },
     );
-
-    await Future.delayed(const Duration(milliseconds: 200));
     FocusScope.of(context).unfocus();
     _bidController.dispose();
 
@@ -1440,12 +1551,11 @@ Future<bool> _checkAuctionTermsStatus() async {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                    
                       if (mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const BuyingStatusPage()
+                            builder: (context) => const BuyingStatusPage(),
                           ),
                         );
                       }
@@ -1519,6 +1629,7 @@ Future<bool> _checkAuctionTermsStatus() async {
       );
     }
   }
+
   Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
@@ -1590,117 +1701,128 @@ Future<bool> _checkAuctionTermsStatus() async {
     }
   }
 
-Future<void> _fetchDetailsData() async {
-  setState(() {
-    isLoadingDetails = true;
-    _isLoadingLocations = true;
-  });
+  Future<void> _fetchDetailsData() async {
+    setState(() {
+      isLoadingDetails = true;
+      _isLoadingLocations = true;
+    });
 
-  try {
-    // Fetch attributes and variations (existing logic)
-    attributes = await TempApiService.fetchAttributes();
-    attributeVariations = await TempApiService.fetchAttributeVariations(
-      widget.post.filters,
-    );
+    try {
+      // Fetch attributes and variations (existing logic)
+      attributes = await TempApiService.fetchAttributes();
+      attributeVariations = await TempApiService.fetchAttributeVariations(
+        widget.post.filters,
+      );
 
-    // Fetch details from the API
-    final response = await http.get(
-      Uri.parse('$baseUrl/post-details.php?token=$token&post_id=${widget.post.id}'),
-      headers: {
-        'token': token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      },
-    );
+      // Fetch details from the API
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-details.php?token=$token&post_id=${widget.post.id}',
+        ),
+        headers: {
+          'token': token,
+          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      if (responseData['status'] == 'true' && responseData['data'] is List) {
-        // Convert API response to a list of AttributeValuePair
-        final List<AttributeValuePair> attributeValuePairs = 
-            (responseData['data'] as List)
-                .map((item) => AttributeValuePair(
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          // Convert API response to a list of AttributeValuePair
+          final List<AttributeValuePair> attributeValuePairs =
+              (responseData['data'] as List)
+                  .map(
+                    (item) => AttributeValuePair(
                       attributeName: item['attribute_name'],
                       attributeValue: item['attribute_value'],
-                    ))
-                .toList();
+                    ),
+                  )
+                  .toList();
 
-        // Map filters to values and filter duplicates
-        _mapFiltersToValues(attributeValuePairs);
+          // Map filters to values and filter duplicates
+          _mapFiltersToValues(attributeValuePairs);
+        } else {
+          throw Exception('Invalid API response format');
+        }
       } else {
-        throw Exception('Invalid API response format');
+        throw Exception('Failed to load details: ${response.reasonPhrase}');
       }
-    } else {
-      throw Exception('Failed to load details: ${response.reasonPhrase}');
+
+      setState(() {
+        isLoadingDetails = false;
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      print('Error fetching details: $e');
+      setState(() {
+        isLoadingDetails = false;
+        _isLoadingLocations = false;
+      });
+    }
+  }
+
+  void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
+    final filters = widget.post.filters;
+    attributeValues.clear();
+    orderedAttributeValues.clear();
+
+    print('Attribute Value Pairs: $attributeValuePairs');
+    print('Attribute Variations: $attributeVariations');
+    print('Filters: $filters');
+
+    // Use a Map to filter duplicates by attribute name
+    final Map<String, String> uniqueAttributes = {};
+
+    // Add Seller Type
+    uniqueAttributes['Seller Type'] =
+        widget.post.byDealer == '1' ? 'Dealer' : 'Owner';
+    orderedAttributeValues.add(
+      MapEntry('Seller Type', uniqueAttributes['Seller Type']!),
+    );
+
+    // Process API response and remove duplicates
+    for (var pair in attributeValuePairs) {
+      uniqueAttributes[pair.attributeName] = pair.attributeValue;
     }
 
-    setState(() {
-      isLoadingDetails = false;
-      _isLoadingLocations = false;
+    // Add attributes from filters (if any) and ensure no duplicates
+    for (var attribute in attributes) {
+      final attributeId = attribute.id;
+      if (filters.containsKey(attributeId) &&
+          filters[attributeId]!.isNotEmpty &&
+          filters[attributeId]!.first.isNotEmpty) {
+        final filterValue = filters[attributeId]!.first;
+        final variation = attributeVariations.firstWhere(
+          (variation) => variation.id == filterValue,
+          orElse:
+              () => AttributeVariation(
+                id: '',
+                name: filterValue,
+                attributeId: '',
+                status: '',
+                createdOn: '',
+                updatedOn: '',
+              ),
+        );
+        final value = variation.name.isNotEmpty ? variation.name : filterValue;
+        uniqueAttributes[attribute.name] = value;
+      }
+    }
+
+    // Convert unique attributes to ordered list for display
+    uniqueAttributes.forEach((key, value) {
+      if (key != 'Seller Type') {
+        // Seller Type is already added
+        orderedAttributeValues.add(MapEntry(key, value));
+      }
     });
-  } catch (e) {
-    print('Error fetching details: $e');
-    setState(() {
-      isLoadingDetails = false;
-      _isLoadingLocations = false;
-    });
-  }
-}
-void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
-  final filters = widget.post.filters;
-  attributeValues.clear();
-  orderedAttributeValues.clear();
 
-  print('Attribute Value Pairs: $attributeValuePairs');
-  print('Attribute Variations: $attributeVariations');
-  print('Filters: $filters');
+    // Update attributeValues for use in Details section
+    attributeValues.addAll(uniqueAttributes);
 
-  // Use a Map to filter duplicates by attribute name
-  final Map<String, String> uniqueAttributes = {};
-
-  // Add Seller Type
-  uniqueAttributes['Seller Type'] = widget.post.byDealer == '1' ? 'Dealer' : 'Owner';
-  orderedAttributeValues.add(MapEntry('Seller Type', uniqueAttributes['Seller Type']!));
-
-  // Process API response and remove duplicates
-  for (var pair in attributeValuePairs) {
-    uniqueAttributes[pair.attributeName] = pair.attributeValue;
+    print('Filtered Attributes: $attributeValues');
   }
 
-  // Add attributes from filters (if any) and ensure no duplicates
-  for (var attribute in attributes) {
-    final attributeId = attribute.id;
-    if (filters.containsKey(attributeId) &&
-        filters[attributeId]!.isNotEmpty &&
-        filters[attributeId]!.first.isNotEmpty) {
-      final filterValue = filters[attributeId]!.first;
-      final variation = attributeVariations.firstWhere(
-        (variation) => variation.id == filterValue,
-        orElse: () => AttributeVariation(
-          id: '',
-          name: filterValue,
-          attributeId: '',
-          status: '',
-          createdOn: '',
-          updatedOn: '',
-        ),
-      );
-      final value = variation.name.isNotEmpty ? variation.name : filterValue;
-      uniqueAttributes[attribute.name] = value;
-    }
-  }
-
-  // Convert unique attributes to ordered list for display
-  uniqueAttributes.forEach((key, value) {
-    if (key != 'Seller Type') { // Seller Type is already added
-      orderedAttributeValues.add(MapEntry(key, value));
-    }
-  });
-
-  // Update attributeValues for use in Details section
-  attributeValues.addAll(uniqueAttributes);
-
-  print('Filtered Attributes: $attributeValues');
-}
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
@@ -1934,8 +2056,6 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
     );
   }
 
-
-
   void _showMeetingDialog(BuildContext context) {
     if (userId == null || userId == 'Unknown') {
       _showLoginPromptDialog(context, 'schedule a meeting');
@@ -1963,7 +2083,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              
+
               content: Container(
                 constraints: const BoxConstraints(maxWidth: 300),
                 child: Column(
@@ -2180,48 +2300,6 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
-    void _showLoginDialog() {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              backgroundColor: Colors.white,
-              title: const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-              ),
-              content: const Text('Please log in to ask a question.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    context.pushNamed(RouteNames.loginPage);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  child: const Text(
-                    'Log In',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2230,7 +2308,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
           children: [
             Expanded(
               child: Text(
-                'You are the first one to ask question',
+                'Ask a question about this product',
                 style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
             ),
@@ -2241,11 +2319,22 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                   listen: false,
                 );
                 if (!userProvider.isLoggedIn) {
-                  _showLoginDialog();
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
                 } else {
                   showDialog(
                     context: context,
-                    barrierDismissible: false,
                     builder: (context) => ReviewDialog(postId: id),
                   );
                 }
@@ -2256,7 +2345,7 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
               ),
               child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.question_answer, color: Colors.white, size: 20.0),
                   SizedBox(width: 8.0),
@@ -2266,14 +2355,142 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity, // Ensure full screen width
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                spreadRadius: 1,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Answers',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      "No reply messages found",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color.fromARGB(255, 192, 187, 187),
+                      ),
+                    ),
+                    // TextButton(
+                    //   onPressed: _fetchReviews,
+                    //   child: const Text('Retry'),
+                    // ),
+                  ],
+                )
+              else if (reviews.isEmpty)
+                Container(
+                  width: double.infinity, // Ensure full width for "No message"
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: const Text(
+                    'No message',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    semanticsLabel: 'No answers available',
+                    textAlign: TextAlign.center, // Center the text
+                  ),
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:
+                      reviews
+                          .where((review) => review.parentId == '0')
+                          .map(
+                            (parent) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildReviewItem(parent, isReply: false),
+                                ...reviews
+                                    .where(
+                                      (reply) => reply.parentId == parent.id,
+                                    )
+                                    .map(
+                                      (reply) => _buildReviewItem(
+                                        reply,
+                                        isReply: true,
+                                      ),
+                                    )
+                                    .toList(),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
+
+  Widget _buildReviewItem(PostReview review, {required bool isReply}) {
+    return Padding(
+      padding: EdgeInsets.only(left: isReply ? 16.0 : 0.0, bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
+            size: 16,
+            color: Colors.grey[700],
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  review.comment,
+                  style: TextStyle(
+                    fontSize: isReply ? 14 : 16,
+                    color: Colors.black,
+                    fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  semanticsLabel: 'Comment: ${review.comment}',
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Posted on: ${review.createdOn}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _stripHtmlTags(String htmlString) {
     return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -2513,7 +2730,8 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                                         MaterialPageRoute(
                                           builder:
                                               (context) => ChatPage(
-                                                listenerId: widget.post.createdBy,
+                                                listenerId:
+                                                    widget.post.createdBy,
                                                 listenerName: sellerName,
                                                 listenerImage:
                                                     sellerProfileImage ??
@@ -2660,9 +2878,9 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
                     ],
                   ),
                 ),
-        
+
                 _buildBannerAd(),
-                  
+
                 Padding(
                   padding: const EdgeInsets.all(10),
                   child: Column(
@@ -2701,109 +2919,109 @@ void _mapFiltersToValues(List<AttributeValuePair> attributeValuePairs) {
               ],
             ),
           ),
-           Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.white, // Prevents ParentDataWidget issues
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 15,
-                      spreadRadius: 0,
-                      offset: Offset(1, 3),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+          
+              decoration: const BoxDecoration(
+               
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 15,
+                    spreadRadius: 0,
+                    offset: Offset(1, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  if (_userProvider.userId == widget.post.createdBy) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SellingStatusPage(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Edit'),
+                      ),
+                    ),
+                 
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isLoadingBid ? null : _moveToAuction,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child:
+                            _isLoadingBid
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                                : Text(_moveToAuctionButtonText),
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => showProductBidDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primarypink,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Place Bid'),
+                      ),
+                    ),
+                    
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _showMeetingDialog(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Palette.primaryblue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 0),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                          ),
+                        ),
+                        child: const Text('Fix Meeting'),
+                      ),
                     ),
                   ],
-                ),
-                child: Row(
-                  children: [
-                    if (_userProvider.userId == widget.post.createdBy) ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SellingStatusPage(),
-            ),
-          );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Edit'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLoadingBid ? null : _moveToAuction,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child:
-                              _isLoadingBid
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Text(_moveToAuctionButtonText),
-                        ),
-                      ),
-                    ] else ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => showProductBidDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primarypink,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Place Bid'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _showMeetingDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Fix Meeting'),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
