@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/feature/categories/seller%20info/user_post_page.dart';
 
-const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
 class SellerInformationPage extends StatefulWidget {
   final String userId;

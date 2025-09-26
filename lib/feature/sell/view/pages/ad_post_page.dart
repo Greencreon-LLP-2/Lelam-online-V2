@@ -741,8 +741,8 @@ class _AdPostFormState extends State<AdPostForm>
     _districts = [
       {
         'id': '0',
-        'name': 'All Kerala',
-        'slug': 'all-kerala',
+        'name': '',
+        'slug': '',
         'parent_id': '0',
         'image': '',
         'description': '',

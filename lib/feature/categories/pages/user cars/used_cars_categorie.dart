@@ -213,8 +213,9 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   Timer? _debounceTimer;
   List<Product> _filteredProductsCache = [];
   bool _filtersChanged = false;
-String? _auctionStatus;
-
+  bool _hasSubmittedSearch = false;
+  bool _hasActiveAuctions = false;
+  bool _hasCheckedAuctions = false;
 
   Map<String, ModelVariation?> _modelVariationsCache = {};
   Set<String> _fetchingModelVariationIds = {};
@@ -252,7 +253,7 @@ String? _auctionStatus;
   List<String> _ownerRanges = [];
   List<String> _kmRanges = [];
 
- @override
+  @override
   void initState() {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
@@ -262,70 +263,132 @@ String? _auctionStatus;
     _checkLoginStatus().then((_) {
       _fetchProducts();
       _initializeVariations();
+      _checkAuctionAvailability();
     });
     _fetchLocations();
 
-
-    // Sync _searchQuery with TextEditingController without rebuilds
+    // Sync _searchQuery with TextEditingController
     _searchController.addListener(() {
       _searchQuery = _searchController.text;
     });
 
-    // Fetch attributes for visible items on initial load
+    // Add focus listener to clear search bar when focus is lost
+    _searchFocusNode.addListener(() {
+      if (!_searchFocusNode.hasFocus &&
+          !_hasSubmittedSearch &&
+          _searchController.text.isNotEmpty) {
+        setState(() {
+          _searchController.clear();
+          _searchQuery = '';
+          _filtersChanged = true;
+        });
+      }
+    });
+
+    // Fetch attributes for visible items
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchVisibleAttributes();
     });
   }
- void _initializeVariations() {
+
+  void _initializeVariations() {
     setState(() {
-      _ownerIdMap = { for (var v in _ownerVariations) v['name']!: v['id']! };
-      _kmRangeIdMap = { for (var v in _kmRangeVariations) v['name']!: v['id']! };
-      _ownerRanges = ['all', ..._ownerVariations.map((v) => v['name']!).toList()];
-      _kmRanges = ['all', ..._kmRangeVariations.map((v) => v['name']!).toList()];
+      _ownerIdMap = {for (var v in _ownerVariations) v['name']!: v['id']!};
+      _kmRangeIdMap = {for (var v in _kmRangeVariations) v['name']!: v['id']!};
+      _ownerRanges = [
+        'all',
+        ..._ownerVariations.map((v) => v['name']!).toList(),
+      ];
+      _kmRanges = [
+        'all',
+        ..._kmRangeVariations.map((v) => v['name']!).toList(),
+      ];
     });
     developer.log('Owner ID map: $_ownerIdMap');
     developer.log('KM Range ID map: $_kmRangeIdMap');
   }
+
   @override
   void dispose() {
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
     _searchController.dispose();
-    _searchFocusNode.dispose(); // Dispose FocusNode
+    _searchFocusNode.dispose();
     _debounceTimer?.cancel();
     super.dispose();
   }
 
- void _onSearchSubmitted(String value) {
-    FocusScope.of(context).unfocus(); // Dismiss keyboard on Enter
+  void _onSearchSubmitted(String value) {
+    FocusScope.of(context).unfocus();
     if (mounted) {
       setState(() {
         _searchQuery = value;
+        _hasSubmittedSearch = true; // Mark search as submitted
         _filtersChanged = true;
       });
-      _fetchVisibleAttributes(); // Fetch attributes for filtered products
+      _fetchVisibleAttributes();
     }
   }
 
- void _handleScroll() {
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _hasSubmittedSearch = false;
+      _filtersChanged = true;
+    });
+    FocusScope.of(context).requestFocus(_searchFocusNode);
+  }
+
+  void _handleScroll() {
     if (_scrollController.offset > 100 && !_showAppBarSearch) {
       setState(() {
         _showAppBarSearch = true;
         _showMainSearch = false;
-        FocusScope.of(context).requestFocus(_searchFocusNode); // Retain focus
+        FocusScope.of(context).requestFocus(_searchFocusNode);
       });
     } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
       setState(() {
         _showAppBarSearch = false;
         _showMainSearch = true;
-        FocusScope.of(context).requestFocus(_searchFocusNode); // Retain focus
+        FocusScope.of(context).requestFocus(_searchFocusNode);
       });
     }
-    _fetchVisibleAttributes(); // Fetch attributes for visible items on scroll
+    _fetchVisibleAttributes();
   }
 
+  Future<void> _checkAuctionAvailability() async {
+    if (_hasCheckedAuctions) return; // Avoid redundant checks
+    try {
+      final auctionPosts = await _marketplaceService.fetchPosts(
+        categoryId: '1',
+        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+        listingType: 'auction',
+        userId: _userId ?? '',
+      );
+      final auctionProducts =
+          auctionPosts.map((post) => post.toProduct()).toList();
+      setState(() {
+        _hasActiveAuctions = auctionProducts.any(
+          (product) => product.ifAuction == '1' && product.auctionStatus == '1',
+        );
+        _hasCheckedAuctions = true;
+      });
+      developer.log(
+        'Initial auction check: _hasActiveAuctions=$_hasActiveAuctions',
+      );
+    } catch (e) {
+      developer.log('Error checking auction availability: $e');
+      if (e.toString().contains('Please accept live auction terms')) {
+        // Don't reset _hasActiveAuctions; assume auctions may exist
+      } else {
+        setState(() {
+          _hasCheckedAuctions = true;
+        });
+      }
+    }
+  }
 
-  
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
     String termsHtml = '';
@@ -453,13 +516,15 @@ String? _auctionStatus;
     }
   }
 
-Future<void> _fetchLocations() async {
+  Future<void> _fetchLocations() async {
     setState(() {
       _isLoadingLocations = true;
     });
 
     try {
-      final Map<String, dynamic> response = await ApiService().get(url: locations);
+      final Map<String, dynamic> response = await ApiService().get(
+        url: locations,
+      );
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
         setState(() {
@@ -480,19 +545,22 @@ Future<void> _fetchLocations() async {
     }
   }
 
- Future<void> _fetchProducts({bool forceRefresh = false}) async {
+  Future<void> _fetchProducts({bool forceRefresh = false}) async {
     if (_listingType == 'auction' &&
         (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
-      developer.log('Showing login dialog: userId=$_userId, listingType=$_listingType');
+      developer.log(
+        'Showing login dialog: userId=$_userId, listingType=$_listingType',
+      );
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (BuildContext dialogContext) => LoginDialog(
-          onSuccess: () async {
-            await _checkLoginStatus();
-            await _fetchProducts(forceRefresh: true);
-          },
-        ),
+        builder:
+            (BuildContext dialogContext) => LoginDialog(
+              onSuccess: () async {
+                await _checkLoginStatus();
+                await _fetchProducts(forceRefresh: true);
+              },
+            ),
       );
       setState(() {
         _isLoading = false;
@@ -507,6 +575,7 @@ Future<void> _fetchLocations() async {
       _filteredProductsCache.clear();
       _modelVariationsCache.clear();
       _fetchingModelVariationIds.clear();
+      _hasCheckedAuctions = false; // Reset auction check on force refresh
     }
     setState(() {
       _isLoading = true;
@@ -520,14 +589,38 @@ Future<void> _fetchLocations() async {
         userId: _userId ?? '',
       );
       final products = posts.map((post) => post.toProduct()).toList();
+
+      // Update _hasActiveAuctions only if not already checked
+      if (!_hasCheckedAuctions) {
+        if (_listingType == 'Marketplace') {
+          final auctionPosts = await _marketplaceService.fetchPosts(
+            categoryId: '1',
+            userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+            listingType: 'auction',
+            userId: _userId ?? '',
+          );
+          final auctionProducts =
+              auctionPosts.map((post) => post.toProduct()).toList();
+          _hasActiveAuctions = auctionProducts.any(
+            (product) =>
+                product.ifAuction == '1' && product.auctionStatus == '1',
+          );
+        } else {
+          _hasActiveAuctions = products.any(
+            (product) =>
+                product.ifAuction == '1' && product.auctionStatus == '1',
+          );
+        }
+        _hasCheckedAuctions = true;
+      }
+
       setState(() {
         _products = products;
         _filtersChanged = true;
         _isLoading = false;
       });
 
-      // Fetch attributes and variations for initial visible products
-      final initialVisibleCount = 10; // Adjust based on screen size or preference
+      final initialVisibleCount = 10;
       final initialProducts = products.take(initialVisibleCount).toList();
       for (final product in initialProducts) {
         if (!_postAttributeValuesCache.containsKey(product.id) &&
@@ -546,11 +639,14 @@ Future<void> _fetchLocations() async {
           await _fetchProducts();
         } else {
           setState(() {
-            _errorMessage = 'You must accept the auction terms to view auctions.';
+            _errorMessage =
+                'You must accept the auction terms to view auctions.';
             _isLoading = false;
           });
         }
-      } else if (e.toString().contains('Unexpected data format: Data not found')) {
+      } else if (e.toString().contains(
+        'Unexpected data format: Data not found',
+      )) {
         setState(() {
           _products = [];
           _filteredProductsCache = [];
@@ -567,12 +663,15 @@ Future<void> _fetchLocations() async {
   }
 
   Future<void> _fetchPostAttributes(String postId) async {
-    if (_postAttributeValuesCache.containsKey(postId) || _fetchingPostIds.contains(postId)) {
+    if (_postAttributeValuesCache.containsKey(postId) ||
+        _fetchingPostIds.contains(postId)) {
       return;
     }
     _fetchingPostIds.add(postId);
     try {
-      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(postId);
+      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(
+        postId,
+      );
       if (mounted) {
         setState(() {
           _postAttributeValuesCache[postId] = attributes;
@@ -591,7 +690,8 @@ Future<void> _fetchLocations() async {
   }
 
   Future<void> _fetchModelVariation(String postId) async {
-    if (_modelVariationsCache.containsKey(postId) || _fetchingModelVariationIds.contains(postId)) {
+    if (_modelVariationsCache.containsKey(postId) ||
+        _fetchingModelVariationIds.contains(postId)) {
       return;
     }
     _fetchingModelVariationIds.add(postId);
@@ -614,7 +714,7 @@ Future<void> _fetchLocations() async {
     }
   }
 
- void _fetchVisibleAttributes() {
+  void _fetchVisibleAttributes() {
     if (_debounceTimer?.isActive ?? false) return;
     if (!_scrollController.hasClients) return;
 
@@ -624,11 +724,15 @@ Future<void> _fetchLocations() async {
       final scrollOffset = _scrollController.offset;
       const itemHeight = 180.0;
       final firstVisibleIndex = (scrollOffset / itemHeight).floor();
-      final lastVisibleIndex = ((scrollOffset + screenHeight) / itemHeight).ceil();
+      final lastVisibleIndex =
+          ((scrollOffset + screenHeight) / itemHeight).ceil();
 
       final visibleProducts = filteredProducts.sublist(
         firstVisibleIndex.clamp(0, filteredProducts.length),
-        (lastVisibleIndex + 2).clamp(0, filteredProducts.length), // Preload 2 extra items
+        (lastVisibleIndex + 2).clamp(
+          0,
+          filteredProducts.length,
+        ), // Preload 2 extra items
       );
 
       for (final product in visibleProducts) {
@@ -643,6 +747,7 @@ Future<void> _fetchLocations() async {
       }
     });
   }
+
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
@@ -743,7 +848,6 @@ Future<void> _fetchLocations() async {
     'Below 2010',
   ];
 
-
   final List<String> _fuelTypes = [
     'Petrol',
     'Diesel',
@@ -754,7 +858,6 @@ Future<void> _fetchLocations() async {
 
   final List<String> _transmissions = ['Manual', 'Automatic'];
 
- 
   final List<String> _soldByOptions = [
     'all',
     'Dealer',
@@ -789,11 +892,12 @@ Future<void> _fetchLocations() async {
         _filteredProductsCache = searchService.searchProducts();
       }
       _filtersChanged = false;
-      developer.log('Filtered products count: ${_filteredProductsCache.length}');
+      developer.log(
+        'Filtered products count: ${_filteredProductsCache.length}',
+      );
     }
     return _filteredProductsCache;
   }
-
 
   double _calculateRelevanceScore(Product product, String query) {
     final attributeValues = _postAttributeValuesCache[product.id] ?? {};
@@ -825,60 +929,71 @@ Future<void> _fetchLocations() async {
     return 'https://lelamonline.com/$cleanedPath';
   }
 
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-
-      builder:
-          (context) => FilterPage(
-            brands: _brands,
-            priceRanges: _priceRanges,
-            yearRanges: _yearRanges,
-            ownerRanges: _ownerRanges,
-            fuelTypes: _fuelTypes,
-            transmissions: _transmissions,
-            kmRanges: _kmRanges,
-            soldByOptions: _soldByOptions,
-            selectedBrands: _selectedBrands,
-            selectedPriceRange: _selectedPriceRange,
-            selectedYearRange: _selectedYearRange,
-            selectedOwnersRange: _selectedOwnersRange,
-            selectedFuelTypes: _selectedFuelTypes,
-            selectedTransmissions: _selectedTransmissions,
-            selectedKmRange: _selectedKmRange,
-            selectedSoldBy: _selectedSoldBy,
-            listingType: _listingType,
-            onClearAll: () {
-              _fetchProducts();
-              developer.log("works");
-            },
-            onApplyFilters: ({
-              required List<String> selectedBrands,
-              required String selectedPriceRange,
-              required String selectedYearRange,
-              required String selectedOwnersRange,
-              required List<String> selectedFuelTypes,
-              required List<String> selectedTransmissions,
-              required String selectedKmRange,
-              required String selectedSoldBy,
-            }) {
-              setState(() {
-                _selectedBrands = selectedBrands;
-                _selectedPriceRange = selectedPriceRange;
-                _selectedYearRange = selectedYearRange;
-                _selectedOwnersRange = selectedOwnersRange;
-                _selectedFuelTypes = selectedFuelTypes;
-                _selectedTransmissions = selectedTransmissions;
-                _selectedKmRange = selectedKmRange;
-                _selectedSoldBy = selectedSoldBy;
-              });
-              _fetchFilterListings();
-            },
-          ),
-    );
-  }
+void _showFilterBottomSheet() {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => FilterPage(
+      brands: _brands,
+      priceRanges: _priceRanges,
+      yearRanges: _yearRanges,
+      ownerRanges: _ownerRanges,
+      fuelTypes: _fuelTypes,
+      transmissions: _transmissions,
+      kmRanges: _kmRanges,
+      soldByOptions: _soldByOptions,
+      selectedBrands: _selectedBrands,
+      selectedPriceRange: _selectedPriceRange,
+      selectedYearRange: _selectedYearRange,
+      selectedOwnersRange: _selectedOwnersRange,
+      selectedFuelTypes: _selectedFuelTypes,
+      selectedTransmissions: _selectedTransmissions,
+      selectedKmRange: _selectedKmRange,
+      selectedSoldBy: _selectedSoldBy,
+      listingType: _listingType,
+      onClearAll: () {
+        setState(() {
+          // Reset all filter states
+          _selectedBrands = [];
+          _selectedPriceRange = 'all';
+          _selectedYearRange = 'all';
+          _selectedOwnersRange = 'all';
+          _selectedFuelTypes = [];
+          _selectedTransmissions = [];
+          _selectedKmRange = 'all';
+          _selectedSoldBy = 'all';
+          _filtersChanged = true;
+        });
+        _fetchFilterListings(); // Fetch listings with cleared filters
+        // Removed Navigator.pop(context) as FilterPage handles closing the bottom sheet
+      },
+      onApplyFilters: ({
+        required List<String> selectedBrands,
+        required String selectedPriceRange,
+        required String selectedYearRange,
+        required String selectedOwnersRange,
+        required List<String> selectedFuelTypes,
+        required List<String> selectedTransmissions,
+        required String selectedKmRange,
+        required String selectedSoldBy,
+      }) {
+        setState(() {
+          _selectedBrands = selectedBrands;
+          _selectedPriceRange = selectedPriceRange;
+          _selectedYearRange = selectedYearRange;
+          _selectedOwnersRange = selectedOwnersRange;
+          _selectedFuelTypes = selectedFuelTypes;
+          _selectedTransmissions = selectedTransmissions;
+          _selectedKmRange = selectedKmRange;
+          _selectedSoldBy = selectedSoldBy;
+          _filtersChanged = true;
+        });
+        _fetchFilterListings();
+      },
+    ),
+  );
+}
 
   int _getActiveFilterCount() {
     int count = 0;
@@ -893,7 +1008,7 @@ Future<void> _fetchLocations() async {
     return count;
   }
 
- Widget _buildAppBarSearchField() {
+  Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -909,19 +1024,13 @@ Future<void> _fetchLocations() async {
           hintText: 'Search cars...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    _searchController.clear();
-                    FocusScope.of(context).requestFocus(_searchFocusNode);
-                    setState(() {
-                      _searchQuery = '';
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchController.text.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: _clearSearch, // Use _clearSearch to reset state
+                  )
+                  : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -929,8 +1038,7 @@ Future<void> _fetchLocations() async {
     );
   }
 
-
- Widget _buildSearchField() {
+  Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: TextField(
@@ -944,19 +1052,13 @@ Future<void> _fetchLocations() async {
           hintText: 'Search by brand, model, location, fuel type...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    _searchController.clear();
-                    FocusScope.of(context).requestFocus(_searchFocusNode);
-                    setState(() {
-                      _searchQuery = '';
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchController.text.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: _clearSearch, // Use _clearSearch to reset state
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade200),
@@ -979,49 +1081,53 @@ Future<void> _fetchLocations() async {
       ),
     );
   }
-Widget _buildListingTypeButtons() {
 
-  bool showAuctionButton = _auctionStatus == "1";
+  Widget _buildListingTypeButtons() {
+    // Show buttons only if there are active auctions
+    if (!_hasActiveAuctions) {
+      return const SizedBox.shrink();
+    }
 
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () {
-              if (_listingType != 'Marketplace') {
-                setState(() {
-                  _listingType = 'Marketplace';
-                  _products = [];
-                  _postAttributeValuesCache.clear();
-                  _fetchingPostIds.clear();
-                  _filteredProductsCache.clear();
-                  _filtersChanged = true;
-                });
-                _fetchProducts(forceRefresh: true);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _listingType == 'Marketplace'
-                  ? Colors.grey.shade700
-                  : Colors.grey.shade200,
-              foregroundColor: _listingType == 'Marketplace'
-                  ? Colors.white
-                  : Colors.black87,
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                if (_listingType != 'Marketplace') {
+                  setState(() {
+                    _listingType = 'Marketplace';
+                    _products = [];
+                    _postAttributeValuesCache.clear();
+                    _fetchingPostIds.clear();
+                    _filteredProductsCache.clear();
+                    _filtersChanged = true;
+                  });
+                  _fetchProducts(forceRefresh: true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _listingType == 'Marketplace'
+                        ? Colors.grey.shade700
+                        : Colors.grey.shade200,
+                foregroundColor:
+                    _listingType == 'Marketplace'
+                        ? Colors.white
+                        : Colors.black87,
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Marketplace',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
-            child: const Text(
-              'Marketplace',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
           ),
-        ),
-        if (showAuctionButton) ...[
           const SizedBox(width: 16),
           Expanded(
             child: ElevatedButton(
@@ -1039,9 +1145,10 @@ Widget _buildListingTypeButtons() {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: _listingType == 'auction'
-                    ? Colors.grey.shade700
-                    : Colors.grey.shade200,
+                backgroundColor:
+                    _listingType == 'auction'
+                        ? Colors.grey.shade700
+                        : Colors.grey.shade200,
                 foregroundColor:
                     _listingType == 'auction' ? Colors.white : Colors.black87,
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1056,10 +1163,9 @@ Widget _buildListingTypeButtons() {
             ),
           ),
         ],
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1631,17 +1737,70 @@ Widget _buildListingTypeButtons() {
     );
   }
 
-Widget _buildFinanceExchangeInfo(
-  bool isFinanceAvailable,
-  bool isExchangeAvailable,
-) {
-  // Show only one on left if only one is available
-  if (!isFinanceAvailable && !isExchangeAvailable) {
-    return const SizedBox.shrink();
-  }
-  
-  if (isFinanceAvailable && !isExchangeAvailable) {
-    // Only finance - show on left
+  Widget _buildFinanceExchangeInfo(
+    bool isFinanceAvailable,
+    bool isExchangeAvailable,
+  ) {
+    // Show only one on left if only one is available
+    if (!isFinanceAvailable && !isExchangeAvailable) {
+      return const SizedBox.shrink();
+    }
+
+    if (isFinanceAvailable && !isExchangeAvailable) {
+      // Only finance - show on left
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Palette.primarylightblue,
+          // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 4),
+            const Icon(Icons.account_balance, size: 10, color: Colors.black),
+            const SizedBox(width: 4),
+            const Text(
+              'Finance Available',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!isFinanceAvailable && isExchangeAvailable) {
+      // Only exchange - show on left
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Palette.primarylightblue,
+          // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 4),
+            const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+            const SizedBox(width: 4),
+            const Text(
+              'Exchange Available',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Both available - show with divider in center
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1651,106 +1810,58 @@ Widget _buildFinanceExchangeInfo(
       ),
       child: Row(
         children: [
-          const SizedBox(width: 4),
-          const Icon(Icons.account_balance, size: 10, color: Colors.black),
-          const SizedBox(width: 4),
-          const Text(
-            'Finance Available',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
+          // Finance on left
+          Expanded(
+            child: Row(
+              children: [
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.account_balance,
+                  size: 10,
+                  color: Colors.black,
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'Finance Available',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Black vertical divider
+          Container(
+            width: 1,
+            height: 10, // Explicit height to ensure visibility
+            color: Colors.black,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+          // Exchange on right
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'Exchange Available',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-  
-  if (!isFinanceAvailable && isExchangeAvailable) {
-    // Only exchange - show on left
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Palette.primarylightblue,
-        // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 4),
-          const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-          const SizedBox(width: 4),
-          const Text(
-            'Exchange Available',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.black,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Both available - show with divider in center
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: Palette.primarylightblue,
-      // borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-    ),
-    child: Row(
-      children: [
-        // Finance on left
-        Expanded(
-          child: Row(
-            children: [
-              const SizedBox(width: 4),
-              const Icon(Icons.account_balance, size: 10, color: Colors.black),
-              const SizedBox(width: 4),
-              const Text(
-                'Finance Available',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // Black vertical divider
-        Container(
-          width: 1,
-          height: 10, // Explicit height to ensure visibility
-          color: Colors.black,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-        ),
-        // Exchange on right
-        Expanded(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              const Text(
-                'Exchange Available',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+
   String _getOwnerText(String owners) {
     if (owners.contains('1st')) return '1st Owner';
     if (owners.contains('2nd')) return '2nd Owner';
@@ -1781,127 +1892,150 @@ Widget _buildFinanceExchangeInfo(
     return value;
   }
 
-Future<void> _fetchFilterListings() async {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-    _filteredProductsCache = [];
-    _postAttributeValuesCache.clear();
-    _fetchingPostIds.clear();
-  });
-
-  final Map<String, String> queryParams = {
-    'category_id': '1',
-    'user_zone_id': _selectedLocation == 'all' ? '0' : _selectedLocation,
-    'listing_type': _listingType.toLowerCase(),
-    'user_id': _userId ?? '647', // Match your form-data
-  };
-
-  // Construct attributes map for owners, KM range, and years
-  Map<String, List<String>> attributes = {};
-
-  // Owners filter
-  if (_selectedOwnersRange != 'all') {
-    attributes['2'] = [_ownerIdMap[_selectedOwnersRange] ?? ''];
-  }
-
-  // KM range filter
-  if (_selectedKmRange != 'all') {
-    attributes['10'] = [_kmRangeIdMap[_selectedKmRange] ?? ''];
-  }
-
-  // Year filter
-  if (_selectedYearRange != 'all') {
-    List<String> yearIds = [];
-    if (_selectedYearRange == '2020 & Above') {
-      yearIds = ['1', '2', '3', '4', '5', '6']; // 2025–2020
-    } else if (_selectedYearRange == '2018-2019') {
-      yearIds = ['7', '8']; // 2019–2018
-    } else if (_selectedYearRange == '2015-2017') {
-      yearIds = ['9', '10', '11']; // 2017–2015
-    } else if (_selectedYearRange == '2010-2014') {
-      yearIds = ['12', '13', '14', '15', '16']; // 2014–2010
-    } else if (_selectedYearRange == 'Below 2010') {
-      yearIds = List.generate(41 - 16 + 1, (index) => (41 - index).toString()); // 1985–2009
-    }
-    if (yearIds.isNotEmpty) {
-      attributes['1'] = yearIds; // Attribute ID "1" for Year
-    }
-  }
-
-  // Encode attributes as JSON string
-  if (attributes.isNotEmpty) {
-    queryParams['attributes'] = jsonEncode(attributes);
-  }
-
-  // Other filters
-  if (_selectedBrands.isNotEmpty) {
-    queryParams['brands'] = _selectedBrands.join(',');
-  }
-  if (_selectedPriceRange != 'all') {
-    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-    if (parts.length == 2) {
-      queryParams['min_price'] = (double.parse(parts[0].replaceAll(' Lakh', '').trim()) * 100000).toStringAsFixed(0);
-      queryParams['max_price'] = (double.parse(parts[1].replaceAll(' Lakh', '').trim()) * 100000).toStringAsFixed(0);
-    } else if (_selectedPriceRange.contains('Under')) {
-      queryParams['max_price'] = '200000';
-    } else if (_selectedPriceRange.contains('Above')) {
-      queryParams['min_price'] = '2000000';
-    }
-  }
-  if (_selectedFuelTypes.isNotEmpty) {
-    queryParams['fuel_types'] = _selectedFuelTypes.map((fuel) => fuel.toLowerCase()).join(',');
-  }
-  if (_selectedTransmissions.isNotEmpty) {
-    queryParams['transmissions'] = _selectedTransmissions.map((trans) => trans.toLowerCase()).join(',');
-  }
-  if (_selectedSoldBy != 'all') {
-    queryParams['sold_by'] = _selectedSoldBy.toLowerCase().replaceAll(' ', '_');
-  }
-
-  try {
-    final apiService = ApiService();
-    final Map<String, dynamic> response = await apiService.postMultipart(
-      url: "$baseUrl/filter-used-cars-listings.php",
-      fields: queryParams,
-    );
-
-    developer.log('Filter API query params: $queryParams', name: 'API.Request');
-    developer.log('Filter API raw response: $response', name: 'API.Response');
-
-    final dataList = response['data'] as List<dynamic>? ?? [];
-    final finalPosts = dataList
-        .map((item) => MarketplacePost.fromJson(item as Map<String, dynamic>))
-        .toList();
-
-    final List<Product> products = finalPosts.map((post) => post.toProduct()).toList();
-
+  Future<void> _fetchFilterListings() async {
     setState(() {
-      _products = products;
-      _filteredProductsCache = products;
-      _filtersChanged = true;
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
+      _filteredProductsCache = [];
+      _postAttributeValuesCache.clear();
+      _fetchingPostIds.clear();
     });
 
-    // Fetch attributes for all products
-    for (final product in _products) {
-      if (!_postAttributeValuesCache.containsKey(product.id) &&
-          !_fetchingPostIds.contains(product.id)) {
-        _fetchPostAttributes(product.id);
+    final Map<String, String> queryParams = {
+      'category_id': '1',
+      'user_zone_id': _selectedLocation == 'all' ? '0' : _selectedLocation,
+      'listing_type': _listingType.toLowerCase(),
+      'user_id': _userId ?? '647', // Match your form-data
+    };
+
+    // Construct attributes map for owners, KM range, and years
+    Map<String, List<String>> attributes = {};
+
+    // Owners filter
+    if (_selectedOwnersRange != 'all') {
+      attributes['2'] = [_ownerIdMap[_selectedOwnersRange] ?? ''];
+    }
+
+    // KM range filter
+    if (_selectedKmRange != 'all') {
+      attributes['10'] = [_kmRangeIdMap[_selectedKmRange] ?? ''];
+    }
+
+    // Year filter
+    if (_selectedYearRange != 'all') {
+      List<String> yearIds = [];
+      if (_selectedYearRange == '2020 & Above') {
+        yearIds = ['1', '2', '3', '4', '5', '6']; // 2025–2020
+      } else if (_selectedYearRange == '2018-2019') {
+        yearIds = ['7', '8']; // 2019–2018
+      } else if (_selectedYearRange == '2015-2017') {
+        yearIds = ['9', '10', '11']; // 2017–2015
+      } else if (_selectedYearRange == '2010-2014') {
+        yearIds = ['12', '13', '14', '15', '16']; // 2014–2010
+      } else if (_selectedYearRange == 'Below 2010') {
+        yearIds = List.generate(
+          41 - 16 + 1,
+          (index) => (41 - index).toString(),
+        ); // 1985–2009
       }
-      if (!_modelVariationsCache.containsKey(product.id) &&
-          !_fetchingModelVariationIds.contains(product.id)) {
-        _fetchModelVariation(product.id);
+      if (yearIds.isNotEmpty) {
+        attributes['1'] = yearIds; // Attribute ID "1" for Year
       }
     }
-  } catch (e) {
-    developer.log('Error while fetching filter listings: $e', name: 'API.Error');
-    setState(() {
-      _isLoading = false;
-      _errorMessage = 'Failed to load filtered cars. Please try again.';
-    });
+
+    // Encode attributes as JSON string
+    if (attributes.isNotEmpty) {
+      queryParams['attributes'] = jsonEncode(attributes);
+    }
+
+    // Other filters
+    if (_selectedBrands.isNotEmpty) {
+      queryParams['brands'] = _selectedBrands.join(',');
+    }
+    if (_selectedPriceRange != 'all') {
+      final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+      if (parts.length == 2) {
+        queryParams['min_price'] =
+            (double.parse(parts[0].replaceAll(' Lakh', '').trim()) * 100000)
+                .toStringAsFixed(0);
+        queryParams['max_price'] =
+            (double.parse(parts[1].replaceAll(' Lakh', '').trim()) * 100000)
+                .toStringAsFixed(0);
+      } else if (_selectedPriceRange.contains('Under')) {
+        queryParams['max_price'] = '200000';
+      } else if (_selectedPriceRange.contains('Above')) {
+        queryParams['min_price'] = '2000000';
+      }
+    }
+    if (_selectedFuelTypes.isNotEmpty) {
+      queryParams['fuel_types'] = _selectedFuelTypes
+          .map((fuel) => fuel.toLowerCase())
+          .join(',');
+    }
+    if (_selectedTransmissions.isNotEmpty) {
+      queryParams['transmissions'] = _selectedTransmissions
+          .map((trans) => trans.toLowerCase())
+          .join(',');
+    }
+    if (_selectedSoldBy != 'all') {
+      queryParams['sold_by'] = _selectedSoldBy.toLowerCase().replaceAll(
+        ' ',
+        '_',
+      );
+    }
+
+    try {
+      final apiService = ApiService();
+      final Map<String, dynamic> response = await apiService.postMultipart(
+        url: "$baseUrl/filter-used-cars-listings.php",
+        fields: queryParams,
+      );
+
+      developer.log(
+        'Filter API query params: $queryParams',
+        name: 'API.Request',
+      );
+      developer.log('Filter API raw response: $response', name: 'API.Response');
+
+      final dataList = response['data'] as List<dynamic>? ?? [];
+      final finalPosts =
+          dataList
+              .map(
+                (item) =>
+                    MarketplacePost.fromJson(item as Map<String, dynamic>),
+              )
+              .toList();
+
+      final List<Product> products =
+          finalPosts.map((post) => post.toProduct()).toList();
+
+      setState(() {
+        _products = products;
+        _filteredProductsCache = products;
+        _filtersChanged = true;
+        _isLoading = false;
+      });
+
+      // Fetch attributes for all products
+      for (final product in _products) {
+        if (!_postAttributeValuesCache.containsKey(product.id) &&
+            !_fetchingPostIds.contains(product.id)) {
+          _fetchPostAttributes(product.id);
+        }
+        if (!_modelVariationsCache.containsKey(product.id) &&
+            !_fetchingModelVariationIds.contains(product.id)) {
+          _fetchModelVariation(product.id);
+        }
+      }
+    } catch (e) {
+      developer.log(
+        'Error while fetching filter listings: $e',
+        name: 'API.Error',
+      );
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load filtered cars. Please try again.';
+      });
+    }
   }
 }
-}
-
-

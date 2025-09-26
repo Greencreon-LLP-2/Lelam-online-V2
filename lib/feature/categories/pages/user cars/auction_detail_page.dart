@@ -1387,7 +1387,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.zero,
                           ),
@@ -1403,7 +1403,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 0),
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.zero,
                           ),

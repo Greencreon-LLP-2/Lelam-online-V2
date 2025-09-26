@@ -28,9 +28,6 @@ import 'package:lelamonline_flutter/utils/review_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const String baseUrl = 'https://lelamonline.com/admin/api/v1';
-const String token = '5cb2c9b569416b5db1604e0e12478ded';
-
 class ProductDetailsPage extends StatefulWidget {
   final dynamic product;
   final bool isAuction;
@@ -94,13 +91,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   bool _isFavorited = false;
   bool _isLoadingFavorite = false;
 
+  String _modelVariation = 'N/A';
+
   bool _isLoadingContainerInfo = false;
   List<ContainerInfo> _containerInfo = [];
   String _containerInfoError = '';
 
-    List<PostReview> reviews = [];
-bool isLoadingReviews = false;
-String reviewsError = "No answers available";
+  List<PostReview> reviews = [];
+  bool isLoadingReviews = false;
+  String reviewsError = "No answers available";
 
   @override
   void initState() {
@@ -108,69 +107,111 @@ String reviewsError = "No answers available";
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeData();
-       _fetchReviews();
+      _fetchReviews();
     });
   }
 
-Future<void> _fetchReviews() async {
-  setState(() {
-    isLoadingReviews = true;
-    reviewsError = '';
-  });
-
-  try {
-    final headers = {'token': token};
-    final url = '$baseUrl/post-reviews.php?token=$token&post_id=$id';
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      print('Reviews API response: $responseData'); // Debug log
-
-      // Check if responseData is valid and contains expected fields
-      if (responseData['status'] == 'true' && responseData['data'] != null) {
-        // Handle case where data is a List
-        if (responseData['data'] is List) {
-          final reviewsResponse = PostReviewsResponse.fromJson(responseData);
+  Future<void> _fetchVariation() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$_baseUrl/post-brand-model-variation.php?token=$_token&post_id=$id',
+        ),
+        headers: {'token': _token},
+      );
+      print(
+        'Variation API Response: ${response.statusCode} - ${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'true' &&
+            data['data'] is List &&
+            data['data'].isNotEmpty) {
           setState(() {
-            reviews = reviewsResponse.data;
-            isLoadingReviews = false;
+            _modelVariation = data['data'][0]['variations'] ?? 'N/A';
           });
+          print('Set _modelVariation: $_modelVariation');
         } else {
-          // Handle case where data is a String or other type
-          print('Unexpected data type: ${responseData['data'].runtimeType}');
+          setState(() {
+            _modelVariation = 'N/A';
+          });
+        }
+      } else {
+        setState(() {
+          _modelVariation = 'N/A';
+        });
+      }
+    } catch (e) {
+      print('Error fetching variation: $e');
+      setState(() {
+        _modelVariation = 'N/A';
+      });
+    }
+  }
+
+  Future<void> _fetchReviews() async {
+    setState(() {
+      isLoadingReviews = true;
+      reviewsError = '';
+    });
+
+    try {
+      final headers = {'token': token};
+      final url = '$baseUrl/post-reviews.php?token=$token&post_id=$id';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        print('Reviews API response: $responseData'); // Debug log
+
+        // Check if responseData is valid and contains expected fields
+        if (responseData['status'] == 'true' && responseData['data'] != null) {
+          // Handle case where data is a List
+          if (responseData['data'] is List) {
+            final reviewsResponse = PostReviewsResponse.fromJson(responseData);
+            setState(() {
+              reviews = reviewsResponse.data;
+              isLoadingReviews = false;
+            });
+          } else {
+            // Handle case where data is a String or other type
+            print('Unexpected data type: ${responseData['data'].runtimeType}');
+            setState(() {
+              reviews = [];
+              reviewsError =
+                  responseData['data'] is String
+                      ? responseData['data']
+                      : 'Invalid reviews data format';
+              isLoadingReviews = false;
+            });
+          }
+        } else {
+          // Handle invalid status or missing data
           setState(() {
             reviews = [];
-            reviewsError = responseData['data'] is String
-                ? responseData['data']
-                : 'Invalid reviews data format';
+            reviewsError =
+                responseData['data']?.toString() ?? 'No reviews available';
             isLoadingReviews = false;
           });
         }
       } else {
-        // Handle invalid status or missing data
-        setState(() {
-          reviews = [];
-          reviewsError = responseData['data']?.toString() ?? 'No reviews available';
-          isLoadingReviews = false;
-        });
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+    } catch (e) {
+      print('Error fetching reviews: $e');
+      setState(() {
+        reviews = [];
+        reviewsError = 'No message fount';
+        isLoadingReviews = false;
+      });
     }
-  } catch (e) {
-    print('Error fetching reviews: $e');
-    setState(() {
-      reviews = [];
-      reviewsError = 'No message fount';
-      isLoadingReviews = false;
-    });
   }
-}
 
   Future<void> _initializeData() async {
     setState(() => isLoadingDetails = true);
@@ -193,21 +234,16 @@ Future<void> _fetchReviews() async {
   }
 
   Future<void> _fetchAllData() async {
-    await _fetchLocations();
-
-    await _fetchContainerInfo();
-
-    await _fetchLocations();
-
-    await _fetchShortlistStatus();
-
-    await _fetchGalleryImages();
-
-    await _fetchBannerImage();
-
-    await _fetchAttributesData();
-
-    await _fetchSellerInfo();
+    await Future.wait([
+      _fetchVariation(),
+      _fetchLocations(),
+      _fetchContainerInfo(),
+      _fetchShortlistStatus(),
+      _fetchGalleryImages(),
+      _fetchBannerImage(),
+      _fetchAttributesData(),
+      _fetchSellerInfo(),
+    ]);
   }
 
   @override
@@ -1205,7 +1241,6 @@ Future<void> _fetchReviews() async {
       },
     );
 
-    
     FocusScope.of(context).unfocus();
     _bidController.dispose();
 
@@ -2237,183 +2272,192 @@ Future<void> _fetchReviews() async {
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'Ask a question about this product',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Ask a question about this product',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
             ),
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity, // Ensure full screen width
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                spreadRadius: 1,
+                offset: const Offset(0, 2),
+              ),
+            ],
+            border: Border.all(color: Colors.grey[300]!),
           ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => LoginDialog(
-                    onSuccess: () {
-                      Navigator.of(dialogContext).pop();
-                      showDialog(
-                        context: context,
-                        builder: (context) => ReviewDialog(postId: id),
-                      );
-                    },
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Answers',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      "No reply messages found",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color.fromARGB(255, 192, 187, 187),
+                      ),
+                    ),
+                    // TextButton(
+                    //   onPressed: _fetchReviews,
+                    //   child: const Text('Retry'),
+                    // ),
+                  ],
+                )
+              else if (reviews.isEmpty)
+                Container(
+                  width: double.infinity, // Ensure full width for "No message"
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: const Text(
+                    'No message',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    semanticsLabel: 'No answers available',
+                    textAlign: TextAlign.center, // Center the text
                   ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
+                )
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:
+                      reviews
+                          .where((review) => review.parentId == '0')
+                          .map(
+                            (parent) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildReviewItem(parent, isReply: false),
+                                ...reviews
+                                    .where(
+                                      (reply) => reply.parentId == parent.id,
+                                    )
+                                    .map(
+                                      (reply) => _buildReviewItem(
+                                        reply,
+                                        isReply: true,
+                                      ),
+                                    )
+                                    .toList(),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewItem(PostReview review, {required bool isReply}) {
+    return Padding(
+      padding: EdgeInsets.only(left: isReply ? 16.0 : 0.0, bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
+            size: 16,
+            color: Colors.grey[700],
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
+                Text(
+                  review.comment,
+                  style: TextStyle(
+                    fontSize: isReply ? 14 : 16,
+                    color: Colors.black,
+                    fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  semanticsLabel: 'Comment: ${review.comment}',
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Posted on: ${review.createdOn}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ],
             ),
           ),
         ],
       ),
-      const SizedBox(height: 12),
-      Container(
-        width: double.infinity, // Ensure full screen width
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Answers',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (isLoadingReviews)
-              const Center(child: CircularProgressIndicator())
-            else if (reviewsError.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    "No reply messages found",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color.fromARGB(255, 192, 187, 187),
-                    ),
-                 
-                  ),
-                  // TextButton(
-                  //   onPressed: _fetchReviews,
-                  //   child: const Text('Retry'),
-                  // ),
-                ],
-              )
-            else if (reviews.isEmpty)
-              Container(
-                width: double.infinity, // Ensure full width for "No message"
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: const Text(
-                  'No message',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  semanticsLabel: 'No answers available',
-                  textAlign: TextAlign.center, // Center the text
-                ),
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: reviews
-                    .where((review) => review.parentId == '0')
-                    .map((parent) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildReviewItem(parent, isReply: false),
-                            ...reviews
-                                .where((reply) => reply.parentId == parent.id)
-                                .map((reply) => _buildReviewItem(reply, isReply: true))
-                                .toList(),
-                          ],
-                        ))
-                    .toList(),
-              ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-Widget _buildReviewItem(PostReview review, {required bool isReply}) {
-  return Padding(
-    padding: EdgeInsets.only(
-      left: isReply ? 16.0 : 0.0,
-      bottom: 8.0,
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
-          size: 16,
-          color: Colors.grey[700],
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                review.comment,
-                style: TextStyle(
-                  fontSize: isReply ? 14 : 16,
-                  color: Colors.black,
-                  fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
-                ),
-                semanticsLabel: 'Comment: ${review.comment}',
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Posted on: ${review.createdOn}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
- 
+    );
+  }
 
   void _showLoginPromptDialog(BuildContext context, String action) {
     showDialog(
@@ -2654,6 +2698,16 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      const SizedBox(
+                        height: 4,
+                      ), // Add spacing between title and variation
+                     Text(
+        _modelVariation,
+        style: TextStyle(
+          fontSize: 16,
+          color: Colors.grey[600],
+        ),
+      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [

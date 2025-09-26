@@ -515,6 +515,7 @@ class _FilterPageState extends State<FilterPage> {
                   TextButton(
                     onPressed: () {
                       setState(() {
+                        // Reset local filter states
                         _selectedBrands.clear();
                         _selectedPriceRange = 'all';
                         _selectedYearRange = 'all';
@@ -526,8 +527,10 @@ class _FilterPageState extends State<FilterPage> {
                         _minPriceController.clear();
                         _maxPriceController.clear();
                       });
+                      // Trigger parent callback to clear filters and refresh list
                       widget.onClearAll?.call();
-
+                      // Close the bottom sheet
+                      Navigator.pop(context);
                     },
                     child: const Text(
                       'Clear All',

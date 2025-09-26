@@ -30,6 +30,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   bool _isLoadingLocations = true;
   Map<String, Map<String, String>> _postAttributeValuesCache = {};
   Set<String> _fetchingPostIds = {};
+  Map<String, String> _variationCache = {};
+  Set<String> _fetchingVariationIds = {};
 
   @override
   void initState() {
@@ -94,6 +96,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         });
         for (var product in products) {
           _fetchPostAttributes(product.id);
+          _fetchVariation(product.id, product.modelVariation);
         }
       } else {
         setState(() {
@@ -134,58 +137,90 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
   }
 
-void _openProductDetails(Product product) {
-  final featureListModel = FeatureListModel(
-    id: product.id,
-    title: product.title,
-    price: product.price,
-    image: product.image ?? "",
-    ifAuction: product.ifAuction,
-    auctionStartingPrice: product.auctionStartingPrice,
-    slug: '',
-    categoryId: '',
-    brand: '',
-    model: '',
-    modelVariation: product.modelVariation,
-    description: '',
-    auctionPriceIntervel: '',
-    attributeId: [],
-    attributeVariationsId: [],
-    filters: {},
-    latitude: '',
-    longitude: '',
-    userZoneId: '',
-    parentZoneId: product.parentZoneId,
-    zoneId: '',
-    landMark: '',
-    auctionStatus: '',
-    auctionStartin: '',
-    auctionEndin: '',
-    auctionAttempt: product.auctionAttempt,
-    adminApproval: '',
-    ifFinance: product.ifFinance,
-    ifExchange: product.ifExchange,
-    feature: product.feature,
-    status: '',
-    visiterCount: '',
-    ifSold: '',
-    ifExpired: '',
-    byDealer: '',
-    createdBy: product.createdBy ?? '', // Add this line to pass createdBy
-    createdOn: '',
-    updatedOn: '',
-  );
+  Future<void> _fetchVariation(String postId, String variationId) async {
+    if (_variationCache.containsKey(postId) || _fetchingVariationIds.contains(postId)) {
+      return;
+    }
+    _fetchingVariationIds.add(postId);
+    try {
+      final response = await apiService.get(
+        url: '$baseUrl/post-brand-model-variation.php',
+        queryParams: {'token': token, 'post_id': postId},
+      );
+      if (response['status'] == 'true' && response['data'] is List && response['data'].isNotEmpty) {
+        final data = response['data'][0]; // Access the first item in the data list
+        final variation = data['variations']?.toString() ?? 'N/A';
+        if (mounted) {
+          setState(() {
+            _variationCache[postId] = variation;
+            _fetchingVariationIds.remove(postId);
+          });
+        }
+      } else {
+        throw Exception('Invalid variation API response');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _fetchingVariationIds.remove(postId);
+        });
+      }
+      developer.log('Error fetching variation for post $postId: $e');
+    }
+  }
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ProductDetailsPage(
-        product: featureListModel,
-        isAuction: featureListModel.ifAuction == "1",
+  void _openProductDetails(Product product) {
+    final featureListModel = FeatureListModel(
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      image: product.image ?? "",
+      ifAuction: product.ifAuction,
+      auctionStartingPrice: product.auctionStartingPrice,
+      slug: '',
+      categoryId: '',
+      brand: _postAttributeValuesCache[product.id]?['Brand'] ?? '',
+      model: _postAttributeValuesCache[product.id]?['Model'] ?? '',
+      modelVariation: _variationCache[product.id] ?? 'N/A',
+      description: '',
+      auctionPriceIntervel: '',
+      attributeId: [],
+      attributeVariationsId: [],
+      filters: {},
+      latitude: '',
+      longitude: '',
+      userZoneId: '',
+      parentZoneId: product.parentZoneId,
+      zoneId: '',
+      landMark: '',
+      auctionStatus: '',
+      auctionStartin: '',
+      auctionEndin: '',
+      auctionAttempt: product.auctionAttempt,
+      adminApproval: '',
+      ifFinance: product.ifFinance,
+      ifExchange: product.ifExchange,
+      feature: product.feature,
+      status: '',
+      visiterCount: '',
+      ifSold: '',
+      ifExpired: '',
+      byDealer: '',
+      createdBy: product.createdBy ?? '',
+      createdOn: '',
+      updatedOn: '',
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailsPage(
+          product: featureListModel,
+          isAuction: featureListModel.ifAuction == "1",
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all' || zoneId.isEmpty) return 'All Kerala';
@@ -391,7 +426,7 @@ void _openProductDetails(Product product) {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          product.modelVariation.isNotEmpty ? product.modelVariation : 'N/A',
+                          _variationCache[product.id] ?? (product.modelVariation.isNotEmpty ? product.modelVariation : 'N/A'),
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey.shade600,
