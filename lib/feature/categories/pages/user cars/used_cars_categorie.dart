@@ -253,43 +253,47 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<String> _ownerRanges = [];
   List<String> _kmRanges = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    _scrollController = ScrollController();
-    _scrollController.addListener(_handleScroll);
-    _listingType = widget.showAuctions ? 'auction' : 'Marketplace';
-    _checkLoginStatus().then((_) {
-      _fetchProducts();
-      _initializeVariations();
-      _checkAuctionAvailability();
-    });
-    _fetchLocations();
+ @override
+void initState() {
+  super.initState();
+  _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+  _scrollController = ScrollController();
+  _scrollController.addListener(_handleScroll);
+  _listingType = widget.showAuctions ? 'auction' : 'Marketplace';
+  _checkLoginStatus().then((_) {
+    _fetchProducts();
+    _initializeVariations();
+    _checkAuctionAvailability();
+  });
+  _fetchLocations();
 
-    // Sync _searchQuery with TextEditingController
-    _searchController.addListener(() {
-      _searchQuery = _searchController.text;
-    });
+  // Sync _searchQuery with TextEditingController
+  _searchController.addListener(() {
+    _searchQuery = _searchController.text;
+  });
 
-    // Add focus listener to clear search bar when focus is lost
-    _searchFocusNode.addListener(() {
-      if (!_searchFocusNode.hasFocus &&
-          !_hasSubmittedSearch &&
-          _searchController.text.isNotEmpty) {
-        setState(() {
-          _searchController.clear();
-          _searchQuery = '';
-          _filtersChanged = true;
-        });
-      }
-    });
+  // Add focus listener to clear search bar when focus is lost
+  _searchFocusNode.addListener(() {
+    developer.log('Search focus changed: hasFocus=${_searchFocusNode.hasFocus}');
+    if (!_searchFocusNode.hasFocus &&
+        !_hasSubmittedSearch &&
+        _searchController.text.isNotEmpty) {
+      setState(() {
+        _searchController.clear();
+        _searchQuery = '';
+        _filtersChanged = true;
+      });
+    }
+  });
 
-    // Fetch attributes for visible items
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchVisibleAttributes();
-    });
-  }
+  // Ensure search bar is unfocused initially
+  _searchFocusNode.unfocus();
+
+  // Fetch attributes for visible items
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _fetchVisibleAttributes();
+  });
+}
 
   void _initializeVariations() {
     setState(() {
@@ -330,33 +334,35 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  void _clearSearch() {
+ void _clearSearch() {
+  setState(() {
+    _searchController.clear();
+    _searchQuery = '';
+    _hasSubmittedSearch = false;
+    _filtersChanged = true;
+  });
+  _searchFocusNode.unfocus(); // Explicitly unfocus the search bar
+  FocusScope.of(context).unfocus(); // Ensure keyboard is dismissed
+}
+
+void _handleScroll() {
+  if (_scrollController.offset > 100 && !_showAppBarSearch) {
     setState(() {
-      _searchController.clear();
-      _searchQuery = '';
-      _hasSubmittedSearch = false;
-      _filtersChanged = true;
+      _showAppBarSearch = true;
+      _showMainSearch = false;
+      // Do not request focus automatically
+      // FocusScope.of(context).requestFocus(_searchFocusNode); // Removed
     });
-    FocusScope.of(context).requestFocus(_searchFocusNode);
+  } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
+    setState(() {
+      _showAppBarSearch = false;
+      _showMainSearch = true;
+      // Do not request focus automatically
+      // FocusScope.of(context).requestFocus(_searchFocusNode); // Removed
+    });
   }
-
-  void _handleScroll() {
-    if (_scrollController.offset > 100 && !_showAppBarSearch) {
-      setState(() {
-        _showAppBarSearch = true;
-        _showMainSearch = false;
-        FocusScope.of(context).requestFocus(_searchFocusNode);
-      });
-    } else if (_scrollController.offset <= 100 && _showAppBarSearch) {
-      setState(() {
-        _showAppBarSearch = false;
-        _showMainSearch = true;
-        FocusScope.of(context).requestFocus(_searchFocusNode);
-      });
-    }
-    _fetchVisibleAttributes();
-  }
-
+  _fetchVisibleAttributes();
+}
   Future<void> _checkAuctionAvailability() async {
     if (_hasCheckedAuctions) return; // Avoid redundant checks
     try {
@@ -662,32 +668,47 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     }
   }
 
-  Future<void> _fetchPostAttributes(String postId) async {
-    if (_postAttributeValuesCache.containsKey(postId) ||
-        _fetchingPostIds.contains(postId)) {
-      return;
+Future<void> _fetchPostAttributes(String postId) async {
+  if (_postAttributeValuesCache.containsKey(postId) ||
+      _fetchingPostIds.contains(postId)) {
+    return;
+  }
+  _fetchingPostIds.add(postId);
+  try {
+    final attributes = await _marketplaceService
+        .fetchPostDetailsWithIcons(postId)
+        .timeout(const Duration(seconds: 10), onTimeout: () {
+      throw TimeoutException('Attribute fetch timed out for post $postId');
+    });
+    if (mounted) {
+      setState(() {
+        _postAttributeValuesCache[postId] = attributes;
+        _fetchingPostIds.remove(postId);
+        _filtersChanged = true;
+      });
+    } else {
+      _fetchingPostIds.remove(postId);
     }
-    _fetchingPostIds.add(postId);
-    try {
-      final attributes = await _marketplaceService.fetchPostDetailsWithIcons(
-        postId,
-      );
-      if (mounted) {
-        setState(() {
-          _postAttributeValuesCache[postId] = attributes;
-          _fetchingPostIds.remove(postId);
-          _filtersChanged = true;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _fetchingPostIds.remove(postId);
-        });
-      }
-      developer.log('Error fetching attributes for post $postId: $e');
+  } catch (e) {
+    developer.log('Error fetching attributes for post $postId: $e', name: 'Attributes.Error');
+    if (mounted) {
+      setState(() {
+        // Fallback to avoid infinite loading
+        _postAttributeValuesCache[postId] = {
+          'Year': 'N/A',
+          'No of owners': 'N/A',
+          'Transmission': 'N/A',
+          'Fuel Type': 'N/A',
+          'KM Range': 'N/A',
+        };
+        _fetchingPostIds.remove(postId);
+        _filtersChanged = true;
+      });
+    } else {
+      _fetchingPostIds.remove(postId);
     }
   }
+}
 
   Future<void> _fetchModelVariation(String postId) async {
     if (_modelVariationsCache.containsKey(postId) ||
@@ -1361,347 +1382,307 @@ void _showFilterBottomSheet() {
     );
   }
 
-  Widget _buildProductCard(Product product) {
-    final isAuction = product.ifAuction == '1';
-    final isFinanceAvailable = product.ifFinance == '1';
-    final isExchangeAvailable = product.ifExchange == '1';
-    final isFeatured = product.feature == '1';
-    final isVerified = product.ifVerifyed == '1';
-    final hasOffer = product.ifOfferPrice == '1';
+Widget _buildProductCard(Product product) {
+  final isAuction = product.ifAuction == '1';
+  final isFinanceAvailable = product.ifFinance == '1';
+  final isExchangeAvailable = product.ifExchange == '1';
+  final isFeatured = product.feature == '1';
+  final isVerified = product.ifVerifyed == '1';
+  final hasOffer = product.ifOfferPrice == '1';
 
-    return GestureDetector(
-      onTap: () {
-        if (isAuction) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AuctionProductDetailsPage(product: product),
+ return GestureDetector(
+    onTap: () {
+      // Clear search bar and ensure keyboard is dismissed
+      _clearSearch();
+      // Additional unfocus to ensure keyboard is dismissed before navigation
+      _searchFocusNode.unfocus();
+      if (isAuction) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AuctionProductDetailsPage(product: product),
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarketPlaceProductDetailsPage(
+              product: product,
+              isAuction: product.ifAuction == '1',
             ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => MarketPlaceProductDetailsPage(
-                    product: product,
-                    isAuction: product.ifAuction == '1',
-                  ),
-            ),
-          );
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.30),
-              blurRadius: 5,
-              spreadRadius: 1,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Container(
-                    width: 120,
-                    height: 150,
-                    // remove left gap so image aligns with any full-width banner above
-                    margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                    decoration: BoxDecoration(color: Colors.grey.shade200),
-                    child: Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                'https://lelamonline.com/admin/${product.image}',
-                            fit: BoxFit.cover,
-                            width: 120,
-                            height: 150,
-                            // memCacheHeight: 120,
-                            // memCacheWidth: 120,
-                            // maxHeightDiskCache: 120,
-                            // maxWidthDiskCache: 120,
-                            placeholder:
-                                (context, url) => const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                            errorWidget: (context, url, error) {
-                              developer.log(
-                                'Failed to load image: https://lelamonline.com/admin/${product.image}',
-                              );
-                              developer.log('Error: $error');
-                              return Container(
-                                color: Colors.grey.shade200,
-                                child: Icon(
-                                  Icons.directions_car,
-                                  size: 40,
-                                  color: Colors.grey.shade400,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        if (isAuction)
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'AUCTION',
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+          ),
+        );
+      }
+    },
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 5,
+            spreadRadius: 1,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Container(
+                  width: 120,
+                  height: 150,
+                  margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                  decoration: BoxDecoration(color: Colors.grey.shade200),
+                  child: Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: 'https://lelamonline.com/admin/${product.image}',
+                          fit: BoxFit.cover,
+                          width: 120,
+                          height: 150,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
                             ),
                           ),
-                        if (isVerified || isFeatured)
-                          Positioned(
-                            top: 4,
-                            left: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(
-                                  12,
-                                ), // rounded pill shape
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(
-                                    Icons.verified,
-                                    size: 12,
-                                    color: Colors.white,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    "Verified",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          product.title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          _modelVariationsCache[product.id] != null
-                              ? ' ${_modelVariationsCache[product.id]!.variations}'
-                              : _fetchingModelVariationIds.contains(product.id)
-                              ? 'Loading...'
-                              : product.modelVariation, // Fallback
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (isAuction)
-                          Text(
-                            '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Palette.primaryblue,
-                            ),
-                          )
-                        else if (hasOffer)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _formatPrice(
-                                  double.tryParse(product.price) ?? 0,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                  decoration: TextDecoration.lineThrough,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                _formatPrice(
-                                  double.tryParse(product.offerPrice) ?? 0,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Palette.primaryblue,
-                                ),
-                              ),
-                            ],
-                          )
-                        else
-                          Text(
-                            _formatPrice(double.tryParse(product.price) ?? 0),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Palette.primaryblue,
-                            ),
-                          ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 12,
-                              color: Colors.grey.shade500,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getLocationName(product.parentZoneId),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Builder(
-                          builder: (context) {
-                            final attributeValues =
-                                _postAttributeValuesCache[product.id] ?? {};
-                            final isFetching = _fetchingPostIds.contains(
-                              product.id,
+                          errorWidget: (context, url, error) {
+                            developer.log(
+                              'Failed to load image: https://lelamonline.com/admin/${product.image}',
                             );
-                            final year = attributeValues['Year'] ?? 'N/A';
-                            final owners =
-                                attributeValues['No of owners'] ?? 'N/A';
-                            final transmission =
-                                attributeValues['Transmission'] ?? 'N/A';
-                            final fuelType =
-                                attributeValues['Fuel Type'] ?? 'N/A';
-                            final kmRange =
-                                attributeValues['KM Range'] ?? 'N/A';
-
-                            if (isFetching && attributeValues.isEmpty) {
-                              return const SizedBox(
-                                height: 32,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            }
-
-                            return Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                if (year != 'N/A')
-                                  _buildDetailChip(Icons.calendar_today, year),
-                                if (owners != 'N/A')
-                                  _buildDetailChip(
-                                    Icons.person,
-                                    _getOwnerText(owners),
-                                  ),
-                                if (kmRange != 'N/A')
-                                  _buildDetailChip(
-                                    Icons.speed,
-                                    _formatKmRange(kmRange),
-                                  ),
-                                if (fuelType != 'N/A')
-                                  _buildDetailChip(
-                                    Icons.local_gas_station,
-                                    fuelType,
-                                  ),
-                                if (transmission != 'N/A')
-                                  _buildDetailChip(
-                                    Icons.settings,
-                                    transmission,
-                                  ),
-                              ],
+                            developer.log('Error: $error');
+                            return Container(
+                              color: Colors.grey.shade200,
+                              child: Icon(
+                                Icons.directions_car,
+                                size: 40,
+                                color: Colors.grey.shade400,
+                              ),
                             );
                           },
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (isAuction || isFinanceAvailable || isExchangeAvailable)
-              Container(
-                decoration: BoxDecoration(
-                  color:
-                      (isAuction || isFinanceAvailable || isExchangeAvailable)
-                          ? Palette.primarylightblue
-                          : Colors.grey.shade50,
-
-                  // keep bottom radius to match card but no extra gap
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 0,
-                  ),
-                  child:
-                      isAuction
-                          ? _buildAuctionInfo(product)
-                          : _buildFinanceExchangeInfo(
-                            isFinanceAvailable,
-                            isExchangeAvailable,
+                      ),
+                      if (isAuction)
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'AUCTION',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
+                        ),
+                      if (isVerified || isFeatured)
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(
+                                  Icons.verified,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Verified",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-          ],
-        ),
-      ),
-    );
-  }
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        _modelVariationsCache[product.id] != null
+                            ? ' ${_modelVariationsCache[product.id]!.variations}'
+                            : _fetchingModelVariationIds.contains(product.id)
+                                ? 'Loading...'
+                                : product.modelVariation,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (isAuction)
+                        Text(
+                          '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Palette.primaryblue,
+                          ),
+                        )
+                      else if (hasOffer)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _formatPrice(double.tryParse(product.price) ?? 0),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Palette.primaryblue,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          _formatPrice(double.tryParse(product.price) ?? 0),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Palette.primaryblue,
+                          ),
+                        ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _getLocationName(product.parentZoneId),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Builder(
+                        builder: (context) {
+                          final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+                          final isFetching = _fetchingPostIds.contains(product.id);
+                          final year = attributeValues['Year'] ?? 'N/A';
+                          final owners = attributeValues['No of owners'] ?? 'N/A';
+                          final transmission = attributeValues['Transmission'] ?? 'N/A';
+                          final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
+                          final kmRange = attributeValues['KM Range'] ?? 'N/A';
 
+                          if (isFetching && attributeValues.isEmpty) {
+                            return const SizedBox(
+                              height: 32,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          }
+
+                          return Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              if (year != 'N/A')
+                                _buildDetailChip(Icons.calendar_today, year),
+                              if (owners != 'N/A')
+                                _buildDetailChip(Icons.person, _getOwnerText(owners)),
+                              if (kmRange != 'N/A')
+                                _buildDetailChip(Icons.speed, _formatKmRange(kmRange)),
+                              if (fuelType != 'N/A')
+                                _buildDetailChip(Icons.local_gas_station, fuelType),
+                              if (transmission != 'N/A')
+                                _buildDetailChip(Icons.settings, transmission),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (isAuction || isFinanceAvailable || isExchangeAvailable)
+            Container(
+              decoration: BoxDecoration(
+                color: (isAuction || isFinanceAvailable || isExchangeAvailable)
+                    ? Palette.primarylightblue
+                    : Colors.grey.shade50,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                child: isAuction
+                    ? _buildAuctionInfo(product)
+                    : _buildFinanceExchangeInfo(isFinanceAvailable, isExchangeAvailable),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
   Widget _buildDetailChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
@@ -1897,7 +1878,7 @@ void _showFilterBottomSheet() {
       _isLoading = true;
       _errorMessage = null;
       _filteredProductsCache = [];
-      _postAttributeValuesCache.clear();
+     // _postAttributeValuesCache.clear();
       _fetchingPostIds.clear();
     });
 
@@ -1984,37 +1965,39 @@ void _showFilterBottomSheet() {
       );
     }
 
-    try {
-      final apiService = ApiService();
-      final Map<String, dynamic> response = await apiService.postMultipart(
-        url: "$baseUrl/filter-used-cars-listings.php",
-        fields: queryParams,
-      );
+ try {
+    final apiService = ApiService();
+    final Map<String, dynamic> response = await apiService.postMultipart(
+      url: "$baseUrl/filter-used-cars-listings.php",
+      fields: queryParams,
+    );
 
-      developer.log(
-        'Filter API query params: $queryParams',
-        name: 'API.Request',
-      );
-      developer.log('Filter API raw response: $response', name: 'API.Response');
+    developer.log('Filter API query params: $queryParams', name: 'API.Request');
+    developer.log('Filter API raw response: $response', name: 'API.Response');
 
-      final dataList = response['data'] as List<dynamic>? ?? [];
-      final finalPosts =
-          dataList
-              .map(
-                (item) =>
-                    MarketplacePost.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
+    final dataList = response['data'] as List<dynamic>? ?? [];
+    final finalPosts = dataList.map((item) => MarketplacePost.fromJson(item as Map<String, dynamic>)).toList();
 
-      final List<Product> products =
-          finalPosts.map((post) => post.toProduct()).toList();
+    var products = finalPosts.map((post) => post.toProduct()).toList();
 
-      setState(() {
-        _products = products;
-        _filteredProductsCache = products;
-        _filtersChanged = true;
-        _isLoading = false;
-      });
+    // Sort by newest (createdOn descending) to match initial fetch order
+    products.sort((a, b) {
+      try {
+        final dateA = DateTime.parse(a.createdOn);
+        final dateB = DateTime.parse(b.createdOn);
+        return dateB.compareTo(dateA);  // Newest first
+      } catch (e) {
+        developer.log('Error parsing dates for sorting: $e');
+        return 0;  // Fallback: no sort change
+      }
+    });
+
+    setState(() {
+      _products = products;
+      _filteredProductsCache = products;
+      _filtersChanged = true;
+      _isLoading = false;
+    });
 
       // Fetch attributes for all products
       for (final product in _products) {

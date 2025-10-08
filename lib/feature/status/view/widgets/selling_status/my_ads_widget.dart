@@ -131,6 +131,33 @@ Future<void> _loadAds() async {
   }
 }
 
+Future<void> _fetchGalleryImagesForAd(String postId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/post-gallery.php?token=$token&post_id=$postId'),
+      headers: {'token': token},
+    );
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      print('Gallery API response for post $postId: $responseData');
+      if (responseData['status'] == 'true' && responseData['data'] is List) {
+        final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
+        if (adIndex != -1) {
+          setState(() {
+            ads[adIndex]['gallery_images'] = List<Map<String, dynamic>>.from(responseData['data']);
+          });
+        }
+      } else {
+        print('No gallery images found for post $postId');
+      }
+    } else {
+      print('Failed to fetch gallery images: ${response.reasonPhrase}');
+    }
+  } catch (e) {
+    print('Error fetching gallery images for post $postId: $e');
+  }
+}
+
   Future<void> _loadAdStatus(String postId) async {
     try {
       final response = await http.get(
@@ -763,22 +790,22 @@ Color _getTextColor(Map<String, dynamic> ad) {
                     ),
                   ),
                 ],
-             PopupMenuButton<String>(
+           PopupMenuButton<String>(
   icon: Icon(Icons.menu, color: Colors.grey.shade600),
   position: PopupMenuPosition.over,
-  onSelected: (value) {
+  onSelected: (value) async {
     if (value == 'edit') {
+      // Fetch gallery images before navigating
+      await _fetchGalleryImagesForAd(ad['id'] as String);
       context.pushNamed(
         RouteNames.adPostPage,
         extra: {
           'categoryId': ad['category_id']?.toString() ?? '',
-          'postId': ad['id']?.toString() ?? '', 
-          'adData': ad,
+          'postId': ad['id']?.toString() ?? '',
+          'adData': ad, // Now includes gallery_images
         },
       );
-      developer.log(
-        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}, postId: ${ad['id']}',
-      );
+      developer.log('Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}, postId: ${ad['id']}');
     } else if (value == 'delete') {
       _deleteAd(ad['id'] as String);
     } else if (value == 'mark_delivered') {

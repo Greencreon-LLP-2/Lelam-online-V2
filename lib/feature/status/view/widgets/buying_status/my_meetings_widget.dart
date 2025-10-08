@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -8,93 +9,10 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/meetingcard_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:retry/retry.dart';
-
 import 'package:url_launcher/url_launcher.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 
-class StatusPill extends StatelessWidget {
-  final String label;
-  final bool isActive;
-  final Color activeColor;
-  final Color inactiveColor;
-  final bool showError;
-  final VoidCallback? onTap;
-
-  const StatusPill({
-    super.key,
-    required this.label,
-    this.isActive = false,
-    this.activeColor = Colors.green,
-    this.inactiveColor = Colors.grey,
-    this.showError = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isActive ? activeColor : inactiveColor,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          color: isActive ? activeColor.withOpacity(0.1) : Colors.transparent,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? activeColor : Colors.black,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                fontSize: 14,
-              ),
-            ),
-            if (showError) ...[
-              const SizedBox(width: 6),
-              const Icon(Icons.error_outline, color: Colors.red, size: 16),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class PillConnector extends StatelessWidget {
-  final bool isActive;
-  final Color activeColor;
-  final Color inactiveColor;
-
-  const PillConnector({
-    super.key,
-    this.isActive = false,
-    this.activeColor = Colors.green,
-    this.inactiveColor = Colors.grey,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Transform.scale(
-          scaleX: 1.5,
-          child: Icon(
-            Icons.arrow_forward,
-            size: 14,
-            color: isActive ? activeColor : inactiveColor,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
+// MyMeetingsWidget
 class MyMeetingsWidget extends StatefulWidget {
   final String baseUrl;
   final String token;
@@ -121,14 +39,15 @@ class MyMeetingsWidget extends StatefulWidget {
   State<MyMeetingsWidget> createState() => _MyMeetingsWidgetState();
 }
 
-class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
+class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerProviderStateMixin {
   final List<String> statuses = [
-    'Date Fixed',
+    'Date F',
     'Meeting Request',
     'Awaiting Location',
     'Ready For Meeting',
     'Meeting Completed',
   ];
+  late TabController _tabController;
   int selectedIndex = 0;
   List<Map<String, dynamic>> meetings = [];
   String? errorMessage;
@@ -137,19 +56,39 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
   Timer? _debounce;
   final Map<String, Map<String, dynamic>> _postDetailsCache = {};
   List<Map<String, String>> _meetingTimesCache = [];
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialStatus != null &&
-        statuses.contains(widget.initialStatus)) {
+    if (widget.initialStatus != null && statuses.contains(widget.initialStatus)) {
       selectedIndex = statuses.indexOf(widget.initialStatus!);
     }
+    _tabController = TabController(initialIndex: selectedIndex, length: statuses.length, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.index != selectedIndex) {
+        setState(() {
+          selectedIndex = _tabController.index;
+        });
+        _manageRefreshTimer();
+        _loadMeetings();
+      }
+    });
     _loadUserId();
+  }
 
-    if (selectedIndex == 2) {
-      // Awaiting Location
-      Timer.periodic(const Duration(minutes: 5), (timer) {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _refreshTimer?.cancel();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _manageRefreshTimer() {
+    _refreshTimer?.cancel();
+    if (selectedIndex == 2) {  // Awaiting Location
+      _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
         if (mounted && selectedIndex == 2) {
           print('Periodic refresh for Awaiting Location');
           _loadMeetings();
@@ -160,55 +99,9 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    super.dispose();
-  }
-
-  List<Widget> _buildPillRow() {
-    List<Widget> pillRow = [];
-    for (var i = 0; i < statuses.length; i++) {
-      final bool isThisActive = i <= selectedIndex;
-      final bool showErrorOnThis = false;
-
-      pillRow.add(
-        StatusPill(
-          label: statuses[i],
-          isActive: isThisActive,
-          activeColor: Colors.blue,
-          showError: showErrorOnThis,
-          onTap: () {
-            if (mounted) {
-              setState(() {
-                selectedIndex = i;
-                developer.log('Selected tab: ${statuses[i]}');
-              });
-              _loadMeetings();
-            }
-          },
-        ),
-      );
-
-      if (i != statuses.length - 1) {
-        pillRow.add(
-          PillConnector(
-            isActive: i < selectedIndex,
-            activeColor: Colors.blue,
-            inactiveColor: Colors.grey,
-          ),
-        );
-      }
-    }
-    return pillRow;
-  }
-
   Future<void> _loadUserId() async {
     try {
-      final userProvider = Provider.of<LoggedUserProvider>(
-        context,
-        listen: false,
-      );
+      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
       final userData = userProvider.userData;
       setState(() {
         _userId = userData?.userId ?? 'Unknown';
@@ -220,6 +113,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       });
       if (_userId != 'Unknown') {
         await _loadMeetings();
+        _manageRefreshTimer();
       }
     } catch (e) {
       print('Error loading userId: $e');
@@ -239,50 +133,40 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     try {
       final response = await retry(
         () => http.get(
-          Uri.parse(
-            '${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId',
-          ),
-          headers: {
-            'token': widget.token,
-            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          },
+          Uri.parse('${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId'),
+          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying post-details for post_id $postId: $e');
-        },
+        onRetry: (e) => print('Retrying post-details for post_id $postId: $e'),
       );
       print('post-details.php response for post_id $postId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          Map<String, dynamic>? postData =
-              data['data'] is List && data['data'].isNotEmpty
-                  ? data['data'][0]
-                  : data['data'] is Map
+          Map<String, dynamic>? postData = data['data'] is List && data['data'].isNotEmpty
+              ? data['data'][0]
+              : data['data'] is Map
                   ? data['data']
                   : null;
           if (postData != null) {
             String imagePath = postData['image']?.toString() ?? '';
-            String fullImageUrl =
-                imagePath.isNotEmpty
-                    ? (imagePath.startsWith('http')
-                        ? imagePath
-                        : imagePath.startsWith('/')
+            String fullImageUrl = imagePath.isNotEmpty
+                ? (imagePath.startsWith('http')
+                    ? imagePath
+                    : imagePath.startsWith('/')
                         ? 'https://lelamonline.com$imagePath'
                         : 'https://lelamonline.com/admin/$imagePath')
-                    : '';
+                : '';
             final postDetails = {
               'title': postData['title'] ?? 'Unknown Vehicle (ID: $postId)',
               'price': postData['price']?.toString() ?? '0',
               'image': fullImageUrl,
-              'location':
-                  postData['land_mark']?.toString() ?? 'Unknown Location',
+              'location': postData['land_mark']?.toString() ?? 'Unknown Location',
               'by_dealer': postData['by_dealer']?.toString() ?? '0',
             };
-
+            _postDetailsCache[postId] = postDetails;
             return postDetails;
           }
         }
@@ -309,20 +193,13 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     try {
       final response = await retry(
         () => http.get(
-          Uri.parse(
-            '${widget.baseUrl}/meeting-times.php?token=${widget.token}',
-          ),
-          headers: {
-            'token': widget.token,
-            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          },
+          Uri.parse('${widget.baseUrl}/meeting-times.php?token=${widget.token}'),
+          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying meeting-times: $e');
-        },
+        onRetry: (e) => print('Retrying meeting-times: $e'),
       );
       print('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
@@ -330,14 +207,11 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         if (data['status'] == true || data['status'] == 'true') {
           if (data['data'] is List && data['data'].isNotEmpty) {
             _meetingTimesCache = List<Map<String, String>>.from(
-              data['data'].map(
-                (item) => {
-                  'name': item['name']?.toString() ?? '',
-                  'value': item['value']?.toString() ?? '',
-                },
-              ),
+              data['data'].map((item) => {
+                'name': item['name']?.toString() ?? '',
+                'value': item['value']?.toString() ?? '',
+              }),
             );
-
             return _meetingTimesCache;
           }
         }
@@ -354,10 +228,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchMeetingStatus(
-    String meetingId,
-    String status,
-  ) async {
+  Future<Map<String, dynamic>?> _fetchMeetingStatus(String meetingId, String status) async {
     try {
       String endpoint;
       switch (status) {
@@ -380,38 +251,28 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       }
       final response = await retry(
         () => http.get(
-          Uri.parse(
-            '${widget.baseUrl}/$endpoint?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
-          ),
-          headers: {
-            'token': widget.token,
-            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-          },
+          Uri.parse('${widget.baseUrl}/$endpoint?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
+          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying $endpoint for meeting_id $meetingId: $e');
-        },
+        onRetry: (e) => print('Retrying $endpoint for meeting_id $meetingId: $e'),
       );
       print('$endpoint response for meeting_id $meetingId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          final statusData =
-              data['data'] is List && data['data'].isNotEmpty
-                  ? data['data'][0]
-                  : data['data'] is Map
+          final statusData = data['data'] is List && data['data'].isNotEmpty
+              ? data['data'][0]
+              : data['data'] is Map
                   ? data['data']
                   : null;
           if (statusData != null) {
             return {
-              'middleStatus_data':
-                  statusData['middle_status']?.toString() ?? 'Schedule meeting',
-              'footerStatus_data':
-                  statusData['Footer_status']?.toString() ??
-                  'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
+              'middleStatus_data': statusData['middle_status']?.toString() ?? 'Schedule meeting',
+              'footerStatus_data': statusData['Footer_status']?.toString() ??
+                  'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': statusData['timer']?.toString() ?? '0',
             };
           }
@@ -425,18 +286,14 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
       print('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data':
-            'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
-
+        'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
         'timer': '0',
       };
     } catch (e) {
       print('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data':
-            'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
-
+        'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
         'timer': '0',
       };
     }
@@ -458,31 +315,23 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     });
 
     try {
-      final headers = {
-        'token': widget.token,
-        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-      };
+      final headers = {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'};
       String url;
       switch (selectedIndex) {
         case 0:
-          url =
-              '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 1:
-          url =
-              '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 2:
-          url =
-              '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         case 3:
-          url =
-              '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
         default:
-          url =
-              '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+          url = '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
           break;
       }
       print('Fetching meetings from: $url');
@@ -491,36 +340,27 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) {
-          print('Retrying meetings fetch: $e');
-        },
+        onRetry: (e) => print('Retrying meetings fetch: $e'),
       );
       print('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData is Map<String, dynamic> &&
-            (responseData['status'] == true ||
-                responseData['status'] == 'true') &&
+            (responseData['status'] == true || responseData['status'] == 'true') &&
             responseData['data'] is List) {
           final List<dynamic> meetingData = responseData['data'];
           print('Found ${meetingData.length} meetings in API response');
 
           for (var meeting in meetingData) {
             print(
-              'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}',
-            );
+                'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}');
             final postDetails = await _fetchPostDetails(meeting['post_id']);
             if (postDetails == null) {
-              print(
-                'Skipping meeting ${meeting['id']} due to missing post details',
-              );
+              print('Skipping meeting ${meeting['id']} due to missing post details');
               continue;
             }
-            final statusData = await _fetchMeetingStatus(
-              meeting['id'],
-              statuses[selectedIndex],
-            );
+            final statusData = await _fetchMeetingStatus(meeting['id'], statuses[selectedIndex]);
             final meetingData = <String, dynamic>{
               'id': meeting['id']?.toString() ?? 'N/A',
               'user_id': meeting['user_id']?.toString() ?? _userId,
@@ -530,13 +370,11 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
               'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
               'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
-              'if_location_request':
-                  meeting['if_location_request']?.toString() ?? '0',
+              'if_location_request': meeting['if_location_request']?.toString() ?? '0',
               'latitude': meeting['latitude']?.toString() ?? '',
               'longitude': meeting['longitude']?.toString() ?? '',
               'location_link': meeting['location_link']?.toString() ?? '',
-              'location_request_count':
-                  meeting['location_request_count']?.toString() ?? '0',
+              'location_request_count': meeting['location_request_count']?.toString() ?? '0',
               'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
               'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
               'status': meeting['status']?.toString() ?? '1',
@@ -544,57 +382,39 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
               'if_junk': meeting['if_junk']?.toString() ?? '0',
               'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
               'if_skipped': meeting['if_skipped']?.toString() ?? '0',
-              'if_not_intersect':
-                  meeting['if_not_intersect']?.toString() ?? '0',
+              'if_not_intersect': meeting['if_not_intersect']?.toString() ?? '0',
               'if_revisit': meeting['if_revisit']?.toString() ?? '0',
-              'if_decisionpedding':
-                  meeting['if_decisionpedding']?.toString() ?? '0',
+              'if_decisionpedding': meeting['if_decisionpedding']?.toString() ?? '0',
               'if_expired': meeting['if_expired']?.toString() ?? '0',
               'if_cancel': meeting['if_cancel']?.toString() ?? '0',
               'if_sold': meeting['if_sold']?.toString() ?? '0',
               'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
               'price_offered': meeting['price_offered']?.toString() ?? '0.00',
-              'created_on':
-                  meeting['created_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'updated_on':
-                  meeting['updated_on']?.toString() ??
-                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-              'title':
-                  postDetails['title'] ??
-                  'Unknown Vehicle (ID: ${meeting['post_id']})',
+              'created_on': meeting['created_on']?.toString() ?? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'updated_on': meeting['updated_on']?.toString() ?? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'title': postDetails['title'] ?? 'Unknown Vehicle (ID: ${meeting['post_id']})',
               'carImage': postDetails['image'] ?? '',
               'appId': 'APP_${meeting['post_id']}',
-              'bidDate':
-                  meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
+              'bidDate': meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
               'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
               'targetPrice': postDetails['price'] ?? '0',
               'bidPrice': meeting['bid_amount']?.toString() ?? '0',
               'location': postDetails['location'] ?? 'Unknown Location',
-              'store':
-                  postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
+              'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
               'if_auction': meeting['if_auction']?.toString() ?? '0',
-              'middleStatus_data':
-                  statusData?['middleStatus_data'] ?? 'Schedule meeting',
-              'footerStatus_data':
-                  statusData?['footerStatus_data'] ??
-                  'Due to convnience reasons meeting location can be requested 24 hrs before meeting time only',
+              'middleStatus_data': statusData?['middleStatus_data'] ?? 'Schedule meeting',
+              'footerStatus_data': statusData?['footerStatus_data'] ??
+                  'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': statusData?['timer'] ?? '0',
+              'parent_zone_id': meeting['parent_zone_id']?.toString() ?? '',
             };
             print('Added meeting ${meeting['id']} to list: $meetingData');
-            print(
-              'Meeting ${meeting['id']}: bid_amount=${meetingData['bid_amount']}, bid_id=${meetingData['bid_id']}, post_id=${meetingData['post_id']}',
-            );
             meetings.add(meetingData);
-          
           }
         } else {
-          developer.log(
-            'Unexpected response format: ${responseData.toString()}',
-          );
+          developer.log('Unexpected response format: ${responseData.toString()}');
           errorMessage = 'Currently No Meeting';
         }
-
         print('Total meetings loaded: ${meetings.length}');
       } else if (response.statusCode == 429) {
         print('Rate limit exceeded for meetings fetch');
@@ -615,501 +435,152 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
     }
   }
 
-  void _onLocationRequestSent(String meetingId) {
-    if (mounted) {
-      setState(() {
-        selectedIndex = 2;
-        developer.log(
-          'Switched to Awaiting Location tab for meeting $meetingId',
-        );
-      });
-      _loadMeetings();
-    }
-  }
-
   List<Map<String, dynamic>> _getFilteredMeetings() {
     final status = statuses[selectedIndex];
     print('Filtering for status: $status');
 
-    var filteredMeetings =
-        meetings.where((meeting) {
-          print(
-            'Meeting ${meeting['id']} - status: ${meeting['status']}, '
-            'seller_approvel: ${meeting['seller_approvel']}, '
-            'admin_approvel: ${meeting['admin_approvel']}, '
-            'meeting_done: ${meeting['meeting_done']}, '
-            'if_location_request: ${meeting['if_location_request']}, '
-            'meeting_date: ${meeting['meeting_date']}',
-          );
+    var filteredMeetings = meetings.where((meeting) {
+      print(
+          'Meeting ${meeting['id']} - status: ${meeting['status']}, '
+          'seller_approvel: ${meeting['seller_approvel']}, '
+          'admin_approvel: ${meeting['admin_approvel']}, '
+          'meeting_done: ${meeting['meeting_done']}, '
+          'if_location_request: ${meeting['if_location_request']}, '
+          'meeting_date: ${meeting['meeting_date']}, '
+          'meeting_time: ${meeting['meeting_time']}');
 
-          if (status == 'Date Fixed') {
-            return meeting['status'] == '1' &&
-                meeting['meeting_done'] == '0' &&
-                meeting['if_location_request'] == '0' &&
-                meeting['seller_approvel'] == '1' &&
-                meeting['admin_approvel'] == '1' &&
-                meeting['meeting_date'] != 'N/A' &&
-                meeting['meeting_date']?.isNotEmpty == true;
-          } else if (status == 'Meeting Request') {
-            return meeting['status'] == '1' &&
-                meeting['meeting_done'] == '0' &&
-                meeting['if_location_request'] == '0' &&
-                meeting['meeting_time'] != 'N/A' &&
-                meeting['meeting_time']?.isNotEmpty == true;
-          } else if (status == 'Awaiting Location') {
-            return meeting['if_location_request'] == '1' &&
-                meeting['status'] == '1' &&
-                meeting['meeting_done'] == '0' &&
-                (meeting['location_link'] == null ||
-                    meeting['location_link'] == '' ||
-                    meeting['latitude'] == null ||
-                    meeting['latitude'] == '' ||
-                    meeting['longitude'] == null ||
-                    meeting['longitude'] == '');
-          } else if (status == 'Ready For Meeting') {
-            return meeting['seller_approvel'] == '1' &&
-                meeting['admin_approvel'] == '1' &&
-                meeting['meeting_done'] == '0' &&
-                meeting['if_location_request'] != '0' &&
-                meeting['location_link']?.isNotEmpty == true;
-          } else if (status == 'Meeting Completed') {
-            return meeting['meeting_done'] == '1';
-          }
-          return false;
-        }).toList();
+      if (status == 'Date Fixed') {
+        return meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['if_location_request'] == '0' &&
+            meeting['seller_approvel'] == '1' &&
+            meeting['admin_approvel'] == '1' &&
+            meeting['meeting_date'] != 'N/A' &&
+            meeting['meeting_date']?.isNotEmpty == true;
+      } else if (status == 'Meeting Request') {
+        return meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['if_location_request'] == '0' &&
+            meeting['meeting_time'] != 'N/A' &&
+            meeting['meeting_time']?.isNotEmpty == true;
+      } else if (status == 'Awaiting Location') {
+        return meeting['if_location_request'] == '1' &&
+            meeting['status'] == '1' &&
+            meeting['meeting_done'] == '0';
+      } else if (status == 'Ready For Meeting') {
+        return meeting['seller_approvel'] == '1' &&
+            meeting['admin_approvel'] == '1' &&
+            meeting['meeting_done'] == '0' &&
+            meeting['if_location_request'] == '1' &&
+            meeting['location_link']?.isNotEmpty == true;
+      } else if (status == 'Meeting Completed') {
+        return meeting['meeting_done'] == '1';
+      }
+      return false;
+    }).toList();
 
-    // Sort meetings by updated_on or created_on in descending order (newest first)
     filteredMeetings.sort((a, b) {
-      final aDate =
-          DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ??
-          DateTime.now();
-      final bDate =
-          DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ??
-          DateTime.now();
-      return bDate.compareTo(aDate); // Descending order
+      final aDate = DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ?? DateTime.now();
+      final bDate = DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ?? DateTime.now();
+      return bDate.compareTo(aDate);
     });
 
     return filteredMeetings;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildMeetingList() {
     final filteredMeetings = _getFilteredMeetings();
-    print(
-      'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
-    );
+    print('Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}');
     for (var meeting in filteredMeetings) {
       print(
-        'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
-        'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
-        'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
-        'date=${meeting['meeting_date']}',
-      );
+          'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
+          'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
+          'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
+          'date=${meeting['meeting_date']}');
     }
 
-    return Scaffold(
-      appBar:
-          widget.showAppBar
-              ? AppBar(
-                title: const Text('My Meetings'),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+    return isLoading
+        ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+        : errorMessage != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.handshake, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No meetings found',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               )
-              : null,
+            : filteredMeetings.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.handshake, size: 64, color: Colors.grey),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No meetings found',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'You have no meetings at this time',
+                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filteredMeetings.length,
+                    itemBuilder: (context, index) {
+                      final meeting = filteredMeetings[index];
+                      print('Displaying meeting: ${meeting['id']}');
+                      return MeetingCard(
+                        meeting: meeting,
+                        baseUrl: widget.baseUrl,
+                        token: widget.token,
+                        currentTab: statuses[selectedIndex],
+                        onEditDate: (meeting) => _editDate(context, meeting),
+                        onEditTime: (meeting) => _editTime(context, meeting),
+                      );
+                    },
+                  );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('My Meetings'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+              bottom: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabs: statuses.map((status) => Tab(text: status)).toList(),
+              ),
+            )
+          : null,
       backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: _buildPillRow()),
-              ),
-            ),
-            Expanded(
-              child: Container(
-                color: Colors.grey[50],
-                child:
-                    isLoading
-                        ? const Center(
-                          child: CircularProgressIndicator(color: Colors.blue),
-                        )
-                        : errorMessage != null
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.handshake,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No ${statuses[selectedIndex].toLowerCase()} found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                        : filteredMeetings.isEmpty
-                        ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.handshake,
-                                size: 64,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No ${statuses[selectedIndex].toLowerCase()} found',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'You have no ${statuses[selectedIndex].toLowerCase()} at this time',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                        : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredMeetings.length,
-                          itemBuilder: (context, index) {
-                            final meeting = filteredMeetings[index];
-                            print('Displaying meeting: ${meeting['id']}');
-                            return MeetingCard(
-                              meeting: meeting,
-                              baseUrl: widget.baseUrl,
-                              token: widget.token,
-                              currentTab:
-                                  statuses[selectedIndex], // Pass current tab
-                              onLocationRequestSent: _onLocationRequestSent,
-                              onProceedWithBid: () {
-                                print(
-                                  'Proceed with Bid triggered for meeting ${meeting['id']}',
-                                );
-                                _proceedWithBid(context, meeting);
-                              },
-                              onEditDate:
-                                  (meeting) => _editDate(context, meeting),
-                              onEditTime:
-                                  (meeting) => _editTime(context, meeting),
-                              onSendLocationRequest:
-                                  (meeting) =>
-                                      _sendLocationRequest(context, meeting),
-                              onViewLocation:
-                                  (meeting) => _viewLocation(context, meeting),
-                            );
-                          },
-                        ),
-              ),
-            ),
-          ],
+        child: TabBarView(
+          controller: _tabController,
+          children: List.generate(statuses.length, (_) => _buildMeetingList()),
         ),
       ),
     );
   }
 
- Future<void> _proceedWithBid(
-  BuildContext context,
-  Map<String, dynamic> meeting,
-) async {
-  print('Proceed with Bid called for meeting ${meeting['id']} from tab ${statuses[selectedIndex]}');
-  if (_userId == null || _userId == 'Unknown') {
-    print('Invalid user ID');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-    );
-    return;
-  }
-
-  final TextEditingController bidController = TextEditingController();
-  double? bidAmount;
-
-  await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Enter Bid Amount'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: bidController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Bid Amount (₹)',
-              hintText: 'Enter your bid amount',
-              border: OutlineInputBorder(),
-            ),
-            onChanged: (value) {
-              bidAmount = double.tryParse(value);
-            },
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () {
-            if (bidAmount == null || bidAmount! <= 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please enter a valid bid amount'),
-                ),
-              );
-              return;
-            }
-            Navigator.pop(dialogContext, true);
-          },
-          child: const Text('OK'),
-        ),
-      ],
-    ),
-  );
-
-  if (bidAmount == null || bidAmount! <= 0) {
-    print('Invalid or no bid amount entered');
-    return;
-  }
-
-  try {
-    final response = await retry(
-      () => http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-meeting-proceed-with-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bidamt=$bidAmount',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-        },
-      ),
-      maxAttempts: 3,
-      delayFactor: const Duration(seconds: 2),
-      randomizationFactor: 0.25,
-      onRetry: (e) {
-        print('Retrying proceed with bid: $e');
-      },
-    );
-    print('my-meeting-proceed-with-bid.php response: ${response.body}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == true || data['status'] == 'true') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Proceeded with bid of ₹${NumberFormat('#,##0').format(bidAmount)} successfully',
-            ),
-          ),
-        );
-        // Update the meeting in the meetings list with the new bid_amount
-        setState(() {
-          final meetingIndex = meetings.indexWhere((m) => m['id'] == meeting['id']);
-          if (meetingIndex != -1) {
-            meetings[meetingIndex] = {
-              ...meetings[meetingIndex],
-              'bid_amount': bidAmount.toString(),
-              'bidPrice': bidAmount.toString(),
-              'with_bid': '1',
-            };
-            print('Updated meeting ${meeting['id']} in meetings list: bid_amount=$bidAmount, with_bid=1');
-          } else {
-            print('Meeting ${meeting['id']} not found in meetings list');
-          }
-        });
-        // Only switch to Meeting Request tab if not in Date Fixed
-        if (selectedIndex != 0) { // Date Fixed is index 0
-          setState(() {
-            selectedIndex = 1; // Index 1 is 'Meeting Request'
-            print('Switched to Meeting Request tab after successful bid');
-          });
-        } else {
-          print('Remaining in Date Fixed tab after successful bid');
-        }
-        await _loadMeetings();
-        widget.onRefreshMeetings?.call();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to proceed with bid: ${data['message'] ?? 'Unknown error'}',
-            ),
-          ),
-        );
-      }
-    } else if (response.statusCode == 429) {
-      print('Rate limit exceeded for proceed with bid');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Too many requests. Please try again later.'),
-        ),
-      );
-    } else {
-      print(
-        'my-meeting-proceed-with-bid.php failed with status ${response.statusCode}',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to proceed with bid')),
-      );
-    }
-  } catch (e) {
-    print('Error proceeding with bid: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Error proceeding with bid')),
-    );
-  }
-}
-  // Future<void> _increaseBid(
-  //   BuildContext context,
-  //   Map<String, dynamic> meeting,
-  // ) async {
-  //   if (_userId == null || _userId == 'Unknown') {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-  //     );
-  //     return;
-  //   }
-  //   final TextEditingController bidController = TextEditingController();
-  //   double? newBidAmount;
-
-  //   await showDialog(
-  //     context: context,
-  //     builder:
-  //         (context) => AlertDialog(
-  //           title: const Text('Increase Bid'),
-  //           content: Column(
-  //             mainAxisSize: MainAxisSize.min,
-  //             children: [
-  //               TextField(
-  //                 controller: bidController,
-  //                 keyboardType: TextInputType.number,
-  //                 decoration: const InputDecoration(
-  //                   labelText: 'New Bid Amount',
-  //                   hintText: 'Enter new bid amount',
-  //                   border: OutlineInputBorder(),
-  //                 ),
-  //                 onChanged: (value) {
-  //                   newBidAmount = double.tryParse(value);
-  //                 },
-  //               ),
-  //             ],
-  //           ),
-  //           actions: [
-  //             TextButton(
-  //               onPressed: () => Navigator.pop(context),
-  //               child: const Text('Cancel'),
-  //             ),
-  //             TextButton(
-  //               onPressed: () async {
-  //                 if (newBidAmount == null || newBidAmount! <= 0) {
-  //                   ScaffoldMessenger.of(context).showSnackBar(
-  //                     const SnackBar(
-  //                       content: Text('Please enter a valid bid amount'),
-  //                     ),
-  //                   );
-  //                   return;
-  //                 }
-  //                 try {
-  //                   final response = await retry(
-  //                     () => http.get(
-  //                       Uri.parse(
-  //                         '${widget.baseUrl}/my-meeting-increase-bid.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&bid_id=${meeting['bid_id']}&bidamt=$newBidAmount',
-  //                       ),
-  //                       headers: {
-  //                         'token': widget.token,
-  //                         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-  //                       },
-  //                     ),
-  //                     maxAttempts: 3,
-  //                     delayFactor: const Duration(seconds: 2),
-  //                     randomizationFactor: 0.25,
-  //                     onRetry: (e) {
-  //                      print('Retrying increase bid: $e');
-  //                     },
-  //                   );
-  //                  print(
-  //                     'my-meeting-increase-bid.php response: ${response.body}',
-  //                   );
-  //                   if (response.statusCode == 200) {
-  //                     final data = jsonDecode(response.body);
-  //                     if (data['status'] == true || data['status'] == 'true') {
-  //                       ScaffoldMessenger.of(context).showSnackBar(
-  //                         const SnackBar(
-  //                           content: Text('Bid increased successfully'),
-  //                         ),
-  //                       );
-
-  //                       await _loadMeetings();
-  //                       widget.onRefreshMeetings?.call();
-  //                     } else {
-  //                       ScaffoldMessenger.of(context).showSnackBar(
-  //                         SnackBar(
-  //                           content: Text(
-  //                             'Failed to increase bid: ${data['message'] ?? 'Unknown error'}',
-  //                           ),
-  //                         ),
-  //                       );
-  //                     }
-  //                   } else if (response.statusCode == 429) {
-  //                    print('Rate limit exceeded for increase bid');
-  //                     ScaffoldMessenger.of(context).showSnackBar(
-  //                       const SnackBar(
-  //                         content: Text(
-  //                           'Too many requests. Please try again later.',
-  //                         ),
-  //                       ),
-  //                     );
-  //                   } else {
-  //                    print(
-  //                       'my-meeting-increase-bid.php failed with status ${response.statusCode}',
-  //                     );
-  //                     ScaffoldMessenger.of(context).showSnackBar(
-  //                       const SnackBar(content: Text('Failed to increase bid')),
-  //                     );
-  //                   }
-  //                 } catch (e) {
-  //                  print('Error increasing bid: $e');
-  //                   ScaffoldMessenger.of(context).showSnackBar(
-  //                     const SnackBar(content: Text('Error increasing bid')),
-  //                   );
-  //                 }
-  //                 Navigator.pop(context);
-  //               },
-  //               child: const Text('OK'),
-  //             ),
-  //           ],
-  //         ),
-  //   );
-  // }
-
-  Future<void> _editTime(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
+  Future<void> _editTime(BuildContext context, Map<String, dynamic> meeting) async {
     if (_userId == null || _userId == 'Unknown') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
@@ -1130,137 +601,85 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
 
     await showDialog(
       context: context,
-      builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: const Text('Select Meeting Time'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedTimeValue,
-                        hint: const Text('Choose a time'),
-                        items:
-                            meetingTimes
-                                .map(
-                                  (time) => DropdownMenuItem<String>(
-                                    value: time['value'],
-                                    child: Text(time['name']!),
-                                  ),
-                                )
-                                .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedTimeValue = value;
-                            selectedTimeName =
-                                meetingTimes.firstWhere(
-                                  (time) => time['value'] == value,
-                                  orElse: () => {'name': ''},
-                                )['name'];
-                            print(
-                              'Selected time: $selectedTimeName ($selectedTimeValue)',
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed:
-                          selectedTimeValue == null
-                              ? null
-                              : () async {
-                                print(
-                                  'Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}',
-                                );
-                                try {
-                                  final response = await http.get(
-                                    Uri.parse(
-                                      '${widget.baseUrl}/my-meeting-fix-time.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_time=$selectedTimeValue',
-                                    ),
-                                    headers: {
-                                      'token': widget.token,
-                                      'Cookie':
-                                          'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-                                    },
-                                  );
-                                  print(
-                                    'my-meeting-fix-time.php response: ${response.body}',
-                                  );
-                                  if (response.statusCode == 200) {
-                                    final data = jsonDecode(response.body);
-                                    if (data['status'] == true ||
-                                        data['status'] == 'true') {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Time updated to $selectedTimeName',
-                                          ),
-                                        ),
-                                      );
-                                      // Switch to Meeting Request tab
-                                      setState(() {
-                                        selectedIndex = 1; // Meeting Request
-                                        print(
-                                          'Switched to Meeting Request tab after fixing time',
-                                        );
-                                      });
-                                      await _loadMeetings();
-                                      widget.onRefreshMeetings?.call();
-                                    } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Failed to update time: ${data['message'] ?? 'Unknown error'}',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } else {
-                                    print(
-                                      'my-meeting-fix-time.php failed with status ${response.statusCode}',
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Failed to update time'),
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  print('Error updating meeting time: $e');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Error updating meeting time',
-                                      ),
-                                    ),
-                                  );
-                                }
-                                Navigator.pop(dialogContext);
-                              },
-                      child: const Text('OK'),
-                    ),
-                  ],
-                ),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Select Meeting Time'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButton<String>(
+                isExpanded: true,
+                value: selectedTimeValue,
+                hint: const Text('Choose a time'),
+                items: meetingTimes
+                    .map((time) => DropdownMenuItem<String>(
+                          value: time['value'],
+                          child: Text(time['name']!),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedTimeValue = value;
+                    selectedTimeName = meetingTimes.firstWhere((time) => time['value'] == value, orElse: () => {'name': ''})['name'];
+                    print('Selected time: $selectedTimeName ($selectedTimeValue)');
+                  });
+                },
+              ),
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: selectedTimeValue == null
+                  ? null
+                  : () async {
+                      print('Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}');
+                      try {
+                        final response = await http.get(
+                          Uri.parse(
+                              '${widget.baseUrl}/my-meeting-fix-time.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_time=$selectedTimeValue'),
+                          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+                        );
+                        print('my-meeting-fix-time.php response: ${response.body}');
+                        if (response.statusCode == 200) {
+                          final data = jsonDecode(response.body);
+                          if (data['status'] == true || data['status'] == 'true') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Time updated to $selectedTimeName')),
+                            );
+                            await _loadMeetings();
+                            widget.onRefreshMeetings?.call();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to update time: ${data['message'] ?? 'Unknown error'}')),
+                            );
+                          }
+                        } else {
+                          print('my-meeting-fix-time.php failed with status ${response.statusCode}');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to update time')),
+                          );
+                        }
+                      } catch (e) {
+                        print('Error updating meeting time: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Error updating meeting time')),
+                        );
+                      }
+                      Navigator.pop(dialogContext);
+                    },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Future<void> _editDate(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
+  Future<void> _editDate(BuildContext context, Map<String, dynamic> meeting) async {
     if (_userId == null || _userId == 'Unknown') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
@@ -1281,19 +700,13 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         final response = await retry(
           () => http.get(
             Uri.parse(
-              '${widget.baseUrl}/my-meeting-edit-date.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_date=$meetingDate',
-            ),
-            headers: {
-              'token': widget.token,
-              'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-            },
+                '${widget.baseUrl}/my-meeting-edit-date.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_date=$meetingDate'),
+            headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
           ),
           maxAttempts: 3,
           delayFactor: const Duration(seconds: 2),
           randomizationFactor: 0.25,
-          onRetry: (e) {
-            print('Retrying edit date: $e');
-          },
+          onRetry: (e) => print('Retrying edit date: $e'),
         );
         print('my-meeting-edit-date.php response: ${response.body}');
         if (response.statusCode == 200) {
@@ -1302,29 +715,20 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Date updated successfully')),
             );
-
             await _loadMeetings();
             widget.onRefreshMeetings?.call();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Failed to update date: ${data['message'] ?? 'Unknown error'}',
-                ),
-              ),
+              SnackBar(content: Text('Failed to update date: ${data['message'] ?? 'Unknown error'}')),
             );
           }
         } else if (response.statusCode == 429) {
           print('Rate limit exceeded for edit date');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Too many requests. Please try again later.'),
-            ),
+            const SnackBar(content: Text('Too many requests. Please try again later.')),
           );
         } else {
-          print(
-            'my-meeting-edit-date.php failed with status ${response.statusCode}',
-          );
+          print('my-meeting-edit-date.php failed with status ${response.statusCode}');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to update date')),
           );
@@ -1333,175 +737,6 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> {
         print('Error updating meeting date: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error updating meeting date')),
-        );
-      }
-    }
-  }
-
-Future<void> _sendLocationRequest(
-  BuildContext context,
-  Map<String, dynamic> meeting,
-) async {
-  if (_userId == null || _userId == 'Unknown') {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-    );
-    return;
-  }
-  try {
-    final response = await retry(
-      () => http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-meeting-send-location-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
-        ),
-        headers: {
-          'token': widget.token,
-          'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-        },
-      ),
-      maxAttempts: 3,
-      delayFactor: const Duration(seconds: 2),
-      randomizationFactor: 0.25,
-      onRetry: (e) {
-        print('Retrying send location request: $e');
-      },
-    );
-    print('my-meeting-send-location-request.php response: ${response.body}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == true || data['status'] == 'true') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location request sent successfully')),
-        );
-        // Switch to Awaiting Location tab
-        if (mounted) {
-          setState(() {
-            selectedIndex = 2; // Awaiting Location tab
-            print('Switched to Awaiting Location tab for meeting ${meeting['id']}');
-          });
-          await _loadMeetings();
-          widget.onRefreshMeetings?.call();
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to send location request: ${data['message'] ?? 'Unknown error'}',
-            ),
-          ),
-        );
-      }
-    } else if (response.statusCode == 429) {
-      print('Rate limit exceeded for send location request');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Too many requests. Please try again later.'),
-        ),
-      );
-    } else {
-      print(
-        'my-meeting-send-location-request.php failed with status ${response.statusCode}',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send location request')),
-      );
-    }
-  } catch (e) {
-    print('Error sending location request: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Error sending location request')),
-    );
-  }
-}
-  // Future<void> _cancelMeeting(
-  //   BuildContext context,
-  //   Map<String, dynamic> meeting,
-  // ) async {
-  //   if (_userId == null || _userId == 'Unknown') {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-  //     );
-  //     return;
-  //   }
-  //   try {
-  //     final response = await http.get(
-  //       Uri.parse(
-  //         '${widget.baseUrl}/my-meeting-cancel.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
-  //       ),
-  //       headers: {
-  //         'token': widget.token,
-  //         'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-  //       },
-  //     );
-  //    print('my-meeting-cancel.php response: ${response.body}');
-  //     if (response.statusCode == 200) {
-  //       final data = jsonDecode(response.body);
-  //       if (data['status'] == true || data['status'] == 'true') {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           const SnackBar(content: Text('Meeting cancelled successfully')),
-  //         );
-
-  //         await _loadMeetings();
-  //         widget.onRefreshMeetings?.call();
-  //       } else {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           SnackBar(
-  //             content: Text(
-  //               'Failed to cancel meeting: ${data['message'] ?? 'Unknown error'}',
-  //             ),
-  //           ),
-  //         );
-  //       }
-  //     } else {
-  //      print(
-  //         'my-meeting-cancel.php failed with status ${response.statusCode}',
-  //       );
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Failed to cancel meeting')),
-  //       );
-  //     }
-  //   } catch (e) {
-  //    print('Error cancelling meeting: $e');
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(const SnackBar(content: Text('Error cancelling meeting')));
-  //   }
-  // }
-
-  Future<void> _viewLocation(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    final locationLink = meeting['location_link'];
-    if (locationLink != null && locationLink.isNotEmpty) {
-      final Uri url = Uri.parse(locationLink);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open location link')),
-        );
-      }
-    } else {
-      final latitude = meeting['latitude'];
-      final longitude = meeting['longitude'];
-      if (latitude != null &&
-          longitude != null &&
-          latitude.isNotEmpty &&
-          longitude.isNotEmpty) {
-        final Uri mapUrl = Uri.parse(
-          'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
-        );
-        if (await canLaunchUrl(mapUrl)) {
-          await launchUrl(mapUrl);
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Could not open map')));
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No location data available')),
         );
       }
     }

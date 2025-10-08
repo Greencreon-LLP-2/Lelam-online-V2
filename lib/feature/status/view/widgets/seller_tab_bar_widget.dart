@@ -3,7 +3,6 @@ import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_bids_seller_widget.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/my_meeting_seller_widget.dart';
 
-import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/junk_widget.dart';
 
 class SellerTabBarWidget extends StatefulWidget {
   final String? userId;
@@ -86,7 +85,7 @@ class _SellerTabBarWidget extends State<SellerTabBarWidget>
                         postId: widget.postId
                        
                       ),
-                      const JunkWidget(),
+                     
                     ],
                   )
                 : const SizedBox.shrink(),

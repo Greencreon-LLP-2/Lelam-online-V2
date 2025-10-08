@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_bids_widget.dart' hide MyMeetingsWidget;
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart' hide MyBidsWidget;
-import 'package:lelamonline_flutter/feature/status/view/widgets/selling_status/junk_widget.dart';
 
 class TabBarWidget extends StatefulWidget {
   const TabBarWidget({super.key});
@@ -70,7 +69,7 @@ class _TabBarWidgetState extends State<TabBarWidget>
                     children: const [
                       MyBidsWidget(),
                       MyMeetingsWidget(),
-                      JunkWidget(),
+                     
                     ],
                   )
                   : const SizedBox(), // Show nothing until a tab is selected
