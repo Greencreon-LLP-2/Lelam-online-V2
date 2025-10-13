@@ -165,6 +165,51 @@ class MarketplaceService {
     );
     return _attributeVariationsCache!;
   }
+Future<Map<String, String>> fetchPostDetailsWithIcons(String postId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/post-attribute-values.php?token=$token&post_id=$postId'));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['status'] == 'true' && decoded['data'] is List) {
+          Map<String, String> attributes = {};
+          for (var item in decoded['data']) {
+            attributes[item['attribute_name']] = item['attribute_value'];
+          }
+          return attributes;
+        }
+        return {};
+      } else {
+        throw Exception('Failed to load post details');
+      }
+    } catch (e) {
+      developer.log('Error fetching post details: $e');
+      return {};
+    }
+  }
+
+  Future<ModelVariation?> fetchModelVariation(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/post-brand-model-variation.php?token=$token&post_id=$postId'),
+      );
+      developer.log('Variation API Response: ${response.statusCode} - ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        developer.log('Parsed Variation Data: $data');
+        if (data['status'] == 'true' && data['data'] is List && (data['data'] as List).isNotEmpty) {
+          final variations = data['data'][0]['variations'] ?? 'N/A';
+          return ModelVariation(variations: variations, brand: brand, model: modelVariations);
+        } else {
+          return null;
+        }
+      } else {
+        return null;
+      }
+    } catch (e) {
+      developer.log('Error fetching variation: $e');
+      return null;
+    }
+  }
 
   static void clearCache() {
     _postsCache.clear();
@@ -188,7 +233,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   String _selectedLocation = 'all';
   String _listingType = 'Marketplace';
   final TextEditingController _searchController = TextEditingController();
-  final MarketplaceService2 _marketplaceService = MarketplaceService2();
+  final MarketplaceService _marketplaceService = MarketplaceService();
   final _storage = const FlutterSecureStorage();
   final FocusNode _searchFocusNode = FocusNode();
   List<Product> _products = [];
@@ -253,6 +298,10 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   List<String> _ownerRanges = [];
   List<String> _kmRanges = [];
 
+  // Shortlist-related variables
+  Map<String, bool> _favoritedStatus = {};
+  Set<String> _togglingIds = {};
+
  @override
 void initState() {
   super.initState();
@@ -264,6 +313,7 @@ void initState() {
     _fetchProducts();
     _initializeVariations();
     _checkAuctionAvailability();
+    _fetchShortlistStatus(); // Fetch shortlist status
   });
   _fetchLocations();
 
@@ -575,7 +625,7 @@ void _handleScroll() {
       return;
     }
     if (forceRefresh) {
-      MarketplaceService2.clearCache();
+      MarketplaceService.clearCache();
       _postAttributeValuesCache.clear();
       _fetchingPostIds.clear();
       _filteredProductsCache.clear();
@@ -625,6 +675,8 @@ void _handleScroll() {
         _filtersChanged = true;
         _isLoading = false;
       });
+
+      await _fetchShortlistStatus(); // Fetch shortlist status
 
       final initialVisibleCount = 10;
       final initialProducts = products.take(initialVisibleCount).toList();
@@ -769,6 +821,140 @@ Future<void> _fetchPostAttributes(String postId) async {
     });
   }
 
+  Future<void> _fetchShortlistStatus() async {
+    if (_userProvider.userId == null) return;
+
+    try {
+      final response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": _userProvider.userId},
+      );
+
+      if (response['status'] == 'true' && response['data'] is List) {
+        final List<String> shortlistedIds = (response['data'] as List)
+            .map((item) => item['post_id'].toString())
+            .toList();
+
+        setState(() {
+          for (var product in _products) {
+            _favoritedStatus[product.id] = shortlistedIds.contains(product.id);
+          }
+        });
+      } else {
+        developer.log('Invalid shortlist data: ${response['data']}');
+      }
+    } catch (e) {
+      developer.log('Error fetching shortlist: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite(String postId) async {
+    if (_userProvider.userId == null) {
+      _showLoginPromptDialog('add or remove from shortlist');
+      return;
+    }
+
+    if (_togglingIds.contains(postId)) return;
+
+    setState(() {
+      _togglingIds.add(postId);
+    });
+
+    try {
+      final headers = {'token': token};
+      final url =
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$postId';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == true || responseData['status'] == 'true';
+        final String message = responseData['data']?.toString() ?? '';
+
+        if (isSuccess) {
+          final bool wasAdded =
+              message.toLowerCase().contains('added') ||
+              !(_favoritedStatus[postId] ?? false);
+          setState(() {
+            _favoritedStatus[postId] = wasAdded;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                wasAdded ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update shortlist: $message'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      developer.log('Error toggling shortlist: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      setState(() {
+        _togglingIds.remove(postId);
+      });
+    }
+  }
+
+  void _showLoginPromptDialog(String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return LoginDialog(
+          onSuccess: () {
+            _fetchLocations();
+            _fetchShortlistStatus();
+          },
+        );
+      },
+    );
+  }
+
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
@@ -904,7 +1090,7 @@ Future<void> _fetchPostAttributes(String postId) async {
           selectedYearRange: _selectedYearRange,
           selectedOwnersRange: _selectedOwnersRange,
           selectedFuelTypes: _selectedFuelTypes,
-          selectedTransmissions: _selectedTransmissions,
+          selectedTransmissions: _selectedTransmissions, 
           selectedKmRange: _selectedKmRange,
           selectedSoldBy: _selectedSoldBy,
           postAttributeValuesCache: _postAttributeValuesCache,
@@ -1389,6 +1575,8 @@ Widget _buildProductCard(Product product) {
   final isFeatured = product.feature == '1';
   final isVerified = product.ifVerifyed == '1';
   final hasOffer = product.ifOfferPrice == '1';
+  final isFavorited = _favoritedStatus[product.id] ?? false;
+  final isToggling = _togglingIds.contains(product.id);
 
  return GestureDetector(
     onTap: () {
@@ -1430,236 +1618,251 @@ Widget _buildProductCard(Product product) {
       ),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Container(
-                  width: 120,
-                  height: 150,
-                  margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                  decoration: BoxDecoration(color: Colors.grey.shade200),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: 'https://lelamonline.com/admin/${product.image}',
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 150,
-                          placeholder: (context, url) => const Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          ),
-                          errorWidget: (context, url, error) {
-                            developer.log(
-                              'Failed to load image: https://lelamonline.com/admin/${product.image}',
-                            );
-                            developer.log('Error: $error');
-                            return Container(
-                              color: Colors.grey.shade200,
-                              child: Icon(
-                                Icons.directions_car,
-                                size: 40,
-                                color: Colors.grey.shade400,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      if (isAuction)
-                        Positioned(
-                          top: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'AUCTION',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (isVerified || isFeatured)
-                        Positioned(
-                          top: 4,
-                          left: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Icon(
-                                  Icons.verified,
-                                  size: 12,
-                                  color: Colors.white,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Container(
+                      width: 120,
+                      height: 150,
+                      margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                      decoration: BoxDecoration(color: Colors.grey.shade200),
+                      child: Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: CachedNetworkImage(
+                              imageUrl: 'https://lelamonline.com/admin/${product.image}',
+                              fit: BoxFit.cover,
+                              width: 120,
+                              height: 150,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
-                                SizedBox(width: 4),
-                                Text(
-                                  "Verified",
+                              ),
+                              errorWidget: (context, url, error) {
+                                developer.log(
+                                  'Failed to load image: https://lelamonline.com/admin/${product.image}',
+                                );
+                                developer.log('Error: $error');
+                                return Container(
+                                  color: Colors.grey.shade200,
+                                  child: Icon(
+                                    Icons.directions_car,
+                                    size: 40,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          if (isAuction)
+                            Positioned(
+                              top: 4,
+                              left: 4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'AUCTION',
                                   style: TextStyle(
+                                    fontSize: 8,
                                     color: Colors.white,
-                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        _modelVariationsCache[product.id] != null
-                            ? ' ${_modelVariationsCache[product.id]!.variations}'
-                            : _fetchingModelVariationIds.contains(product.id)
-                                ? 'Loading...'
-                                : product.modelVariation,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      if (isAuction)
-                        Text(
-                          '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Palette.primaryblue,
-                          ),
-                        )
-                      else if (hasOffer)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _formatPrice(double.tryParse(product.price) ?? 0),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                decoration: TextDecoration.lineThrough,
                               ),
                             ),
-                            SizedBox(width: 10),
+                          if (isVerified || isFeatured)
+                            Positioned(
+                              top: 4,
+                              left: 4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(
+                                      Icons.verified,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "Verified",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            product.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            _modelVariationsCache[product.id] != null
+                                ? ' ${_modelVariationsCache[product.id]!.variations}'
+                                : _fetchingModelVariationIds.contains(product.id)
+                                    ? 'Loading...'
+                                    : product.modelVariation,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (isAuction)
                             Text(
-                              _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                              '${_formatPrice(double.tryParse(product.auctionStartingPrice) ?? 0)} - ${_formatPrice(double.tryParse(product.price) ?? 0)}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Palette.primaryblue,
+                              ),
+                            )
+                          else if (hasOffer)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _formatPrice(double.tryParse(product.price) ?? 0),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Palette.primaryblue,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              _formatPrice(double.tryParse(product.price) ?? 0),
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Palette.primaryblue,
                               ),
                             ),
-                          ],
-                        )
-                      else
-                        Text(
-                          _formatPrice(double.tryParse(product.price) ?? 0),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Palette.primaryblue,
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _getLocationName(product.parentZoneId),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 12,
-                            color: Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _getLocationName(product.parentZoneId),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade600,
-                            ),
+                          const SizedBox(height: 4),
+                          Builder(
+                            builder: (context) {
+                              final attributeValues = _postAttributeValuesCache[product.id] ?? {};
+                              final isFetching = _fetchingPostIds.contains(product.id);
+                              final year = attributeValues['Year'] ?? 'N/A';
+                              final owners = attributeValues['No of owners'] ?? 'N/A';
+                              final transmission = attributeValues['Transmission'] ?? 'N/A';
+                              final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
+                              final kmRange = attributeValues['KM Range'] ?? 'N/A';
+
+                              if (isFetching && attributeValues.isEmpty) {
+                                return const SizedBox(
+                                  height: 32,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  if (year != 'N/A')
+                                    _buildDetailChip(Icons.calendar_today, year),
+                                  if (owners != 'N/A')
+                                    _buildDetailChip(Icons.person, _getOwnerText(owners)),
+                                  if (kmRange != 'N/A')
+                                    _buildDetailChip(Icons.speed, _formatKmRange(kmRange)),
+                                  if (fuelType != 'N/A')
+                                    _buildDetailChip(Icons.local_gas_station, fuelType),
+                                  if (transmission != 'N/A')
+                                    _buildDetailChip(Icons.settings, transmission),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Builder(
-                        builder: (context) {
-                          final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-                          final isFetching = _fetchingPostIds.contains(product.id);
-                          final year = attributeValues['Year'] ?? 'N/A';
-                          final owners = attributeValues['No of owners'] ?? 'N/A';
-                          final transmission = attributeValues['Transmission'] ?? 'N/A';
-                          final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
-                          final kmRange = attributeValues['KM Range'] ?? 'N/A';
-
-                          if (isFetching && attributeValues.isEmpty) {
-                            return const SizedBox(
-                              height: 32,
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          }
-
-                          return Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: [
-                              if (year != 'N/A')
-                                _buildDetailChip(Icons.calendar_today, year),
-                              if (owners != 'N/A')
-                                _buildDetailChip(Icons.person, _getOwnerText(owners)),
-                              if (kmRange != 'N/A')
-                                _buildDetailChip(Icons.speed, _formatKmRange(kmRange)),
-                              if (fuelType != 'N/A')
-                                _buildDetailChip(Icons.local_gas_station, fuelType),
-                              if (transmission != 'N/A')
-                                _buildDetailChip(Icons.settings, transmission),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: IconButton(
+                  icon: Icon(
+                    isFavorited ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorited ? Colors.red : Colors.grey,
+                  ),
+                  onPressed: isToggling ? null : () => _toggleFavorite(product.id),
                 ),
               ),
             ],

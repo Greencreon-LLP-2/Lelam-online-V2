@@ -7,6 +7,9 @@ import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/real%20estate/real_estate_details_page.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/utils/login_dialog.dart';
+import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
 
 // MarketplacePost model (unchanged)
@@ -257,9 +260,15 @@ class _RealEstatePageState extends State<RealEstatePage> {
   List<MarketplacePost> _filteredPostsCache = [];
   bool _filtersChanged = true; // Initialize to true for initial filtering
 
+  // Shortlist-related variables
+  Map<String, bool> _favoritedStatus = {};
+  Set<String> _togglingIds = {};
+  late LoggedUserProvider _userProvider;
+
   @override
   void initState() {
     super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _scrollController = ScrollController();
     _scrollController.addListener(_handleScroll);
     _fetchPosts();
@@ -477,12 +486,147 @@ class _RealEstatePageState extends State<RealEstatePage> {
         _filtersChanged = true;
         _isLoading = false;
       });
+      _fetchShortlistStatus();
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchShortlistStatus() async {
+    if (_userProvider.userId == null) return;
+
+    try {
+      final response = await ApiService().get(
+        url: shortlist,
+        queryParams: {"user_id": _userProvider.userId},
+      );
+
+      if (response['status'] == 'true' && response['data'] is List) {
+        final List<String> shortlistedIds = (response['data'] as List)
+            .map((item) => item['post_id'].toString())
+            .toList();
+
+        setState(() {
+          for (var post in _posts) {
+            _favoritedStatus[post.id] = shortlistedIds.contains(post.id);
+          }
+        });
+      } else {
+        developer.log('Invalid shortlist data: ${response['data']}');
+      }
+    } catch (e) {
+      developer.log('Error fetching shortlist: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite(String postId) async {
+    if (_userProvider.userId == null) {
+      _showLoginPromptDialog('add or remove from shortlist');
+      return;
+    }
+
+    if (_togglingIds.contains(postId)) return;
+
+    setState(() {
+      _togglingIds.add(postId);
+    });
+
+    try {
+      final headers = {'token': token};
+      final url =
+          '$baseUrl/add-to-shortlist.php?token=$token&user_id=${_userProvider.userId}&post_id=$postId';
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        final bool isSuccess =
+            responseData['status'] == true || responseData['status'] == 'true';
+        final String message = responseData['data']?.toString() ?? '';
+
+        if (isSuccess) {
+          final bool wasAdded =
+              message.toLowerCase().contains('added') ||
+              !(_favoritedStatus[postId] ?? false);
+          setState(() {
+            _favoritedStatus[postId] = wasAdded;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                wasAdded ? 'Added to shortlist' : 'Removed from shortlist',
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update shortlist: $message'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${response.reasonPhrase}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    } catch (e) {
+      developer.log('Error toggling shortlist: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } finally {
+      setState(() {
+        _togglingIds.remove(postId);
+      });
+    }
+  }
+
+  void _showLoginPromptDialog(String action) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return LoginDialog(
+          onSuccess: () {
+            _fetchLocations();
+            _fetchShortlistStatus();
+          },
+        );
+      },
+    );
   }
 
   // New method for relevance scoring
@@ -1108,13 +1252,9 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           displayText,
                           style: TextStyle(
                             color:
-                                isSelected
-                                    ? Palette.primarypink
-                                    : Colors.black87,
+                                isSelected ? Palette.primarypink : Colors.black87,
                             fontWeight:
-                                isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
+                                isSelected ? FontWeight.w600 : FontWeight.normal,
                             fontSize: 12,
                           ),
                         ),
@@ -1637,6 +1777,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
             ? post.filters['propertyType']!.first
             : 'N/A';
     final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+    final isFavorited = _favoritedStatus[post.id] ?? false;
+    final isToggling = _togglingIds.contains(post.id);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1670,127 +1812,142 @@ class _RealEstatePageState extends State<RealEstatePage> {
             ),
             child: Column(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Stack(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Container(
-                        width: 120,
-                        height: 138,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: const BorderRadius.all(
-                            Radius.circular(0),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 10),
+                          child: Container(
+                            width: 120,
+                            height: 138,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: const BorderRadius.all(
+                                Radius.circular(0),
+                              ),
+                            ),
+                            child: Container(
+                              width: 130,
+                              height: 138,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(12),
+                                ),
+                                image: DecorationImage(
+                                  image: NetworkImage(getImageUrl(post.image)),
+                                  fit: BoxFit.cover,
+                                  onError: (exception, stackTrace) {
+                                    developer.log(
+                                      'Failed to load image: ${getImageUrl(post.image)}',
+                                    );
+                                    developer.log('Error: $exception');
+                                  },
+                                ),
+                              ),
+                              child:
+                                  isFeatured
+                                      ? Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Container(
+                                          margin: const EdgeInsets.only(
+                                            top: 8,
+                                            left: 8,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.white),
+                                          ),
+                                          child: const Text(
+                                            'FEATURED',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      : null,
+                            ),
                           ),
                         ),
-                        child: Container(
-                          width: 130,
-                          height: 138,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            image: DecorationImage(
-                              image: NetworkImage(getImageUrl(post.image)),
-                              fit: BoxFit.cover,
-                              onError: (exception, stackTrace) {
-                                developer.log(
-                                  'Failed to load image: ${getImageUrl(post.image)}',
-                                );
-                                developer.log('Error: $exception');
-                              },
-                            ),
-                          ),
-                          child:
-                              isFeatured
-                                  ? Align(
-                                    alignment: Alignment.topLeft,
-                                    child: Container(
-                                      margin: const EdgeInsets.only(
-                                        top: 8,
-                                        left: 8,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Colors.white),
-                                      ),
-                                      child: const Text(
-                                        'FEATURED',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  post.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  isAuction
+                                      ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
+                                      : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Palette.primaryblue,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.location_on,
+                                      size: 14,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _getLocationName(post.parentZoneId),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
                                       ),
                                     ),
-                                  )
-                                  : null,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              post.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              isAuction
-                                  ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
-                                  : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Palette.primaryblue,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.grey.shade500,
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _getLocationName(post.parentZoneId),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
+                                const SizedBox(height: 8),
+                                _buildDetailChip(
+                                  Icon(
+                                    Icons.person,
+                                    size: 8,
+                                    color: Colors.grey[700],
                                   ),
+                                  sellerType,
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            _buildDetailChip(
-                              Icon(
-                                Icons.person,
-                                size: 8,
-                                color: Colors.grey[700],
-                              ),
-                              sellerType,
-                            ),
-                          ],
+                          ),
                         ),
+                      ],
+                    ),
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: IconButton(
+                        icon: Icon(
+                          isFavorited ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorited ? Colors.red : Colors.grey,
+                        ),
+                        onPressed: isToggling ? null : () => _toggleFavorite(post.id),
                       ),
                     ),
                   ],

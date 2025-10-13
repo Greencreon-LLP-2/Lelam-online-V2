@@ -246,7 +246,7 @@ Future<void> _showResponseDialog(
                     ),
                   if (isSuccess && isHighestBid) const SizedBox(height: 8),
                   Text(
-                    '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                    '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
                     style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                           fontSize: 16,
                           color: Colors.grey[800],
@@ -1701,16 +1701,16 @@ void showProductBidDialog(BuildContext context) async {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Current Highest Bid: ${_currentHighestBid.startsWith('Error') ? _currentHighestBid : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid) ?? 0)}'}',
-                    style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _currentHighestBid.startsWith('Error')
-                              ? Colors.red[800]
-                              : Colors.grey[800],
-                        ),
-                  ),
+                  // Text(
+                  //   'Current Highest Bid: ${_currentHighestBid.startsWith('Error') ? _currentHighestBid : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid) ?? 0)}'}',
+                  //   style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                  //         fontSize: 16,
+                  //         fontWeight: FontWeight.bold,
+                  //         color: _currentHighestBid.startsWith('Error')
+                  //             ? Colors.red[800]
+                  //             : Colors.grey[800],
+                  //       ),
+                  // ),
                   const SizedBox(height: 8),
                   Text(
                     'Your Bid Amount *',
