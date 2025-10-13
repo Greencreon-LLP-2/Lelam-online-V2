@@ -65,17 +65,20 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
     return widget.isRequired ? '$baseText *' : baseText;
   }
 
-  // Show full-screen dropdown dialog
-  Future<void> _showFullScreenDropdown(BuildContext context, FormFieldState<T> field) async {
+  // Show dropdown dialog with max height
+  Future<void> _showDropdownDialog(BuildContext context, FormFieldState<T> field) async {
     final T? selectedValue = await showDialog<T?>(
       context: context,
       builder: (context) => Dialog(
-        insetPadding: EdgeInsets.zero,
-        backgroundColor: Colors.white,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+            minWidth: double.infinity,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               // Header with title and close button
               Padding(
@@ -98,41 +101,46 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
                   ],
                 ),
               ),
-              // Scrollable list of items
-              Expanded(
-                child: ListView(
-                  children: [
-                    // Clear option
-                    ListTile(
-                      title: Text(
-                        'Clear selection',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context, null);
-                      },
-                    ),
-                    // Regular items
-                    ...widget.items.map(
-                      (item) => ListTile(
+              const Divider(height: 1),
+              // Scrollable list with scrollbar
+              Flexible(
+                child: Scrollbar(
+                  thumbVisibility: true,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      // Clear option
+                      ListTile(
                         title: Text(
-                          widget.itemToString(item),
-                          style: const TextStyle(
+                          'Clear selection',
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
-                            color: Colors.black87,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                         onTap: () {
-                          Navigator.pop(context, item);
+                          Navigator.pop(context, null);
                         },
                       ),
-                    ),
-                  ],
+                      // Regular items
+                      ...widget.items.map(
+                        (item) => ListTile(
+                          title: Text(
+                            widget.itemToString(item),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context, item);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -184,7 +192,7 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
             onTap: widget.enabled
                 ? () {
                     _focusNode.requestFocus();
-                    _showFullScreenDropdown(context, field);
+                    _showDropdownDialog(context, field);
                   }
                 : null,
             child: InputDecorator(

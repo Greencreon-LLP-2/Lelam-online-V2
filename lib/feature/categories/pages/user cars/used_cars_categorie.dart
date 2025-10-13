@@ -413,37 +413,39 @@ void _handleScroll() {
   }
   _fetchVisibleAttributes();
 }
-  Future<void> _checkAuctionAvailability() async {
-    if (_hasCheckedAuctions) return; // Avoid redundant checks
-    try {
-      final auctionPosts = await _marketplaceService.fetchPosts(
-        categoryId: '1',
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
-        listingType: 'auction',
-        userId: _userId ?? '',
+Future<void> _checkAuctionAvailability() async {
+  if (_hasCheckedAuctions) return; // Avoid redundant checks
+  try {
+    final auctionPosts = await _marketplaceService.fetchPosts(
+      categoryId: '1',
+      userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+      listingType: 'auction',
+      userId: _userId ?? '',
+    );
+    final auctionProducts =
+        auctionPosts.map((post) => post.toProduct()).toList();
+    setState(() {
+      _hasActiveAuctions = auctionProducts.any(
+        (product) => product.ifAuction == '1' && product.auctionStatus == '1',
       );
-      final auctionProducts =
-          auctionPosts.map((post) => post.toProduct()).toList();
+      _hasCheckedAuctions = true;
+    });
+    developer.log(
+      'Initial auction check: _hasActiveAuctions=$_hasActiveAuctions',
+    );
+  } catch (e) {
+    developer.log('Error checking auction availability: $e');
+    if (e.toString().contains('Please accept live auction terms')) {
       setState(() {
-        _hasActiveAuctions = auctionProducts.any(
-          (product) => product.ifAuction == '1' && product.auctionStatus == '1',
-        );
+        _hasActiveAuctions = true;  // Set to true since terms error implies auctions exist
+      });
+    } else {
+      setState(() {
         _hasCheckedAuctions = true;
       });
-      developer.log(
-        'Initial auction check: _hasActiveAuctions=$_hasActiveAuctions',
-      );
-    } catch (e) {
-      developer.log('Error checking auction availability: $e');
-      if (e.toString().contains('Please accept live auction terms')) {
-        // Don't reset _hasActiveAuctions; assume auctions may exist
-      } else {
-        setState(() {
-          _hasCheckedAuctions = true;
-        });
-      }
     }
   }
+}
 
   Future<bool> _showTermsAndConditionsDialog(BuildContext context) async {
     bool isAccepted = false;
@@ -1376,7 +1378,7 @@ void _showFilterBottomSheet() {
 
   @override
   Widget build(BuildContext context) {
-    print(
+    developer.log(
       'Building UI: isLoading=$_isLoading, filteredProducts=${filteredProducts.length}, products=${_products.length}, errorMessage=$_errorMessage',
     );
     return Consumer<LoggedUserProvider>(
