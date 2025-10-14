@@ -136,24 +136,26 @@ class _MarketPlaceProductDetailsPageState
 
   String _modelVariation = 'N/A';
   final TextEditingController _bidController = TextEditingController();
-  
 
-@override
-void initState() {
-  super.initState();
-  _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-  // Initialize auction status (adjust field names based on your MarketplacePost model)
-  _isWaitingForApproval =
-      widget.product.ifAuction == '1' || widget.product.status == 'pending';
-  _moveToAuctionButtonText =
-      _isWaitingForApproval
-          ? 'Waiting for Admin Approval'
-          : 'Move to Auction';
-  _fetchAllData();  // New method to fetch everything together
-  _isCheckingShortlist = true;
-}
+  String get latitude => _getProperty('latitude') ?? '';
+  String get longitude => _getProperty('longitude') ?? '';
 
-@override
+  @override
+  void initState() {
+    super.initState();
+    _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    // Initialize auction status (adjust field names based on your MarketplacePost model)
+    _isWaitingForApproval =
+        widget.product.ifAuction == '1' || widget.product.status == 'pending';
+    _moveToAuctionButtonText =
+        _isWaitingForApproval
+            ? 'Waiting for Admin Approval'
+            : 'Move to Auction';
+    _fetchAllData(); // New method to fetch everything together
+    _isCheckingShortlist = true;
+  }
+
+  @override
   void dispose() {
     _bidController.dispose();
     _pageController.dispose();
@@ -161,269 +163,284 @@ void initState() {
     super.dispose();
   }
 
-Future<void> _fetchAllData() async {
-  await Future.wait([
-    _fetchVariation(),
-    _fetchLocations(),
-    _fetchSellerComments(),
-    _fetchSellerInfo(),
-    _checkShortlistStatus(),
-    _fetchGalleryImages(),
-    _fetchBannerImage(),
-    _fetchContainerInfo(),
-    _fetchReviews(),
-  ]);
-  if (mounted) {
-    setState(() {
-      _isCheckingShortlist = false;  // Ensure this is reset after all fetches
-    });
+  Future<void> _fetchAllData() async {
+    await Future.wait([
+      _fetchVariation(),
+      _fetchLocations(),
+      _fetchSellerComments(),
+      _fetchSellerInfo(),
+      _checkShortlistStatus(),
+      _fetchGalleryImages(),
+      _fetchBannerImage(),
+      _fetchContainerInfo(),
+      _fetchReviews(),
+    ]);
+    if (mounted) {
+      setState(() {
+        _isCheckingShortlist = false; // Ensure this is reset after all fetches
+      });
+    }
   }
-}
 
-Future<void> _showResponseDialog(
-    String message, bool isSuccess, bool isHighestBid) async {
-  // Format the current highest bid
-  final String formattedBid = _currentHighestBid.startsWith('Error')
-      ? _currentHighestBid
-      : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+  Future<void> _showResponseDialog(
+    String message,
+    bool isSuccess,
+    bool isHighestBid,
+  ) async {
+    // Format the current highest bid
+    final String formattedBid =
+        _currentHighestBid.startsWith('Error')
+            ? _currentHighestBid
+            : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
 
-  // Support phone number
-  const String supportPhoneNumber = '+918089308048';
+    // Support phone number
+    const String supportPhoneNumber = '+918089308048';
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  return showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-        ),
-        backgroundColor: Colors.white,
-        titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              isSuccess ? 'Thank You' : 'Error',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isSuccess ? AppTheme.primaryColor : Colors.red,
-              ),
-            ),
-            IconButton(
-              icon: Icon(Icons.close, size: 28, color: Colors.grey[700]),
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              splashRadius: 24,
-              onPressed: () {
-                Navigator.of(ctx).pop();
-              },
-              tooltip: 'Close dialog',
-            ),
-          ],
-        ),
-        content: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isSuccess && isHighestBid)
-                    Text(
-                      'Congratulations, your bid is the highest bid! 🎉 \nCheck status in High Bids',
-                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[800],
-                          ),
-                    ),
-                  if (isSuccess && isHighestBid) const SizedBox(height: 8),
-                  Text(
-                    '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
-                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          color: Colors.grey[800],
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Last Highest Bid:',
-                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[600],
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _currentHighestBid.startsWith('Error')
-                        ? Colors.red
-                        : Colors.grey[300]!,
-                    width: 1.5,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  color: _currentHighestBid.startsWith('Error')
-                      ? Colors.red[50]
-                      : Colors.green[50],
-                ),
-                child: Text(
-                  formattedBid,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: _currentHighestBid.startsWith('Error')
-                        ? Colors.red[800]
-                        : Colors.green[800],
-                  ),
-                ),
-              ),
-            ],
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
           ),
-        ),
-        actions: [
-          Row(
+          backgroundColor: Colors.white,
+          titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    if (isSuccess) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => BuyingStatusPage(),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    foregroundColor: Colors.grey[800],
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Check Status',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              Text(
+                isSuccess ? 'Thank You' : 'Error',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isSuccess ? AppTheme.primaryColor : Colors.red,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final Uri phoneUri = Uri(
-                      scheme: 'tel',
-                      path: supportPhoneNumber,
-                    );
-                    if (await canLaunchUrl(phoneUri)) {
-                      await launchUrl(phoneUri);
-                    } else {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: const Text(
-                            'Unable to initiate call. Please try again or contact support via other channels.',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          backgroundColor: Colors.red[800],
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 2,
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.phone, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Call Support',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              IconButton(
+                icon: Icon(Icons.close, size: 28, color: Colors.grey[700]),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                splashRadius: 24,
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                },
+                tooltip: 'Close dialog',
               ),
             ],
           ),
-        ],
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      );
-    },
-  );
-}
-
-Future<void> _fetchVariation() async {
-  
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/post-brand-model-variation.php?token=$token&post_id=$id'),
-      headers: {'token': token},
+          content: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (isSuccess && isHighestBid)
+                      Text(
+                        'Congratulations, your bid is the highest bid! 🎉 \nCheck status in High Bids',
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[800],
+                        ),
+                      ),
+                    if (isSuccess && isHighestBid) const SizedBox(height: 8),
+                    Text(
+                      '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
+                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                        fontSize: 16,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Last Highest Bid:',
+                  style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red
+                              : Colors.grey[300]!,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color:
+                        _currentHighestBid.startsWith('Error')
+                            ? Colors.red[50]
+                            : Colors.green[50],
+                  ),
+                  child: Text(
+                    formattedBid,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color:
+                          _currentHighestBid.startsWith('Error')
+                              ? Colors.red[800]
+                              : Colors.green[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      if (isSuccess) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BuyingStatusPage(),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.grey[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Check Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final Uri phoneUri = Uri(
+                        scheme: 'tel',
+                        path: supportPhoneNumber,
+                      );
+                      if (await canLaunchUrl(phoneUri)) {
+                        await launchUrl(phoneUri);
+                      } else {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              'Unable to initiate call. Please try again or contact support via other channels.',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.red[800],
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 2,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.phone, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Call Support',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        );
+      },
     );
-    developer.log('Variation API Response: ${response.statusCode} - ${response.body}');  // Use developer.log for better logging
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      developer.log('Parsed Variation Data: $data');
-      if (data['status'] == 'true' && data['data'] is List && (data['data'] as List).isNotEmpty) {
-        final variations = data['data'][0]['variations'] ?? 'N/A';
-        setState(() {
-          _modelVariation = variations; 
-         
-        });
-        developer.log('Set _modelVariation: $variations');
+  }
+
+  Future<void> _fetchVariation() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-brand-model-variation.php?token=$token&post_id=$id',
+        ),
+        headers: {'token': token},
+      );
+      developer.log(
+        'Variation API Response: ${response.statusCode} - ${response.body}',
+      ); // Use developer.log for better logging
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        developer.log('Parsed Variation Data: $data');
+        if (data['status'] == 'true' &&
+            data['data'] is List &&
+            (data['data'] as List).isNotEmpty) {
+          final variations = data['data'][0]['variations'] ?? 'N/A';
+          setState(() {
+            _modelVariation = variations;
+          });
+          developer.log('Set _modelVariation: $variations');
+        } else {
+          setState(() {
+            _modelVariation = 'N/A';
+          });
+        }
       } else {
         setState(() {
           _modelVariation = 'N/A';
-        
         });
       }
-    } else {
+    } catch (e) {
+      developer.log('Error fetching variation: $e');
       setState(() {
         _modelVariation = 'N/A';
-        
       });
     }
-  } catch (e) {
-    developer.log('Error fetching variation: $e');
-    setState(() {
-      _modelVariation = 'N/A';
-     
-    });
   }
-}
+
   Future<void> _fetchReviews() async {
     setState(() {
       isLoadingReviews = true;
@@ -1271,78 +1288,80 @@ Future<void> _fetchVariation() async {
     }
   }
 
-Future<void> _fetchCurrentHighestBid() async {
-  try {
-    if (mounted) {
-      setState(() {
-        _isLoadingBid = true;
-      });
-    }
+  Future<void> _fetchCurrentHighestBid() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _isLoadingBid = true;
+        });
+      }
 
-    final headers = {'token': token};
-    final url = '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
-    print('Fetching highest bid: $url');
-    final request = http.Request('GET', Uri.parse(url));
-    request.headers.addAll(headers);
+      final headers = {'token': token};
+      final url =
+          '$baseUrl/current-higest-bid-for-post.php?token=$token&post_id=$id';
+      print('Fetching highest bid: $url');
+      final request = http.Request('GET', Uri.parse(url));
+      request.headers.addAll(headers);
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    print('Full API response body: $responseBody');
-    print('Response status code: ${response.statusCode}');
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      print('Full API response body: $responseBody');
+      print('Response status code: ${response.statusCode}');
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(responseBody);
-      print('Parsed response data: $responseData');
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(responseBody);
+        print('Parsed response data: $responseData');
 
-      if (responseData['status'] == true) {
-        final dataValue = (responseData['data']?.toString() ?? '0').trim();
-        final parsed = double.tryParse(dataValue);
-        if (parsed != null) {
-          if (mounted) {
-            setState(() {
-              _currentHighestBid = parsed.toString();
-            });
+        if (responseData['status'] == true) {
+          final dataValue = (responseData['data']?.toString() ?? '0').trim();
+          final parsed = double.tryParse(dataValue);
+          if (parsed != null) {
+            if (mounted) {
+              setState(() {
+                _currentHighestBid = parsed.toString();
+              });
+            }
+            print('Successfully fetched highest bid: $dataValue');
+          } else {
+            print('API returned non-numeric data (possible error): $dataValue');
+            if (mounted) {
+              setState(() {
+                _currentHighestBid = 'Error: $dataValue';
+              });
+            }
           }
-          print('Successfully fetched highest bid: $dataValue');
         } else {
-          print('API returned non-numeric data (possible error): $dataValue');
+          print('API status false: ${responseData['data']}');
           if (mounted) {
             setState(() {
-              _currentHighestBid = 'Error: $dataValue';
+              _currentHighestBid = '0';
             });
           }
         }
       } else {
-        print('API status false: ${responseData['data']}');
+        print('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
         if (mounted) {
           setState(() {
             _currentHighestBid = '0';
           });
         }
       }
-    } else {
-      print('HTTP error: ${response.statusCode} - ${response.reasonPhrase}');
+    } catch (e) {
+      print('Exception in fetch highest bid: $e');
       if (mounted) {
         setState(() {
-          _currentHighestBid = '0';
+          _currentHighestBid = 'Error: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingBid = false;
         });
       }
     }
-  } catch (e) {
-    print('Exception in fetch highest bid: $e');
-    if (mounted) {
-      setState(() {
-        _currentHighestBid = 'Error: $e';
-      });
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoadingBid = false;
-      });
-    }
   }
-}
+
   Future<void> _checkShortlistStatus() async {
     if (_userProvider.userId == null) {
       setState(() {
@@ -1660,297 +1679,335 @@ Future<void> _fetchCurrentHighestBid() async {
     );
   }
 
-void showProductBidDialog(BuildContext context) async {
-  if (!_userProvider.isLoggedIn) {
-    _showLoginPromptDialog(context, 'place a bid');
-    return;
-  }
+  void showProductBidDialog(BuildContext context) async {
+    if (!_userProvider.isLoggedIn) {
+      _showLoginPromptDialog(context, 'place a bid');
+      return;
+    }
 
-  setState(() => _isBidDialogOpen = true);
-  await _fetchCurrentHighestBid(); // Fetch the current highest bid
-  final TextEditingController _bidController = TextEditingController();
-  bool isDialogActive = true; // Track if dialog is still open
+    setState(() => _isBidDialogOpen = true);
+    await _fetchCurrentHighestBid(); // Fetch the current highest bid
+    final TextEditingController _bidController = TextEditingController();
+    bool isDialogActive = true; // Track if dialog is still open
 
-  final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    barrierDismissible: false,
-    builder: (dialogContext) {
-      return WillPopScope(
-        onWillPop: () async {
-          isDialogActive = false; // Mark dialog as closed
-          return true;
-        },
-        child: StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0),
-              ),
-              backgroundColor: Colors.white,
-              titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              title: Text(
-                'Place Your Bid Amount',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
+    final Map<String, dynamic>? result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return WillPopScope(
+          onWillPop: () async {
+            isDialogActive = false; // Mark dialog as closed
+            return true;
+          },
+          child: StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16.0),
                 ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Text(
-                  //   'Current Highest Bid: ${_currentHighestBid.startsWith('Error') ? _currentHighestBid : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid) ?? 0)}'}',
-                  //   style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
-                  //         fontSize: 16,
-                  //         fontWeight: FontWeight.bold,
-                  //         color: _currentHighestBid.startsWith('Error')
-                  //             ? Colors.red[800]
-                  //             : Colors.grey[800],
-                  //       ),
-                  // ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your Bid Amount *',
-                    style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
-                    semanticsLabel: 'Your Bid Amount (required)',
+                backgroundColor: Colors.white,
+                titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                contentPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: Text(
+                  'Place Your Bid Amount',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _bidController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: false),
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      hintText: 'Enter amount',
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.only(left: 12, right: 8),
-                        child: Text(
-                          '₹',
-                          style: Theme.of(dialogContext)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                                fontSize: 16,
-                                color: Colors.grey[800],
-                              ),
-                        ),
-                      ),
-                      prefixIconConstraints:
-                          const BoxConstraints(minWidth: 0, minHeight: 0),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[300]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: AppTheme.primaryColor, width: 2),
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: Colors.red, width: 2),
-                      ),
-                      focusedErrorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: Colors.red, width: 2),
-                      ),
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    ),
-                    style: Theme.of(dialogContext)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontSize: 16, color: Colors.grey[800]),
-                  ),
-                  if (_isLoadingBid)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12.0),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          isDialogActive = false; // Mark dialog as closed
-                          Navigator.of(dialogContext).pop(null);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[200],
-                          foregroundColor: Colors.grey[800],
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Close',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          semanticsLabel: 'Close dialog',
-                        ),
+                    // Text(
+                    //   'Current Highest Bid: ${_currentHighestBid.startsWith('Error') ? _currentHighestBid : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid) ?? 0)}'}',
+                    //   style: Theme.of(dialogContext).textTheme.bodyMedium?.copyWith(
+                    //         fontSize: 16,
+                    //         fontWeight: FontWeight.bold,
+                    //         color: _currentHighestBid.startsWith('Error')
+                    //             ? Colors.red[800]
+                    //             : Colors.grey[800],
+                    //       ),
+                    // ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Your Bid Amount *',
+                      style: Theme.of(
+                        dialogContext,
+                      ).textTheme.bodyMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
                       ),
+                      semanticsLabel: 'Your Bid Amount (required)',
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isLoadingBid
-                            ? null
-                            : () async {
-                                final String amount = _bidController.text;
-                                if (amount.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text(
-                                        'Please enter a bid amount',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[800],
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8)),
-                                      margin: const EdgeInsets.all(16),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                final int bidAmount = int.tryParse(amount) ?? 0;
-                                final double currentHighest =
-                                    double.tryParse(_currentHighestBid) ?? 0;
-                                if (bidAmount <= currentHighest) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Your bid must be higher than ₹${NumberFormat('#,##0').format(currentHighest)}',
-                                        style: const TextStyle(
-                                            color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[800],
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8)),
-                                      margin: const EdgeInsets.all(16),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                if (bidAmount < _minBidIncrement) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
-                                        style: const TextStyle(
-                                            color: Colors.white),
-                                      ),
-                                      backgroundColor: Colors.red[800],
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8)),
-                                      margin: const EdgeInsets.all(16),
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                if (isDialogActive) {
-                                  setDialogState(() {
-                                    _isLoadingBid = true;
-                                  });
-                                }
-
-                                try {
-                                  FocusScope.of(dialogContext).unfocus();
-                                  final String responseMessage =
-                                      await _saveBidData(bidAmount);
-
-                                  final bool isHighestBid =
-                                      bidAmount > currentHighest;
-                                  isDialogActive = false; // Mark dialog as closed
-                                  Navigator.of(dialogContext).pop({
-                                    'success': true,
-                                    'message': responseMessage,
-                                    'isHighestBid': isHighestBid,
-                                  });
-                                } catch (e) {
-                                  isDialogActive = false; // Mark dialog as closed
-                                  Navigator.of(dialogContext).pop({
-                                    'success': false,
-                                    'message': 'Error placing bid: $e',
-                                    'isHighestBid': false,
-                                  });
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 2,
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.send, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Submit',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              semanticsLabel: 'Submit bid amount',
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _bidController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: false,
+                      ),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Enter amount',
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 8),
+                          child: Text(
+                            '₹',
+                            style: Theme.of(
+                              dialogContext,
+                            ).textTheme.bodyMedium?.copyWith(
+                              fontSize: 16,
+                              color: Colors.grey[800],
                             ),
-                          ],
+                          ),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 0,
+                          minHeight: 0,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: AppTheme.primaryColor,
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
                         ),
                       ),
+                      style: Theme.of(dialogContext).textTheme.bodyMedium
+                          ?.copyWith(fontSize: 16, color: Colors.grey[800]),
                     ),
+                    if (_isLoadingBid)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ],
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            );
-          },
-        ),
-      );
-    },
-  );
+                actions: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            isDialogActive = false; // Mark dialog as closed
+                            Navigator.of(dialogContext).pop(null);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[200],
+                            foregroundColor: Colors.grey[800],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Close',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            semanticsLabel: 'Close dialog',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              _isLoadingBid
+                                  ? null
+                                  : () async {
+                                    final String amount = _bidController.text;
+                                    if (amount.isEmpty) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: const Text(
+                                            'Please enter a bid amount',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-  // Dispose controller only after all operations are complete
-  if (result != null && mounted) {
-    await _fetchCurrentHighestBid(); // Refresh highest bid after placing a bid
-    final bool ok = result['success'] == true;
-    final String msg = result['message']?.toString() ??
-        (ok ? 'Bid placed successfully' : 'Failed to place bid');
-    final bool isHighestBid = result['isHighestBid'] ?? false;
-    await _showResponseDialog(msg, ok, isHighestBid);
+                                    final int bidAmount =
+                                        int.tryParse(amount) ?? 0;
+                                    final double currentHighest =
+                                        double.tryParse(_currentHighestBid) ??
+                                        0;
+                                    if (bidAmount <= currentHighest) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Your bid must be higher than ₹${NumberFormat('#,##0').format(currentHighest)}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    if (bidAmount < _minBidIncrement) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Minimum bid amount is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.red[800],
+                                          behavior: SnackBarBehavior.floating,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          margin: const EdgeInsets.all(16),
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    if (isDialogActive) {
+                                      setDialogState(() {
+                                        _isLoadingBid = true;
+                                      });
+                                    }
+
+                                    try {
+                                      FocusScope.of(dialogContext).unfocus();
+                                      final String responseMessage =
+                                          await _saveBidData(bidAmount);
+
+                                      final bool isHighestBid =
+                                          bidAmount > currentHighest;
+                                      isDialogActive =
+                                          false; // Mark dialog as closed
+                                      Navigator.of(dialogContext).pop({
+                                        'success': true,
+                                        'message': responseMessage,
+                                        'isHighestBid': isHighestBid,
+                                      });
+                                    } catch (e) {
+                                      isDialogActive =
+                                          false; // Mark dialog as closed
+                                      Navigator.of(dialogContext).pop({
+                                        'success': false,
+                                        'message': 'Error placing bid: $e',
+                                        'isHighestBid': false,
+                                      });
+                                    }
+                                  },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 2,
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.send, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Submit',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                semanticsLabel: 'Submit bid amount',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    // Dispose controller only after all operations are complete
+    if (result != null && mounted) {
+      await _fetchCurrentHighestBid(); // Refresh highest bid after placing a bid
+      final bool ok = result['success'] == true;
+      final String msg =
+          result['message']?.toString() ??
+          (ok ? 'Bid placed successfully' : 'Failed to place bid');
+      final bool isHighestBid = result['isHighestBid'] ?? false;
+      await _showResponseDialog(msg, ok, isHighestBid);
+    }
+
+    _bidController.dispose(); // Dispose after all async operations
+    if (mounted) setState(() => _isBidDialogOpen = false);
   }
-
-  _bidController.dispose(); // Dispose after all async operations
-  if (mounted) setState(() => _isBidDialogOpen = false);
-}
 
   Future<void> _fetchSellerInfo() async {
     try {
@@ -2075,6 +2132,10 @@ void showProductBidDialog(BuildContext context) async {
         return widget.product.createdBy;
       case 'byDealer':
         return widget.product.byDealer;
+      case 'latitude':
+        return widget.product.latitude;
+      case 'longitude':
+        return widget.product.longitude;
       default:
         return null;
     }
@@ -3201,13 +3262,13 @@ void showProductBidDialog(BuildContext context) async {
                         const SizedBox(
                           height: 4,
                         ), // Add spacing between title and variation
-                      Text(
-  _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
-  style: TextStyle(
-    fontSize: 16,
-    color: Colors.grey[600],
-  ),
-),
+                        Text(
+                          _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -3242,6 +3303,34 @@ void showProductBidDialog(BuildContext context) async {
                             ),
                           ],
                         ),
+                        if (latitude.isNotEmpty && longitude.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final mapUrl = Uri.parse(
+                                'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+                              );
+                              if (await canLaunchUrl(mapUrl)) {
+                                await launchUrl(mapUrl);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Could not open Google Maps'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            child: const Text(
+                              'View on Google Maps',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         Text(
                           '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',

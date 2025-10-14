@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -39,124 +40,133 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     _loadAds();
   }
 
-Future<void> _loadAds() async {
-  setState(() {
-    isLoading = true;
-    errorMessage = null;
-  });
-
-  // If adData is passed, add it to the ads list immediately
-  if (widget.adData != null) {
+  Future<void> _loadAds() async {
     setState(() {
-      final passedAdId = widget.adData!['id'];
-      if (!ads.any((ad) => ad['id'] == passedAdId)) {
-        ads.add(widget.adData!);
-        _expandedImages[passedAdId] = false;
-        print('Added passed adData to ads list: ${widget.adData}');
-      } else {
-        final adIndex = ads.indexWhere((ad) => ad['id'] == passedAdId);
-        ads[adIndex] = {...ads[adIndex], ...widget.adData!};
-        print('Updated existing ad with passed adData: ${widget.adData}');
-      }
-      isLoading = false; // Show the ad immediately
+      isLoading = true;
+      errorMessage = null;
     });
-  }
 
-
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}'),
-      headers: {'token': token},
-    );
-
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      print('API response: $responseData');
-      if (responseData['status'] == 'true' && responseData['data'] is List) {
-        final fetchedAds = List<Map<String, dynamic>>.from(responseData['data']);
-
-        // Merge passed adData with fetched ads
-        if (widget.adData != null) {
-          final passedAdId = widget.adData!['id'];
-          final isAlreadyIncluded = fetchedAds.any((ad) => ad['id'] == passedAdId);
-          if (!isAlreadyIncluded) {
-            fetchedAds.add(widget.adData!);
-            print('Added passed adData to fetched ads: ${widget.adData}');
-          } else {
-            final adIndex = fetchedAds.indexWhere((ad) => ad['id'] == passedAdId);
-            fetchedAds[adIndex] = {...fetchedAds[adIndex], ...widget.adData!};
-            print('Updated fetched ad with passed adData: ${widget.adData}');
-          }
+    // If adData is passed, add it to the ads list immediately
+    if (widget.adData != null) {
+      setState(() {
+        final passedAdId = widget.adData!['id'];
+        if (!ads.any((ad) => ad['id'] == passedAdId)) {
+          ads.add(widget.adData!);
+          _expandedImages[passedAdId] = false;
+          print('Added passed adData to ads list: ${widget.adData}');
+        } else {
+          final adIndex = ads.indexWhere((ad) => ad['id'] == passedAdId);
+          ads[adIndex] = {...ads[adIndex], ...widget.adData!};
+          print('Updated existing ad with passed adData: ${widget.adData}');
         }
-
-        // Sort ads by created_on date (newest first)
-        fetchedAds.sort((a, b) {
-          try {
-            final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
-            final dateA = dateFormat.parse(a['created_on'] as String);
-            final dateB = dateFormat.parse(b['created_on'] as String);
-            return dateB.compareTo(dateA);
-          } catch (e) {
-            print('Error parsing dates for sorting: $e');
-            return 0;
-          }
-        });
-
-        setState(() {
-          ads = fetchedAds;
-          _expandedImages = {for (var ad in ads) ad['id']: false};
-          isLoading = false;
-        });
-        print('Fetched ${ads.length} ads');
-
-        // Check approval and status for each ad
-        for (var ad in ads) {
-          if (ad['admin_approval'] == '0') {
-            _checkApprovalStatus(ad['id']);
-          }
-          _loadAdStatus(ad['id']);
-        }
-      } else {
-        throw Exception(responseData['message'] ?? 'No ads found');
-      }
-    } else {
-      throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
+        isLoading = false; // Show the ad immediately
+      });
     }
-  } catch (e) {
-    print('Error fetching ads: $e');
-    setState(() {
-      errorMessage = '$e';
-      isLoading = false;
-    });
-  }
-}
 
-Future<void> _fetchGalleryImagesForAd(String postId) async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/post-gallery.php?token=$token&post_id=$postId'),
-      headers: {'token': token},
-    );
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      print('Gallery API response for post $postId: $responseData');
-      if (responseData['status'] == 'true' && responseData['data'] is List) {
-        final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
-        if (adIndex != -1) {
-          setState(() {
-            ads[adIndex]['gallery_images'] = List<Map<String, dynamic>>.from(responseData['data']);
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/sell.php?token=$token&user_id=${_userProvider.userId}',
+        ),
+        headers: {'token': token},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('API response: $responseData');
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final fetchedAds = List<Map<String, dynamic>>.from(
+            responseData['data'],
+          );
+
+          // Merge passed adData with fetched ads
+          if (widget.adData != null) {
+            final passedAdId = widget.adData!['id'];
+            final isAlreadyIncluded = fetchedAds.any(
+              (ad) => ad['id'] == passedAdId,
+            );
+            if (!isAlreadyIncluded) {
+              fetchedAds.add(widget.adData!);
+              print('Added passed adData to fetched ads: ${widget.adData}');
+            } else {
+              final adIndex = fetchedAds.indexWhere(
+                (ad) => ad['id'] == passedAdId,
+              );
+              fetchedAds[adIndex] = {...fetchedAds[adIndex], ...widget.adData!};
+              print('Updated fetched ad with passed adData: ${widget.adData}');
+            }
+          }
+
+          // Sort ads by created_on date (newest first)
+          fetchedAds.sort((a, b) {
+            try {
+              final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+              final dateA = dateFormat.parse(a['created_on'] as String);
+              final dateB = dateFormat.parse(b['created_on'] as String);
+              return dateB.compareTo(dateA);
+            } catch (e) {
+              print('Error parsing dates for sorting: $e');
+              return 0;
+            }
           });
+
+          setState(() {
+            ads = fetchedAds;
+            _expandedImages = {for (var ad in ads) ad['id']: false};
+            isLoading = false;
+          });
+          print('Fetched ${ads.length} ads');
+
+          // Check approval and status for each ad
+          for (var ad in ads) {
+            if (ad['admin_approval'] == '0') {
+              _checkApprovalStatus(ad['id']);
+            }
+            _loadAdStatus(ad['id']);
+          }
+        } else {
+          throw Exception(responseData['message'] ?? 'No ads found');
         }
       } else {
-        print('No gallery images found for post $postId');
+        throw Exception('Failed to fetch ads: ${response.reasonPhrase}');
       }
-    } else {
-      print('Failed to fetch gallery images: ${response.reasonPhrase}');
+    } catch (e) {
+      print('Error fetching ads: $e');
+      setState(() {
+        errorMessage = '$e';
+        isLoading = false;
+      });
     }
-  } catch (e) {
-    print('Error fetching gallery images for post $postId: $e');
   }
-}
+
+  Future<void> _fetchGalleryImagesForAd(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/post-gallery.php?token=$token&post_id=$postId'),
+        headers: {'token': token},
+      );
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Gallery API response for post $postId: $responseData');
+        if (responseData['status'] == 'true' && responseData['data'] is List) {
+          final adIndex = ads.indexWhere((ad) => ad['id'] == postId);
+          if (adIndex != -1) {
+            setState(() {
+              ads[adIndex]['gallery_images'] = List<Map<String, dynamic>>.from(
+                responseData['data'],
+              );
+            });
+          }
+        } else {
+          print('No gallery images found for post $postId');
+        }
+      } else {
+        print('Failed to fetch gallery images: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      print('Error fetching gallery images for post $postId: $e');
+    }
+  }
 
   Future<void> _loadAdStatus(String postId) async {
     try {
@@ -444,7 +454,7 @@ Future<void> _fetchGalleryImagesForAd(String postId) async {
           print('Decoded delete ad response: $responseData');
           if (responseData['status'] == 'true' && responseData['code'] != 4) {
             print('Deleted ad $adId via API');
-           
+
             await _loadAds();
             Fluttertoast.showToast(
               msg: 'Ad deleted successfully',
@@ -478,36 +488,140 @@ Future<void> _fetchGalleryImagesForAd(String postId) async {
       );
     }
   }
-Color _getContainerColor(Map<String, dynamic> ad) {
-  if (ad['if_expired'] == '1') return Colors.grey;
-  if (ad['admin_approval'] == '0') return Colors.yellow.shade700;
-  if (ad['admin_approval'] == '2') return Colors.red;
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return Colors.yellow.shade700;
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return Colors.red;
-  if (ad['admin_approval'] == '1') return Colors.blue;
-  return Colors.blue.shade100;
-}
 
-String _getStatusText(Map<String, dynamic> ad) {
-  if (ad['if_expired'] == '1') return 'Expired';
-  if (ad['admin_approval'] == '0') return 'Pending';
-  if (ad['admin_approval'] == '2') return 'Rejected';
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return 'Waiting for Auction Approval';
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return 'Post Now On Auction';
-  if (ad['admin_approval'] == '1') return 'Live';
-  return ad['status'] == '1' ? 'Live' : 'Sold';
-}
+  Color _getContainerColor(Map<String, dynamic> ad) {
+    if (ad['if_expired'] == '1') return Colors.grey;
+    if (ad['admin_approval'] == '0') return Colors.yellow.shade700;
+    if (ad['admin_approval'] == '2') return Colors.red;
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '0')
+      return Colors.yellow.shade700;
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '1')
+      return Colors.red;
+    if (ad['admin_approval'] == '1') return Colors.blue;
+    return Colors.blue.shade100;
+  }
 
-Color _getTextColor(Map<String, dynamic> ad) {
-  if (ad['if_expired'] == '1') return Colors.white;
-  if (ad['admin_approval'] == '0') return Colors.black;
-  if (ad['admin_approval'] == '2') return Colors.white;
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '0') return Colors.black;
-  if (ad['if_auction'] == '1' && ad['auction_status'] == '1') return Colors.white;
-  if (ad['status'] == '0') return Colors.red;
-  return Colors.white;
-}
+  String _getStatusText(Map<String, dynamic> ad) {
+    if (ad['if_expired'] == '1') return 'Expired';
+    if (ad['admin_approval'] == '0') return 'Pending';
+    if (ad['admin_approval'] == '2') return 'Rejected';
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '0')
+      return 'Waiting for Auction Approval';
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '1')
+      return 'Post Now On Auction';
+    if (ad['admin_approval'] == '1') return 'Live';
+    return ad['status'] == '1' ? 'Live' : 'Sold';
+  }
 
+  Color _getTextColor(Map<String, dynamic> ad) {
+    if (ad['if_expired'] == '1') return Colors.white;
+    if (ad['admin_approval'] == '0') return Colors.black;
+    if (ad['admin_approval'] == '2') return Colors.white;
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '0')
+      return Colors.black;
+    if (ad['if_auction'] == '1' && ad['auction_status'] == '1')
+      return Colors.white;
+    if (ad['status'] == '0') return Colors.red;
+    return Colors.white;
+  }
+
+  Future<void> _updateLocation(String postId) async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      Fluttertoast.showToast(
+        msg: 'Location services are disabled. Enable them in device settings.',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        Fluttertoast.showToast(
+          msg:
+              'Location permissions denied. Grant "While Using" in app settings.',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      Fluttertoast.showToast(
+        msg: 'Location permissions permanently denied. Reset in app settings.',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10), // Fail fast if no signal
+      );
+
+      developer.log(
+        'Captured live position: Lat=${position.latitude}, Lng=${position.longitude}, Accuracy=${position.accuracy}m',
+      );
+
+      Fluttertoast.showToast(
+        msg:
+            'Live Location: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.blue,
+        textColor: Colors.white,
+      );
+
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/update-location-post.php?token=$token&post_id=$postId&latitude=${position.latitude}&longitude=${position.longitude}',
+        ),
+        headers: {'token': token},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['status'] == 'true') {
+          Fluttertoast.showToast(
+            msg: 'Location updated to live GPS coords',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.green,
+            textColor: Colors.white,
+          );
+          await _loadAds(); 
+        } else {
+          throw Exception(
+            responseData['message'] ?? 'Failed to update location',
+          );
+        }
+      } else {
+        throw Exception('Failed to update location: ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      developer.log('Location error: $e');
+      Fluttertoast.showToast(
+        msg:
+            'Error getting live location: $e. Check GPS signal or use real device.',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+  }
 
   Widget _buildAdCard(Map<String, dynamic> ad) {
     String? imageUrl;
@@ -550,19 +664,22 @@ Color _getTextColor(Map<String, dynamic> ad) {
             Row(
               children: [
                 Container(
-  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-  decoration: BoxDecoration(
-    color: _getContainerColor(ad),
-    borderRadius: BorderRadius.circular(6),
-  ),
-  child: Text(
-    _getStatusText(ad),
-    style: TextStyle(
-      color: _getTextColor(ad),
-      fontWeight: FontWeight.bold,
-    ),
-  ),
-),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getContainerColor(ad),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _getStatusText(ad),
+                    style: TextStyle(
+                      color: _getTextColor(ad),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 const Spacer(),
                 Icon(
                   Icons.remove_red_eye,
@@ -673,7 +790,6 @@ Color _getTextColor(Map<String, dynamic> ad) {
                 ),
                 Column(
                   children: [
-
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -713,7 +829,7 @@ Color _getTextColor(Map<String, dynamic> ad) {
                                     print(
                                       'Error loading image for ad ${ad['id']}: $error',
                                     );
-                                    
+
                                     return Image.asset(
                                       'assets/placeholder_image.png',
                                       fit: BoxFit.cover,
@@ -755,6 +871,31 @@ Color _getTextColor(Map<String, dynamic> ad) {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
+                    ),
+                    onPressed: () => _updateLocation(ad['id'] as String),
+                    icon: const Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      'Update Location',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             SizedBox(height: 15),
             Container(color: Colors.grey, height: 1.5, width: double.infinity),
             Row(
@@ -790,39 +931,51 @@ Color _getTextColor(Map<String, dynamic> ad) {
                     ),
                   ),
                 ],
-           PopupMenuButton<String>(
-  icon: Icon(Icons.menu, color: Colors.grey.shade600),
-  position: PopupMenuPosition.over,
-  onSelected: (value) async {
-    if (value == 'edit') {
-      // Fetch gallery images before navigating
-      await _fetchGalleryImagesForAd(ad['id'] as String);
-      context.pushNamed(
-        RouteNames.adPostPage,
-        extra: {
-          'categoryId': ad['category_id']?.toString() ?? '',
-          'postId': ad['id']?.toString() ?? '',
-          'adData': ad, // Now includes gallery_images
-        },
-      );
-      developer.log('Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}, postId: ${ad['id']}');
-    } else if (value == 'delete') {
-      _deleteAd(ad['id'] as String);
-    } else if (value == 'mark_delivered') {
-      _markAsDelivered(ad['id'] as String);
-    } else if (value == 'check_auction') {
-      _checkAuctionTerms(ad['id'] as String);
-    }
-  },
-  itemBuilder: (context) => [
-    const PopupMenuItem(value: 'edit', child: Text('Edit')),
-    const PopupMenuItem(value: 'delete', child: Text('Delete')),
-    if (ad['status'] == '1')
-      const PopupMenuItem(value: 'mark_delivered', child: Text('Mark as Delivered')),
-    if (ad['status'] == '1' && ad['if_auction'] == '0')
-      const PopupMenuItem(value: 'check_auction', child: Text('Move to Auction')),
-  ],
-),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.menu, color: Colors.grey.shade600),
+                  position: PopupMenuPosition.over,
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      // Fetch gallery images before navigating
+                      await _fetchGalleryImagesForAd(ad['id'] as String);
+                      context.pushNamed(
+                        RouteNames.adPostPage,
+                        extra: {
+                          'categoryId': ad['category_id']?.toString() ?? '',
+                          'postId': ad['id']?.toString() ?? '',
+                          'adData': ad, // Now includes gallery_images
+                        },
+                      );
+                      developer.log(
+                        'Navigating to edit ad ${ad['id']} with categoryId ${ad['category_id']}, postId: ${ad['id']}',
+                      );
+                    } else if (value == 'delete') {
+                      _deleteAd(ad['id'] as String);
+                    } else if (value == 'mark_delivered') {
+                      _markAsDelivered(ad['id'] as String);
+                    } else if (value == 'check_auction') {
+                      _checkAuctionTerms(ad['id'] as String);
+                    }
+                  },
+                  itemBuilder:
+                      (context) => [
+                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                        if (ad['status'] == '1')
+                          const PopupMenuItem(
+                            value: 'mark_delivered',
+                            child: Text('Mark as Delivered'),
+                          ),
+                        if (ad['status'] == '1' && ad['if_auction'] == '0')
+                          const PopupMenuItem(
+                            value: 'check_auction',
+                            child: Text('Move to Auction'),
+                          ),
+                      ],
+                ),
               ],
             ),
             Container(color: Colors.grey, height: 1.5, width: double.infinity),
@@ -948,7 +1101,7 @@ Color _getTextColor(Map<String, dynamic> ad) {
   }
 
   Widget _adDetail(String label, String value, {bool highlight = false}) {
-    const double labelWidth =95;
+    const double labelWidth = 95;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(

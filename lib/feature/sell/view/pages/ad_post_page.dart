@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -693,6 +694,12 @@ class _AdPostFormState extends State<AdPostForm>
   final GlobalKey<FormFieldState> _insuranceKey = GlobalKey<FormFieldState>();
   Map<String, GlobalKey<FormFieldState>> _attrKeys = {};
 
+  double? _latitude;
+  double? _longitude;
+
+  final TextEditingController _latitudeController = TextEditingController();
+  final TextEditingController _longitudeController = TextEditingController();
+
   List<String> _getRequiredAttributes() => switch (widget.categoryId) {
     '1' => [
       'Year',
@@ -775,6 +782,10 @@ class _AdPostFormState extends State<AdPostForm>
       _controllers['insurance']!.text = ad['insurance_upto']?.toString() ?? '';
       _selectedDistrict = ad['district']?.toString();
       _coverImageIndex = ad['coverImageIndex']?.toInt() ?? 0;
+      _latitude = double.tryParse(ad['latitude'] ?? '');
+      _longitude = double.tryParse(ad['longitude'] ?? '');
+      _latitudeController.text = _latitude?.toString() ?? '';
+      _longitudeController.text = _longitude?.toString() ?? '';
     }
 
     _districts = await AttributeValueService.fetchDistricts();
@@ -1130,6 +1141,43 @@ class _AdPostFormState extends State<AdPostForm>
     return filters;
   }
 
+  Future<void> _fetchLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showSnackBar('Location services are disabled.', Colors.red);
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showSnackBar('Location permissions are denied', Colors.red);
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackBar('Location permissions are permanently denied', Colors.red);
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+      _latitudeController.text = _latitude.toString();
+      _longitudeController.text = _longitude.toString();
+      _showSnackBar('Location fetched successfully', Colors.green);
+    } catch (e) {
+      _showSnackBar('Error fetching location: $e', Colors.red);
+    }
+  }
+
   Future<void> _submitForm() async {
     // Image check (not part of form validation)
     if (_selectedImages.isEmpty) {
@@ -1284,6 +1332,8 @@ class _AdPostFormState extends State<AdPostForm>
               ?.toString() ??
           '',
       'land_mark': _controllers['landMark']!.text,
+      'latitude': _latitude?.toString() ?? '',
+      'longitude': _longitude?.toString() ?? '',
       if (widget.categoryId == '1') ...{
         'registration_valid_till': _controllers['registration']!.text,
         'insurance_upto': _controllers['insurance']!.text,
@@ -1336,8 +1386,6 @@ class _AdPostFormState extends State<AdPostForm>
             'offer_price': '0.00',
             'auction_price_intervel': '0.00',
             'auction_starting_price': '0.00',
-            'latitude': '',
-            'longitude': '',
             'user_zone_id': '0',
             'zone_id': '0',
             'if_auction': '0',
@@ -1390,6 +1438,8 @@ class _AdPostFormState extends State<AdPostForm>
           'visiter_count': '0',
           'if_sold': '0',
           'land_mark': _controllers['landMark']!.text,
+          'latitude': _latitude?.toString() ?? '',
+          'longitude': _longitude?.toString() ?? '',
           'filters': jsonEncode(getFilters()),
           'brand': _selectedBrand?.id ?? '',
           'model': _selectedBrandModel?.id ?? '',
@@ -1791,6 +1841,30 @@ class _AdPostFormState extends State<AdPostForm>
         alignLabelWithHint: true,
       ),
       const SizedBox(height: 12),
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CustomFormField(
+            controller: _latitudeController,
+            label: 'Latitude',
+            isNumberInput: true,
+            readOnly: true,
+          ),
+          const SizedBox(height: 12),
+          CustomFormField(
+            controller: _longitudeController,
+            label: 'Longitude',
+            isNumberInput: true,
+            readOnly: true,
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _fetchLocation,
+            child: const Text('Fetch Live Location'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
       CustomFormField(
         fieldKey: _descriptionKey,
         controller: _controllers['description']!,
@@ -1951,6 +2025,8 @@ class _AdPostFormState extends State<AdPostForm>
     for (var c in _attributeControllers.values) {
       c.dispose();
     }
+    _latitudeController.dispose();
+    _longitudeController.dispose();
     _animationController.dispose();
     super.dispose();
   }

@@ -16,6 +16,7 @@ class CustomFormField extends StatefulWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final bool enabled;
+  final bool readOnly;
 
   const CustomFormField({
     super.key,
@@ -32,6 +33,7 @@ class CustomFormField extends StatefulWidget {
     this.obscureText = false,
     this.keyboardType,
     this.enabled = true,
+    this.readOnly = true,
   });
 
   @override
@@ -80,11 +82,15 @@ class _CustomFormFieldState extends State<CustomFormField> {
         maxLines: widget.maxLines,
         obscureText: widget.obscureText,
         enabled: widget.enabled,
-        keyboardType: widget.keyboardType ?? 
-            (widget.isNumberInput == true ? TextInputType.number : TextInputType.text),
-        inputFormatters: widget.isNumberInput == true 
-            ? [FilteringTextInputFormatter.digitsOnly] 
-            : null,
+        keyboardType:
+            widget.keyboardType ??
+            (widget.isNumberInput == true
+                ? TextInputType.number
+                : TextInputType.text),
+        inputFormatters:
+            widget.isNumberInput == true
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w500,
@@ -95,30 +101,28 @@ class _CustomFormFieldState extends State<CustomFormField> {
           alignLabelWithHint: widget.alignLabelWithHint,
           labelStyle: TextStyle(
             fontSize: 16,
-            color: _isFocused 
-                ? AppTheme.primaryColor 
-                : Colors.grey.shade600,
+            color: _isFocused ? AppTheme.primaryColor : Colors.grey.shade600,
             fontWeight: FontWeight.w500,
           ),
           floatingLabelStyle: TextStyle(
             fontSize: 14,
-            color: _isFocused 
-                ? AppTheme.primaryColor 
-                : Colors.grey.shade600,
+            color: _isFocused ? AppTheme.primaryColor : Colors.grey.shade600,
             fontWeight: FontWeight.w600,
           ),
-          prefixIcon: widget.prefixIcon != null 
-              ? Container(
-                  margin: const EdgeInsets.all(12),
-                  child: Icon(
-                    widget.prefixIcon,
-                    color: _isFocused 
-                        ? AppTheme.primaryColor 
-                        : Colors.grey.shade600,
-                    size: 20,
-                  ),
-                )
-              : null,
+          prefixIcon:
+              widget.prefixIcon != null
+                  ? Container(
+                    margin: const EdgeInsets.all(12),
+                    child: Icon(
+                      widget.prefixIcon,
+                      color:
+                          _isFocused
+                              ? AppTheme.primaryColor
+                              : Colors.grey.shade600,
+                      size: 20,
+                    ),
+                  )
+                  : null,
           contentPadding: EdgeInsets.symmetric(
             horizontal: widget.prefixIcon != null ? 8 : 20,
             vertical: widget.maxLines == 1 ? 18 : 16,
@@ -129,10 +133,7 @@ class _CustomFormFieldState extends State<CustomFormField> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Colors.grey.shade300,
-              width: 1.5,
-            ),
+            borderSide: BorderSide(color: Colors.grey.shade300, width: 1.5),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -143,24 +144,20 @@ class _CustomFormFieldState extends State<CustomFormField> {
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Colors.red,
-              width: 1.5,
-            ),
+            borderSide: const BorderSide(color: Colors.red, width: 1.5),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Colors.red,
-              width: 2,
-            ),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
           ),
           filled: true,
-          fillColor: widget.enabled 
-              ? (_isFocused ? Colors.white : Colors.grey.shade50)
-              : Colors.grey.shade100,
+          fillColor:
+              widget.enabled
+                  ? (_isFocused ? Colors.white : Colors.grey.shade50)
+                  : Colors.grey.shade100,
         ),
-        validator: widget.validator ??
+        validator:
+            widget.validator ??
             (value) {
               if (widget.isRequired && (value == null || value.isEmpty)) {
                 return 'Please enter ${widget.label.toLowerCase()}';
