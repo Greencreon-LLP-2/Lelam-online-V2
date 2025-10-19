@@ -69,6 +69,10 @@ class _SearchButtonWidgetState extends State<SearchButtonWidget> {
           focusNode: widget.focusNode,
           decoration: InputDecoration(
             hintText: 'Search products...',
+              contentPadding: const EdgeInsets.symmetric(
+    vertical: 5,  // 👈 reduce this value to make the height smaller
+    horizontal: 12,
+  ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

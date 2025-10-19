@@ -11,6 +11,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:provider/provider.dart';
 import 'dart:developer' as developer;
+import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
 
 // MarketplacePost model (unchanged)
 class MarketplacePost {
@@ -230,7 +231,6 @@ class RealEstatePage extends StatefulWidget {
 class _RealEstatePageState extends State<RealEstatePage> {
   final String categoryId = '2';
   String _searchQuery = '';
-  String _selectedLocation = 'all';
   String _listingType = 'sale';
   final TextEditingController _searchController = TextEditingController();
   final MarketplaceService _marketplaceService = MarketplaceService();
@@ -294,6 +294,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   }
 
   Future<void> _fetchFilterListings() async {
+    final locationProvider = context.read<LocationProvider>();
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -388,8 +389,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
     }
 
     // Location
-    if (_selectedLocation != 'all') {
-      queryParams['user_zone_id'] = _selectedLocation;
+    if (locationProvider.selectedLocationId != 'all') {
+      queryParams['user_zone_id'] = locationProvider.selectedLocationId;
     }
 
     // Listing type
@@ -460,6 +461,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
+        context.read<LocationProvider>().setLocations(locationResponse.data);
       } else {
         throw Exception('Invalid API response format');
       }
@@ -477,9 +479,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
       _errorMessage = null;
     });
     try {
+      final locationProvider = context.read<LocationProvider>();
       final posts = await _marketplaceService.fetchPosts(
         categoryId: '2',
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+        userZoneId:
+            locationProvider.selectedLocationId == 'all'
+                ? '0'
+                : locationProvider.selectedLocationId,
       );
       setState(() {
         _posts = posts;
@@ -505,9 +511,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
       );
 
       if (response['status'] == 'true' && response['data'] is List) {
-        final List<String> shortlistedIds = (response['data'] as List)
-            .map((item) => item['post_id'].toString())
-            .toList();
+        final List<String> shortlistedIds =
+            (response['data'] as List)
+                .map((item) => item['post_id'].toString())
+                .toList();
 
         setState(() {
           for (var post in _posts) {
@@ -654,6 +661,18 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
     List<MarketplacePost> filtered = _posts;
 
+    final locationProvider = context.read<LocationProvider>();
+    if (locationProvider.selectedLocationId != 'all') {
+      filtered =
+          filtered
+              .where(
+                (post) =>
+                    post.userZoneId == locationProvider.selectedLocationId ||
+                    post.parentZoneId == locationProvider.selectedLocationId,
+              )
+              .toList();
+    }
+
     // Apply search query filtering if present
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
@@ -730,7 +749,7 @@ class _RealEstatePageState extends State<RealEstatePage> {
   final List<String> _postedByOptions = ['all', 'Owner', 'Builder', 'Agent'];
 
   List<String> get _keralaCities {
-    return ['all', ..._locations.map((loc) => loc.name)];
+    return context.read<LocationProvider>().districts;
   }
 
   void _showFilterBottomSheet() {
@@ -1252,9 +1271,13 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           displayText,
                           style: TextStyle(
                             color:
-                                isSelected ? Palette.primarypink : Colors.black87,
+                                isSelected
+                                    ? Palette.primarypink
+                                    : Colors.black87,
                             fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.normal,
+                                isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                             fontSize: 12,
                           ),
                         ),
@@ -1558,7 +1581,10 @@ class _RealEstatePageState extends State<RealEstatePage> {
 
   @override
   Widget build(BuildContext context) {
-    print ('Building UI: isLoading=$_isLoading, filteredPosts=${filteredPosts.length}, posts=${_posts.length}, errorMessage=$_errorMessage');
+    print(
+      'Building UI: isLoading=$_isLoading, filteredPosts=${filteredPosts.length}, posts=${_posts.length}, errorMessage=$_errorMessage',
+    );
+    final locationProvider = context.watch<LocationProvider>();
     return Scaffold(
       resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
@@ -1622,16 +1648,17 @@ class _RealEstatePageState extends State<RealEstatePage> {
                         color: Colors.black87,
                       ),
                       onSelected: (String value) {
-                        setState(() {
-                          _selectedLocation =
-                              value == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == value)
-                                      .id;
-                          _filtersChanged = true;
-                          _fetchPosts();
-                        });
+                        final id =
+                            value == 'all'
+                                ? 'all'
+                                : _locations
+                                    .firstWhere((loc) => loc.name == value)
+                                    .id;
+                        context.read<LocationProvider>().setSelectedLocation(
+                          value,
+                          id: id,
+                        );
+                        _fetchPosts();
                       },
                       itemBuilder: (BuildContext context) {
                         return _keralaCities.map((String city) {
@@ -1639,27 +1666,15 @@ class _RealEstatePageState extends State<RealEstatePage> {
                             value: city,
                             child: Row(
                               children: [
-                                if (_selectedLocation ==
-                                    (city == 'all'
-                                        ? 'all'
-                                        : _locations
-                                            .firstWhere(
-                                              (loc) => loc.name == city,
-                                            )
-                                            .id))
+                                if (locationProvider.selectedLocationName ==
+                                    city)
                                   const Icon(
                                     Icons.check,
                                     color: Colors.blue,
                                     size: 16,
                                   ),
-                                if (_selectedLocation ==
-                                    (city == 'all'
-                                        ? 'all'
-                                        : _locations
-                                            .firstWhere(
-                                              (loc) => loc.name == city,
-                                            )
-                                            .id))
+                                if (locationProvider.selectedLocationName ==
+                                    city)
                                   const SizedBox(width: 8),
                                 Text(city == 'all' ? 'All Kerala' : city),
                               ],
@@ -1862,8 +1877,12 @@ class _RealEstatePageState extends State<RealEstatePage> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: Colors.red,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.white),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.white,
+                                            ),
                                           ),
                                           child: const Text(
                                             'FEATURED',
@@ -1947,7 +1966,8 @@ class _RealEstatePageState extends State<RealEstatePage> {
                           isFavorited ? Icons.favorite : Icons.favorite_border,
                           color: isFavorited ? Colors.red : Colors.grey,
                         ),
-                        onPressed: isToggling ? null : () => _toggleFavorite(post.id),
+                        onPressed:
+                            isToggling ? null : () => _toggleFavorite(post.id),
                       ),
                     ),
                   ],

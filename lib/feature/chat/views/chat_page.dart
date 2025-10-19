@@ -11,46 +11,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:provider/provider.dart';
 
 class ChatRoomService {
-  Future<ChatRoom?> createChatRoom({
-    required String userIdFrom,
-    required String userIdTo,
-  }) async {
-    final url = Uri.parse(
-      '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userIdFrom&user_id_to=$userIdTo',
-    );
-    try {
-      final response = await http.get(
-        url,
-      );
-      debugPrint('ChatRoomService: Creating chat room: $url');
-      debugPrint('ChatRoomService: Response status: ${response.statusCode}');
-      debugPrint('ChatRoomService: Raw response: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == true && jsonResponse['data'] != null) {
-          final room = jsonResponse['data'];
-          debugPrint('ChatRoomService: Created room: ${room['chat_room_id']}');
-          return ChatRoom(
-            id: room['chat_room_id'].toString(),
-            userIdFrom: userIdFrom,
-            userIdTo: userIdTo,
-            createdOn: DateTime.now().toString(),
-            updatedOn: DateTime.now().toString(),
-          );
-        }
-        debugPrint('ChatRoomService: Failed to create chat room');
-        return null;
-      } else {
-        throw Exception('Failed to create chat room: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('ChatRoomService: Error creating chat room: $e');
-      throw Exception('Error creating chat room: $e');
-    }
-  }
-
-  Future<ChatRoom?> getChatRoom({
+  Future<ChatRoom> getOrCreateChatRoom({
     required String userId,
     required String listenerId,
   }) async {
@@ -58,13 +19,10 @@ class ChatRoomService {
       '$baseUrl/chat-room-list.php?token=$token&user_id=$userId',
     );
     try {
-      final response = await http.get(
-        url,
-        headers: {'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
-      );
+      final response = await http.get(url);
       debugPrint('ChatRoomService: Fetching chat rooms: $url');
       debugPrint('ChatRoomService: Response status: ${response.statusCode}');
-      debugPrint('ChatRoomService: Raw response: ${response.body}');
+      debugPrint('ChatRoomService: Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -72,29 +30,68 @@ class ChatRoomService {
           final rooms = jsonResponse['data'] as List;
           final room = rooms.firstWhere(
             (r) =>
-                (r['user_id_from'] == userId && r['user_id_to'] == listenerId) ||
+                (r['user_id_from'] == userId &&
+                    r['user_id_to'] == listenerId) ||
                 (r['user_id_from'] == listenerId && r['user_id_to'] == userId),
             orElse: () => null,
           );
           if (room != null) {
-            debugPrint('ChatRoomService: Found room: ${room['chat_room_id']}');
+            debugPrint(
+              'ChatRoomService: Found existing room: ${room['chat_room_id']}',
+            );
             return ChatRoom(
-              id: room['chat_room_id'].toString(),
-              userIdFrom: room['user_id_from'].toString(),
-              userIdTo: room['user_id_to'].toString(),
+              id: room['chat_room_id'],
+              userIdFrom: room['user_id_from'],
+              userIdTo: room['user_id_to'],
               createdOn: room['created_on'],
               updatedOn: room['updated_on'],
             );
           }
         }
-        debugPrint('ChatRoomService: No matching room found');
-        return null;
       } else {
         throw Exception('Failed to fetch chat rooms: ${response.statusCode}');
       }
+
+      debugPrint('ChatRoomService: No room found, creating new room');
+      final createUrl = Uri.parse(
+        '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userId&user_id_to=$listenerId',
+      );
+      final createResponse = await http.get(createUrl);
+      debugPrint('ChatRoomService: Creating chat room: $createUrl');
+      debugPrint(
+        'ChatRoomService: Create response status: ${createResponse.statusCode}',
+      );
+      debugPrint(
+        'ChatRoomService: Create response body: ${createResponse.body}',
+      );
+
+      if (createResponse.statusCode == 200) {
+        final createJson = jsonDecode(createResponse.body);
+        if (createJson['status'] == true && createJson['data'] is Map) {
+          final newRoom = createJson['data'];
+          debugPrint(
+            'ChatRoomService: Created room: ${newRoom['chat_room_id']}',
+          );
+          return ChatRoom(
+            id: newRoom['chat_room_id'],
+            userIdFrom: newRoom['user_id_from'],
+            userIdTo: newRoom['user_id_to'],
+            createdOn: newRoom['created_on'],
+            updatedOn: newRoom['updated_on'],
+          );
+        } else {
+          throw Exception(
+            'Failed to create chat room: ${createJson['message']}',
+          );
+        }
+      } else {
+        throw Exception(
+          'Failed to create chat room: ${createResponse.statusCode}',
+        );
+      }
     } catch (e) {
       debugPrint('ChatRoomService: Error: $e');
-      throw Exception('Error fetching chat room: $e');
+      throw Exception('Error fetching/creating chat room: $e');
     }
   }
 }
@@ -117,17 +114,19 @@ class MessageService {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
           return (jsonResponse['data'] as List)
-              .map((item) => ChatMessage(
-                    id: item['message_id']?.toString() ?? '',
-                    chatRoomId: item['chat_room_id']?.toString() ?? '',
-                    userIdFrom: item['user_id_from']?.toString() ?? '',
-                    userIdTo: item['user_id_to']?.toString() ?? '',
-                    message: item['message']?.toString() ?? '',
-                    chatFrom: item['chat_from']?.toString() ?? '',
-                    status: item['status']?.toString() ?? '',
-                    createdOn: item['created_on']?.toString() ?? '',
-                    updatedOn: item['updated_on']?.toString() ?? '',
-                  ))
+              .map(
+                (item) => ChatMessage(
+                  id: item['message_id']?.toString() ?? '',
+                  chatRoomId: item['chat_room_id']?.toString() ?? '',
+                  userIdFrom: item['user_id_from']?.toString() ?? '',
+                  userIdTo: item['user_id_to']?.toString() ?? '',
+                  message: item['message']?.toString() ?? '',
+                  chatFrom: item['chat_from']?.toString() ?? '',
+                  status: item['status']?.toString() ?? '',
+                  createdOn: item['created_on']?.toString() ?? '',
+                  updatedOn: item['updated_on']?.toString() ?? '',
+                ),
+              )
               .toList();
         }
       }
@@ -143,8 +142,10 @@ class MessageService {
     required String chatRoomId,
     required String message,
   }) async {
+    final encodedMessage = Uri.encodeComponent(message);
     final url = Uri.parse(
-        '$baseUrl/chat-message-send.php?token=$token&user_id=$userId&chat_room_id=$chatRoomId&message=$message');
+      '$baseUrl/chat-message-send.php?token=$token&user_id=$userId&chat_room_id=$chatRoomId&message=$encodedMessage',
+    );
     try {
       final response = await http.get(
         url,
@@ -186,7 +187,9 @@ class MessageService {
         if (jsonResponse['status'] == true) {
           return true;
         } else {
-          debugPrint('MessageService: Delete failed: ${jsonResponse['message']}');
+          debugPrint(
+            'MessageService: Delete failed: ${jsonResponse['message']}',
+          );
           return false;
         }
       }
@@ -229,12 +232,14 @@ class ChatPage extends HookWidget {
   final String listenerId;
   final String listenerName;
   final String listenerImage;
+  final String? initialMessage;
 
   const ChatPage({
     super.key,
     required this.listenerId,
     required this.listenerName,
     required this.listenerImage,
+    this.initialMessage,
   });
 
   String _formatTime(String dateStr) {
@@ -256,9 +261,12 @@ class ChatPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Retrieve userId from LoggedUserProvider
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
     final userId = userProvider.userId ?? '';
+    final userName = userProvider.userData?.name ?? 'User';
 
     final messageController = useTextEditingController();
     final messages = useState<List<ChatMessage>>([]);
@@ -266,9 +274,11 @@ class ChatPage extends HookWidget {
     final isLoading = useState(true);
     final isSending = useState(false);
     final scrollController = useScrollController();
+    final hasSentInitialMessage = useState(false);
 
     Future<void> scrollToBottom() async {
       if (scrollController.hasClients) {
+        await Future.delayed(const Duration(milliseconds: 100));
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
@@ -277,22 +287,115 @@ class ChatPage extends HookWidget {
       }
     }
 
+    Future<void> fetchMessages(String chatRoomId) async {
+      final messageService = MessageService();
+      final fetchedMessages = await messageService.fetchMessages(chatRoomId);
+      messages.value = fetchedMessages;
+      await scrollToBottom();
+    }
+
+    Future<void> sendInitialMessage(String chatRoomId) async {
+      if (initialMessage != null &&
+          !hasSentInitialMessage.value &&
+          userId.isNotEmpty) {
+        final messageService = MessageService();
+        final success = await messageService.sendMessage(
+          userId: userId,
+          chatRoomId: chatRoomId,
+          message: initialMessage!,
+        );
+        if (success) {
+          hasSentInitialMessage.value = true;
+          await fetchMessages(chatRoomId);
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to send initial message')),
+            );
+          }
+        }
+      }
+    }
+
+    Future<void> initializeChatRoom() async {
+      if (userId.isEmpty) {
+        isLoading.value = false;
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('User ID is missing. Please log in again.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      try {
+        final chatRoomService = ChatRoomService();
+        final room = await chatRoomService.getOrCreateChatRoom(
+          userId: userId, // Buyer
+          listenerId: listenerId, // Seller
+        );
+        chatRoom.value = room;
+        await fetchMessages(room.id);
+        if (initialMessage != null && !hasSentInitialMessage.value) {
+          await sendInitialMessage(room.id);
+        }
+      } catch (e) {
+        debugPrint('ChatPage: Error initializing chat room: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error initializing chat: $e')),
+          );
+        }
+      } finally {
+        isLoading.value = false;
+      }
+    }
+
+    Future<void> sendMessage() async {
+      if (messageController.text.trim().isEmpty ||
+          chatRoom.value == null ||
+          userId.isEmpty) {
+        return;
+      }
+
+      isSending.value = true;
+      try {
+        final messageService = MessageService();
+        final success = await messageService.sendMessage(
+          userId: userId,
+          chatRoomId: chatRoom.value!.id,
+          message: messageController.text.trim(),
+        );
+        if (success) {
+          messageController.clear();
+          await fetchMessages(chatRoom.value!.id);
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to send message')),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('ChatPage: Error sending message: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error sending message: $e')));
+        }
+      } finally {
+        isSending.value = false;
+      }
+    }
+
     Future<void> deleteMessage(String messageId) async {
       if (userId.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('User ID is missing. Please log in again.'),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 3),
+            const SnackBar(
+              content: Text('User ID is missing. Please log in again.'),
             ),
           );
         }
@@ -306,23 +409,12 @@ class ChatPage extends HookWidget {
           userId: userId,
         );
         if (success) {
-          messages.value = messages.value.where((m) => m.id != messageId).toList();
+          messages.value =
+              messages.value.where((m) => m.id != messageId).toList();
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text('Message deleted'),
-                  ],
-                ),
-                backgroundColor: Colors.green[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Message deleted')));
           }
         } else {
           throw Exception('Failed to delete message');
@@ -330,45 +422,19 @@ class ChatPage extends HookWidget {
       } catch (e) {
         debugPrint('ChatPage: Error deleting message: $e');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('Error deleting message: $e')),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting message: $e')));
         }
       }
     }
 
     Future<void> deleteChat() async {
       if (chatRoom.value == null || userId.isEmpty) {
-        if (userId.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text('User ID is missing. Please log in again.'),
-                  ],
-                ),
-                backgroundColor: Colors.red[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User ID or chat room is missing.')),
+          );
         }
         return;
       }
@@ -382,21 +448,9 @@ class ChatPage extends HookWidget {
         if (success) {
           messages.value = [];
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text('Chat deleted'),
-                  ],
-                ),
-                backgroundColor: Colors.green[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Chat deleted')));
             Navigator.pop(context);
           }
         } else {
@@ -405,21 +459,9 @@ class ChatPage extends HookWidget {
       } catch (e) {
         debugPrint('ChatPage: Error deleting chat: $e');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('Error deleting chat: $e')),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error deleting chat: $e')));
         }
       }
     }
@@ -428,32 +470,42 @@ class ChatPage extends HookWidget {
       if (!context.mounted) return;
       final bool? shouldDelete = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.delete_outline, color: Colors.red, size: 24),
-              SizedBox(width: 8),
-              Text('Delete Message'),
-            ],
-          ),
-          content: const Text('This message will be permanently deleted. This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        builder:
+            (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text('Delete'),
+              title: const Row(
+                children: [
+                  Icon(Icons.delete_outline, color: Colors.red, size: 24),
+                  SizedBox(width: 8),
+                  Text('Delete Message'),
+                ],
+              ),
+              content: const Text(
+                'This message will be permanently deleted. This action cannot be undone.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Delete'),
+                ),
+              ],
             ),
-          ],
-        ),
       );
 
       if (shouldDelete == true) {
@@ -465,32 +517,42 @@ class ChatPage extends HookWidget {
       if (!context.mounted || chatRoom.value == null) return;
       final bool? shouldDelete = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.delete_outline, color: Colors.red, size: 24),
-              SizedBox(width: 8),
-              Text('Delete Chat'),
-            ],
-          ),
-          content: const Text('All messages in this chat will be permanently deleted. This action cannot be undone.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        builder:
+            (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text('Delete'),
+              title: const Row(
+                children: [
+                  Icon(Icons.delete_outline, color: Colors.red, size: 24),
+                  SizedBox(width: 8),
+                  Text('Delete Chat'),
+                ],
+              ),
+              content: const Text(
+                'This chat will be permanently deleted. This action cannot be undone.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Delete'),
+                ),
+              ],
             ),
-          ],
-        ),
       );
 
       if (shouldDelete == true) {
@@ -499,621 +561,158 @@ class ChatPage extends HookWidget {
     }
 
     useEffect(() {
-      if (userId.isEmpty) {
-        isLoading.value = false;
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('User ID is missing. Please log in again.'),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-        return null;
-      }
-
-      final chatRoomService = ChatRoomService();
-      final messageService = MessageService();
-      Timer? timer;
-
-      Future<void> initializeChat() async {
-        debugPrint('ChatPage: Initializing chat with userId=$userId, listenerId=$listenerId');
-        try {
-          ChatRoom? room = await chatRoomService.getChatRoom(
-            userId: userId,
-            listenerId: listenerId,
-          );
-
-          if (room == null) {
-            room = await chatRoomService.createChatRoom(
-              userIdFrom: userId,
-              userIdTo: listenerId,
-            );
-            if (room == null) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Row(
-                      children: [
-                        Icon(Icons.error_outline, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text('Failed to create or find chat room'),
-                      ],
-                    ),
-                    backgroundColor: Colors.red[600],
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-              isLoading.value = false;
-              return;
-            }
-          }
-          chatRoom.value = room;
-
-          final fetchedMessages = await messageService.fetchMessages(room.id);
-          messages.value = fetchedMessages;
-          await scrollToBottom();
-
-          timer = Timer.periodic(const Duration(seconds: 2), (_) async {
-            if (chatRoom.value != null) {
-              try {
-                final newMessages = await messageService.fetchMessages(chatRoom.value!.id);
-                final oldLen = messages.value.length;
-                messages.value = newMessages;
-                if (newMessages.length != oldLen) {
-                  await scrollToBottom();
-                }
-              } catch (e) {
-                debugPrint('ChatPage: Error fetching messages: $e');
-              }
-            }
-          });
-        } catch (e) {
-          debugPrint('ChatPage: Error initializing chat: $e');
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text('Error loading chat: $e')),
-                  ],
-                ),
-                backgroundColor: Colors.red[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        } finally {
-          isLoading.value = false;
-        }
-      }
-
-      initializeChat();
-      return () => timer?.cancel();
-    }, [userId]);
-
-    Future<void> sendMessage() async {
-      if (userId.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text('User ID is missing. Please log in again.'),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-
-      final messageText = messageController.text.trim();
-      if (messageText.isEmpty || chatRoom.value == null) {
-        if (messageText.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text('Please enter a message'),
-                  ],
-                ),
-                backgroundColor: Colors.orange[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        } else if (chatRoom.value == null) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text('Cannot send message: No chat room available'),
-                  ],
-                ),
-                backgroundColor: Colors.red[600],
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        }
-        return;
-      }
-
-      isSending.value = true;
-      try {
-        final messageService = MessageService();
-        final success = await messageService.sendMessage(
-          userId: userId,
-          chatRoomId: chatRoom.value!.id,
-          message: messageText,
-        );
-        debugPrint('ChatPage: SendMessage Success: $success');
-        if (success) {
-          messages.value = [
-            ...messages.value,
-            ChatMessage(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              chatRoomId: chatRoom.value!.id,
-              userIdFrom: userId,
-              userIdTo: listenerId,
-              message: messageText,
-              chatFrom: '0',
-              status: '1',
-              createdOn: DateTime.now().toString(),
-              updatedOn: DateTime.now().toString(),
-            ),
-          ];
-          messageController.clear();
-          await scrollToBottom();
-        } else {
-          throw Exception('API returned false status');
-        }
-      } catch (e) {
-        debugPrint('ChatPage: SendMessage Exception: $e');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('Failed to send message: $e')),
-                ],
-              ),
-              backgroundColor: Colors.red[600],
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      } finally {
-        isSending.value = false;
-      }
-    }
+      initializeChatRoom();
+      return () {};
+    }, const []);
 
     return CustomSafeArea(
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
         appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
           title: Row(
             children: [
               CircleAvatar(
-                backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                radius: 20,
-                child: Icon(
-                  Icons.person,
-                  color: Theme.of(context).primaryColor,
-                  size: 24,
-                ),
+                radius: 16,
+                backgroundImage:
+                    listenerImage.isNotEmpty
+                        ? NetworkImage(listenerImage)
+                        : const AssetImage('assets/images/default_avatar.png')
+                            as ImageProvider,
+                backgroundColor: Colors.grey[200],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      listenerName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      'Online',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  listenerName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           actions: [
             IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red[50],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.delete_outline,
-                  color: Colors.red[600],
-                  size: 20,
-                ),
-              ),
+              icon: const Icon(Icons.delete_outline),
               onPressed: _showDeleteChatConfirmation,
             ),
-            const SizedBox(width: 8),
           ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(1),
-            child: Divider(
-              height: 1,
-              thickness: 0.5,
-              color: Colors.grey[200],
-            ),
-          ),
         ),
-        body: userId.isEmpty
-            ? Center(
-                child: Container(
-                  margin: const EdgeInsets.all(24),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red[100]!, width: 1),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.error_outline_rounded,
-                        size: 48,
-                        color: Colors.red[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'User Not Logged In',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Please log in to view your chats.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.red[600],
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : isLoading.value
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading chat...',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+        body: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: Colors.grey[100],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'lelam online is a default member in all chats. Please don’t ask or share phone numbers before fix meeting.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                : chatRoom.value == null
-                    ? Center(
-                        child: Container(
-                          margin: const EdgeInsets.all(24),
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 64,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Chat Unavailable',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child:
+                  isLoading.value
+                      ? const Center(child: CircularProgressIndicator())
+                      : messages.value.isEmpty
+                      ? const Center(child: Text('No messages yet'))
+                      : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(8),
+                        itemCount: messages.value.length,
+                        itemBuilder: (context, index) {
+                          final message = messages.value[index];
+                          final isMe = message.userIdFrom == userId;
+                          return GestureDetector(
+                            onLongPress:
+                                isMe
+                                    ? () => _showDeleteConfirmation(message.id)
+                                    : null,
+                            child: Align(
+                              alignment:
+                                  isMe
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isMe
+                                          ? Colors.blue[100]
+                                          : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Please contact the seller to start a chat.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          Expanded(
-                            child: ListView.builder(
-                              controller: scrollController,
-                              padding: const EdgeInsets.all(16),
-                              itemCount: messages.value.isEmpty ? 1 : messages.value.length + 1,
-                              itemBuilder: (context, index) {
-                                if (index == 0) {
-                                  // Pinned notice at the top
-                                  return Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[200],
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.grey[300]!, width: 1),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      isMe
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      message.message,
+                                      style: const TextStyle(fontSize: 14),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.info_outline,
-                                          size: 20,
-                                          color: Colors.grey[700],
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'Lelam Online is a default member in all chats. Please don’t ask or share phone numbers before fixing a meeting.',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey[800],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-                                // Adjust index for messages
-                                final messageIndex = index - 1;
-                                if (messageIndex >= messages.value.length) {
-                                  return const SizedBox.shrink();
-                                }
-                                final message = messages.value[messageIndex];
-                                final isMe = message.userIdFrom == userId;
-                                final showTime = _formatTime(message.createdOn);
-
-                                return GestureDetector(
-                                  onLongPress: isMe ? () => _showDeleteConfirmation(message.id) : null,
-                                  child: Align(
-                                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                                    child: Container(
-                                      margin: EdgeInsets.only(
-                                        top: 4,
-                                        bottom: 4,
-                                        left: isMe ? 48 : 0,
-                                        right: isMe ? 0 : 48,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 12,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: isMe
-                                                  ? Theme.of(context).primaryColor
-                                                  : Colors.white,
-                                              borderRadius: BorderRadius.only(
-                                                topLeft: const Radius.circular(16),
-                                                topRight: const Radius.circular(16),
-                                                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                                bottomRight: Radius.circular(isMe ? 4 : 16),
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.05),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(0, 1),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Text(
-                                              message.message,
-                                              style: TextStyle(
-                                                color: isMe ? Colors.white : Colors.black87,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                          ),
-                                          if (showTime.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 4),
-                                              child: Text(
-                                                showTime,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey[500],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _formatTime(message.createdOn),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
-                                  );
-                                },
+                                  ],
+                                ),
                               ),
                             ),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, -2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[50],
-                                      borderRadius: BorderRadius.circular(24),
-                                      border: Border.all(
-                                        color: chatRoom.value == null
-                                            ? Colors.grey[300]!
-                                            : Colors.grey[200]!,
-                                      ),
-                                    ),
-                                    child: TextField(
-                                      controller: messageController,
-                                      decoration: InputDecoration(
-                                        hintText: chatRoom.value == null
-                                            ? 'Chat unavailable'
-                                            : 'Type a message...',
-                                        hintStyle: TextStyle(
-                                          color: Colors.grey[500],
-                                          fontSize: 15,
-                                        ),
-                                        border: InputBorder.none,
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 20,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      enabled: chatRoom.value != null && userId.isNotEmpty,
-                                      maxLines: 4,
-                                      minLines: 1,
-                                      style: const TextStyle(fontSize: 15),
-                                      onSubmitted: (value) {
-                                        if (chatRoom.value != null && !isSending.value && userId.isNotEmpty) {
-                                          sendMessage();
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  height: 48,
-                                  width: 48,
-                                  decoration: BoxDecoration(
-                                    color: (chatRoom.value == null || isSending.value || userId.isEmpty)
-                                        ? Colors.grey[300]
-                                        : Theme.of(context).primaryColor,
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(24),
-                                      onTap: (chatRoom.value == null || isSending.value || userId.isEmpty)
-                                          ? null
-                                          : sendMessage,
-                                      child: Center(
-                                        child: isSending.value
-                                            ? SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                                    Colors.grey[600]!,
-                                                  ),
-                                                ),
-                                              )
-                                            : Icon(
-                                                Icons.send_rounded,
-                                                color: (chatRoom.value == null ||
-                                                        isSending.value ||
-                                                        userId.isEmpty)
-                                                    ? Colors.grey[600]
-                                                    : Colors.white,
-                                                size: 20,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              color: Colors.grey[100],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  isSending.value
+                      ? const CircularProgressIndicator(strokeWidth: 2)
+                      : IconButton(
+                        icon: const Icon(Icons.send, color: Colors.blue),
+                        onPressed: sendMessage,
+                      ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

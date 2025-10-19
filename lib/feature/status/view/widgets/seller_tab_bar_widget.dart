@@ -64,8 +64,8 @@ class _SellerTabBarWidget extends State<SellerTabBarWidget>
           unselectedLabelStyle: const TextStyle(fontSize: 14),
           tabs: const [
             Tab(text: 'My Ads'),
-            Tab(text: 'My Meetings (Seller)'),
-            Tab(text: 'Junk'),
+            Tab(text: 'My Meetings '),
+            
           ],
         ),
         Flexible(

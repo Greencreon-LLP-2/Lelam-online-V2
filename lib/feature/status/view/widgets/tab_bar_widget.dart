@@ -57,7 +57,7 @@ class _TabBarWidgetState extends State<TabBarWidget>
           tabs: const [
             Tab(text: 'My Bids'),
             Tab(text: 'My Meetings'),
-            Tab(text: 'Junk'),
+            
           ],
         ),
         SizedBox(

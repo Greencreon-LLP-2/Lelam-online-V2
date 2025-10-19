@@ -10,6 +10,8 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'dart:developer' as developer;
+import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
+import 'package:provider/provider.dart';
 
 class MarketplacePost {
   final String id;
@@ -223,9 +225,8 @@ class CommercialVehiclesPage extends StatefulWidget {
 }
 
 class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
- String _searchQuery = '';
+  String _searchQuery = '';
   final String categoryId = '3';
-  String _selectedLocation = 'all';
   final List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
@@ -247,7 +248,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
 
   late ScrollController _scrollController;
   bool _showAppBarSearch = false;
-  String _listingType = 'Marketplace';// Default to Marketplace
+  String _listingType = 'Marketplace'; // Default to Marketplace
 
   @override
   void initState() {
@@ -296,6 +297,7 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
+        context.read<LocationProvider>().setLocations(locationResponse.data);
       } else {
         throw Exception('Invalid API response format');
       }
@@ -307,11 +309,12 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
     }
   }
 
-double _calculateRelevanceScore(MarketplacePost post, String query) {
+  double _calculateRelevanceScore(MarketplacePost post, String query) {
     double score = 0;
-    final vehicleType = post.filters['type']?.isNotEmpty ?? false
-        ? post.filters['type']!.first.toLowerCase()
-        : '';
+    final vehicleType =
+        post.filters['type']?.isNotEmpty ?? false
+            ? post.filters['type']!.first.toLowerCase()
+            : '';
     final brand = post.brand.toLowerCase();
     final model = post.model.toLowerCase();
     final modelVariation = post.modelVariation.toLowerCase();
@@ -323,79 +326,93 @@ double _calculateRelevanceScore(MarketplacePost post, String query) {
     if (model.contains(query)) score += 2.0;
     if (modelVariation.contains(query)) score += 1.5;
     if (post.description.toLowerCase().contains(query)) score += 1.5;
-    if (_getLocationName(post.parentZoneId).toLowerCase().contains(query)) score += 1.0;
+    if (_getLocationName(post.parentZoneId).toLowerCase().contains(query))
+      score += 1.0;
     if (sellerType.contains(query)) score += 0.5;
 
     return score;
   }
 
+  List<MarketplacePost> get filteredPosts {
+    if (!_filtersChanged) return _filteredPostsCache;
 
-List<MarketplacePost> get filteredPosts {
-  if (!_filtersChanged) return _filteredPostsCache;
+    final locationProvider = context.read<LocationProvider>();
+    final filtered =
+        _posts.where((post) {
+          final vehicleType =
+              post.filters['type']?.isNotEmpty ?? false
+                  ? post.filters['type']!.first
+                  : 'N/A';
+          final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+          final condition =
+              post.filters['condition']?.isNotEmpty ?? false
+                  ? post.filters['condition']!.first
+                  : 'N/A';
+          final fuelType =
+              post.filters['fuel_type']?.isNotEmpty ?? false
+                  ? post.filters['fuel_type']!.first
+                  : 'N/A';
 
-  final filtered = _posts.where((post) {
-    final vehicleType = post.filters['type']?.isNotEmpty ?? false
-        ? post.filters['type']!.first
-        : 'N/A';
-    final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
-    final condition = post.filters['condition']?.isNotEmpty ?? false
-        ? post.filters['condition']!.first
-        : 'N/A';
-    final fuelType = post.filters['fuel_type']?.isNotEmpty ?? false
-        ? post.filters['fuel_type']!.first
-        : 'N/A';
+          // Location filtering
+          if (locationProvider.selectedLocationId != 'all' &&
+              post.userZoneId != locationProvider.selectedLocationId &&
+              post.parentZoneId != locationProvider.selectedLocationId) {
+            return false;
+          }
 
-    // Search query filtering
+          // Search query filtering
+          if (_searchQuery.trim().isNotEmpty) {
+            final query = _searchQuery.toLowerCase().trim();
+            final searchableText = [
+              post.title.toLowerCase(),
+              vehicleType.toLowerCase(),
+              post.brand.toLowerCase(),
+              post.model.toLowerCase(),
+              post.modelVariation.toLowerCase(),
+              post.description.toLowerCase(),
+              _getLocationName(post.parentZoneId).toLowerCase(),
+              sellerType.toLowerCase(),
+              condition.toLowerCase(),
+              fuelType.toLowerCase(),
+            ].join(' ');
+            if (!searchableText.contains(query)) return false;
+          }
+
+          // Apply existing filters without modifying filter logic
+          if (_selectedVehicleTypes.isNotEmpty &&
+              !_selectedVehicleTypes.contains(vehicleType))
+            return false;
+          if (_selectedPriceRange != 'all') {
+            final price = int.tryParse(post.price) ?? 0;
+            final range = _priceRangeMap[_selectedPriceRange];
+            if (range != null) {
+              if (price < range['min']! || price >= range['max']!) return false;
+            }
+          }
+          if (_selectedCondition != 'all' && condition != _selectedCondition)
+            return false;
+          if (_selectedFuelTypes.isNotEmpty &&
+              !_selectedFuelTypes.contains(fuelType))
+            return false;
+
+          return true;
+        }).toList();
+
+    // Sort posts by relevance if search query exists
     if (_searchQuery.trim().isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
-      final searchableText = [
-        post.title.toLowerCase(),
-        vehicleType.toLowerCase(),
-        post.brand.toLowerCase(),
-        post.model.toLowerCase(),
-        post.modelVariation.toLowerCase(),
-        post.description.toLowerCase(),
-        _getLocationName(post.parentZoneId).toLowerCase(),
-        sellerType.toLowerCase(),
-        condition.toLowerCase(),
-        fuelType.toLowerCase(),
-      ].join(' ');
-      if (!searchableText.contains(query)) return false;
+      filtered.sort((a, b) {
+        final aScore = _calculateRelevanceScore(a, query);
+        final bScore = _calculateRelevanceScore(b, query);
+        return bScore.compareTo(aScore); // Higher score comes first
+      });
     }
 
-    // Apply existing filters without modifying filter logic
-    if (_selectedLocation != 'all' && post.parentZoneId != _selectedLocation) return false;
-    if (_selectedVehicleTypes.isNotEmpty && !_selectedVehicleTypes.contains(vehicleType)) return false;
-    if (_selectedPriceRange != 'all') {
-      final price = int.tryParse(post.price) ?? 0;
-      final range = _priceRangeMap[_selectedPriceRange];
-      if (range != null) {
-        if (price < range['min']! || price >= range['max']!) return false;
-      }
-    }
-    if (_selectedCondition != 'all' && condition != _selectedCondition) return false;
-    if (_selectedFuelTypes.isNotEmpty && !_selectedFuelTypes.contains(fuelType)) return false;
-
-    return true;
-  }).toList();
-
-  // Sort posts by relevance if search query exists
-  if (_searchQuery.trim().isNotEmpty) {
-    final query = _searchQuery.toLowerCase().trim();
-    filtered.sort((a, b) {
-      final aScore = _calculateRelevanceScore(a, query);
-      final bScore = _calculateRelevanceScore(b, query);
-      return bScore.compareTo(aScore); // Higher score comes first
-    });
+    _filteredPostsCache = filtered;
+    _filtersChanged = false;
+    return filtered;
   }
 
-  _filteredPostsCache = filtered;
-  _filtersChanged = false;
-  return filtered;
-}
-
-
-  
   Future<void> _fetchPosts() async {
     setState(() {
       _isLoading = true;
@@ -403,9 +420,13 @@ List<MarketplacePost> get filteredPosts {
       _filtersChanged = true;
     });
     try {
+      final locationProvider = context.read<LocationProvider>();
       final posts = await _marketplaceService.fetchPosts(
         categoryId: categoryId,
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+        userZoneId:
+            locationProvider.selectedLocationId == 'all'
+                ? '0'
+                : locationProvider.selectedLocationId,
       );
       setState(() {
         _posts = posts;
@@ -459,7 +480,7 @@ List<MarketplacePost> get filteredPosts {
   final List<String> _fuelTypes = ['Diesel', 'CNG', 'Petrol'];
 
   List<String> get _keralaCities {
-    return ['all', ..._locations.map((loc) => loc.name)];
+    return context.read<LocationProvider>().districts;
   }
 
   void _showFilterBottomSheet() {
@@ -660,92 +681,106 @@ List<MarketplacePost> get filteredPosts {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child:ElevatedButton(
-  onPressed: () async {
-    try {
-      setState(() => _isLoading = true);
-      final apiService = ApiService();
-      final Map<String, String> queryParams = {};
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              setState(() => _isLoading = true);
+                              final apiService = ApiService();
+                              final Map<String, String> queryParams = {};
+                              final locationProvider =
+                                  context.read<LocationProvider>();
 
-      if (_selectedVehicleTypes.isNotEmpty) {
-        queryParams['vehicle_types'] = _selectedVehicleTypes.join(',');
-      }
-      if (_selectedPriceRange != 'all') {
-        switch (_selectedPriceRange) {
-          case '0-1L':
-            queryParams['min_price'] = '0';
-            queryParams['max_price'] = '100000';
-            break;
-          case '1-3L':
-            queryParams['min_price'] = '100000';
-            queryParams['max_price'] = '300000';
-            break;
-          case '3-6L':
-            queryParams['min_price'] = '300000';
-            queryParams['max_price'] = '600000';
-            break;
-          case '6-10L':
-            queryParams['min_price'] = '600000';
-            queryParams['max_price'] = '1000000';
-            break;
-          case '10-20L':
-            queryParams['min_price'] = '1000000';
-            queryParams['max_price'] = '2000000';
-            break;
-          case '20-50L':
-            queryParams['min_price'] = '2000000';
-            queryParams['max_price'] = '5000000';
-            break;
-          case 'Above 50L':
-            queryParams['min_price'] = '5000000';
-            break;
-        }
-      }
-      if (_selectedCondition != 'all') {
-        queryParams['condition'] = _selectedCondition;
-      }
-      if (_selectedFuelTypes.isNotEmpty) {
-        queryParams['fuel_type'] = _selectedFuelTypes.join(',');
-      }
-      queryParams['listing_type'] = _listingType;
+                              if (_selectedVehicleTypes.isNotEmpty) {
+                                queryParams['vehicle_types'] =
+                                    _selectedVehicleTypes.join(',');
+                              }
+                              if (_selectedPriceRange != 'all') {
+                                switch (_selectedPriceRange) {
+                                  case '0-1L':
+                                    queryParams['min_price'] = '0';
+                                    queryParams['max_price'] = '100000';
+                                    break;
+                                  case '1-3L':
+                                    queryParams['min_price'] = '100000';
+                                    queryParams['max_price'] = '300000';
+                                    break;
+                                  case '3-6L':
+                                    queryParams['min_price'] = '300000';
+                                    queryParams['max_price'] = '600000';
+                                    break;
+                                  case '6-10L':
+                                    queryParams['min_price'] = '600000';
+                                    queryParams['max_price'] = '1000000';
+                                    break;
+                                  case '10-20L':
+                                    queryParams['min_price'] = '1000000';
+                                    queryParams['max_price'] = '2000000';
+                                    break;
+                                  case '20-50L':
+                                    queryParams['min_price'] = '2000000';
+                                    queryParams['max_price'] = '5000000';
+                                    break;
+                                  case 'Above 50L':
+                                    queryParams['min_price'] = '5000000';
+                                    break;
+                                }
+                              }
+                              if (_selectedCondition != 'all') {
+                                queryParams['condition'] = _selectedCondition;
+                              }
+                              if (_selectedFuelTypes.isNotEmpty) {
+                                queryParams['fuel_type'] = _selectedFuelTypes
+                                    .join(',');
+                              }
+                              if (locationProvider.selectedLocationId !=
+                                  'all') {
+                                queryParams['user_zone_id'] =
+                                    locationProvider.selectedLocationId;
+                              }
+                              queryParams['listing_type'] = _listingType;
 
-      final Map<String, dynamic> response = await apiService.postMultipart(
-        url: "https://lelamonline.com/admin/api/v1/filter-comercial-cars-listings.php",
-        fields: queryParams,
-      );
+                              final Map<String, dynamic>
+                              response = await apiService.postMultipart(
+                                url:
+                                    "https://lelamonline.com/admin/api/v1/filter-comercial-cars-listings.php",
+                                fields: queryParams,
+                              );
 
-      final dataList = response['data'] as List<dynamic>? ?? [];
-      final finalPosts = dataList.map((item) {
-        final json = item as Map<String, dynamic>;
-        return MarketplacePost.fromJson(json);
-      }).toList();
+                              final dataList =
+                                  response['data'] as List<dynamic>? ?? [];
+                              final finalPosts =
+                                  dataList.map((item) {
+                                    final json = item as Map<String, dynamic>;
+                                    return MarketplacePost.fromJson(json);
+                                  }).toList();
 
-      setState(() {
-        _posts = finalPosts;
-        _filtersChanged = true; // Invalidate search cache
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-    Navigator.pop(context);
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Palette.primaryblue,
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-  ),
-  child: const Text(
-    'Apply Filters',
-    style: TextStyle(
-      color: Colors.white,
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
-    ),
-  ),
-)
+                              setState(() {
+                                _posts = finalPosts;
+                                _filtersChanged =
+                                    true; // Invalidate search cache
+                                _isLoading = false;
+                              });
+                            } catch (e) {
+                              setState(() => _isLoading = false);
+                            }
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Palette.primaryblue,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Apply Filters',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -973,7 +1008,7 @@ List<MarketplacePost> get filteredPosts {
     return count;
   }
 
-Widget _buildAppBarSearchField() {
+  Widget _buildAppBarSearchField() {
     return Container(
       height: 40,
       decoration: BoxDecoration(
@@ -986,26 +1021,28 @@ Widget _buildAppBarSearchField() {
         autofillHints: null,
         enableSuggestions: false,
         enableInteractiveSelection: true,
-        onChanged: (value) => setState(() {
-          _searchQuery = value;
-          _filtersChanged = true; // Trigger re-filtering
-        }),
+        onChanged:
+            (value) => setState(() {
+              _searchQuery = value;
+              _filtersChanged = true; // Trigger re-filtering
+            }),
         decoration: InputDecoration(
           hintText: 'Search vehicles...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.only(top: 10),
         ),
@@ -1013,15 +1050,16 @@ Widget _buildAppBarSearchField() {
     );
   }
 
- Widget _buildSearchField() {
+  Widget _buildSearchField() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         controller: _searchController,
-        onChanged: (value) => setState(() {
-          _searchQuery = value;
-          _filtersChanged = true; // Trigger re-filtering
-        }),
+        onChanged:
+            (value) => setState(() {
+              _searchQuery = value;
+              _filtersChanged = true; // Trigger re-filtering
+            }),
         autofillHints: null,
         enableSuggestions: false,
         enableInteractiveSelection: true,
@@ -1029,18 +1067,19 @@ Widget _buildAppBarSearchField() {
           hintText: 'Search by vehicle type, brand, location...',
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: Icon(Icons.search, color: Colors.grey.shade400),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear, color: Colors.grey.shade400),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _filtersChanged = true;
-                    });
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: Icon(Icons.clear, color: Colors.grey.shade400),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                        _filtersChanged = true;
+                      });
+                    },
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.grey.shade200),
@@ -1055,7 +1094,10 @@ Widget _buildAppBarSearchField() {
           ),
           filled: true,
           fillColor: Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
@@ -1066,8 +1108,6 @@ Widget _buildAppBarSearchField() {
         imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
-
-
 
   String _getLocationName(String zoneId) {
     if (zoneId == 'all') return 'All Kerala';
@@ -1095,6 +1135,7 @@ Widget _buildAppBarSearchField() {
 
   @override
   Widget build(BuildContext context) {
+    final locationProvider = context.watch<LocationProvider>();
     return Scaffold(
       resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
       backgroundColor: Colors.white,
@@ -1143,15 +1184,17 @@ Widget _buildAppBarSearchField() {
               : PopupMenuButton<String>(
                 icon: const Icon(Icons.location_on, color: Colors.black87),
                 onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchPosts();
-                  });
+                  final id =
+                      value == 'all'
+                          ? 'all'
+                          : _locations
+                              .firstWhere((loc) => loc.name == value)
+                              .id;
+                  context.read<LocationProvider>().setSelectedLocation(
+                    value,
+                    id: id,
+                  );
+                  _fetchPosts();
                 },
                 itemBuilder: (BuildContext context) {
                   return _keralaCities.map((String city) {
@@ -1159,23 +1202,13 @@ Widget _buildAppBarSearchField() {
                       value: city,
                       child: Row(
                         children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                          if (locationProvider.selectedLocationName == city)
                             const Icon(
                               Icons.check,
                               color: Colors.blue,
                               size: 16,
                             ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                          if (locationProvider.selectedLocationName == city)
                             const SizedBox(width: 8),
                           Text(city == 'all' ? 'All Kerala' : city),
                         ],
@@ -1408,7 +1441,7 @@ Widget _buildAppBarSearchField() {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             _buildDetailChip(
                               Icon(
                                 Icons.person,

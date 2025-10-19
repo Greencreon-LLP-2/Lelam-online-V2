@@ -51,9 +51,7 @@ GoRoute(
   name: RouteNames.buyingStatusPage,
   builder: (context, state) {
     final loggedUser = context.watch<LoggedUserProvider>();
-    // Extract query parameters using queryParameters
-    final initialTab = int.tryParse(state.uri.queryParameters['initialTab'] ?? '0') ?? 0;
-    final initialStatus = state.uri.queryParameters['initialStatus'];
+
     final postId = state.uri.queryParameters['postId'];
     final bidId = state.uri.queryParameters['bidId'];
     final userId = loggedUser.isLoggedIn ? loggedUser.userData?.userId : null;
@@ -61,8 +59,6 @@ GoRoute(
     if (loggedUser.isLoggedIn) {
       return BuyingStatusPage(
         userId: userId,
-        initialTab: initialTab,
-        initialStatus: initialStatus,
         postId: postId,
         bidId: bidId,
       );

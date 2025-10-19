@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lelamonline_flutter/core/router/app_router.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -40,6 +41,7 @@ void main() async {
         ChangeNotifierProvider(
           create: (_) => ProductProvider()..fetchFeaturedProducts(),
         ),
+        ChangeNotifierProvider(create: (_) => LocationProvider()),
       ],
       child: const LelamOnlineWidget(),
     ),

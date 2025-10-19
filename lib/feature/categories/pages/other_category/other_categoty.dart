@@ -6,9 +6,11 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/feature/categories/pages/other_category/other_Category_details_page.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
+import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_widgte.dart';
 import 'dart:developer' as developer;
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:provider/provider.dart'; // Added import
 
 // MarketplacePost model
 class MarketplacePost {
@@ -347,7 +349,6 @@ class OthersPage extends StatefulWidget {
 
 class _OthersPageState extends State<OthersPage> {
   String _searchQuery = '';
-  String _selectedLocation = 'all';
   List<String> _selectedVehicleTypes = [];
   String _selectedPriceRange = 'all';
   String _selectedCondition = 'all';
@@ -403,7 +404,6 @@ class _OthersPageState extends State<OthersPage> {
 
       if (response['status'].toString() == 'true' && response['data'] is List) {
         final locationResponse = LocationResponse.fromJson(response);
-
         setState(() {
           _locations = locationResponse.data;
           _isLoadingLocations = false;
@@ -411,6 +411,9 @@ class _OthersPageState extends State<OthersPage> {
             'Locations fetched: ${_locations.map((loc) => "${loc.id}: ${loc.name}").toList()}',
           );
         });
+        context.read<LocationProvider>().setLocations(
+          locationResponse.data,
+        ); // Sync with LocationProvider
       } else {
         throw Exception('Invalid API response format');
       }
@@ -428,9 +431,13 @@ class _OthersPageState extends State<OthersPage> {
       _errorMessage = null;
     });
     try {
+      final locationProvider = context.read<LocationProvider>();
       final posts = await _marketplaceService.fetchPosts(
-        categoryId: '4', // Change this to the appropriate category ID for bikes
-        userZoneId: _selectedLocation == 'all' ? '0' : _selectedLocation,
+        categoryId: '4',
+        userZoneId:
+            locationProvider.selectedLocationId == 'all'
+                ? '0'
+                : locationProvider.selectedLocationId,
       );
       setState(() {
         _bikes = posts.map((post) => Bike.fromMarketplacePost(post)).toList();
@@ -481,13 +488,14 @@ class _OthersPageState extends State<OthersPage> {
           }).toList();
     }
 
-    if (_selectedLocation != 'all') {
+    final locationProvider = context.read<LocationProvider>();
+    if (locationProvider.selectedLocationId != 'all') {
       filtered =
           filtered
               .where(
                 (bike) =>
-                    bike.userZoneId == _selectedLocation ||
-                    bike.parentZoneId == _selectedLocation,
+                    bike.userZoneId == locationProvider.selectedLocationId ||
+                    bike.parentZoneId == locationProvider.selectedLocationId,
               )
               .toList();
     }
@@ -550,7 +558,7 @@ class _OthersPageState extends State<OthersPage> {
   }
 
   void _showFilterBottomSheet() {
-    String selectedFilter = 'Vehicle Type'; // Default selected filter
+    String selectedFilter = 'Vehicle Type';
 
     showModalBottomSheet(
       context: context,
@@ -570,7 +578,6 @@ class _OthersPageState extends State<OthersPage> {
               builder:
                   (context, setModalState) => Column(
                     children: [
-                      // Top handle and title
                       Container(
                         margin: const EdgeInsets.symmetric(vertical: 12),
                         width: 40,
@@ -614,11 +621,9 @@ class _OthersPageState extends State<OthersPage> {
                         ),
                       ),
                       const Divider(height: 1),
-                      // Two-column layout
                       Expanded(
                         child: Row(
                           children: [
-                            // Left: Filter Categories
                             Container(
                               width: 140,
                               color: Palette.primaryblue,
@@ -664,7 +669,6 @@ class _OthersPageState extends State<OthersPage> {
                                 ],
                               ),
                             ),
-                            // Right: Filter Options
                             Expanded(
                               child: SingleChildScrollView(
                                 padding: const EdgeInsets.all(16),
@@ -711,7 +715,6 @@ class _OthersPageState extends State<OthersPage> {
                           ],
                         ),
                       ),
-                      // Bottom buttons
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -1112,8 +1115,11 @@ class _OthersPageState extends State<OthersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final locationProvider =
+        context.watch<LocationProvider>(); // Watch LocationProvider
+
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Prevent resize on keyboard show
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -1160,15 +1166,17 @@ class _OthersPageState extends State<OthersPage> {
               : PopupMenuButton<String>(
                 icon: const Icon(Icons.location_on, color: Colors.black87),
                 onSelected: (String value) {
-                  setState(() {
-                    _selectedLocation =
-                        value == 'all'
-                            ? 'all'
-                            : _locations
-                                .firstWhere((loc) => loc.name == value)
-                                .id;
-                    _fetchBikes();
-                  });
+                  final id =
+                      value == 'all'
+                          ? 'all'
+                          : _locations
+                              .firstWhere((loc) => loc.name == value)
+                              .id;
+                  context.read<LocationProvider>().setSelectedLocation(
+                    value,
+                    id: id,
+                  );
+                  _fetchBikes();
                 },
                 itemBuilder: (BuildContext context) {
                   return _keralaCities.map((String city) {
@@ -1176,23 +1184,13 @@ class _OthersPageState extends State<OthersPage> {
                       value: city,
                       child: Row(
                         children: [
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                          if (locationProvider.selectedLocationName == city)
                             const Icon(
                               Icons.check,
                               color: Colors.blue,
                               size: 16,
                             ),
-                          if (_selectedLocation ==
-                              (city == 'all'
-                                  ? 'all'
-                                  : _locations
-                                      .firstWhere((loc) => loc.name == city)
-                                      .id))
+                          if (locationProvider.selectedLocationName == city)
                             const SizedBox(width: 8),
                           Text(city == 'all' ? 'All Kerala' : city),
                         ],
@@ -1204,11 +1202,7 @@ class _OthersPageState extends State<OthersPage> {
         ],
       ),
       body: GestureDetector(
-        onTap:
-            () =>
-                FocusScope.of(
-                  context,
-                ).unfocus(), // Dismiss keyboard on tap outside
+        onTap: () => FocusScope.of(context).unfocus(),
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
@@ -1222,15 +1216,13 @@ class _OthersPageState extends State<OthersPage> {
                         child: Column(
                           children: [
                             if (!_showAppBarSearch) _buildSearchField(),
-                            if (_searchQuery
-                                .isNotEmpty) // Show SearchResultsWidget when typing
+                            if (_searchQuery.isNotEmpty)
                               SearchResultsPage(searchQuery: _searchQuery),
                           ],
                         ),
                       ),
             ),
-            if (!_isLoadingLocations &&
-                _searchQuery.isEmpty) // Hide posts when searching
+            if (!_isLoadingLocations && _searchQuery.isEmpty)
               _isLoading
                   ? const SliverToBoxAdapter(
                     child: Center(child: CircularProgressIndicator()),
@@ -1312,7 +1304,7 @@ class _OthersPageState extends State<OthersPage> {
   }
 
   List<String> get _keralaCities {
-    return ['all', ..._locations.map((loc) => loc.name)];
+    return context.read<LocationProvider>().districts;
   }
 
   Widget _buildBikeCard(Bike bike) {

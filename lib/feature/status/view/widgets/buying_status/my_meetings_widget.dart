@@ -35,13 +35,30 @@ class MyMeetingsWidget extends StatefulWidget {
     this.showAppBar = true,
   });
 
+  // Static method to clear cache (call on logout)
+  static void clearCache() {
+    _MyMeetingsWidgetState._staticMeetingsCache.clear();
+    _MyMeetingsWidgetState._staticPostDetailsCache.clear();
+    _MyMeetingsWidgetState._staticMeetingTimesCache.clear();
+    _MyMeetingsWidgetState._lastCacheUpdate = null;
+    developer.log('MyMeetingsWidget static cache cleared');
+  }
+
   @override
   State<MyMeetingsWidget> createState() => _MyMeetingsWidgetState();
 }
 
-class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerProviderStateMixin {
+class _MyMeetingsWidgetState extends State<MyMeetingsWidget>
+    with SingleTickerProviderStateMixin {
+  // Static caches that persist across widget instances
+  static final List<Map<String, dynamic>> _staticMeetingsCache = [];
+  static final Map<String, Map<String, dynamic>> _staticPostDetailsCache = {};
+  static final List<Map<String, String>> _staticMeetingTimesCache = [];
+  static DateTime? _lastCacheUpdate;
+  static const Duration _cacheExpiry = Duration(minutes: 3); // 3 minutes cache expiry
+
   final List<String> statuses = [
-    'Date F',
+    'Date Fixed',
     'Meeting Request',
     'Awaiting Location',
     'Ready For Meeting',
@@ -61,17 +78,23 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    if (widget.initialStatus != null && statuses.contains(widget.initialStatus)) {
+    if (widget.initialStatus != null &&
+        statuses.contains(widget.initialStatus)) {
       selectedIndex = statuses.indexOf(widget.initialStatus!);
     }
-    _tabController = TabController(initialIndex: selectedIndex, length: statuses.length, vsync: this);
+    _tabController = TabController(
+      initialIndex: selectedIndex,
+      length: statuses.length,
+      vsync: this,
+    );
     _tabController.addListener(() {
       if (_tabController.index != selectedIndex) {
         setState(() {
           selectedIndex = _tabController.index;
         });
         _manageRefreshTimer();
-        _loadMeetings();
+        _checkAndUseStaticCache();
+        _loadMeetingsIfNeeded();
       }
     });
     _loadUserId();
@@ -85,13 +108,70 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     super.dispose();
   }
 
+  /// Check if static cache is valid and use it
+  void _checkAndUseStaticCache() {
+    final now = DateTime.now();
+    final cacheValid = _lastCacheUpdate != null && 
+                       now.difference(_lastCacheUpdate!) < _cacheExpiry &&
+                       _staticMeetingsCache.isNotEmpty;
+
+    if (cacheValid && mounted) {
+      developer.log('Using static cache for meetings - valid until ${_lastCacheUpdate!.add(_cacheExpiry)}');
+      
+      // Copy static cache to instance
+      setState(() {
+        meetings = List.from(_staticMeetingsCache);
+        isLoading = false;
+      });
+      return;
+    }
+    
+    developer.log('Static cache invalid or empty, will fetch fresh data');
+  }
+
+  /// Update static cache after successful fetch
+  void _updateStaticCache() {
+    _staticMeetingsCache.clear();
+    _staticMeetingsCache.addAll(meetings);
+    _staticPostDetailsCache.clear();
+    _staticPostDetailsCache.addAll(_postDetailsCache);
+    _staticMeetingTimesCache.clear();
+    _staticMeetingTimesCache.addAll(_meetingTimesCache);
+    _lastCacheUpdate = DateTime.now();
+    
+    developer.log('Static cache updated at $_lastCacheUpdate with ${meetings.length} meetings');
+  }
+
+  /// Force refresh - clears static cache and refetches
+  Future<void> _forceRefresh() async {
+    developer.log('Force refreshing meetings - clearing static cache');
+    _staticMeetingsCache.clear();
+    _staticPostDetailsCache.clear();
+    _staticMeetingTimesCache.clear();
+    _lastCacheUpdate = null;
+    _postDetailsCache.clear();
+    _meetingTimesCache.clear();
+    
+    await _loadMeetings();
+  }
+
+  /// Load meetings only if cache is invalid or empty
+  Future<void> _loadMeetingsIfNeeded() async {
+    if (meetings.isNotEmpty && !isLoading) {
+      developer.log('Using existing valid cache');
+      return;
+    }
+    await _loadMeetings();
+  }
+
   void _manageRefreshTimer() {
     _refreshTimer?.cancel();
-    if (selectedIndex == 2) {  // Awaiting Location
-      _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+    if (selectedIndex == 2) {
+      // Awaiting Location
+      _refreshTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
         if (mounted && selectedIndex == 2) {
-          print('Periodic refresh for Awaiting Location');
-          _loadMeetings();
+          developer.log('Periodic refresh for Awaiting Location');
+          _forceRefresh(); // Use force refresh for critical tab
         } else {
           timer.cancel();
         }
@@ -101,22 +181,26 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
 
   Future<void> _loadUserId() async {
     try {
-      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+      final userProvider = Provider.of<LoggedUserProvider>(
+        context,
+        listen: false,
+      );
       final userData = userProvider.userData;
       setState(() {
         _userId = userData?.userId ?? 'Unknown';
-        print('Loaded userId: $_userId');
+        developer.log('Loaded userId: $_userId');
         if (_userId == 'Unknown') {
-          errorMessage = ' Please log in .';
+          errorMessage = 'Please log in.';
           isLoading = false;
         }
       });
       if (_userId != 'Unknown') {
-        await _loadMeetings();
+        _checkAndUseStaticCache();
+        await _loadMeetingsIfNeeded();
         _manageRefreshTimer();
       }
     } catch (e) {
-      print('Error loading userId: $e');
+      developer.log('Error loading userId: $e');
       setState(() {
         errorMessage = 'Error loading user ID: $e';
         isLoading = false;
@@ -125,110 +209,141 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
   }
 
   Future<Map<String, dynamic>?> _fetchPostDetails(String postId) async {
-    if (_postDetailsCache.containsKey(postId)) {
-      print('Returning cached post details for post_id $postId');
-      return _postDetailsCache[postId];
+    // Check static cache first, then instance cache
+    final cachedPost = _staticPostDetailsCache[postId] ?? _postDetailsCache[postId];
+    if (cachedPost != null) {
+      developer.log('Returning cached post details for post_id $postId');
+      return cachedPost;
     }
 
     try {
       final response = await retry(
         () => http.get(
-          Uri.parse('${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId'),
-          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+          Uri.parse(
+            '${widget.baseUrl}/post-details.php?token=${widget.token}&post_id=$postId',
+          ),
+          headers: {
+            'token': widget.token,
+            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          },
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) => print('Retrying post-details for post_id $postId: $e'),
+        onRetry: (e) => developer.log('Retrying post-details for post_id $postId: $e'),
       );
-      print('post-details.php response for post_id $postId: ${response.body}');
+      developer.log('post-details.php response for post_id $postId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          Map<String, dynamic>? postData = data['data'] is List && data['data'].isNotEmpty
-              ? data['data'][0]
-              : data['data'] is Map
+          Map<String, dynamic>? postData =
+              data['data'] is List && data['data'].isNotEmpty
+                  ? data['data'][0]
+                  : data['data'] is Map
                   ? data['data']
                   : null;
           if (postData != null) {
             String imagePath = postData['image']?.toString() ?? '';
-            String fullImageUrl = imagePath.isNotEmpty
-                ? (imagePath.startsWith('http')
-                    ? imagePath
-                    : imagePath.startsWith('/')
+            String fullImageUrl =
+                imagePath.isNotEmpty
+                    ? (imagePath.startsWith('http')
+                        ? imagePath
+                        : imagePath.startsWith('/')
                         ? 'https://lelamonline.com$imagePath'
                         : 'https://lelamonline.com/admin/$imagePath')
-                : '';
+                    : '';
             final postDetails = {
               'title': postData['title'] ?? 'Unknown Vehicle (ID: $postId)',
               'price': postData['price']?.toString() ?? '0',
               'image': fullImageUrl,
-              'location': postData['land_mark']?.toString() ?? 'Unknown Location',
+              'location':
+                  postData['land_mark']?.toString() ?? 'Unknown Location',
               'by_dealer': postData['by_dealer']?.toString() ?? '0',
+              'created_by': postData['created_by']?.toString() ?? '', // Added seller ID
             };
-            _postDetailsCache[postId] = postDetails;
+            _postDetailsCache[postId] = postDetails; // Cache in instance
             return postDetails;
           }
         }
       } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for post-details.php');
-        setState(() {
-          errorMessage = 'Too many requests. Please try again later.';
-        });
+        developer.log('Rate limit exceeded for post-details.php');
+        if (mounted) {
+          setState(() {
+            errorMessage = 'Too many requests. Please try again later.';
+          });
+        }
       }
-      print('No valid post data for post_id $postId');
+      developer.log('No valid post data for post_id $postId');
       return null;
     } catch (e) {
-      print('Error fetching post details for post_id $postId: $e');
+      developer.log('Error fetching post details for post_id $postId: $e');
       return null;
     }
   }
 
   Future<List<Map<String, String>>> _fetchMeetingTimes() async {
+    // Check static cache first, then instance cache
+    if (_staticMeetingTimesCache.isNotEmpty) {
+      developer.log('Returning static cached meeting times');
+      return List.from(_staticMeetingTimesCache);
+    }
     if (_meetingTimesCache.isNotEmpty) {
-      print('Returning cached meeting times');
-      return _meetingTimesCache;
+      developer.log('Returning instance cached meeting times');
+      return List.from(_meetingTimesCache);
     }
 
     try {
       final response = await retry(
         () => http.get(
-          Uri.parse('${widget.baseUrl}/meeting-times.php?token=${widget.token}'),
-          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+          Uri.parse(
+            '${widget.baseUrl}/meeting-times.php?token=${widget.token}',
+          ),
+          headers: {
+            'token': widget.token,
+            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          },
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) => print('Retrying meeting-times: $e'),
+        onRetry: (e) => developer.log('Retrying meeting-times: $e'),
       );
-      print('meeting-times.php response: ${response.body}');
+      developer.log('meeting-times.php response: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
           if (data['data'] is List && data['data'].isNotEmpty) {
-            _meetingTimesCache = List<Map<String, String>>.from(
-              data['data'].map((item) => {
-                'name': item['name']?.toString() ?? '',
-                'value': item['value']?.toString() ?? '',
-              }),
+            final times = List<Map<String, String>>.from(
+              data['data'].map(
+                (item) => {
+                  'name': item['name']?.toString() ?? '',
+                  'value': item['value']?.toString() ?? '',
+                },
+              ),
             );
-            return _meetingTimesCache;
+            _meetingTimesCache = times; // Cache in instance
+            return times;
           }
         }
       } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for meeting-times.php');
-        setState(() {
-          errorMessage = 'Too many requests. Please try again later.';
-        });
+        developer.log('Rate limit exceeded for meeting-times.php');
+        if (mounted) {
+          setState(() {
+            errorMessage = 'Too many requests. Please try again later.';
+          });
+        }
       }
       return [];
     } catch (e) {
-      print('Error fetching meeting times: $e');
+      developer.log('Error fetching meeting times: $e');
       return [];
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchMeetingStatus(String meetingId, String status) async {
+  Future<Map<String, dynamic>?> _fetchMeetingStatus(
+    String meetingId,
+    String status,
+  ) async {
     try {
       String endpoint;
       switch (status) {
@@ -251,49 +366,62 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
       }
       final response = await retry(
         () => http.get(
-          Uri.parse('${widget.baseUrl}/$endpoint?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
-          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+          Uri.parse(
+            '${widget.baseUrl}/$endpoint?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+          ),
+          headers: {
+            'token': widget.token,
+            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+          },
         ),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) => print('Retrying $endpoint for meeting_id $meetingId: $e'),
+        onRetry:
+            (e) => developer.log('Retrying $endpoint for meeting_id $meetingId: $e'),
       );
-      print('$endpoint response for meeting_id $meetingId: ${response.body}');
+      developer.log('$endpoint response for meeting_id $meetingId: ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          final statusData = data['data'] is List && data['data'].isNotEmpty
-              ? data['data'][0]
-              : data['data'] is Map
+          final statusData =
+              data['data'] is List && data['data'].isNotEmpty
+                  ? data['data'][0]
+                  : data['data'] is Map
                   ? data['data']
                   : null;
           if (statusData != null) {
             return {
-              'middleStatus_data': statusData['middle_status']?.toString() ?? 'Schedule meeting',
-              'footerStatus_data': statusData['Footer_status']?.toString() ??
+              'middleStatus_data':
+                  statusData['middle_status']?.toString() ?? 'Schedule meeting',
+              'footerStatus_data':
+                  statusData['Footer_status']?.toString() ??
                   'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
               'timer': statusData['timer']?.toString() ?? '0',
             };
           }
         }
       } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for $endpoint');
-        setState(() {
-          errorMessage = 'Too many requests. Please try again later.';
-        });
+        developer.log('Rate limit exceeded for $endpoint');
+        if (mounted) {
+          setState(() {
+            errorMessage = 'Too many requests. Please try again later.';
+          });
+        }
       }
-      print('No valid status data for meeting_id $meetingId');
+      developer.log('No valid status data for meeting_id $meetingId');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
+        'footerStatus_data':
+            'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
         'timer': '0',
       };
     } catch (e) {
-      print('Error fetching meeting status for meeting_id $meetingId: $e');
+      developer.log('Error fetching meeting status for meeting_id $meetingId: $e');
       return {
         'middleStatus_data': 'Schedule meeting',
-        'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
+        'footerStatus_data':
+            'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
         'timer': '0',
       };
     }
@@ -301,10 +429,12 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
 
   Future<void> _loadMeetings() async {
     if (!mounted || _userId == null || _userId == 'Unknown') {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Cannot load meetings: Invalid user ID';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Cannot load meetings: Invalid user ID';
+        });
+      }
       return;
     }
 
@@ -315,34 +445,23 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     });
 
     try {
-      final headers = {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'};
-      String url;
-      switch (selectedIndex) {
-        case 0:
-          url = '${widget.baseUrl}/my-meeting-date-fix.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-          break;
-        case 1:
-          url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-          break;
-        case 2:
-          url = '${widget.baseUrl}/my-meeting-awaiting-location.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-          break;
-        case 3:
-          url = '${widget.baseUrl}/my-meeting-ready-for-meeting.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-          break;
-        default:
-          url = '${widget.baseUrl}/my-meeting-done.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-          break;
-      }
-      print('Fetching meetings from: $url');
+      final headers = {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
+      
+      // Always use the my-meeting-request.php endpoint to get ALL meetings
+      String url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+      developer.log('Fetching ALL meetings from: $url');
+      
       final response = await retry(
         () => http.get(Uri.parse(url), headers: headers),
         maxAttempts: 3,
         delayFactor: const Duration(seconds: 2),
         randomizationFactor: 0.25,
-        onRetry: (e) => print('Retrying meetings fetch: $e'),
+        onRetry: (e) => developer.log('Retrying meetings fetch: $e'),
       );
-      print('Raw response body: ${response.body}');
+      developer.log('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -350,20 +469,35 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
             (responseData['status'] == true || responseData['status'] == 'true') &&
             responseData['data'] is List) {
           final List<dynamic> meetingData = responseData['data'];
-          print('Found ${meetingData.length} meetings in API response');
+          developer.log('Found ${meetingData.length} meetings in API response');
 
           for (var meeting in meetingData) {
-            print(
-                'Processing meeting: id=${meeting['id']}, bid_id=${meeting['bid_id']}, post_id=${meeting['post_id']}, user_id=${meeting['user_id'] ?? _userId}, seller_approvel=${meeting['seller_approvel']}, admin_approvel=${meeting['admin_approvel']}, meeting_done=${meeting['meeting_done']}, meeting_date=${meeting['meeting_date']}, meeting_time=${meeting['meeting_time']}');
-            final postDetails = await _fetchPostDetails(meeting['post_id']);
-            if (postDetails == null) {
-              print('Skipping meeting ${meeting['id']} due to missing post details');
-              continue;
+            developer.log(
+              'Processing meeting: id=${meeting['id']}, date=${meeting['meeting_date']}, time=${meeting['meeting_time']}, done=${meeting['meeting_done']}, seller_approvel=${meeting['seller_approvel']}',
+            );
+            
+            Map<String, dynamic>? postDetails;
+            // Only fetch post details if post_id is valid (not 0)
+            if (meeting['post_id'] != null && meeting['post_id'] != '0' && meeting['post_id'] != 0) {
+              postDetails = await _fetchPostDetails(meeting['post_id']);
             }
-            final statusData = await _fetchMeetingStatus(meeting['id'], statuses[selectedIndex]);
-            final meetingData = <String, dynamic>{
+            
+            // If post details fetch failed or post_id is 0, create default post details
+            if (postDetails == null) {
+              postDetails = {
+                'title': 'Vehicle (ID: ${meeting['post_id'] ?? 'Unknown'})',
+                'price': '0',
+                'image': '',
+                'location': 'Unknown Location',
+                'by_dealer': '0',
+                'created_by': '', // Default empty
+              };
+              developer.log('Using default post details for meeting ${meeting['id']}');
+            }
+            
+            final meetingDataMap = <String, dynamic>{
               'id': meeting['id']?.toString() ?? 'N/A',
-              'user_id': meeting['user_id']?.toString() ?? _userId,
+              'user_id': meeting['user_id']?.toString() ?? _userId, // Buyer's ID
               'post_id': meeting['post_id']?.toString() ?? 'N/A',
               'bid_id': meeting['bid_id']?.toString() ?? '0',
               'with_bid': meeting['with_bid']?.toString() ?? '0',
@@ -402,29 +536,32 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
               'location': postDetails['location'] ?? 'Unknown Location',
               'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
               'if_auction': meeting['if_auction']?.toString() ?? '0',
-              'middleStatus_data': statusData?['middleStatus_data'] ?? 'Schedule meeting',
-              'footerStatus_data': statusData?['footerStatus_data'] ??
-                  'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
-              'timer': statusData?['timer'] ?? '0',
+              'middleStatus_data': 'Schedule meeting',
+              'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
+              'timer': '0',
               'parent_zone_id': meeting['parent_zone_id']?.toString() ?? '',
+              'created_by': postDetails['created_by'] ?? '', // Added seller ID
             };
-            print('Added meeting ${meeting['id']} to list: $meetingData');
-            meetings.add(meetingData);
+            developer.log('Added meeting ${meeting['id']} to list: Date: ${meetingDataMap['meeting_date']}, Time: ${meetingDataMap['meeting_time']}, Seller ID: ${meetingDataMap['created_by']}');
+            meetings.add(meetingDataMap);
           }
+
+          // Update static cache after successful fetch
+          _updateStaticCache();
         } else {
           developer.log('Unexpected response format: ${responseData.toString()}');
           errorMessage = 'Currently No Meeting';
         }
-        print('Total meetings loaded: ${meetings.length}');
+        developer.log('Total meetings loaded: ${meetings.length}');
       } else if (response.statusCode == 429) {
-        print('Rate limit exceeded for meetings fetch');
+        developer.log('Rate limit exceeded for meetings fetch');
         errorMessage = 'Too many requests. Please try again later.';
       } else {
-        print('Failed to fetch meetings: ${response.reasonPhrase}');
+        developer.log('Failed to fetch meetings: ${response.reasonPhrase}');
         errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
       }
     } catch (e) {
-      print('Error loading meetings: $e');
+      developer.log('Error loading meetings: $e');
       errorMessage = 'Error loading meetings: $e';
     }
 
@@ -437,120 +574,133 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
 
   List<Map<String, dynamic>> _getFilteredMeetings() {
     final status = statuses[selectedIndex];
-    print('Filtering for status: $status');
-
     var filteredMeetings = meetings.where((meeting) {
-      print(
-          'Meeting ${meeting['id']} - status: ${meeting['status']}, '
-          'seller_approvel: ${meeting['seller_approvel']}, '
-          'admin_approvel: ${meeting['admin_approvel']}, '
-          'meeting_done: ${meeting['meeting_done']}, '
-          'if_location_request: ${meeting['if_location_request']}, '
-          'meeting_date: ${meeting['meeting_date']}, '
-          'meeting_time: ${meeting['meeting_time']}');
-
       if (status == 'Date Fixed') {
-        return meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['if_location_request'] == '0' &&
-            meeting['seller_approvel'] == '1' &&
-            meeting['admin_approvel'] == '1' &&
+        return meeting['meeting_done'] == '0' &&
             meeting['meeting_date'] != 'N/A' &&
-            meeting['meeting_date']?.isNotEmpty == true;
+            meeting['meeting_date']?.isNotEmpty == true &&
+            meeting['meeting_date'] != '1970-01-01';
       } else if (status == 'Meeting Request') {
-        return meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['if_location_request'] == '0' &&
-            meeting['meeting_time'] != 'N/A' &&
-            meeting['meeting_time']?.isNotEmpty == true;
+        return meeting['meeting_done'] == '0' &&
+            (meeting['meeting_date'] == 'N/A' ||
+             meeting['meeting_date']?.isEmpty == true ||
+             meeting['meeting_date'] == '1970-01-01');
       } else if (status == 'Awaiting Location') {
-        return meeting['if_location_request'] == '1' &&
-            meeting['status'] == '1' &&
-            meeting['meeting_done'] == '0';
+        return meeting['meeting_done'] == '0' &&
+            meeting['meeting_time'] != 'N/A' &&
+            meeting['meeting_time']?.isNotEmpty == true &&
+            meeting['meeting_time'] != '00:00:00';
       } else if (status == 'Ready For Meeting') {
-        return meeting['seller_approvel'] == '1' &&
-            meeting['admin_approvel'] == '1' &&
-            meeting['meeting_done'] == '0' &&
-            meeting['if_location_request'] == '1' &&
-            meeting['location_link']?.isNotEmpty == true;
+        return meeting['meeting_done'] == '0' &&
+            meeting['seller_approvel'] == '1';
       } else if (status == 'Meeting Completed') {
         return meeting['meeting_done'] == '1';
       }
       return false;
     }).toList();
-
     filteredMeetings.sort((a, b) {
       final aDate = DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ?? DateTime.now();
       final bDate = DateTime.tryParse(b['updated_on'] ?? b['created_on'] ?? '') ?? DateTime.now();
       return bDate.compareTo(aDate);
     });
 
+    developer.log('Filtered meetings count for $status: ${filteredMeetings.length}');
+    
+    // Debug: Print all filtered meetings
+    for (var meeting in filteredMeetings) {
+      developer.log('Filtered meeting: ${meeting['id']} - Date: ${meeting['meeting_date']}, Time: ${meeting['meeting_time']}, Seller ID: ${meeting['created_by']}');
+    }
+    
     return filteredMeetings;
   }
 
   Widget _buildMeetingList() {
     final filteredMeetings = _getFilteredMeetings();
-    print('Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}');
+    developer.log(
+      'Filtered meetings for ${statuses[selectedIndex]}: ${filteredMeetings.length}',
+    );
     for (var meeting in filteredMeetings) {
-      print(
-          'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
-          'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
-          'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
-          'date=${meeting['meeting_date']}');
+      developer.log(
+        'Filtered meeting ${meeting['id']}: status=${meeting['status']}, '
+        'seller=${meeting['seller_approvel']}, admin=${meeting['admin_approvel']}, '
+        'done=${meeting['meeting_done']}, location=${meeting['if_location_request']}, '
+        'date=${meeting['meeting_date']}, seller ID: ${meeting['created_by']}',
+      );
     }
 
     return isLoading
         ? const Center(child: CircularProgressIndicator(color: Colors.blue))
         : errorMessage != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.handshake, size: 64, color: Colors.grey),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No meetings found',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.handshake, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  errorMessage!,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-              )
-            : filteredMeetings.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.handshake, size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No meetings found',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'You have no meetings at this time',
-                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredMeetings.length,
-                    itemBuilder: (context, index) {
-                      final meeting = filteredMeetings[index];
-                      print('Displaying meeting: ${meeting['id']}');
-                      return MeetingCard(
-                        meeting: meeting,
-                        baseUrl: widget.baseUrl,
-                        token: widget.token,
-                        currentTab: statuses[selectedIndex],
-                        onEditDate: (meeting) => _editDate(context, meeting),
-                        onEditTime: (meeting) => _editTime(context, meeting),
-                      );
-                    },
-                  );
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _forceRefresh,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          )
+        : filteredMeetings.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.handshake, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'No meetings found',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'You have no meetings at this time',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _forceRefresh,
+                  child: const Text('Refresh'),
+                ),
+              ],
+            ),
+          )
+        : RefreshIndicator(
+            onRefresh: _forceRefresh,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: filteredMeetings.length,
+              itemBuilder: (context, index) {
+                final meeting = filteredMeetings[index];
+                developer.log('Displaying meeting: ${meeting['id']}, seller ID: ${meeting['created_by']}');
+                return MeetingCard(
+                  meeting: meeting,
+                  baseUrl: widget.baseUrl,
+                  token: widget.token,
+                  currentTab: statuses[selectedIndex],
+                  onEditDate: (meeting) => _editDate(context, meeting),
+                  onEditTime: (meeting) => _editTime(context, meeting),
+                );
+              },
+            ),
+          );
   }
 
   @override
@@ -558,7 +708,41 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     return Scaffold(
       appBar: widget.showAppBar
           ? AppBar(
-              title: const Text('My Meetings'),
+              title: Row(
+                children: [
+                  const Text('My Meetings'),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.refresh, size: 16, color: Colors.blue[700]),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_getFilteredMeetings().length} Meetings',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: _forceRefresh,
+                    icon: const Icon(Icons.refresh),
+                    tooltip: 'Refresh meetings (clears cache)',
+                  ),
+                ],
+              ),
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.pop(context),
@@ -580,7 +764,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     );
   }
 
-  Future<void> _editTime(BuildContext context, Map<String, dynamic> meeting) async {
+  Future<void> _editTime(
+    BuildContext context,
+    Map<String, dynamic> meeting,
+  ) async {
     if (_userId == null || _userId == 'Unknown') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
@@ -589,7 +776,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     }
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
-      print('No meeting times available');
+      developer.log('No meeting times available');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No meeting times available')),
       );
@@ -612,16 +799,24 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
                 value: selectedTimeValue,
                 hint: const Text('Choose a time'),
                 items: meetingTimes
-                    .map((time) => DropdownMenuItem<String>(
-                          value: time['value'],
-                          child: Text(time['name']!),
-                        ))
+                    .map(
+                      (time) => DropdownMenuItem<String>(
+                        value: time['value'],
+                        child: Text(time['name']!),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) {
                   setState(() {
                     selectedTimeValue = value;
-                    selectedTimeName = meetingTimes.firstWhere((time) => time['value'] == value, orElse: () => {'name': ''})['name'];
-                    print('Selected time: $selectedTimeName ($selectedTimeValue)');
+                    selectedTimeName =
+                        meetingTimes.firstWhere(
+                          (time) => time['value'] == value,
+                          orElse: () => {'name': ''},
+                        )['name'];
+                    developer.log(
+                      'Selected time: $selectedTimeName ($selectedTimeValue)',
+                    );
                   });
                 },
               ),
@@ -636,37 +831,66 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
               onPressed: selectedTimeValue == null
                   ? null
                   : () async {
-                      print('Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}');
+                      developer.log(
+                        'Submitting meeting time: $selectedTimeValue for meeting_id: ${meeting['id']}',
+                      );
                       try {
                         final response = await http.get(
                           Uri.parse(
-                              '${widget.baseUrl}/my-meeting-fix-time.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_time=$selectedTimeValue'),
-                          headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+                            '${widget.baseUrl}/my-meeting-fix-time.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_time=$selectedTimeValue',
+                          ),
+                          headers: {
+                            'token': widget.token,
+                            'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+                          },
                         );
-                        print('my-meeting-fix-time.php response: ${response.body}');
+                        developer.log(
+                          'my-meeting-fix-time.php response: ${response.body}',
+                        );
                         if (response.statusCode == 200) {
                           final data = jsonDecode(response.body);
-                          if (data['status'] == true || data['status'] == 'true') {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Time updated to $selectedTimeName')),
+                          if (data['status'] == true ||
+                              data['status'] == 'true') {
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Time updated to $selectedTimeName',
+                                ),
+                              ),
                             );
-                            await _loadMeetings();
+                            await _forceRefresh(); // Force refresh after update
                             widget.onRefreshMeetings?.call();
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to update time: ${data['message'] ?? 'Unknown error'}')),
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to update time: ${data['message'] ?? 'Unknown error'}',
+                                ),
+                              ),
                             );
                           }
                         } else {
-                          print('my-meeting-fix-time.php failed with status ${response.statusCode}');
+                          developer.log(
+                            'my-meeting-fix-time.php failed with status ${response.statusCode}',
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Failed to update time')),
+                            const SnackBar(
+                              content: Text('Failed to update time'),
+                            ),
                           );
                         }
                       } catch (e) {
-                        print('Error updating meeting time: $e');
+                        developer.log('Error updating meeting time: $e');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Error updating meeting time')),
+                          const SnackBar(
+                            content: Text(
+                              'Error updating meeting time',
+                            ),
+                          ),
                         );
                       }
                       Navigator.pop(dialogContext);
@@ -679,7 +903,10 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
     );
   }
 
-  Future<void> _editDate(BuildContext context, Map<String, dynamic> meeting) async {
+  Future<void> _editDate(
+    BuildContext context,
+    Map<String, dynamic> meeting,
+  ) async {
     if (_userId == null || _userId == 'Unknown') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invalid user ID. Please log in again.')),
@@ -700,41 +927,53 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget> with SingleTickerPr
         final response = await retry(
           () => http.get(
             Uri.parse(
-                '${widget.baseUrl}/my-meeting-edit-date.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_date=$meetingDate'),
-            headers: {'token': widget.token, 'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76'},
+              '${widget.baseUrl}/my-meeting-edit-date.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}&post_id=${meeting['post_id']}&meeting_id=${meeting['id']}&meeting_date=$meetingDate',
+            ),
+            headers: {
+              'token': widget.token,
+              'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+            },
           ),
           maxAttempts: 3,
           delayFactor: const Duration(seconds: 2),
           randomizationFactor: 0.25,
-          onRetry: (e) => print('Retrying edit date: $e'),
+          onRetry: (e) => developer.log('Retrying edit date: $e'),
         );
-        print('my-meeting-edit-date.php response: ${response.body}');
+        developer.log('my-meeting-edit-date.php response: ${response.body}');
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           if (data['status'] == true || data['status'] == 'true') {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Date updated successfully')),
             );
-            await _loadMeetings();
+            await _forceRefresh(); // Force refresh after update
             widget.onRefreshMeetings?.call();
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to update date: ${data['message'] ?? 'Unknown error'}')),
+              SnackBar(
+                content: Text(
+                  'Failed to update date: ${data['message'] ?? 'Unknown error'}',
+                ),
+              ),
             );
           }
         } else if (response.statusCode == 429) {
-          print('Rate limit exceeded for edit date');
+          developer.log('Rate limit exceeded for edit date');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Too many requests. Please try again later.')),
+            const SnackBar(
+              content: Text('Too many requests. Please try again later.'),
+            ),
           );
         } else {
-          print('my-meeting-edit-date.php failed with status ${response.statusCode}');
+          developer.log(
+            'my-meeting-edit-date.php failed with status ${response.statusCode}',
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to update date')),
           );
         }
       } catch (e) {
-        print('Error updating meeting date: $e');
+        developer.log('Error updating meeting date: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Error updating meeting date')),
         );

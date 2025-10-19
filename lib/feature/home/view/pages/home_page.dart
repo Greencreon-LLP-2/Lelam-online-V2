@@ -8,10 +8,12 @@ import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart' as ApiConstant;
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/banner_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/category_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/product_section_widget.dart';
 import 'package:lelamonline_flutter/feature/home/view/widgets/search_button_widget.dart';
+import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:provider/provider.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,8 +26,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin, RouteAware {
   final FocusNode _searchFocusNode = FocusNode();
-  String? _selectedDistrict;
-  List<String> _districts = ['All Kerala'];
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -35,7 +35,7 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    _fetchDistricts(); // Add this: Load districts on init
+    _fetchDistricts(); // Load districts on init
   }
 
   @override
@@ -64,14 +64,13 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _fetchDistricts() async {
-    if (!mounted) return; // Prevent setState on unmounted widget
+    if (!mounted) return;
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    // Validate token
     if (ApiConstant.token.isEmpty) {
       setState(() {
         _isLoading = false;
@@ -84,83 +83,62 @@ class _HomePageState extends State<HomePage>
     try {
       final url =
           '${ApiConstant.baseUrl}/list-location.php?token=${ApiConstant.token}';
-      developer.log('Fetching districts from: $url'); // Log the full URL
+      developer.log('Fetching districts from: $url');
 
       final response = await http
           .get(Uri.parse(url), headers: {'Content-Type': 'application/json'})
-          .timeout(
-            const Duration(seconds: 10),
-          ); // Add timeout to prevent hanging
+          .timeout(const Duration(seconds: 10));
 
-      developer.log('Response Status: ${response.statusCode}'); // Log status
-      developer.log(
-        'Response Body: ${response.body}',
-      ); // Log full body for debugging
+      developer.log('Response Status: ${response.statusCode}');
+      developer.log('Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
-        developer.log('Parsed Response Data: $responseData'); // Log parsed data
+        developer.log('Parsed Response Data: $responseData');
 
         if (responseData['status'] == 'true' && responseData['data'] is List) {
           final List<dynamic> data = responseData['data'];
-          developer.log('Raw data length: ${data.length}'); // Log data size
-
           final filteredData =
               data.where((item) => item['status'] == '1').toList();
-          developer.log(
-            'Filtered data (status=1) length: ${filteredData.length}',
-          ); // Log after filter
+          final locations =
+              filteredData.map((item) => LocationData.fromJson(item)).toList();
 
           if (mounted) {
+            context.read<LocationProvider>().setLocations(locations);
             setState(() {
-              _districts =
-                  ['All Kerala'] +
-                  filteredData.map((item) => item['name'].toString()).toList();
               _isLoading = false;
             });
-            developer.log('Updated districts: $_districts');
+            developer.log(
+              'Updated districts: ${context.read<LocationProvider>().districts}',
+            );
           }
         } else {
-          // Handle unexpected format without throwing
-          developer.log(
-            'Unexpected format: status=${responseData['status']}, data type=${responseData['data'].runtimeType}',
-          );
           setState(() {
             _isLoading = false;
             _errorMessage = 'Invalid API response format. Check logs.';
           });
         }
       } else {
-        // Handle non-200 statuses
         setState(() {
           _isLoading = false;
           _errorMessage =
               'API error: ${response.statusCode} - ${response.reasonPhrase}';
         });
-        developer.log(
-          'Non-200 status: ${response.statusCode} - ${response.body}',
-        );
       }
     } catch (e) {
-      developer.log(
-        'Full error in _fetchDistricts: $e',
-      ); // Log full stack trace
+      developer.log('Full error in _fetchDistricts: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Failed to load districts: $e';
         });
       }
-      // Show snackbar only if not already shown
       if (_errorMessage != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_errorMessage!),
             backgroundColor: Colors.red.withOpacity(0.8),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _fetchDistricts, // Add retry button
-            ),
+            action: SnackBarAction(label: 'Retry', onPressed: _fetchDistricts),
           ),
         );
       }
@@ -170,7 +148,7 @@ class _HomePageState extends State<HomePage>
   Future<void> _onRefresh() async {
     if (kDebugMode) {
       developer.log(
-        'Pull-to-refresh triggered, selectedDistrict: $_selectedDistrict',
+        'Pull-to-refresh triggered, selectedLocationName: ${context.read<LocationProvider>().selectedLocationName}',
       );
     }
     try {
@@ -226,10 +204,11 @@ class _HomePageState extends State<HomePage>
     }
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final userProvider = context.watch<LoggedUserProvider>();
+    final locationProvider = context.watch<LocationProvider>();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -257,46 +236,75 @@ class _HomePageState extends State<HomePage>
                               const SizedBox(width: 8),
                               _isLoading
                                   ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ) // Smaller spinner for dropdown area
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                   : _errorMessage != null
-                                      ? Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Text('Error loading locations'),
-                                            IconButton(
-                                              icon: const Icon(Icons.refresh, size: 16),
-                                              onPressed: _fetchDistricts, // Retry button
-                                            ),
-                                          ],
-                                        )
-                                      : DropdownButton<String>(
-                                          value: _selectedDistrict,
-                                          hint: const Text('All Kerala'),
-                                          items: _districts.map((district) {
-                                            return DropdownMenuItem<String>(
-                                              value: district,
-                                              child: Text(district),
-                                            );
-                                          }).toList(),
-                                          onChanged: _isLoading
-                                              ? null // Disable dropdown while loading
-                                              : (String? newValue) {
-                                                  if (mounted) {
-                                                    setState(() {
-                                                      _selectedDistrict = newValue;
-                                                    });
-                                                    _handleInteractiveTap('location dropdown');
-                                                    if (kDebugMode) {
-                                                      developer.log('Selected district: $_selectedDistrict');
-                                                    }
-                                                  }
-                                                },
-                                          underline: const SizedBox(),
-                                          icon: const SizedBox.shrink(),
+                                  ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Error loading locations'),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 16,
                                         ),
+                                        onPressed: _fetchDistricts,
+                                      ),
+                                    ],
+                                  )
+                                  : DropdownButton<String>(
+                                    value:
+                                        locationProvider.selectedLocationName ==
+                                                'All Kerala'
+                                            ? null
+                                            : locationProvider
+                                                .selectedLocationName,
+                                    hint: const Text('All Kerala'),
+                                    items:
+                                        locationProvider.districts.map((
+                                          district,
+                                        ) {
+                                          return DropdownMenuItem<String>(
+                                            value:
+                                                district == 'All Kerala'
+                                                    ? 'all'
+                                                    : district,
+                                            child: Text(district),
+                                          );
+                                        }).toList(),
+                                    onChanged:
+                                        _isLoading
+                                            ? null
+                                            : (String? newValue) {
+                                              if (mounted && newValue != null) {
+                                                final id = locationProvider
+                                                    .getLocationIdByName(
+                                                      newValue,
+                                                    );
+                                                locationProvider
+                                                    .setSelectedLocation(
+                                                      newValue == 'all'
+                                                          ? 'All Kerala'
+                                                          : newValue,
+                                                      id: id,
+                                                    );
+                                                _handleInteractiveTap(
+                                                  'location dropdown',
+                                                );
+                                                if (kDebugMode) {
+                                                  developer.log(
+                                                    'Selected district: ${locationProvider.selectedLocationName} (ID: ${locationProvider.selectedLocationId})',
+                                                  );
+                                                }
+                                              }
+                                            },
+                                    underline: const SizedBox(),
+                                    icon: const SizedBox.shrink(),
+                                  ),
                             ],
                           ),
                           const Spacer(),

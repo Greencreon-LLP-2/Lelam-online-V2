@@ -5,7 +5,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
+import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
+import 'package:provider/provider.dart';
 
 class MeetingCard extends StatefulWidget {
   final Map<String, dynamic> meeting;
@@ -71,15 +74,19 @@ class _MeetingCardState extends State<MeetingCard> {
   Future<Map<String, dynamic>> _fetchMeetingDoneStatus(String meetingId) async {
     try {
       final response = await http.get(
-        Uri.parse('${widget.baseUrl}/my-meeting-done-post-status.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
+        Uri.parse(
+          '${widget.baseUrl}/my-meeting-done-post-status.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+        ),
         headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
           return {
-            'middleStatus_data': data['data'][0]['middle_status'] ?? 'Enter Your Feedback',
-            'footerStatus_data': data['data'][0]['Footer_status'] ?? 'Thanks for meeting done',
+            'middleStatus_data':
+                data['data'][0]['middle_status'] ?? 'Enter Your Feedback',
+            'footerStatus_data':
+                data['data'][0]['Footer_status'] ?? 'Thanks for meeting done',
             'timer': data['data'][0]['timer']?.toString() ?? '0',
           };
         }
@@ -99,17 +106,24 @@ class _MeetingCardState extends State<MeetingCard> {
     }
   }
 
-  Future<String> _fetchOfferPrice(String userId, String postId, String meetingId) async {
+  Future<String> _fetchOfferPrice(
+    String userId,
+    String postId,
+    String meetingId,
+  ) async {
     try {
       final response = await http.get(
         Uri.parse(
-            '${widget.baseUrl}/my-meetings-offer-price.php?token=${widget.token}&user_id=$userId&post_id=$postId&ads_post_customer_meeting_id=$meetingId&price_offered=${widget.meeting['price_offered']}'),
+          '${widget.baseUrl}/my-meetings-offer-price.php?token=${widget.token}&user_id=$userId&post_id=$postId&ads_post_customer_meeting_id=$meetingId&price_offered=${widget.meeting['price_offered']}',
+        ),
         headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          return data['data']['price_offered']?.toString() ?? widget.meeting['price_offered'] ?? '0.00';
+          return data['data']['price_offered']?.toString() ??
+              widget.meeting['price_offered'] ??
+              '0.00';
         }
       }
       return widget.meeting['price_offered'] ?? '0.00';
@@ -122,7 +136,9 @@ class _MeetingCardState extends State<MeetingCard> {
   Future<String> _fetchDecisionPendingStatus(String meetingId) async {
     try {
       final response = await http.get(
-        Uri.parse('${widget.baseUrl}/my-meetings-decision-pendding.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
+        Uri.parse(
+          '${widget.baseUrl}/my-meetings-decision-pendding.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+        ),
         headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
@@ -141,7 +157,9 @@ class _MeetingCardState extends State<MeetingCard> {
   Future<void> _notInterested(BuildContext context, String meetingId) async {
     try {
       final response = await http.get(
-        Uri.parse('${widget.baseUrl}/my-meetings-not-intersted.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
+        Uri.parse(
+          '${widget.baseUrl}/my-meetings-not-intersted.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+        ),
         headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
@@ -152,7 +170,9 @@ class _MeetingCardState extends State<MeetingCard> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${data['message'] ?? 'Unknown error'}')),
+            SnackBar(
+              content: Text('Failed: ${data['message'] ?? 'Unknown error'}'),
+            ),
           );
         }
       } else {
@@ -171,7 +191,9 @@ class _MeetingCardState extends State<MeetingCard> {
   Future<void> _revisit(BuildContext context, String meetingId) async {
     try {
       final response = await http.get(
-        Uri.parse('${widget.baseUrl}/my-meetings-revisit.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId'),
+        Uri.parse(
+          '${widget.baseUrl}/my-meetings-revisit.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
+        ),
         headers: {'token': widget.token},
       );
       if (response.statusCode == 200) {
@@ -182,7 +204,9 @@ class _MeetingCardState extends State<MeetingCard> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${data['message'] ?? 'Unknown error'}')),
+            SnackBar(
+              content: Text('Failed: ${data['message'] ?? 'Unknown error'}'),
+            ),
           );
         }
       } else {
@@ -192,9 +216,9 @@ class _MeetingCardState extends State<MeetingCard> {
       }
     } catch (e) {
       debugPrint('Error requesting revisit: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error requesting revisit')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error requesting revisit')));
     }
   }
 
@@ -203,9 +227,13 @@ class _MeetingCardState extends State<MeetingCard> {
       return 'Meeting Completed';
     } else if (meeting['seller_approvel'] == '1') {
       return 'Seller Confirmed';
-    } else if (meeting['meeting_time'] != 'N/A' && meeting['meeting_time']?.isNotEmpty == true) {
+    } else if (meeting['meeting_time'] != 'N/A' &&
+        meeting['meeting_time']?.isNotEmpty == true &&
+        meeting['meeting_time'] != '00:00:00') {
       return 'Time Fixed';
-    } else if (meeting['meeting_date'] != 'N/A' && meeting['meeting_date']?.isNotEmpty == true) {
+    } else if (meeting['meeting_date'] != 'N/A' &&
+        meeting['meeting_date']?.isNotEmpty == true &&
+        meeting['meeting_date'] != '1970-01-01') {
       return 'Date Fixed';
     } else {
       return 'Meeting Request';
@@ -218,7 +246,8 @@ class _MeetingCardState extends State<MeetingCard> {
     required bool isCompleted,
     required String message,
   }) {
-    Color color = isCompleted ? Colors.green : (isActive ? Colors.blue : Colors.grey);
+    Color color =
+        isCompleted ? Colors.green : (isActive ? Colors.blue : Colors.grey);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -230,7 +259,12 @@ class _MeetingCardState extends State<MeetingCard> {
             color: color,
             border: Border.all(color: color, width: 1.5),
           ),
-          child: isCompleted ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
+          child:
+              isCompleted
+                  ? const Icon(Icons.check, size: 10, color: Colors.white)
+                  : (isActive
+                      ? const Icon(Icons.circle, size: 8, color: Colors.white)
+                      : null),
         ),
         const SizedBox(height: 4),
         Text(
@@ -261,61 +295,119 @@ class _MeetingCardState extends State<MeetingCard> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    final buyerName = userProvider.userData?.name ?? 'Buyer';
+    final productName = widget.meeting['title'] ?? 'Unknown Product';
+    final meetingDate = widget.meeting['meeting_date'] ?? 'N/A';
+    final meetingTime = widget.meeting['meeting_time'] ?? 'N/A';
+    final sellerApproval = widget.meeting['seller_approvel']?.toString() ?? '0';
+    final sellerId =
+        widget.meeting['created_by']?.toString() ??
+        'Unknown'; // Use created_by (seller ID)
+    final sellerName = widget.meeting['seller_name']?.toString() ?? 'Seller';
+    final sellerImage = widget.meeting['seller_image']?.toString() ?? '';
+
     final status = _getMeetingStatus(widget.meeting);
     final bool withBid = widget.meeting['with_bid'] == '1';
-    final double bidAmount = double.tryParse(widget.meeting['bid_amount'] ?? widget.meeting['bidPrice'] ?? '0') ?? 0;
-    final double targetPrice = double.tryParse(widget.meeting['targetPrice']?.toString() ?? '0') ?? 0;
+    final double bidAmount =
+        double.tryParse(
+          widget.meeting['bid_amount'] ?? widget.meeting['bidPrice'] ?? '0',
+        ) ??
+        0;
+    final double targetPrice =
+        double.tryParse(widget.meeting['targetPrice']?.toString() ?? '0') ?? 0;
     final bool isLowBid = bidAmount > 0 && bidAmount < targetPrice;
 
-    bool isDateSet = widget.meeting['meeting_date'] != 'N/A' && widget.meeting['meeting_date']?.isNotEmpty == true;
-    bool isTimeSet = widget.meeting['meeting_time'] != 'N/A' && widget.meeting['meeting_time']?.isNotEmpty == true;
+    bool isDateSet =
+        widget.meeting['meeting_date'] != 'N/A' &&
+        widget.meeting['meeting_date']?.isNotEmpty == true &&
+        widget.meeting['meeting_date'] != '1970-01-01';
+    bool isTimeSet =
+        widget.meeting['meeting_time'] != 'N/A' &&
+        widget.meeting['meeting_time']?.isNotEmpty == true &&
+        widget.meeting['meeting_time'] != '00:00:00';
     bool isSellerConfirmed = widget.meeting['seller_approvel'] == '1';
     bool isMeetingDone = widget.meeting['meeting_done'] == '1';
 
     bool step1Completed = isDateSet;
     bool step1Active = !isDateSet;
+
     bool step2Completed = isTimeSet;
-    bool step2Active = isDateSet && !isTimeSet;
-    bool step3Completed = isSellerConfirmed;
-    bool step3Active = isTimeSet && !isSellerConfirmed;
-    bool step4Completed = isMeetingDone;
-    bool step4Active = isSellerConfirmed && !isMeetingDone;
+    bool step2Active = step1Completed && !isTimeSet;
 
-    String step1Message = step1Completed ? widget.meeting['meeting_date'] ?? '' : (step1Active ? 'Select Date' : '');
-    String step2Message = step2Completed ? widget.meeting['meeting_time'] ?? '' : (step2Active ? 'Select Time' : '');
-    String step3Message = step3Completed ? 'Confirmed' : (step3Active ? 'Awaiting Confirmation' : '');
-    String step4Message = step4Completed ? 'Completed' : (step4Active ? 'Ready' : '');
+    bool step3Completed = isSellerConfirmed && step2Completed;
+    bool step3Active = step2Completed && !isSellerConfirmed;
 
+    bool step4Completed =
+        isMeetingDone &&
+        step3Completed; // Meeting Done (only if seller confirmed AND meeting done)
+    bool step4Active =
+        step3Completed &&
+        !isMeetingDone; // Only active if seller confirmed but meeting not done
+
+    String step1Message =
+        step1Completed
+            ? widget.meeting['meeting_date'] ?? ''
+            : (step1Active ? 'Select Date' : '');
+    String step2Message =
+        step2Completed
+            ? (widget.meeting['meeting_time'] ?? 'Time Set')
+            : (step2Active ? 'Fix Time' : '');
+    String step3Message =
+        step3Completed
+            ? 'Confirmed'
+            : (step3Active ? 'Awaiting Confirmation' : '');
+    String step4Message =
+        step4Completed ? 'Completed' : (step4Active ? 'Ready' : '');
     return FutureBuilder<Map<String, dynamic>>(
-      future: status == 'Meeting Completed'
-          ? _fetchMeetingDoneStatus(widget.meeting['id'])
-          : Future.value({
-              'middleStatus_data': _middleStatusData,
-              'footerStatus_data': widget.meeting['footerStatus_data'] ?? '',
-              'timer': widget.meeting['timer'] ?? '0',
-            }),
+      future:
+          status == 'Meeting Completed'
+              ? _fetchMeetingDoneStatus(widget.meeting['id'])
+              : Future.value({
+                'middleStatus_data': _middleStatusData,
+                'footerStatus_data': widget.meeting['footerStatus_data'] ?? '',
+                'timer': widget.meeting['timer'] ?? '0',
+              }),
       builder: (context, statusSnapshot) {
-        final statusData = statusSnapshot.data ??
+        final statusData =
+            statusSnapshot.data ??
             {
               'middleStatus_data': _middleStatusData,
               'footerStatus_data': widget.meeting['footerStatus_data'] ?? '',
               'timer': widget.meeting['timer'] ?? '0',
             };
         return FutureBuilder<String>(
-          future: status == 'Meeting Completed'
-              ? _fetchOfferPrice(widget.meeting['user_id'], widget.meeting['post_id'], widget.meeting['id'])
-              : Future.value(widget.meeting['price_offered'] ?? '0.00'),
+          future:
+              status == 'Meeting Completed'
+                  ? _fetchOfferPrice(
+                    widget.meeting['user_id'],
+                    widget.meeting['post_id'],
+                    widget.meeting['id'],
+                  )
+                  : Future.value(widget.meeting['price_offered'] ?? '0.00'),
           builder: (context, offerPriceSnapshot) {
-            final offerPrice = offerPriceSnapshot.data ?? widget.meeting['price_offered'] ?? '0.00';
+            final offerPrice =
+                offerPriceSnapshot.data ??
+                widget.meeting['price_offered'] ??
+                '0.00';
             return FutureBuilder<String>(
-              future: status == 'Meeting Completed' ? _fetchDecisionPendingStatus(widget.meeting['id']) : Future.value(''),
+              future:
+                  status == 'Meeting Completed'
+                      ? _fetchDecisionPendingStatus(widget.meeting['id'])
+                      : Future.value(''),
               builder: (context, decisionPendingSnapshot) {
-                final decisionPendingStatus = decisionPendingSnapshot.data ?? '';
+                final decisionPendingStatus =
+                    decisionPendingSnapshot.data ?? '';
                 return FutureBuilder<Map<String, String>>(
                   future: _fetchLocations(),
                   builder: (context, locationSnapshot) {
                     final locations = locationSnapshot.data ?? {};
-                    final locationName = locations[widget.meeting['parent_zone_id']] ?? 'Unknown Location';
+                    final locationName =
+                        locations[widget.meeting['parent_zone_id']] ??
+                        'Unknown Location';
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -332,18 +424,27 @@ class _MeetingCardState extends State<MeetingCard> {
                       ),
                       child: Column(
                         children: [
-                          if (status == 'Meeting Completed' && decisionPendingStatus.isNotEmpty)
+                          if (status == 'Meeting Completed' &&
+                              decisionPendingStatus.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(color: Colors.grey[50]),
                               child: Row(
                                 children: [
-                                  Icon(Icons.hourglass_empty, size: 14, color: Colors.blue[700]),
+                                  Icon(
+                                    Icons.hourglass_empty,
+                                    size: 14,
+                                    color: Colors.blue[700],
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       decisionPendingStatus,
-                                      style: TextStyle(fontSize: 10, color: Colors.blue[700], fontWeight: FontWeight.w500),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.blue[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -355,31 +456,55 @@ class _MeetingCardState extends State<MeetingCard> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)),
-                                      constraints: const BoxConstraints(maxWidth: 200),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 200,
+                                      ),
                                       child: Text(
                                         statusData['middleStatus_data'],
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                         maxLines: 1,
                                       ),
                                     ),
                                     IconButton(
-                                      icon: const Icon(Icons.close, size: 20),
+                                      icon: const Icon(
+                                        Icons.cancel,
+                                        size: 22,
+                                        color: Colors.red,
+                                      ),
                                       onPressed: () {
-                                        debugPrint('Close button pressed for meeting ${widget.meeting['id']}');
+                                        debugPrint(
+                                          'Close button pressed for meeting ${widget.meeting['id']}',
+                                        );
                                       },
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  widget.meeting['title'] ?? 'Unknown Vehicle (ID: ${widget.meeting['post_id']})',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                                  widget.meeting['title'] ??
+                                      'Unknown Vehicle (ID: ${widget.meeting['post_id']})',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 Row(
@@ -387,28 +512,44 @@ class _MeetingCardState extends State<MeetingCard> {
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
                                             children: [
-                                              Icon(Icons.directions_car, size: 12, color: Colors.grey[500]),
+                                              Icon(
+                                                Icons.directions_car,
+                                                size: 12,
+                                                color: Colors.grey[500],
+                                              ),
                                               const SizedBox(width: 4),
                                               Text(
                                                 'App Id: ${widget.meeting['appId'] ?? 'LAD_${widget.meeting['post_id']}'}',
-                                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey[600],
+                                                ),
                                               ),
                                             ],
                                           ),
                                           const SizedBox(height: 4),
                                           Row(
                                             children: [
-                                              Icon(Icons.location_on, size: 12, color: Colors.grey[500]),
+                                              Icon(
+                                                Icons.location_on,
+                                                size: 12,
+                                                color: Colors.grey[500],
+                                              ),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
                                                   'Location: $locationName',
-                                                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
@@ -418,12 +559,26 @@ class _MeetingCardState extends State<MeetingCard> {
                                             children: [
                                               Expanded(
                                                 child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    Text('Target Price', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
                                                     Text(
-                                                      targetPrice == 0 ? 'N/A' : '₹${NumberFormat('#,##0').format(targetPrice)}',
-                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87),
+                                                      'Target Price',
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        color: Colors.grey[500],
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      targetPrice == 0
+                                                          ? 'N/A'
+                                                          : '₹${NumberFormat('#,##0').format(targetPrice)}',
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Colors.black87,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -431,15 +586,31 @@ class _MeetingCardState extends State<MeetingCard> {
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    Text('My Bid', style: TextStyle(fontSize: 9, color: Colors.grey[500])),
+                                                    Text(
+                                                      'My Bid',
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        color: Colors.grey[500],
+                                                      ),
+                                                    ),
                                                     Text(
                                                       bidAmount == 0 && !withBid
                                                           ? 'N/A'
                                                           : '₹${NumberFormat('#,##0').format(bidAmount)}',
                                                       style: TextStyle(
-                                                          fontSize: 12, fontWeight: FontWeight.w600, color: isLowBid ? Colors.orange[700] : Colors.green[700]),
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            isLowBid
+                                                                ? Colors
+                                                                    .orange[700]
+                                                                : Colors
+                                                                    .green[700],
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -453,23 +624,39 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
                                       child: CachedNetworkImage(
-                                        imageUrl: widget.meeting['carImage']?.toString() ?? '',
+                                        imageUrl:
+                                            widget.meeting['carImage']
+                                                ?.toString() ??
+                                            '',
                                         width: 120,
                                         height: 150,
                                         fit: BoxFit.cover,
-                                        placeholder: (context, url) => Container(
-                                          width: 120,
-                                          height: 120,
-                                          color: Colors.grey[200],
-                                          child: const Center(child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.blue)),
-                                        ),
+                                        placeholder:
+                                            (context, url) => Container(
+                                              width: 120,
+                                              height: 120,
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 1.5,
+                                                      color: Colors.blue,
+                                                    ),
+                                              ),
+                                            ),
                                         errorWidget: (context, url, error) {
-                                          debugPrint('Image load error: $error for URL: $url');
+                                          debugPrint(
+                                            'Image load error: $error for URL: $url',
+                                          );
                                           return Container(
                                             width: 120,
                                             height: 120,
                                             color: Colors.grey[200],
-                                            child: const Icon(Icons.directions_car, size: 30, color: Colors.grey),
+                                            child: const Icon(
+                                              Icons.directions_car,
+                                              size: 30,
+                                              color: Colors.grey,
+                                            ),
                                           );
                                         },
                                       ),
@@ -487,16 +674,66 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                   ),
                                 ),
+                                if (sellerApproval == '1') ...[
+                                  const SizedBox(height: 12),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        final initialMessage =
+                                            'Hi, I am $buyerName, I want to buy this $productName $meetingTime and $meetingDate';
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) => ChatPage(
+                                                  listenerId:
+                                                      sellerId, // Now correctly the seller ID (created_by)
+                                                  listenerName: sellerName,
+                                                  listenerImage: sellerImage,
+                                                  initialMessage:
+                                                      initialMessage,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                          horizontal: 16,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Chat with Seller',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
                           Container(height: 1, color: Colors.grey[300]),
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: statusData['middleStatus_data'].length > 20 ? 12 : 8),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical:
+                                  statusData['middleStatus_data'].length > 20
+                                      ? 12
+                                      : 8,
+                            ),
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Flexible(
@@ -510,7 +747,14 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                     Expanded(
                                       flex: 1,
-                                      child: Divider(color: Colors.grey, thickness: 1.5, height: 16),
+                                      child: Divider(
+                                        color:
+                                            step1Completed
+                                                ? Colors.green
+                                                : Colors.grey,
+                                        thickness: 1.5,
+                                        height: 16,
+                                      ),
                                     ),
                                     Flexible(
                                       flex: 2,
@@ -523,7 +767,14 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                     Expanded(
                                       flex: 1,
-                                      child: Divider(color: Colors.grey, thickness: 1.5, height: 16),
+                                      child: Divider(
+                                        color:
+                                            step2Completed
+                                                ? Colors.green
+                                                : Colors.grey,
+                                        thickness: 1.5,
+                                        height: 16,
+                                      ),
                                     ),
                                     Flexible(
                                       flex: 2,
@@ -536,7 +787,14 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                     Expanded(
                                       flex: 1,
-                                      child: Divider(color: Colors.grey, thickness: 1.5, height: 16),
+                                      child: Divider(
+                                        color:
+                                            step3Completed
+                                                ? Colors.green
+                                                : Colors.grey,
+                                        thickness: 1.5,
+                                        height: 16,
+                                      ),
                                     ),
                                     Flexible(
                                       flex: 2,
@@ -554,26 +812,61 @@ class _MeetingCardState extends State<MeetingCard> {
                                   children: [
                                     Expanded(
                                       child: ElevatedButton(
-                                        onPressed: status != 'Meeting Completed' ? () => widget.onEditDate(widget.meeting) : null,
+                                        onPressed:
+                                            status != 'Meeting Completed'
+                                                ? () => widget.onEditDate(
+                                                  widget.meeting,
+                                                )
+                                                : null,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.blue,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
                                         ),
-                                        child: const Text('Edit Date', style: TextStyle(fontSize: 12)),
+                                        child: Text(
+                                          step1Completed
+                                              ? 'Edit Date'
+                                              : 'Set Date',
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: ElevatedButton(
-                                        onPressed: status != 'Meeting Completed' ? () => widget.onEditTime(widget.meeting) : null,
+                                        onPressed:
+                                            (status != 'Meeting Completed' &&
+                                                    step1Completed)
+                                                ? () => widget.onEditTime(
+                                                  widget.meeting,
+                                                )
+                                                : null,
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                          backgroundColor:
+                                              !step1Completed
+                                                  ? Colors.grey
+                                                  : (step2Completed
+                                                      ? Colors.blue
+                                                      : Colors.orange),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                          ),
                                         ),
                                         child: Text(
-                                          widget.currentTab == 'Date Fixed' ? 'Fix Time' : 'Edit Time',
+                                          step2Completed
+                                              ? 'Edit Time'
+                                              : 'Fix Time',
                                           style: const TextStyle(fontSize: 12),
                                         ),
                                       ),
@@ -583,29 +876,54 @@ class _MeetingCardState extends State<MeetingCard> {
                                 const SizedBox(height: 12),
                                 if (status == 'Meeting Completed') ...[
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
                                     children: [
                                       Expanded(
                                         child: ElevatedButton(
-                                          onPressed: () => _notInterested(context, widget.meeting['id']),
+                                          onPressed:
+                                              () => _notInterested(
+                                                context,
+                                                widget.meeting['id'],
+                                              ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.blue,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            ),
                                           ),
-                                          child: const Text('Not Interested', style: TextStyle(fontSize: 12)),
+                                          child: const Text(
+                                            'Not Interested',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: ElevatedButton(
-                                          onPressed: () => _revisit(context, widget.meeting['id']),
+                                          onPressed:
+                                              () => _revisit(
+                                                context,
+                                                widget.meeting['id'],
+                                              ),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.blue,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            ),
                                           ),
-                                          child: const Text('Revisit', style: TextStyle(fontSize: 12)),
+                                          child: const Text(
+                                            'Revisit',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
                                         ),
                                       ),
                                     ],

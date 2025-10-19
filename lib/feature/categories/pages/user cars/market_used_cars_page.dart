@@ -2501,7 +2501,7 @@ class _MarketPlaceProductDetailsPageState
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => MyMeetingsWidget(showAppBar: true),
+                                (context) => BuyingStatusPage(initialTabIndex: 1,),
                           ),
                         );
                       }
@@ -2833,154 +2833,134 @@ class _MarketPlaceProductDetailsPageState
         );
   }
 
-  Widget _buildQuestionsSection(BuildContext context, String id) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'Ask a question about this product',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
+Widget _buildQuestionsSection(BuildContext context, String id) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              'Ask a question about this product',
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
-            ElevatedButton(
-              onPressed: () {
-                final userProvider = Provider.of<LoggedUserProvider>(
-                  context,
-                  listen: false,
-                );
-                if (!userProvider.isLoggedIn) {
-                  showDialog(
-                    context: context,
-                    builder:
-                        (dialogContext) => LoginDialog(
-                          onSuccess: () {
-                            Navigator.of(dialogContext).pop();
-                            showDialog(
-                              context: context,
-                              builder: (context) => ReviewDialog(postId: id),
-                            );
-                          },
-                        ),
-                  );
-                } else {
-                  showDialog(
-                    context: context,
-                    builder: (context) => ReviewDialog(postId: id),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                  SizedBox(width: 8.0),
-                  Text('Ask a question'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity, // Ensure full screen width
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                spreadRadius: 1,
-                offset: const Offset(0, 2),
-              ),
-            ],
-            border: Border.all(color: Colors.grey[300]!),
           ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Answers',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              if (isLoadingReviews)
-                const Center(child: CircularProgressIndicator())
-              else if (reviewsError.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      "No reply messages found",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color.fromARGB(255, 192, 187, 187),
-                      ),
-                    ),
-                    // TextButton(
-                    //   onPressed: _fetchReviews,
-                    //   child: const Text('Retry'),
-                    // ),
-                  ],
-                )
-              else if (reviews.isEmpty)
-                Container(
-                  width: double.infinity, // Ensure full width for "No message"
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: const Text(
-                    'No message',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    semanticsLabel: 'No answers available',
-                    textAlign: TextAlign.center, // Center the text
+          ElevatedButton(
+            onPressed: () {
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
+              if (!userProvider.isLoggedIn) {
+                showDialog(
+                  context: context,
+                  builder: (dialogContext) => LoginDialog(
+                    onSuccess: () {
+                      Navigator.of(dialogContext).pop();
+                      showDialog(
+                        context: context,
+                        builder: (context) => ReviewDialog(postId: id),
+                      );
+                    },
                   ),
-                )
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children:
-                      reviews
-                          .where((review) => review.parentId == '0')
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  builder: (context) => ReviewDialog(postId: id),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                SizedBox(width: 8.0),
+                Text('Ask a question'),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      
+      // Answers section WITHOUT container styling
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if (isLoadingReviews)
+              const Center(child: CircularProgressIndicator())
+            else if (reviewsError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color.fromARGB(255, 192, 187, 187),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else if (reviews.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: const Text(
+                  '',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              // Show answers directly without any container
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reviews.where((review) => review.parentId == '0').length,
+                separatorBuilder: (context, index) => const Divider(),
+                itemBuilder: (context, index) {
+                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildReviewItem(parent, isReply: false),
+                      // Show replies indented
+                      ...reviews
+                          .where((reply) => reply.parentId == parent.id)
                           .map(
-                            (parent) => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildReviewItem(parent, isReply: false),
-                                ...reviews
-                                    .where(
-                                      (reply) => reply.parentId == parent.id,
-                                    )
-                                    .map(
-                                      (reply) => _buildReviewItem(
-                                        reply,
-                                        isReply: true,
-                                      ),
-                                    )
-                                    .toList(),
-                              ],
+                            (reply) => Padding(
+                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
+                              child: _buildReviewItem(reply, isReply: true),
                             ),
                           )
                           .toList(),
-                ),
-            ],
-          ),
+                    ],
+                  );
+                },
+              ),
+          ],
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   Widget _buildReviewItem(PostReview review, {required bool isReply}) {
     return Padding(
@@ -3452,118 +3432,115 @@ class _MarketPlaceProductDetailsPageState
                 ],
               ),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 00,
-              child: Container(
-                child: Row(
-                  children: [
-                    if (_userProvider.userId == widget.product.createdBy) ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            context.pushNamed(RouteNames.sellStatusPage);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Edit'),
-                        ),
-                      ),
-
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed:
-                              _isWaitingForApproval || _isLoadingBid
-                                  ? null
-                                  : _moveToAuction,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                _isWaitingForApproval
-                                    ? Colors.grey[800]
-                                    : Palette.primaryblue,
-                            foregroundColor:
-                                _isWaitingForApproval
-                                    ? Colors.black
-                                    : Colors.white,
-                            side:
-                                _isWaitingForApproval
-                                    ? const BorderSide(
-                                      color: Colors.black,
-                                      width: 1,
-                                    )
-                                    : BorderSide.none,
-
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child:
-                              _isLoadingBid
-                                  ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                  : Text(
-                                    _moveToAuctionButtonText,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color:
-                                          _isWaitingForApproval
-                                              ? Colors.black
-                                              : Colors.white,
-                                    ),
-                                  ),
-                        ),
-                      ),
-                    ] else ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => showProductBidDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primarypink,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Place Bid'),
-                        ),
-                      ),
-
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _showMeetingDialog(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Palette.primaryblue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 0),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: const Text('Fix Meeting'),
-                        ),
-                      ),
-                    ],
-                  ],
+          Positioned(
+  left: 0,
+  right: 0,
+  bottom: 0,
+  child: SafeArea(
+    top: false,
+    child: SizedBox(
+      height: 50, // fixed height for uniformity
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_userProvider.userId == widget.product.createdBy) ...[
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  context.pushNamed(RouteNames.sellStatusPage);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: const Text(
+                  'Edit',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _isWaitingForApproval || _isLoadingBid
+                    ? null
+                    : _moveToAuction,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isWaitingForApproval
+                      ? Colors.grey.shade800
+                      : Palette.primaryblue,
+                  foregroundColor: _isWaitingForApproval
+                      ? Colors.black
+                      : Colors.white,
+                  side: _isWaitingForApproval
+                      ? const BorderSide(color: Colors.black, width: 1)
+                      : BorderSide.none,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: _isLoadingBid
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _moveToAuctionButtonText,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+              ),
+            ),
+          ] else ...[
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => showProductBidDialog(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Palette.primarypink,
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: const Text(
+                  'Place Bid',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _showMeetingDialog(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Palette.primaryblue,
+                  foregroundColor: Colors.white,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                child: const Text(
+                  'Fix Meeting',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  ),
+)
+
           ],
         ),
       ),

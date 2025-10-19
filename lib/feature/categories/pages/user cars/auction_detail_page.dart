@@ -21,6 +21,7 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
 
+
 class AuctionProductDetailsPage extends StatefulWidget {
   final dynamic product;
 
@@ -49,6 +50,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   bool _isLoadingContainerInfo = false;
   List<ContainerInfo> _containerInfo = [];
   String _containerInfoError = '';
+
+    String _modelVariation = 'N/A';
 
   final AuctionService _auctionService = AuctionService();
   List<Map<String, dynamic>> _bidHistory = [];
@@ -112,16 +115,105 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     _fetchAllData();
   }
 
-  Future<void> _fetchAllData() async {
-    await _fetchLocations();
+ Future<void> _fetchAllData() async {
+  setState(() {
+    _isLoading = true;
+    _isLoadingLocations = true;
+  });
+  try {
+    await Future.wait([
+      _fetchLocations(),
+      _fetchAttributesData(),
+      _fetchVariation(), // Add this
+      _fetchSellerInfo(),
+      _fetchContainerInfo(),
+      _fetchFavoriteStatus(),
+      _auctionService.fetchBidHistory(id).then((value) {
+        _bidHistory = value;
+      }),
+      _auctionService.fetchMinBidIncrement(id).then((value) {
+        _minBidIncrement = value.toDouble();
+      }),
+    ]);
 
-   
-    await _fetchSellerInfo();
-
-   
-    await _fetchData();
-    await _fetchContainerInfo();
+    setState(() {
+      if (_bidHistory.isNotEmpty) {
+        _currentHighestBid = _bidHistory[0]['amount']?.replaceAll('₹', '').replaceAll(',', '') ?? '0';
+        _currentBid = int.tryParse(_currentHighestBid) ?? 0;
+      } else {
+        _currentHighestBid = auctionStartingPrice;
+        _currentBid = int.tryParse(auctionStartingPrice) ?? 0;
+      }
+      _isLoading = false;
+      _isLoadingLocations = false;
+    });
+  } catch (e) {
+    debugPrint('Error fetching auction data: $e');
+    setState(() {
+      _isLoading = false;
+      _isLoadingLocations = false;
+      _currentHighestBid = 'Error: Failed to fetch bid data';
+    });
   }
+}
+
+Future<void> _fetchFavoriteStatus() async {
+  if (userId == null || userId!.isEmpty) return;
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId'),
+      headers: {'token': token},
+    );
+    debugPrint('Favorite Status API Response: Status=${response.statusCode}, Body=${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == 'true') {
+        setState(() {
+          _isFavorited = data['data']?['is_favorited'] == 'true';
+        });
+        debugPrint('Set _isFavorited: $_isFavorited');
+      }
+    }
+  } catch (e) {
+    debugPrint('Error fetching favorite status: $e');
+  }
+}
+
+Future<void> _toggleFavorite() async {
+  if (userId == null || userId!.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please log in to favorite this item')),
+    );
+    return;
+  }
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId&action=${_isFavorited ? 'remove' : 'add'}'),
+      headers: {'token': token},
+    );
+    debugPrint('Toggle Favorite API Response: Status=${response.statusCode}, Body=${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == 'true') {
+        setState(() {
+          _isFavorited = !_isFavorited;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_isFavorited ? 'Added to favorites' : 'Removed from favorites')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update favorite status')),
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint('Error toggling favorite: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error: $e')),
+    );
+  }
+}
 
   Future<void> _loadUserId() async {
     final userProvider = Provider.of<LoggedUserProvider>(
@@ -280,6 +372,42 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     };
     return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
+
+Future<void> _fetchVariation() async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/post-brand-model-variation.php?token=$token&post_id=$id'),
+      headers: {'token': token},
+    );
+    debugPrint('Variation API Response: Status=${response.statusCode}, Body=${response.body}');
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      debugPrint('Parsed Variation Data: $data');
+      if (data['status'] == 'true' && data['data'] is List && (data['data'] as List).isNotEmpty) {
+        final variations = data['data'][0]['variations']?.toString() ?? 'N/A';
+        setState(() {
+          _modelVariation = variations;
+        });
+        debugPrint('Set _modelVariation: $variations');
+      } else {
+        debugPrint('No valid variation data: $data');
+        setState(() {
+          _modelVariation = 'N/A';
+        });
+      }
+    } else {
+      debugPrint('Variation API failed with status: ${response.statusCode}');
+      setState(() {
+        _modelVariation = 'N/A';
+      });
+    }
+  } catch (e, stackTrace) {
+    debugPrint('Error fetching variation: $e\n$stackTrace');
+    setState(() {
+      _modelVariation = 'N/A';
+    });
+  }
+}
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -518,14 +646,25 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     _transformationController.value = Matrix4.identity();
   }
 
-  List<String> get _images {
-    if (image.isNotEmpty) {
+ List<String> get _images {
+  if (image.isNotEmpty) {
+    try {
+      // Check if image is a JSON string containing multiple images
+      final imageData = jsonDecode(image);
+      if (imageData is List) {
+        return imageData.map((img) => 'https://lelamonline.com/admin/$img').toList();
+      } else if (imageData is String) {
+        return ['https://lelamonline.com/admin/$imageData'];
+      }
+    } catch (e) {
+      // If not JSON, treat as a single image
       return ['https://lelamonline.com/admin/$image'];
     }
-    return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-    ];
   }
+  return [
+    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+  ];
+}
 
   void _showFullScreenGallery(BuildContext context) {
     Navigator.of(context).push(
@@ -542,54 +681,33 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 backgroundColor: Colors.white,
                 body: Stack(
                   children: [
-                    PageView.builder(
-                      controller: fullScreenController,
-                      onPageChanged: (index) {
-                        setState(() {
-                          _currentImageIndex = index;
-                          _resetZoom();
-                        });
-                        _pageController.animateToPage(
-                          index,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      itemCount: _images.length,
-                      itemBuilder: (context, index) {
-                        return InteractiveViewer(
-                          transformationController: _transformationController,
-                          minScale: 0.5,
-                          maxScale: 5.0,
-                          boundaryMargin: const EdgeInsets.all(double.infinity),
-                          child: GestureDetector(
-                            onDoubleTap: _resetZoom,
-                            child: Hero(
-                              tag: 'image_$index',
-                              child: CachedNetworkImage(
-                                imageUrl: _images[index],
-                                fit: BoxFit.contain,
-                                placeholder:
-                                    (context, url) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                errorWidget:
-                                    (context, url, error) => Container(
-                                      color: Colors.grey[200],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.error_outline,
-                                          size: 50,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                  PageView.builder(
+  controller: _pageController,
+  itemCount: _images.length,
+  onPageChanged: (index) {
+    setState(() {
+      _currentImageIndex = index;
+    });
+  },
+  itemBuilder: (context, index) {
+    return GestureDetector(
+      onTap: () => _showFullScreenGallery(context),
+      child: CachedNetworkImage(
+        imageUrl: _images[index],
+        width: double.infinity,
+        height: 400,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+        errorWidget: (context, url, error) => Container(
+          color: Colors.grey[200],
+          child: const Center(
+            child: Icon(Icons.error_outline, size: 50, color: Colors.red),
+          ),
+        ),
+      ),
+    );
+  },
+),
                     CustomSafeArea(
                       child: Column(
                         children: [
@@ -1053,19 +1171,13 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                               ),
                             ),
                             const Spacer(),
-                            IconButton(
-                              icon: Icon(
-                                _isFavorited
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isFavorited ? Colors.red : Colors.white,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isFavorited = !_isFavorited;
-                                });
-                              },
-                            ),
+                          IconButton(
+  icon: Icon(
+    _isFavorited ? Icons.favorite : Icons.favorite_border,
+    color: _isFavorited ? Colors.red : Colors.white,
+  ),
+  onPressed: _toggleFavorite,
+),
                             IconButton(
                               icon: const Icon(
                                 Icons.share,
@@ -1128,13 +1240,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          modelVariation,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[700],
-                          ),
-                        ),
+                       Text(
+          _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
+          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+        ),
                         const SizedBox(height: 8),
                         Row(
                           children: [

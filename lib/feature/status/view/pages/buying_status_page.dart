@@ -8,21 +8,43 @@ import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my
 import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart' hide MyBidsWidget;
 import 'package:provider/provider.dart';
 
-class BuyingStatusPage extends StatelessWidget {
+class BuyingStatusPage extends StatefulWidget {
   final String? userId;
-  final int initialTab;
-  final String? initialStatus;
   final String? postId;
   final String? bidId;
+  final int initialTabIndex; // Add this parameter
 
   const BuyingStatusPage({
     super.key,
     this.userId,
-    this.initialTab = 0,
-    this.initialStatus,
     this.postId,
     this.bidId,
+    this.initialTabIndex = 0, // Default to first tab
   });
+
+  @override
+  State<BuyingStatusPage> createState() => _BuyingStatusPageState();
+}
+
+class _BuyingStatusPageState extends State<BuyingStatusPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      initialIndex: widget.initialTabIndex,
+      length: 3,
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,46 +74,43 @@ class BuyingStatusPage extends StatelessWidget {
       );
     }
 
-    return DefaultTabController(
-      length: 3,
-      initialIndex: initialTab,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Buying Status',
-            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-          ),
-          backgroundColor: AppTheme.primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          bottom: const TabBar(
-            dividerColor: Colors.transparent,
-            isScrollable: false,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: TextStyle(fontSize: 14),
-            tabs: [
-              Tab(text: 'My Bids'),
-              Tab(text: 'My Meetings'),
-              Tab(text: 'Expired'),
-            ],
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Buying Status',
+          style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
         ),
-        backgroundColor: Colors.grey[50],
-        body: TabBarView(
-          children: [
-            MyBidsWidget(userId: userId),
-            MyMeetingsWidget(
-              showAppBar: false,
-              initialStatus: initialStatus,
-              postId: postId,
-              bidId: bidId,
-            ),
-            const ExpiredMeetingsPage(),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        bottom: TabBar(
+          controller: _tabController, // Use custom TabController
+          dividerColor: Colors.transparent,
+          isScrollable: false,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 14),
+          tabs: const [
+            Tab(text: 'My Bids'),
+            Tab(text: 'My Meetings'),
+            //Tab(text: 'Expired'),
           ],
         ),
+      ),
+      backgroundColor: Colors.grey[50],
+      body: TabBarView(
+        controller: _tabController, // Use custom TabController
+        children: [
+          MyBidsWidget(userId: widget.userId),
+          MyMeetingsWidget(
+            showAppBar: false,
+            postId: widget.postId,
+            bidId: widget.bidId,
+          ),
+          const ExpiredMeetingsPage(),
+        ],
       ),
     );
   }

@@ -657,6 +657,7 @@ class _AdPostFormState extends State<AdPostForm>
   ModelVariation? _selectedModelVariation;
   Map<String, String?> _selectedAttributes = {};
   bool _isLoadingImages = true;
+  bool _isFetchingLocation = false;
 
   final _controllers = {
     'description': TextEditingController(),
@@ -1189,7 +1190,6 @@ class _AdPostFormState extends State<AdPostForm>
       _showSnackBar('Please select at least 1 image', Colors.red);
       return;
     }
-
     // Category-specific null checks (before form validate)
     if (widget.categoryId == '1' || widget.categoryId == '2') {
       if (_selectedBrand == null) {
@@ -1258,7 +1258,6 @@ class _AdPostFormState extends State<AdPostForm>
       _showSnackBar('Please select Sale/rent type from Model', Colors.red);
       return;
     }
-
     // Form validation (covers validators in fields like required attributes, price, etc.)
     if (!widget.formKey.currentState!.validate()) {
       // Collect keys in screen order (add any missing ones like registration/insurance if they have fields)
@@ -1274,7 +1273,6 @@ class _AdPostFormState extends State<AdPostForm>
         if (widget.categoryId == '1') _insuranceKey,
         ..._attrKeys.values,
       ];
-
       // Find and scroll to first field with error
       for (var key in fieldKeys) {
         if (key.currentState != null && key.currentState!.hasError) {
@@ -1288,15 +1286,14 @@ class _AdPostFormState extends State<AdPostForm>
       }
       return;
     }
-
-    // Existing logic if all validations pass
+    // Check required attributes
     final requiredAttributes = _getRequiredAttributes();
     final missingAttributes =
         requiredAttributes
             .where((attr) => _selectedAttributes[attr]?.isEmpty ?? true)
             .toList();
     if (missingAttributes.isNotEmpty) {
-      // Scroll to first missing attr (assuming they are in _attrKeys)
+      // Scroll to first missing attr
       final firstMissing = missingAttributes.first;
       if (_attrKeys.containsKey(firstMissing)) {
         Scrollable.ensureVisible(
@@ -1311,7 +1308,7 @@ class _AdPostFormState extends State<AdPostForm>
       );
       return;
     }
-
+    // Prepare form data
     final filters = getFilters();
     final formData = {
       'user_id': widget.userId,
@@ -1339,12 +1336,10 @@ class _AdPostFormState extends State<AdPostForm>
         'insurance_upto': _controllers['insurance']!.text,
       },
     };
-
     try {
       setState(() => isSaving = true);
       final apiService = ApiService();
       Map<String, dynamic> response;
-
       if (widget.postId != null && widget.adData != null) {
         // Edit existing post
         print(
@@ -1413,7 +1408,6 @@ class _AdPostFormState extends State<AdPostForm>
                   .toList(),
         );
       }
-
       if (response['status'] == 'true') {
         // Construct complete adData to pass to MyAdsWidget
         final newAdData = {
@@ -1444,9 +1438,7 @@ class _AdPostFormState extends State<AdPostForm>
           'brand': _selectedBrand?.id ?? '',
           'model': _selectedBrandModel?.id ?? '',
           'model_variation': _selectedModelVariation?.id ?? '',
-          // Add any other fields expected by MyAdsWidget
         };
-
         _showSnackBar(
           'Ad ${widget.postId != null ? 'updated' : 'posted'} successfully',
           Colors.green,
@@ -1841,29 +1833,46 @@ class _AdPostFormState extends State<AdPostForm>
         alignLabelWithHint: true,
       ),
       const SizedBox(height: 12),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CustomFormField(
-            controller: _latitudeController,
-            label: 'Latitude',
-            isNumberInput: true,
-            readOnly: true,
+ElevatedButton(
+  onPressed: _isFetchingLocation ? null : _fetchLocation, // Disable button during fetch
+  style: ElevatedButton.styleFrom(
+    backgroundColor: (_latitude != null && _longitude != null)
+        ? Colors.green
+        : AppTheme.primaryColor,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+  ),
+  child: _isFetchingLocation
+      ? const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
-          const SizedBox(height: 12),
-          CustomFormField(
-            controller: _longitudeController,
-            label: 'Longitude',
-            isNumberInput: true,
-            readOnly: true,
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _fetchLocation,
-            child: const Text('Fetch Live Location'),
-          ),
-        ],
-      ),
+        )
+      : Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_latitude != null && _longitude != null) ...[
+              const Icon(Icons.check, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              (_latitude != null && _longitude != null)
+                  ? 'Location Fetched'
+                  : 'Fetch Live Location',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+),
       const SizedBox(height: 12),
       CustomFormField(
         fieldKey: _descriptionKey,

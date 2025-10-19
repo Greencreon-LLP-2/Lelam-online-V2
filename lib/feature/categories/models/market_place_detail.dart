@@ -178,7 +178,7 @@ class MarketplaceService2 {
                   uniqueAttributes['No of owners'] = value;
                   break;
                 case 'bi-speedometer':
-                  uniqueAttributes['KM Range'] = value;
+                  uniqueAttributes['KM Driven'] = value;
                   break;
                 case 'bi-fuel-pump-fill':
                   uniqueAttributes['Fuel Type'] = value;

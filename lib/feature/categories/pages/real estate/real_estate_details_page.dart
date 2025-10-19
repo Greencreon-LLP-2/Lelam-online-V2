@@ -2529,7 +2529,10 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
           ),
           ElevatedButton(
             onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+              final userProvider = Provider.of<LoggedUserProvider>(
+                context,
+                listen: false,
+              );
               if (!userProvider.isLoggedIn) {
                 showDialog(
                   context: context,
@@ -2567,81 +2570,71 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
         ],
       ),
       const SizedBox(height: 12),
-      Container(
-        width: double.infinity, // Ensure full screen width
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              spreadRadius: 1,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        padding: const EdgeInsets.all(12),
+      
+      // Answers section WITHOUT container styling
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Answers',
+              '',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             if (isLoadingReviews)
               const Center(child: CircularProgressIndicator())
             else if (reviewsError.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    "No reply messages found",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color.fromARGB(255, 192, 187, 187),
-                    ),
-                 
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color.fromARGB(255, 192, 187, 187),
                   ),
-                  // TextButton(
-                  //   onPressed: _fetchReviews,
-                  //   child: const Text('Retry'),
-                  // ),
-                ],
+                  textAlign: TextAlign.center,
+                ),
               )
             else if (reviews.isEmpty)
-              Container(
-                width: double.infinity, // Ensure full width for "No message"
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: const Text(
-                  'No message',
+                  '',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey,
                     fontStyle: FontStyle.italic,
                   ),
-                  semanticsLabel: 'No answers available',
-                  textAlign: TextAlign.center, // Center the text
+                  textAlign: TextAlign.center,
                 ),
               )
             else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: reviews
-                    .where((review) => review.parentId == '0')
-                    .map((parent) => Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildReviewItem(parent, isReply: false),
-                            ...reviews
-                                .where((reply) => reply.parentId == parent.id)
-                                .map((reply) => _buildReviewItem(reply, isReply: true))
-                                .toList(),
-                          ],
-                        ))
-                    .toList(),
+              // Show answers directly without any container
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: reviews.where((review) => review.parentId == '0').length,
+                separatorBuilder: (context, index) => const Divider(),
+                itemBuilder: (context, index) {
+                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildReviewItem(parent, isReply: false),
+                      // Show replies indented
+                      ...reviews
+                          .where((reply) => reply.parentId == parent.id)
+                          .map(
+                            (reply) => Padding(
+                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
+                              child: _buildReviewItem(reply, isReply: true),
+                            ),
+                          )
+                          .toList(),
+                    ],
+                  );
+                },
               ),
           ],
         ),

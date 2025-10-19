@@ -111,7 +111,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
   final List<String> statuses = [
     'Date Fixed',
     'Upcoming Meetings',
-    'Location Request List',
     'Waiting Meetings',
     'Meeting Done',
   ];
@@ -120,7 +119,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
   String? errorMessage;
   bool isLoading = true;
   String? _userId;
-  String locationText = '';
   Timer? _debounce;
 
   @override
@@ -132,18 +130,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       selectedIndex = statuses.indexOf(widget.initialStatus!);
     }
     _loadUserId();
-
-    if (selectedIndex == 2) {
-      // Awaiting Location
-      Timer.periodic(const Duration(minutes: 5), (timer) {
-        if (mounted && selectedIndex == 2) {
-          print('Periodic refresh for Awaiting Location');
-          _loadMeetings();
-        } else {
-          timer.cancel();
-        }
-      });
-    }
   }
 
   @override
@@ -251,7 +237,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       isLoading = true;
       errorMessage = null;
       meetings = [];
-      locationText = '';
     });
 
     try {
@@ -267,10 +252,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
               '${widget.baseUrl}/sell-upcoming-meetings.php?token=${widget.token}&post_id=${widget.postId}';
           break;
         case 2:
-          url =
-              '${widget.baseUrl}/sell-location-request.php?token=${widget.token}&post_id=${widget.postId}';
-          break;
-        case 3:
           url =
               '${widget.baseUrl}/sell-waiting-for-meeting.php?token=${widget.token}&post_id=${widget.postId}';
           break;
@@ -303,12 +284,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                   meeting['id']?.toString() ??
                   'N/A',
               'value': meeting['value']?.toString() ?? 'No details available',
-              'sharelocation_button':
-                  meeting['sharelocation_button']?.toString() ?? '0',
-              'reschedule_button':
-                  meeting['reschedule_button']?.toString() ?? '0',
-              'deny_request_button':
-                  meeting['deny_request_button']?.toString() ?? '0',
+              'mobile': meeting['mobile']?.toString() ?? '',
               'post_id': widget.postId,
               'bid_amount': meeting['bid_amount']?.toString() ?? '',
               'meeting_date': meeting['meeting_date']?.toString() ?? '',
@@ -345,7 +321,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
     }
   }
 
-  Future<void> _sendLocationRequest(
+  Future<void> _approveMeeting(
     BuildContext context,
     Map<String, dynamic> meeting,
   ) async {
@@ -355,188 +331,54 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       );
       return;
     }
-    setState(() {
-      isLoading = true;
-    });
     try {
       final response = await http.get(
         Uri.parse(
-          '${widget.baseUrl}/sell-share-location.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}&currentLatitude=70.185&currentLongitude=68.386',
+          '${widget.baseUrl}/my-meeting-approvel.php?token=${widget.token}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}&user_id=$_userId',
         ),
         headers: {'token': widget.token},
       );
       debugPrint(
-        'sell-share-location.php response for meeting_id ${meeting['id']}: ${response.body}',
+        'my-meeting-approvel.php response for meeting_id ${meeting['id']}: ${response.body}',
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          final locationLink =
-              data['data'] is List && data['data'].isNotEmpty
-                  ? data['data'][0]['link']?.toString() ?? ''
-                  : '';
-          final message =
-              data['data'] is List && data['data'].isNotEmpty
-                  ? data['data'][0]['message']?.toString() ??
-                      'Location shared successfully'
-                  : 'Location shared successfully';
-          debugPrint('Location shared successfully with link: $locationLink');
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text(message)));
+          ).showSnackBar(
+            const SnackBar(content: Text('Meeting approved successfully')),
+          );
 
           await _loadMeetings();
           widget.onRefreshMeetings?.call();
         } else {
           debugPrint(
-            'Failed to share location: ${data['message'] ?? 'Unknown error'}',
+            'Failed to approve meeting: ${data['message'] ?? 'Unknown error'}',
           );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Failed to share location: ${data['message'] ?? 'Unknown error'}',
+                'Failed to approve meeting: ${data['message'] ?? 'Unknown error'}',
               ),
             ),
           );
         }
       } else {
         debugPrint(
-          'sell-share-location.php failed with status ${response.statusCode}: ${response.reasonPhrase}',
+          'my-meeting-approvel.php failed with status ${response.statusCode}: ${response.reasonPhrase}',
         );
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Failed to share location: Server error'),
+            content: Text('Failed to approve meeting: Server error'),
           ),
         );
       }
     } catch (e) {
-      debugPrint('Error sharing location for meeting_id ${meeting['id']}: $e');
+      debugPrint('Error approving meeting for meeting_id ${meeting['id']}: $e');
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Error sharing location')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _rescheduleMeeting(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    DateTime selectedDate = DateTime.now();
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-    );
-
-    if (picked != null) {
-      final String meetingDate = DateFormat('yyyy-MM-dd').format(picked);
-      try {
-        final response = await http.get(
-          Uri.parse(
-            '${widget.baseUrl}/sell-meeting-reschedule.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}&post_id=${meeting['post_id']}&meeting_date=$meetingDate',
-          ),
-          headers: {'token': widget.token},
-        );
-        debugPrint('sell-meeting-reschedule.php response: ${response.body}');
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['status'] == true || data['status'] == 'true') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Meeting rescheduled successfully')),
-            );
-
-            await _loadMeetings();
-            widget.onRefreshMeetings?.call();
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Failed to reschedule: ${data['message'] ?? 'Unknown error'}',
-                ),
-              ),
-            );
-          }
-        } else {
-          debugPrint(
-            'sell-meeting-reschedule.php failed with status ${response.statusCode}',
-          );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to reschedule meeting')),
-          );
-        }
-      } catch (e) {
-        debugPrint('Error rescheduling meeting: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error rescheduling meeting')),
-        );
-      }
-    }
-  }
-
-  Future<void> _denyRequest(
-    BuildContext context,
-    Map<String, dynamic> meeting,
-  ) async {
-    if (_userId == null || _userId == 'Unknown') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid user ID. Please log in again.')),
-      );
-      return;
-    }
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/my-meeting-cancel.php?token=${widget.token}&post_id=${meeting['post_id']}&ads_post_customer_meeting_id=${meeting['id']}',
-        ),
-        headers: {'token': widget.token},
-      );
-      debugPrint('my-meeting-cancel.php response: ${response.body}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Meeting request denied successfully'),
-            ),
-          );
-
-          await _loadMeetings();
-          widget.onRefreshMeetings?.call();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to deny request: ${data['message'] ?? 'Unknown error'}',
-              ),
-            ),
-          );
-        }
-      } else {
-        debugPrint(
-          'my-meeting-cancel.php failed with status ${response.statusCode}',
-        );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to deny request')));
-      }
-    } catch (e) {
-      debugPrint('Error denying request: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error denying request')));
+      ).showSnackBar(const SnackBar(content: Text('Error approving meeting')));
     }
   }
 
@@ -819,89 +661,45 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                           color: Colors.black87,
                                         ),
                                       ),
-                                      if (selectedIndex == 2) ...[
+                                      if (selectedIndex == 0 &&
+                                          meeting['mobile'] != null &&
+                                          meeting['mobile'].isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Mobile: ${meeting['mobile']}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                      if (selectedIndex == 1) ...[
                                         const SizedBox(height: 8),
                                         Row(
                                           children: [
-                                            if (meeting['sharelocation_button'] ==
-                                                '1')
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  onPressed:
-                                                      () =>
-                                                          _sendLocationRequest(
-                                                            context,
-                                                            meeting,
-                                                          ),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            AppTheme
-                                                                .primaryColor,
-                                                      ),
-                                                  child: const Text(
-                                                    'Share Location',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed:
+                                                    () => _approveMeeting(
+                                                      context,
+                                                      meeting,
                                                     ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppTheme.primaryColor,
+                                                ),
+                                                child: const Text(
+                                                  'Approve Meeting',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ),
-                                            if (meeting['sharelocation_button'] ==
-                                                '1')
-                                              const SizedBox(width: 10),
-                                            if (meeting['reschedule_button'] ==
-                                                '1')
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  onPressed:
-                                                      () => _rescheduleMeeting(
-                                                        context,
-                                                        meeting,
-                                                      ),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            AppTheme
-                                                                .primaryColor,
-                                                      ),
-                                                  child: const Text(
-                                                    'Reschedule',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            if (meeting['reschedule_button'] ==
-                                                '1')
-                                              const SizedBox(width: 10),
-                                            if (meeting['deny_request_button'] ==
-                                                '1')
-                                              Expanded(
-                                                child: ElevatedButton(
-                                                  onPressed:
-                                                      () => _denyRequest(
-                                                        context,
-                                                        meeting,
-                                                      ),
-                                                  style:
-                                                      ElevatedButton.styleFrom(
-                                                        backgroundColor:
-                                                            Colors.red,
-                                                      ),
-                                                  child: const Text(
-                                                    'Deny Request',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
+                                            ),
                                           ],
                                         ),
                                       ],
-                                      if (selectedIndex == 3) ...[
+                                      if (selectedIndex == 2) ...[
                                         const SizedBox(height: 8),
                                         Row(
                                           children: [
