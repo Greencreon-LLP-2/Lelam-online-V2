@@ -1879,29 +1879,29 @@ class _MarketPlaceProductDetailsPageState
                                     final double currentHighest =
                                         double.tryParse(_currentHighestBid) ??
                                         0;
-                                    if (bidAmount <= currentHighest) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Your bid must be higher than ₹${NumberFormat('#,##0').format(currentHighest)}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          backgroundColor: Colors.red[800],
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          margin: const EdgeInsets.all(16),
-                                        ),
-                                      );
-                                      return;
-                                    }
+                                    // if (bidAmount <= currentHighest) {
+                                    //   ScaffoldMessenger.of(
+                                    //     context,
+                                    //   ).showSnackBar(
+                                    //     SnackBar(
+                                    //       content: Text(
+                                    //         'Your bid must be higher than ₹${NumberFormat('#,##0').format(currentHighest)}',
+                                    //         style: const TextStyle(
+                                    //           color: Colors.white,
+                                    //         ),
+                                    //       ),
+                                    //       backgroundColor: Colors.red[800],
+                                    //       behavior: SnackBarBehavior.floating,
+                                    //       shape: RoundedRectangleBorder(
+                                    //         borderRadius: BorderRadius.circular(
+                                    //           8,
+                                    //         ),
+                                    //       ),
+                                    //       margin: const EdgeInsets.all(16),
+                                    //     ),
+                                    //   );
+                                    //   return;
+                                    // }
 
                                     if (bidAmount < _minBidIncrement) {
                                       ScaffoldMessenger.of(
@@ -2501,7 +2501,8 @@ class _MarketPlaceProductDetailsPageState
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => BuyingStatusPage(initialTabIndex: 1,),
+                                (context) =>
+                                    BuyingStatusPage(initialTabIndex: 1),
                           ),
                         );
                       }
@@ -2833,134 +2834,142 @@ class _MarketPlaceProductDetailsPageState
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'Ask a question about this product',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => LoginDialog(
-                    onSuccess: () {
-                      Navigator.of(dialogContext).pop();
-                      showDialog(
-                        context: context,
-                        builder: (context) => ReviewDialog(postId: id),
-                      );
-                    },
-                  ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
-              ],
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      
-      // Answers section WITHOUT container styling
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              '',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (isLoadingReviews)
-              const Center(child: CircularProgressIndicator())
-            else if (reviewsError.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color.fromARGB(255, 192, 187, 187),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (reviews.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(
-                  '',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              // Show answers directly without any container
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: reviews.where((review) => review.parentId == '0').length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildReviewItem(parent, isReply: false),
-                      // Show replies indented
-                      ...reviews
-                          .where((reply) => reply.parentId == parent.id)
-                          .map(
-                            (reply) => Padding(
-                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
-                              child: _buildReviewItem(reply, isReply: true),
-                            ),
-                          )
-                          .toList(),
-                    ],
-                  );
-                },
+            Expanded(
+              child: Text(
+                'Ask a question about this product',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-    ],
-  );
-}
+        const SizedBox(height: 12),
+
+        // Answers section WITHOUT container styling
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    "",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else if (reviews.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: const Text(
+                    '',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                // Show answers directly without any container
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount:
+                      reviews.where((review) => review.parentId == '0').length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final parent =
+                        reviews
+                            .where((review) => review.parentId == '0')
+                            .toList()[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReviewItem(parent, isReply: false),
+                        // Show replies indented
+                        ...reviews
+                            .where((reply) => reply.parentId == parent.id)
+                            .map(
+                              (reply) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 32.0,
+                                  top: 8.0,
+                                ),
+                                child: _buildReviewItem(reply, isReply: true),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildReviewItem(PostReview review, {required bool isReply}) {
     return Padding(
@@ -3242,40 +3251,19 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                         const SizedBox(
                           height: 4,
                         ), // Add spacing between title and variation
-                        Text(
-                          _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(
-                              Icons.location_on,
-                              size: 16,
-                              color: Colors.grey,
+                            Text(
+                              _modelVariation.isNotEmpty
+                                  ? _modelVariation
+                                  : 'N/A',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                              ),
                             ),
-                            const SizedBox(width: 4),
-                            _isLoadingLocations
-                                ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                                : Text(
-                                  landMark,
-                                  style: const TextStyle(color: Colors.grey),
-                                ),
-                            const Spacer(),
-                            const Icon(
-                              Icons.access_time,
-                              size: 16,
-                              color: Colors.grey,
-                            ),
+                           
                             const SizedBox(width: 4),
                             Text(
                               createdOn,
@@ -3283,34 +3271,82 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                             ),
                           ],
                         ),
-                        if (latitude.isNotEmpty && longitude.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () async {
-                              final mapUrl = Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
-                              );
-                              if (await canLaunchUrl(mapUrl)) {
-                                await launchUrl(mapUrl);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Could not open Google Maps'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            },
-                            child: const Text(
-                              'View on Google Maps',
-                              style: TextStyle(
-                                color: Colors.blue,
-                                decoration: TextDecoration.underline,
-                                fontSize: 14,
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                _isLoadingLocations
+                                    ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : Text(
+                                      landMark, // This shows the district from parent_zone_id
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    
+                              ],
+                              
+                            ),
+
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 20.0,
+                              ), // Indent to align with icon
+                              child: Text(
+                                widget.product.landMark ??
+                                    'Landmark not specified', // This shows the actual landmark
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                        // if (latitude.isNotEmpty && longitude.isNotEmpty) ...[
+                        //   const SizedBox(height: 8),
+                        //   GestureDetector(
+                        //     onTap: () async {
+                        //       final mapUrl = Uri.parse(
+                        //         'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+                        //       );
+                        //       if (await canLaunchUrl(mapUrl)) {
+                        //         await launchUrl(mapUrl);
+                        //       } else {
+                        //         ScaffoldMessenger.of(context).showSnackBar(
+                        //           const SnackBar(
+                        //             content: Text('Could not open Google Maps'),
+                        //             backgroundColor: Colors.red,
+                        //           ),
+                        //         );
+                        //       }
+                        //     },
+                        //     child: const Text(
+                        //       'View on Google Maps',
+                        //       style: TextStyle(
+                        //         color: Colors.blue,
+                        //         decoration: TextDecoration.underline,
+                        //         fontSize: 14,
+                        //       ),
+                        //     ),
+                        //   ),
+                        // ],
                         const SizedBox(height: 16),
                         Text(
                           '₹ ${formatPriceInt(double.tryParse(price) ?? 0)}',
@@ -3432,115 +3468,132 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                 ],
               ),
             ),
-          Positioned(
-  left: 0,
-  right: 0,
-  bottom: 0,
-  child: SafeArea(
-    top: false,
-    child: SizedBox(
-      height: 50, // fixed height for uniformity
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_userProvider.userId == widget.product.createdBy) ...[
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  context.pushNamed(RouteNames.sellStatusPage);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-                child: const Text(
-                  'Edit',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _isWaitingForApproval || _isLoadingBid
-                    ? null
-                    : _moveToAuction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isWaitingForApproval
-                      ? Colors.grey.shade800
-                      : Palette.primaryblue,
-                  foregroundColor: _isWaitingForApproval
-                      ? Colors.black
-                      : Colors.white,
-                  side: _isWaitingForApproval
-                      ? const BorderSide(color: Colors.black, width: 1)
-                      : BorderSide.none,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-                child: _isLoadingBid
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: 50, // fixed height for uniformity
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_userProvider.userId == widget.product.createdBy) ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              context.pushNamed(RouteNames.sellStatusPage);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                            child: const Text(
+                              'Edit',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                      )
-                    : Text(
-                        _moveToAuctionButtonText,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _isWaitingForApproval || _isLoadingBid
+                                    ? null
+                                    : _moveToAuction,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  _isWaitingForApproval
+                                      ? Colors.grey.shade800
+                                      : Palette.primaryblue,
+                              foregroundColor:
+                                  _isWaitingForApproval
+                                      ? Colors.black
+                                      : Colors.white,
+                              side:
+                                  _isWaitingForApproval
+                                      ? const BorderSide(
+                                        color: Colors.black,
+                                        width: 1,
+                                      )
+                                      : BorderSide.none,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                            child:
+                                _isLoadingBid
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                    : Text(
+                                      _moveToAuctionButtonText,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                          ),
                         ),
-                      ),
-              ),
-            ),
-          ] else ...[
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => showProductBidDialog(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Palette.primarypink,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
+                      ] else ...[
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => showProductBidDialog(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Palette.primarypink,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                            child: const Text(
+                              'Place Bid',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => _showMeetingDialog(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Palette.primaryblue,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                            child: const Text(
+                              'Fix Meeting',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                child: const Text(
-                  'Place Bid',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
               ),
             ),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _showMeetingDialog(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Palette.primaryblue,
-                  foregroundColor: Colors.white,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-                child: const Text(
-                  'Fix Meeting',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    ),
-  ),
-)
-
           ],
         ),
       ),

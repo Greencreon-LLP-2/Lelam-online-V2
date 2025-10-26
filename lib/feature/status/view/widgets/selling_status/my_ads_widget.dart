@@ -601,7 +601,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
             backgroundColor: Colors.green,
             textColor: Colors.white,
           );
-          await _loadAds(); 
+          await _loadAds();
         } else {
           throw Exception(
             responseData['message'] ?? 'Failed to update location',
@@ -869,11 +869,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
+                const SizedBox(width: 10), // spacing between buttons
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -896,6 +892,7 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                 ),
               ],
             ),
+
             SizedBox(height: 15),
             Container(color: Colors.grey, height: 1.5, width: double.infinity),
             Row(

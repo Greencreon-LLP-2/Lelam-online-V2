@@ -14,7 +14,8 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/custom_dropdown_widget.dart';
 import 'package:lelamonline_flutter/feature/sell/view/widgets/image_source_bottom_sheet.dart';
-import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart';
+import 'package:lelamonline_flutter/feature/sell/view/widgets/text_field_widget.dart'
+    hide CustomDropdownWidget;
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -1340,6 +1341,8 @@ class _AdPostFormState extends State<AdPostForm>
       setState(() => isSaving = true);
       final apiService = ApiService();
       Map<String, dynamic> response;
+      final mainImagePath = _selectedImages[_coverImageIndex].path;
+      final allImagePaths = _selectedImages.map((e) => e.path).toList();
       if (widget.postId != null && widget.adData != null) {
         // Edit existing post
         print(
@@ -1347,29 +1350,26 @@ class _AdPostFormState extends State<AdPostForm>
         );
         formData['post_id'] = widget.postId!;
         formData['token'] = AttributeValueService.token;
+
+        // Delete all existing gallery images to avoid duplicates, then re-add all current as gallery
+        final allOldGalleryIds =
+            _existingImages
+                .where((img) => !(img['isMain'] ?? false))
+                .map((img) => img['id']?.toString())
+                .where((id) => id != null && id.isNotEmpty)
+                .toList();
+        _deleteGalleryIds.addAll(allOldGalleryIds as Iterable<String>);
+
         if (_deleteGalleryIds.isNotEmpty) {
           formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
           print('Sending delete_gallery: $_deleteGalleryIds');
         }
-        final newImages =
-            _selectedImages
-                .asMap()
-                .entries
-                .where(
-                  (e) =>
-                      !_existingImages.any(
-                        (img) => img['path'] == e.value.path,
-                      ),
-                )
-                .map((e) => e.value.path)
-                .toList();
-        final mainImage = _selectedImages[_coverImageIndex].path;
+
         response = await apiService.postInfinityMultipart(
           url: "${AttributeValueService.baseUrl}/flutter-edit-post.php",
           fields: formData,
-          mainImagePath: mainImage,
-          galleryImagePaths:
-              newImages.where((path) => path != mainImage).toList(),
+          mainImagePath: mainImagePath,
+          galleryImagePaths: allImagePaths, // All images including main
         );
       } else {
         // Create new post
@@ -1398,14 +1398,8 @@ class _AdPostFormState extends State<AdPostForm>
             'if_verifyed': '0',
             'by_dealer': '0',
           },
-          mainImagePath: _selectedImages[_coverImageIndex].path,
-          galleryImagePaths:
-              _selectedImages
-                  .asMap()
-                  .entries
-                  .where((e) => e.key != _coverImageIndex)
-                  .map((e) => e.value.path)
-                  .toList(),
+          mainImagePath: mainImagePath,
+          galleryImagePaths: allImagePaths, // All images including main
         );
       }
       if (response['status'] == 'true') {
@@ -1833,46 +1827,49 @@ class _AdPostFormState extends State<AdPostForm>
         alignLabelWithHint: true,
       ),
       const SizedBox(height: 12),
-ElevatedButton(
-  onPressed: _isFetchingLocation ? null : _fetchLocation, // Disable button during fetch
-  style: ElevatedButton.styleFrom(
-    backgroundColor: (_latitude != null && _longitude != null)
-        ? Colors.green
-        : AppTheme.primaryColor,
-    foregroundColor: Colors.white,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8),
-    ),
-  ),
-  child: _isFetchingLocation
-      ? const SizedBox(
-          width: 24,
-          height: 24,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        )
-      : Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_latitude != null && _longitude != null) ...[
-              const Icon(Icons.check, size: 20),
-              const SizedBox(width: 8),
-            ],
-            Text(
+      ElevatedButton(
+        onPressed:
+            _isFetchingLocation
+                ? null
+                : _fetchLocation, // Disable button during fetch
+        style: ElevatedButton.styleFrom(
+          backgroundColor:
               (_latitude != null && _longitude != null)
-                  ? 'Location Fetched'
-                  : 'Fetch Live Location',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+                  ? Colors.green
+                  : AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-),
+        child:
+            _isFetchingLocation
+                ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+                : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_latitude != null && _longitude != null) ...[
+                      const Icon(Icons.check, size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(
+                      (_latitude != null && _longitude != null)
+                          ? 'Location Fetched'
+                          : 'Fetch Live Location',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+      ),
       const SizedBox(height: 12),
       CustomFormField(
         fieldKey: _descriptionKey,
@@ -1980,12 +1977,12 @@ ElevatedButton(
           ),
           child:
               isSaving
-                  ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ? const Text(
+                    'Loading...', // Change to "Loading..." text
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
                   )
                   : Text(
@@ -2003,26 +2000,33 @@ ElevatedButton(
   @override
   Widget build(BuildContext context) => FadeTransition(
     opacity: _fadeAnimation,
-    child: Stack(
-      children: [
-        SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
-            child: Form(
-              key: widget.formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _buildImageSection(),
-                  _buildKeyInfoSection(),
-                  _buildMoreInfoSection(),
-                ],
+    child: GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        // Dismiss keyboard when tapping outside text fields
+        FocusScope.of(context).unfocus();
+      },
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
+              child: Form(
+                key: widget.formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _buildImageSection(),
+                    _buildKeyInfoSection(),
+                    _buildMoreInfoSection(),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        _buildSubmitButton(),
-      ],
+          _buildSubmitButton(),
+        ],
+      ),
     ),
   );
 

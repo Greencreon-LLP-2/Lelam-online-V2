@@ -147,6 +147,53 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // Check if user is banned
+  bool _isUserBanned(Map<String, dynamic> userData) {
+    try {
+      // Check if ban field exists and is "1"
+      if (userData.containsKey('ban')) {
+        return userData['ban'] == "1" || userData['ban'] == 1;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Show banned user message
+  void _showBannedMessage() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Account Banned',
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Sorry, your account is banned. Please contact support for more information.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Clear the form and go back to phone input
+                setState(() {
+                  _isOtpMode = false;
+                  _phoneController.clear();
+                  _otpController.clear();
+                });
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Handle login or OTP verification
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) {
@@ -173,9 +220,18 @@ class _LoginPageState extends State<LoginPage> {
           url: userDetails,
           queryParams: {'mobile_code': _mobileCode, 'mobile': mobile},
         );
+
         // Check if mobile is verified or just existence
         if (response['status'] == true && response['code'] == 200) {
-          // User exists, proceed to OTP mode
+          // Check if user is banned before proceeding to OTP
+          final userData = response['data'][0] as Map<String, dynamic>;
+          if (_isUserBanned(userData)) {
+            _showBannedMessage();
+            setState(() => _isLoading = false);
+            return;
+          }
+
+          // User exists and is not banned, proceed to OTP mode
           setState(() => _isOtpMode = true);
           _startOtpTimer(); // Start the OTP timer
           Fluttertoast.showToast(
@@ -236,6 +292,13 @@ class _LoginPageState extends State<LoginPage> {
             final userData = UserData.fromJson(
               response['data'][0] as Map<String, dynamic>,
             );
+
+            // Check if user is banned before allowing login
+            if (_isUserBanned(response['data'][0])) {
+              _showBannedMessage();
+              setState(() => _isLoading = false);
+              return;
+            }
 
             // Save & notify provider
             await Provider.of<LoggedUserProvider>(
@@ -555,10 +618,7 @@ class _LoginPageState extends State<LoginPage> {
                               ?.copyWith(color: Colors.grey[600]),
                           textAlign: TextAlign.center,
                         ),
-                        if (!_isOtpMode) ...[
-                          const SizedBox(height: 8),
-                         
-                        ],
+                        if (!_isOtpMode) ...[const SizedBox(height: 8)],
                       ],
                     ),
                   ),

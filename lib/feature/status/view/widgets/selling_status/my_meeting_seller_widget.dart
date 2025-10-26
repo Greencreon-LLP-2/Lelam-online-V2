@@ -111,7 +111,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
   final List<String> statuses = [
     'Date Fixed',
     'Upcoming Meetings',
-    'Waiting Meetings',
+   // 'Waiting Meetings',
     'Meeting Done',
   ];
   int selectedIndex = 0;
@@ -344,9 +344,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Meeting approved successfully')),
           );
 
@@ -665,11 +663,70 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                           meeting['mobile'] != null &&
                                           meeting['mobile'].isNotEmpty) ...[
                                         const SizedBox(height: 4),
-                                        Text(
-                                          'Mobile: ${meeting['mobile']}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black,
+                                        ElevatedButton(
+                                          onPressed: () async {
+                                            final phoneNumber =
+                                                meeting['mobile'];
+                                            final Uri phoneUri = Uri(
+                                              scheme: 'tel',
+                                              path: phoneNumber,
+                                            );
+                                            try {
+                                              if (await canLaunchUrl(
+                                                phoneUri,
+                                              )) {
+                                                await launchUrl(
+                                                  phoneUri,
+                                                  mode:
+                                                      LaunchMode
+                                                          .externalApplication,
+                                                );
+                                                debugPrint(
+                                                  'Initiated call to: $phoneNumber',
+                                                );
+                                              } else {
+                                                debugPrint(
+                                                  'Cannot initiate call to: $phoneNumber',
+                                                );
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Could not initiate call',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            } catch (e) {
+                                              debugPrint(
+                                                'Error initiating call: $e',
+                                              );
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Error initiating call',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                AppTheme.primaryColor,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Call Buyer',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                            ),
                                           ),
                                         ),
                                       ],

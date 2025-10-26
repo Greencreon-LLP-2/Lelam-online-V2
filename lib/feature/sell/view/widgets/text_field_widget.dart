@@ -51,6 +51,9 @@ class _CustomFormFieldState extends State<CustomFormField> {
       setState(() {
         _isFocused = _focusNode.hasFocus;
       });
+      if (!_focusNode.hasFocus) {
+        _focusNode.unfocus();
+      }
     });
   }
 

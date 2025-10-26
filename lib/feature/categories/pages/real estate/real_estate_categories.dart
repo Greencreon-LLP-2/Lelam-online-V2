@@ -1783,227 +1783,247 @@ class _RealEstatePageState extends State<RealEstatePage> {
     return 'https://lelamonline.com/admin/$cleanedPath';
   }
 
-  Widget _buildPostCard(MarketplacePost post) {
-    final isFinanceAvailable = post.ifFinance == '1';
-    final isFeatured = post.feature == '1';
-    final isAuction = post.ifAuction == '1';
-    final propertyType =
-        post.filters['propertyType']?.isNotEmpty ?? false
-            ? post.filters['propertyType']!.first
-            : 'N/A';
-    final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
-    final isFavorited = _favoritedStatus[post.id] ?? false;
-    final isToggling = _togglingIds.contains(post.id);
+ Widget _buildPostCard(MarketplacePost post) {
+  final isFinanceAvailable = post.ifFinance == '1';
+  final isFeatured = post.feature == '1';
+  final isAuction = post.ifAuction == '1';
+  final propertyType =
+      post.filters['propertyType']?.isNotEmpty ?? false
+          ? post.filters['propertyType']!.first
+          : 'N/A';
+  final sellerType = post.byDealer == '1' ? 'Dealer' : 'Owner';
+  final isFavorited = _favoritedStatus[post.id] ?? false;
+  final isToggling = _togglingIds.contains(post.id);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => RealEstateProductDetailsPage(
-                      product: post,
-                      isAuction: isAuction,
-                    ),
+  // Parse landmark: split by \t and take the last part as the main landmark (e.g., "Chevayur")
+  // Adjust parsing logic if needed based on consistent format
+  String? parsedLandmark;
+  if (post.landMark?.isNotEmpty ?? false) {
+    final parts = post.landMark!.split('\t');
+    parsedLandmark = parts.isNotEmpty ? parts.last.trim() : null;
+  }
+
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RealEstateProductDetailsPage(
+                product: post,
+                isAuction: isAuction,
               ),
-            );
-          },
-          child: Container(
-            width: constraints.maxWidth,
-            margin: EdgeInsets.zero,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(0),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.30),
-                  blurRadius: 5,
-                  spreadRadius: 1,
-                  offset: const Offset(0, 5),
-                ),
-              ],
             ),
-            child: Column(
-              children: [
-                Stack(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 10),
+          );
+        },
+        child: Container(
+          width: constraints.maxWidth,
+          margin: EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.30),
+                blurRadius: 5,
+                spreadRadius: 1,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Stack(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Container(
+                          width: 120,
+                          height: 138,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(0),
+                            ),
+                          ),
                           child: Container(
-                            width: 120,
+                            width: 130,
                             height: 138,
                             decoration: BoxDecoration(
                               color: Colors.grey.shade200,
                               borderRadius: const BorderRadius.all(
-                                Radius.circular(0),
+                                Radius.circular(12),
+                              ),
+                              image: DecorationImage(
+                                image: NetworkImage(getImageUrl(post.image)),
+                                fit: BoxFit.cover,
+                                onError: (exception, stackTrace) {
+                                  developer.log(
+                                    'Failed to load image: ${getImageUrl(post.image)}',
+                                  );
+                                  developer.log('Error: $exception');
+                                },
                               ),
                             ),
-                            child: Container(
-                              width: 130,
-                              height: 138,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(12),
-                                ),
-                                image: DecorationImage(
-                                  image: NetworkImage(getImageUrl(post.image)),
-                                  fit: BoxFit.cover,
-                                  onError: (exception, stackTrace) {
-                                    developer.log(
-                                      'Failed to load image: ${getImageUrl(post.image)}',
-                                    );
-                                    developer.log('Error: $exception');
-                                  },
-                                ),
-                              ),
-                              child:
-                                  isFeatured
-                                      ? Align(
-                                        alignment: Alignment.topLeft,
-                                        child: Container(
-                                          margin: const EdgeInsets.only(
-                                            top: 8,
-                                            left: 8,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'FEATURED',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                            child: isFeatured
+                                ? Align(
+                                    alignment: Alignment.topLeft,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(
+                                        top: 8,
+                                        left: 8,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: Colors.white,
                                         ),
-                                      )
-                                      : null,
-                            ),
+                                      ),
+                                      child: const Text(
+                                        'FEATURED',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : null,
                           ),
                         ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  post.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                    color: Colors.black87,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  color: Colors.black87,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  isAuction
-                                      ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
-                                      : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Palette.primaryblue,
-                                  ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                isAuction
+                                    ? '₹${formatPriceInt(double.tryParse(post.auctionStartingPrice) ?? 0)} - ₹${formatPriceInt(double.tryParse(post.price) ?? 0)}'
+                                    : '₹${formatPriceInt(double.tryParse(post.price) ?? 0)}',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Palette.primaryblue,
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      size: 14,
-                                      color: Colors.grey.shade500,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 14,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
                                       _getLocationName(post.parentZoneId),
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey.shade600,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                _buildDetailChip(
-                                  Icon(
-                                    Icons.person,
-                                    size: 8,
-                                    color: Colors.grey[700],
                                   ),
-                                  sellerType,
+                                ],
+                              ),
+                              if (parsedLandmark != null && parsedLandmark.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0, left: 18.0),
+                                  child: Text(
+                                    parsedLandmark,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                              ],
-                            ),
+                              const SizedBox(height: 8),
+                              _buildDetailChip(
+                                Icon(
+                                  Icons.person,
+                                  size: 8,
+                                  color: Colors.grey[700],
+                                ),
+                                sellerType,
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: IconButton(
-                        icon: Icon(
-                          isFavorited ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorited ? Colors.red : Colors.grey,
-                        ),
-                        onPressed:
-                            isToggling ? null : () => _toggleFavorite(post.id),
-                      ),
-                    ),
-                  ],
-                ),
-                if (isAuction || isFinanceAvailable)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.only(top: 3),
-                          decoration: BoxDecoration(
-                            color:
-                                isAuction
-                                    ? Palette.primarylightblue
-                                    : Colors.white,
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
-                            ),
-                          ),
-                          child:
-                              isAuction
-                                  ? _buildAuctionInfo(post)
-                                  : _buildFinanceInfo(isFinanceAvailable),
                         ),
                       ),
                     ],
                   ),
-              ],
-            ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: IconButton(
+                      icon: Icon(
+                        isFavorited ? Icons.favorite : Icons.favorite_border,
+                        color: isFavorited ? Colors.red : Colors.grey,
+                      ),
+                      onPressed: isToggling ? null : () => _toggleFavorite(post.id),
+                    ),
+                  ),
+                ],
+              ),
+              if (isAuction || isFinanceAvailable)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.only(top: 3),
+                        decoration: BoxDecoration(
+                          color: isAuction
+                              ? Palette.primarylightblue
+                              : Colors.white,
+                          borderRadius: const BorderRadius.only(
+                            bottomLeft: Radius.circular(12),
+                            bottomRight: Radius.circular(12),
+                          ),
+                        ),
+                        child: isAuction
+                            ? _buildAuctionInfo(post)
+                            : _buildFinanceInfo(isFinanceAvailable),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildAuctionInfo(MarketplacePost post) {
     return Row(

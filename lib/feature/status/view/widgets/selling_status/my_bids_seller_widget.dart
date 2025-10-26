@@ -22,100 +22,118 @@ class MyBidsSellerWidget extends StatefulWidget {
 }
 
 class _MyBidsSellerWidget extends State<MyBidsSellerWidget> {
-  String? selectedBidType = 'Low Bids';
   String bidsText = '';
+  String bidType = '';
   bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchBids();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[70],
-      body: Column(
+      body: Stack(
         children: [
           Container(
-            color: Colors.white,
-            //padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        selectedBidType = 'Low Bids';
-                      });
-                      _fetchBids('');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedBidType == 'Low Bids' ? AppTheme.primaryColor : null,
+            padding: const EdgeInsets.all(10),
+            child:
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : Text(
+                      bidsText.isEmpty ? 'No bids found' : bidsText,
+                      style: const TextStyle(color: Colors.grey),
                     ),
-                    child: Text('Low Bids'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        selectedBidType = 'High Bids';
-                      });
-                      _fetchBids('');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: selectedBidType == 'High Bids' ? AppTheme.primaryColor : null,
-                    ),
-                    child: Text('High Bids'),
-                  ),
-                ),
-              ],
-            ),
           ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Text(bidsText.isEmpty ? 'No bids found' : bidsText,style: TextStyle(color: Colors.grey),),
-            ),
-          ),
+          // Positioned(
+          //   top: 10,
+          //   right: 10,
+          //   child: Container(
+          //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          //     decoration: BoxDecoration(
+          //       color: AppTheme.primaryColor,
+          //       borderRadius: BorderRadius.circular(4),
+          //     ),
+          //     child: Text(
+          //       bidType.isEmpty ? '' : bidType,
+          //       style: const TextStyle(
+          //         color: Colors.white,
+          //         fontSize: 12,
+          //         fontWeight: FontWeight.bold,
+          //       ),
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
   }
 
-  Future<void> _fetchBids(String postId) async {
+  Future<void> _fetchBids() async {
     setState(() {
       isLoading = true;
       bidsText = '';
+      bidType = '';
     });
 
-    String apiEndpoint = selectedBidType == 'Low Bids' 
-        ? 'sell-post-low-bid.php' 
-        : 'sell-post-high-bid.php';
-
+    // Try fetching high bids first
     try {
-      final response = await http.get(
-    Uri.parse('${widget.baseUrl}/$apiEndpoint?token=${widget.token}&post_id=${widget.postId}&user_id=${widget.userId ?? ''}'),
+      final highBidResponse = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/sell-post-high-bid.php?token=${widget.token}&post_id=${widget.postId}&user_id=${widget.userId ?? ''}',
+        ),
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['status'] == 'true' && data['data'] is List) {
+      if (highBidResponse.statusCode == 200) {
+        final highBidData = jsonDecode(highBidResponse.body);
+        if (highBidData['status'] == 'true' &&
+            highBidData['data'] is List &&
+            highBidData['data'].isNotEmpty) {
           setState(() {
-            bidsText = data['data'].join('\n');
+            bidsText = highBidData['data'].join('\n');
+            bidType = 'High Bid';
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      // Continue to low bids if high bids fail
+    }
+
+    // Try fetching low bids if high bids are empty or fail
+    try {
+      final lowBidResponse = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/sell-post-low-bid.php?token=${widget.token}&post_id=${widget.postId}&user_id=${widget.userId ?? ''}',
+        ),
+      );
+
+      if (lowBidResponse.statusCode == 200) {
+        final lowBidData = jsonDecode(lowBidResponse.body);
+        if (lowBidData['status'] == 'true' && lowBidData['data'] is List) {
+          setState(() {
+            bidsText = lowBidData['data'].join('\n');
+            bidType = lowBidData['data'].isEmpty ? '' : 'Low Bid';
           });
         } else {
           setState(() {
             bidsText = 'No bids available';
+            bidType = '';
           });
         }
       } else {
         setState(() {
           bidsText = 'Error fetching bids';
+          bidType = '';
         });
       }
     } catch (e) {
       setState(() {
         bidsText = 'Error: $e';
+        bidType = '';
       });
     } finally {
       setState(() {

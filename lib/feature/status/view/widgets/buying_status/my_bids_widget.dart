@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/theme/app_theme.dart';
+import 'package:lelamonline_flutter/feature/status/view/widgets/buying_status/my_meetings_widget.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -21,12 +22,14 @@ class MyBidsWidget extends StatefulWidget {
   final String baseUrl;
   final String token;
   final String? userId;
+  final Function(String, String?, String?, bool)? onNavigateToMeetings;
 
   const MyBidsWidget({
     super.key,
     this.baseUrl = 'https://lelamonline.com/admin/api/v1',
     this.token = '5cb2c9b569416b5db1604e0e12478ded',
     this.userId,
+    this.onNavigateToMeetings,
   });
 
   static void clearCache() {
@@ -46,6 +49,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     'Low Bids': [],
     'High Bids': [],
   };
+  final GlobalKey<ScaffoldMessengerState> scaffoldKey =
+      GlobalKey<ScaffoldMessengerState>();
   static final Map<String, dynamic> _staticPostCache = {};
   static DateTime? _lastCacheUpdate;
   static const Duration _cacheExpiry = Duration(minutes: 5);
@@ -63,7 +68,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   final Map<String, dynamic> _postCache = {};
   late final Logger logger;
   late final Dio dio;
-
+  bool _isProcessing = false;
   @override
   void initState() {
     userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
@@ -101,7 +106,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         now.difference(_lastCacheUpdate!) < _cacheExpiry &&
         _staticBidCache['Low Bids']!.isNotEmpty &&
         _staticBidCache['High Bids']!.isNotEmpty;
-
     if (cacheValid) {
       print(
         'Using static cache - valid until ${_lastCacheUpdate!.add(_cacheExpiry)}',
@@ -109,21 +113,23 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       _bidCache['Low Bids'] = List.from(_staticBidCache['Low Bids']!);
       _bidCache['High Bids'] = List.from(_staticBidCache['High Bids']!);
       _postCache.addAll(_staticPostCache);
-
       List<Map<String, dynamic>> allBids = [];
       allBids.addAll(_bidCache['Low Bids']!);
       allBids.addAll(_bidCache['High Bids']!);
-
+      // Sort bids by created_on (newest first)
       allBids.sort((a, b) {
-        final dateA = DateTime.tryParse(
-          a['created_on']?.toString().split(' ')[0] ?? '1900-01-01',
-        );
-        final dateB = DateTime.tryParse(
-          b['created_on']?.toString().split(' ')[0] ?? '1900-01-01',
-        );
-        return (dateB?.compareTo(dateA ?? DateTime(1900))) ?? 0;
+        final dateA =
+            DateTime.tryParse(
+              a['created_on']?.toString() ?? '1900-01-01 00:00:00',
+            ) ??
+            DateTime(1900);
+        final dateB =
+            DateTime.tryParse(
+              b['created_on']?.toString() ?? '1900-01-01 00:00:00',
+            ) ??
+            DateTime(1900);
+        return dateB.compareTo(dateA); // Newest first
       });
-
       if (mounted) {
         setState(() {
           bids = allBids;
@@ -132,7 +138,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       }
       return;
     }
-
     print('Static cache invalid or empty, will fetch fresh data');
   }
 
@@ -155,6 +160,115 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     _bidCache['High Bids']?.clear();
     _postCache.clear();
     await _loadBids();
+  }
+
+  // Add this method to _MyBidsWidgetState class
+  Future<String?> _fetchCurrentHighestBid(String postId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/current-higest-bid-for-post.php?token=${widget.token}&post_id=$postId',
+        ),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+        },
+      );
+
+      developer.log(
+        'Highest bid API response for post $postId: ${response.body}',
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true || data['status'] == 'true') {
+          return data['data']?.toString() ??
+              data['highest_bid']?.toString() ??
+              data['current_highest_bid']?.toString();
+        }
+      }
+      return null;
+    } catch (e) {
+      developer.log('Error fetching current highest bid for post $postId: $e');
+      return null;
+    }
+  }
+
+  // ADDED: Delete bid function
+  Future<void> _deleteBid(String bidId, String postId, int index) async {
+    try {
+      final userIdToUse = _userId ?? widget.userId;
+      if (userIdToUse == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: User ID not found')),
+        );
+        return;
+      }
+
+      final deleteUrl =
+          '${widget.baseUrl}/bid-delete.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId';
+      print('Delete bid URL: $deleteUrl');
+
+      final response = await http.get(
+        Uri.parse(deleteUrl),
+        headers: {
+          'token': widget.token,
+          'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
+        },
+      );
+
+      print('bid-delete.php response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == true || data['status'] == 'true') {
+          // Remove the bid from the UI immediately
+          if (mounted) {
+            setState(() {
+              bids.removeAt(index);
+            });
+          }
+
+          // Also remove from cache
+          _removeBidFromCache(bidId);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Bid deleted successfully')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to delete bid: ${data['message'] ?? 'Unknown error'}',
+              ),
+            ),
+          );
+        }
+      } else {
+        print('bid-delete.php failed with status ${response.statusCode}');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to delete bid')));
+      }
+    } catch (e) {
+      print('Error deleting bid: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Error deleting bid')));
+    }
+  }
+
+  // ADDED: Helper function to remove bid from cache
+  void _removeBidFromCache(String bidId) {
+    // Remove from low bids cache
+    _bidCache['Low Bids']?.removeWhere((bid) => bid['id'] == bidId);
+    _staticBidCache['Low Bids']?.removeWhere((bid) => bid['id'] == bidId);
+
+    // Remove from high bids cache
+    _bidCache['High Bids']?.removeWhere((bid) => bid['id'] == bidId);
+    _staticBidCache['High Bids']?.removeWhere((bid) => bid['id'] == bidId);
+
+    print('Bid $bidId removed from cache');
   }
 
   Future<void> _loadUserIdAndBids() async {
@@ -349,9 +463,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       );
       return;
     }
-    print(
-      'Bid details: id=${bid['id']}, post_id=${bid['post_id']}, user_id=${bid['user_id'] ?? _userId}, bid_amount=${bid['my_bid_amount']}, target_price=${bid['targetPrice']}',
-    );
 
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
@@ -476,13 +587,19 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                         );
                                         await _forceRefresh();
                                         print(
-                                          'Meeting scheduled, navigating to My Meetings tab',
+                                          'Meeting scheduled, navigating to My Meetings tab with Meeting Request',
                                         );
                                         context.pushNamed(
                                           RouteNames.buyingStatusPage,
                                           queryParameters: {
+                                            'initialTab':
+                                                '1', // Select "My Meetings" tab
+                                            'initialStatus':
+                                                'Meeting Request', // Set to "Meeting Request" status
                                             'postId': postId,
                                             'bidId': bidId,
+                                            'forceRefresh':
+                                                'true', // Add flag to force refresh
                                           },
                                         );
                                       }
@@ -530,59 +647,125 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
   }
 
   Future<void> _proccedWithoutBid(BuildContext context, String postId) async {
-    final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    print('=== PROCEED WITHOUT BID STARTED ===');
+    print('Post ID: $postId');
+    print('User ID: $_userId');
+
     try {
+      final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final requestUrl =
+          '${widget.baseUrl}/procced-meeting-without-bid.php?token=${widget.token}&user_id=$_userId&post_id=$postId&meeting_date=$meetingDate';
+
+      print('API URL: $requestUrl');
+
       final response = await http.get(
-        Uri.parse(
-          '${widget.baseUrl}/procced-meeting-without-bid.php?token=${widget.token}&user_id=$_userId&post_id=$postId&meeting_date=$meetingDate',
-        ),
+        Uri.parse(requestUrl),
         headers: {
           'token': widget.token,
           'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
         },
       );
-      print('procced-meeting-without-bid.php response: ${response.body}');
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['status'] == true || data['status'] == 'true') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Meeting scheduled successfully')),
-          );
-          await _forceRefresh();
-          print(
-            'Meeting without bid scheduled, navigating to My Meetings tab with Date Fixed',
-          );
-          context.pushNamed(
-            RouteNames.buyingStatusPage,
-            queryParameters: {
-              'initialTab': '0',
-              'initialStatus': 'Date Fixed',
-              'postId': postId,
-            },
-          );
+          print('=== MEETING CREATION SUCCESSFUL ===');
+
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Meeting scheduled successfully')),
+            );
+          }
+
+          // Clear cache
+          print('Clearing MyMeetingsWidget cache...');
+          MyMeetingsWidget.clearCache();
+
+          // Small delay to ensure UI updates
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          print('=== CALLING NAVIGATION CALLBACK ===');
+          print('Callback is null: ${widget.onNavigateToMeetings == null}');
+
+          // Use the callback to navigate to meetings tab
+          if (widget.onNavigateToMeetings != null) {
+            print(
+              'Calling onNavigateToMeetings with: Date Fixed, $postId, null, true',
+            );
+            widget.onNavigateToMeetings!('Date Fixed', postId, null, true);
+            print('=== NAVIGATION CALLBACK CALLED SUCCESSFULLY ===');
+          } else {
+            print('ERROR: onNavigateToMeetings callback is null!');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Navigation failed - callback is null'),
+                ),
+              );
+            }
+          }
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to schedule meeting: ${data['message'] ?? 'Unknown error'}',
+          print('API returned error: ${data['message']}');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed: ${data['message'] ?? 'Unknown error'}'),
               ),
-            ),
-          );
+            );
+          }
         }
       } else {
-        print(
-          'procced-meeting-without-bid.php failed with status ${response.statusCode}',
-        );
+        print('HTTP error: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to schedule meeting')),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      print('Exception: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to schedule meeting')),
+          const SnackBar(content: Text('Error scheduling meeting')),
         );
       }
-    } catch (e) {
-      print('Error scheduling meeting without bid: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Error scheduling meeting')));
     }
+
+    print('=== PROCEED WITHOUT BID COMPLETED ===');
+  }
+
+  void _handleSuccessfulMeeting(BuildContext context, String postId) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Meeting scheduled successfully')),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.pushNamed(
+          RouteNames.buyingStatusPage,
+          queryParameters: {
+            'initialTab': '1',
+            'initialStatus': 'Date Fixed',
+            'postId': postId,
+            'forceRefresh': 'true',
+          },
+        );
+      }
+    });
+  }
+
+  void _showError(BuildContext context, String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _increaseBid(
@@ -715,7 +898,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       isLoading = true;
       error = null;
     });
-
     if (_userId == null || _userId == 'Unknown') {
       setState(() {
         isLoading = false;
@@ -723,19 +905,15 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       });
       return;
     }
-
     try {
       final headers = {
         'token': widget.token,
         'Cookie': 'PHPSESSID=g6nr0pkfdnp6o573mn9srq20b4',
       };
-
       List<Map<String, dynamic>> allBids = [];
       bool cacheUpdated = false;
-
       bool needLowFetch = _staticBidCache['Low Bids']!.isEmpty;
       bool needHighFetch = _staticBidCache['High Bids']!.isEmpty;
-
       if (needLowFetch) {
         final lowBidsResponse = await http.get(
           Uri.parse(
@@ -743,10 +921,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           ),
           headers: headers,
         );
-
         print('my-bids-low.php status: ${lowBidsResponse.statusCode}');
         print('my-bids-low.php response: ${lowBidsResponse.body}');
-
         if (lowBidsResponse.statusCode == 200) {
           final lowBidsData = jsonDecode(lowBidsResponse.body);
           if (lowBidsData['status'] == true && lowBidsData['data'] is List) {
@@ -770,7 +946,6 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           'Using static cache for Low Bids: ${_staticBidCache['Low Bids']!.length} items',
         );
       }
-
       if (needHighFetch) {
         final highBidsResponse = await http.get(
           Uri.parse(
@@ -778,10 +953,8 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           ),
           headers: headers,
         );
-
         print('my-bids-high.php status: ${highBidsResponse.statusCode}');
         print('my-bids-high.php response: ${highBidsResponse.body}');
-
         if (highBidsResponse.statusCode == 200) {
           final highBidsData = jsonDecode(highBidsResponse.body);
           if (highBidsData['status'] == true && highBidsData['data'] is List) {
@@ -805,25 +978,27 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           'Using static cache for High Bids: ${_staticBidCache['High Bids']!.length} items',
         );
       }
-
+      // Sort bids by created_on (newest first)
       allBids.sort((a, b) {
-        final dateA = DateTime.tryParse(
-          a['created_on']?.toString().split(' ')[0] ?? '1900-01-01',
-        );
-        final dateB = DateTime.tryParse(
-          b['created_on']?.toString().split(' ')[0] ?? '1900-01-01',
-        );
-        return (dateB?.compareTo(dateA ?? DateTime(1900))) ?? 0;
+        final dateA =
+            DateTime.tryParse(
+              a['created_on']?.toString() ?? '1900-01-01 00:00:00',
+            ) ??
+            DateTime(1900);
+        final dateB =
+            DateTime.tryParse(
+              b['created_on']?.toString() ?? '1900-01-01 00:00:00',
+            ) ??
+            DateTime(1900);
+        return dateB.compareTo(dateA); // Newest first
       });
-
       print('Total bids: ${allBids.length}');
-
+      // Inside the bid processing loop in _loadBids() method
       for (var bid in allBids) {
         print('Processing bid: ${bid['id']} for post: ${bid['post_id']}');
 
         final postDetails =
             _staticPostCache[bid['post_id']] ?? _postCache[bid['post_id']];
-
         if (postDetails != null) {
           bid['title'] = postDetails['title'];
           bid['carImage'] = postDetails['image'];
@@ -851,20 +1026,28 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
         bid['expirationDate'] = bid['exp_date']?.toString() ?? 'N/A';
         bid['bidDate'] = bid['created_on']?.split(' ')[0] ?? 'N/A';
 
+        // ADD THIS: Fetch highest bid for low bids
+        final bool isLowBid = bid['fromLowBids'] == true;
+        if (isLowBid && bid['post_id'] != null) {
+          developer.log(
+            'Fetching highest bid for low bid ${bid['id']} on post ${bid['post_id']}',
+          );
+          final highestBid = await _fetchCurrentHighestBid(bid['post_id']);
+          bid['current_highest_bid'] = highestBid;
+          developer.log('Highest bid for post ${bid['post_id']}: $highestBid');
+        }
+
         print(
           'Bid processed: ${bid['title']}, bid_id: ${bid['id']}, fromLowBids: ${bid['fromLowBids']}, fromHighBids: ${bid['fromHighBids']}',
         );
       }
-
       if (cacheUpdated) {
         _updateStaticCache();
       }
-
       setState(() {
         bids = allBids;
         isLoading = false;
       });
-
       print('Bids loaded successfully: ${bids.length} items');
     } catch (e) {
       print('Error loading bids: $e');
@@ -975,6 +1158,13 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                     bid['bidPrice'],
                                   ),
                               onCancelBid: () => _cancelBid(context, bid['id']),
+                              // ADDED: Delete bid function
+                              onDeleteBid:
+                                  () => _deleteBid(
+                                    bid['id'],
+                                    bid['post_id'],
+                                    index,
+                                  ),
                             );
                           },
                         ),
@@ -996,6 +1186,7 @@ class BidCard extends StatelessWidget {
   final VoidCallback onproccedWithoutBid;
   final VoidCallback onIncreaseBid;
   final VoidCallback onCancelBid;
+  final VoidCallback onDeleteBid; // ADDED: Delete bid callback
 
   const BidCard({
     super.key,
@@ -1007,6 +1198,7 @@ class BidCard extends StatelessWidget {
     required this.onproccedWithoutBid,
     required this.onIncreaseBid,
     required this.onCancelBid,
+    required this.onDeleteBid, // ADDED: Delete bid parameter
   });
 
   bool get isHighBid => bid['fromHighBids'] == true;
@@ -1033,7 +1225,7 @@ class BidCard extends StatelessWidget {
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1083,14 +1275,22 @@ class BidCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.cancel,
-                        size: 22,
-                        color: Colors.red,
-                      ),
-                      onPressed: onCancelBid,
-                      tooltip: 'Cancel Bid',
+                    // MODIFIED: Added delete button
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.cancel,
+                            size: 22,
+                            color: Colors.red,
+                          ),
+                          onPressed: () {
+                            _showDeleteConfirmationDialog(context);
+                          },
+                          tooltip: 'Delete Bid',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1266,6 +1466,7 @@ class BidCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
+                // In BidCard's build method, replace the price Row with this:
                 Row(
                   children: [
                     Expanded(
@@ -1329,6 +1530,55 @@ class BidCard extends StatelessWidget {
                     ),
                   ],
                 ),
+
+                // ADD THIS SECTION: Show current highest bid for low bids
+                if (!isHighBid &&
+                    bid['current_highest_bid'] != null &&
+                    bid['current_highest_bid'] != '0') ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.trending_up,
+                          size: 16,
+                          color: Colors.orange[700],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current Highest Bid',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange[700],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '₹${NumberFormat('#,##0').format(double.tryParse(bid['current_highest_bid']) ?? 0)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1449,6 +1699,36 @@ class BidCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // ADDED: Delete confirmation dialog
+  void _showDeleteConfirmationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Bid'),
+          content: const Text(
+            'Are you sure you want to delete this bid? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onDeleteBid();
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

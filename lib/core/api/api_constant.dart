@@ -3,6 +3,7 @@
 const String simpleBaseUrl = 'https://lelamonline.com';
   const String baseUrl = 'https://lelamonline.com/admin/api/v1';
 const String token = '5cb2c9b569416b5db1604e0e12478ded';
+ const  String onesignalAppId = 'ba0196f0-a9d3-4987-beff-64dc671f75d5';
 
 //====================== Authentication ==============================//
 const String login = '$baseUrl/login?token=$token';

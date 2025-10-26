@@ -614,7 +614,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
       final headers = {'token': _token};
       final url =
-          '$_baseUrl/current-highest-bid-for-post.php?token=$_token&post_id=$id';
+          '$_baseUrl/current-higest-bid-for-post.php?token=$_token&post_id=$id';
       debugPrint('Fetching highest bid: $url');
       final request = http.Request('GET', Uri.parse(url));
       request.headers.addAll(headers);
@@ -756,6 +756,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
 
     setState(() => _isBidDialogOpen = true);
     await _fetchCurrentHighestBid(); // Fetch the current highest bid
+
+    // Create the controller within the dialog's scope
     final TextEditingController _bidController = TextEditingController();
 
     Future<void> _showResponseDialog(
@@ -767,11 +769,10 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       final String formattedBid =
           _currentHighestBid.startsWith('Error')
               ? _currentHighestBid
-              : '₹ ${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
-
-      // Support phone number (replace with your actual support number)
+              : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+      // Support phone number
       const String supportPhoneNumber = '+918089308048';
-
+      if (!mounted) return;
       return showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -820,7 +821,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     children: [
                       if (isSuccess && isHighestBid)
                         Text(
-                          'Congratulations, your bid is the highest bid! 🎉',
+                          'Congratulations, your bid is the highest bid! 🎉 \nCheck status in High Bids',
                           style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -829,7 +830,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       if (isSuccess && isHighestBid) const SizedBox(height: 8),
                       Text(
-                        '$message\n\nFor further proceedings, you will receive a callback soon or call support now.',
+                        '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
                         style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                           fontSize: 16,
                           color: Colors.grey[800],
@@ -972,7 +973,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 ],
               ),
             ],
-            actionsPadding: const EdgeInsets.all(16),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           );
         },
       );
@@ -983,7 +984,11 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return WillPopScope(
-          onWillPop: () async => true,
+          onWillPop: () async {
+            _bidController
+                .dispose(); // Dispose controller when dialog is dismissed
+            return true;
+          },
           child: StatefulBuilder(
             builder: (dialogContext, setDialogState) {
               return AlertDialog(
@@ -1146,7 +1151,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       );
                                       return;
                                     }
-
                                     final int bidAmount =
                                         int.tryParse(amount) ?? 0;
                                     if (bidAmount < _minBidIncrement) {
@@ -1172,11 +1176,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                                       );
                                       return;
                                     }
-
                                     setDialogState(() {
                                       _isLoadingBid = true;
                                     });
-
                                     try {
                                       FocusScope.of(dialogContext).unfocus();
                                       final String responseMessage =
@@ -1242,8 +1244,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     );
 
     FocusScope.of(context).unfocus();
-    _bidController.dispose();
-
     if (result != null) {
       final bool ok = result['success'] == true;
       final String msg =
@@ -1252,6 +1252,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       final bool isHighestBid = result['isHighestBid'] ?? false;
       await _showResponseDialog(msg, ok, isHighestBid);
     }
+    _bidController.dispose(); // Dispose controller after dialog is fully closed
     if (mounted) setState(() => _isBidDialogOpen = false);
   }
 
@@ -1385,7 +1386,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => MyMeetingsWidget(showAppBar: true),
+                                (context) =>
+                                    BuyingStatusPage(initialTabIndex: 1),
                           ),
                         );
                       }
@@ -2272,135 +2274,142 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'Ask a question about this product',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => LoginDialog(
-                    onSuccess: () {
-                      Navigator.of(dialogContext).pop();
-                      showDialog(
-                        context: context,
-                        builder: (context) => ReviewDialog(postId: id),
-                      );
-                    },
-                  ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
-              ],
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      
-      // Answers section WITHOUT container styling
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              '',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (isLoadingReviews)
-              const Center(child: CircularProgressIndicator())
-            else if (reviewsError.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color.fromARGB(255, 192, 187, 187),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (reviews.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(
-                  '',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              // Show answers directly without any container
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: reviews.where((review) => review.parentId == '0').length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildReviewItem(parent, isReply: false),
-                      // Show replies indented
-                      ...reviews
-                          .where((reply) => reply.parentId == parent.id)
-                          .map(
-                            (reply) => Padding(
-                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
-                              child: _buildReviewItem(reply, isReply: true),
-                            ),
-                          )
-                          .toList(),
-                    ],
-                  );
-                },
+            Expanded(
+              child: Text(
+                'Ask a question about this product',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-    ],
-  );
-}
+        const SizedBox(height: 12),
 
+        // Answers section WITHOUT container styling
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    "",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else if (reviews.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: const Text(
+                    '',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                // Show answers directly without any container
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount:
+                      reviews.where((review) => review.parentId == '0').length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final parent =
+                        reviews
+                            .where((review) => review.parentId == '0')
+                            .toList()[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReviewItem(parent, isReply: false),
+                        // Show replies indented
+                        ...reviews
+                            .where((reply) => reply.parentId == parent.id)
+                            .map(
+                              (reply) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 32.0,
+                                  top: 8.0,
+                                ),
+                                child: _buildReviewItem(reply, isReply: true),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildReviewItem(PostReview review, {required bool isReply}) {
     return Padding(
@@ -2682,45 +2691,51 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                       const SizedBox(
                         height: 4,
                       ), // Add spacing between title and variation
-                     Text(
-        _modelVariation,
-        style: TextStyle(
-          fontSize: 16,
-          color: Colors.grey[600],
-        ),
-      ),
+                      Text(
+                        _modelVariation,
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      ),
                       const SizedBox(height: 8),
-                      Row(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.grey,
                               ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.grey,
+                              const SizedBox(width: 4),
+                              _isLoadingLocations
+                                  ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Text(
+                                    landMark, // This shows the district from parent_zone_id
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                            ],
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            createdOn,
-                            style: const TextStyle(color: Colors.grey),
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 20.0,
+                            ), // Indent to align with icon
+                            child: Text(
+                              widget.product.landMark ??
+                                  'Landmark not specified', // This shows the actual landmark
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
+                          const SizedBox(height: 8),
                         ],
                       ),
                       const SizedBox(height: 16),

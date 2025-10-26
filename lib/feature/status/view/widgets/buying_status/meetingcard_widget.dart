@@ -9,6 +9,7 @@ import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/chat/views/chat_page.dart';
 import 'package:lelamonline_flutter/feature/status/view/widgets/call_support/call_support.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MeetingCard extends StatefulWidget {
   final Map<String, dynamic> meeting;
@@ -17,7 +18,8 @@ class MeetingCard extends StatefulWidget {
   final String currentTab;
   final Function(Map<String, dynamic>) onEditDate;
   final Function(Map<String, dynamic>) onEditTime;
-
+  final Function(Map<String, dynamic>)? onDelete;
+  final VoidCallback? onRefresh;
   const MeetingCard({
     super.key,
     required this.meeting,
@@ -26,6 +28,8 @@ class MeetingCard extends StatefulWidget {
     required this.currentTab,
     required this.onEditDate,
     required this.onEditTime,
+    this.onDelete,
+    this.onRefresh,
   });
 
   static final Map<String, String> _locationCache = {};
@@ -36,11 +40,23 @@ class MeetingCard extends StatefulWidget {
 
 class _MeetingCardState extends State<MeetingCard> {
   String _middleStatusData = 'Schedule meeting';
+  String? _latitude;
+  String? _longitude;
 
   @override
   void initState() {
     super.initState();
     _middleStatusData = _getMeetingStatus(widget.meeting);
+    // Initialize with existing coordinates if available
+    _latitude = widget.meeting['latitude']?.toString();
+    _longitude = widget.meeting['longitude']?.toString();
+    debugPrint('Initial meeting data: ${widget.meeting}');
+    if (_latitude == null ||
+        _latitude!.isEmpty ||
+        _longitude == null ||
+        _longitude!.isEmpty) {
+      _fetchAndSetCoordinates();
+    }
   }
 
   Future<Map<String, String>> _fetchLocations() async {
@@ -106,6 +122,59 @@ class _MeetingCardState extends State<MeetingCard> {
     }
   }
 
+  Future<Map<String, String>> fetchPostCoordinates(
+    String baseUrl,
+    String token,
+    String postId,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/post-details.php?token=$token&post_id=$postId'),
+        headers: {'token': token},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'true' &&
+            data['data'] is List &&
+            data['data'].isNotEmpty) {
+          final post = data['data'][0];
+          final coords = {
+            'latitude': post['latitude']?.toString() ?? '',
+            'longitude': post['longitude']?.toString() ?? '',
+          };
+          debugPrint('Fetched coordinates for post $postId: $coords');
+          return coords;
+        } else {
+          debugPrint(
+            'Error: Invalid response or no data found for post $postId',
+          );
+          return {'latitude': '', 'longitude': ''};
+        }
+      } else {
+        debugPrint(
+          'Error: Failed to fetch post details, status code: ${response.statusCode}',
+        );
+        return {'latitude': '', 'longitude': ''};
+      }
+    } catch (e) {
+      debugPrint('Error fetching post coordinates: $e');
+      return {'latitude': '', 'longitude': ''};
+    }
+  }
+
+  Future<void> _fetchAndSetCoordinates() async {
+    final coords = await fetchPostCoordinates(
+      widget.baseUrl,
+      widget.token,
+      widget.meeting['post_id']?.toString() ?? '909',
+    );
+    setState(() {
+      _latitude = coords['latitude'];
+      _longitude = coords['longitude'];
+    });
+  }
+
   Future<String> _fetchOfferPrice(
     String userId,
     String postId,
@@ -152,6 +221,59 @@ class _MeetingCardState extends State<MeetingCard> {
       debugPrint('Error fetching decision pending status: $e');
       return 'Decision pending';
     }
+  }
+
+  Future<void> _deleteMeeting(BuildContext context, String meetingId) async {
+    try {
+      final userId = widget.meeting['user_id']?.toString() ?? '6';
+      debugPrint('Deleting meeting ID: $meetingId for user ID: $userId');
+      final response = await http.get(
+        Uri.parse(
+          '${widget.baseUrl}/my-meeting-delete.php?token=${widget.token}&user_id=$userId&ads_post_customer_meeting_id=$meetingId',
+        ),
+        headers: {'token': widget.token},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('Delete response: $data');
+        if (data['status'] == true || data['status'] == 'true') {
+          // SUCCESS: Just call onDelete - let parent handle refresh and SnackBar
+          widget.onDelete?.call(widget.meeting);
+        } else {
+          // Only show error SnackBar here since we're not navigating away
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed: ${data['message'] ?? 'Unknown error'}'),
+              ),
+            );
+          }
+        }
+      } else {
+        debugPrint('Delete failed with status code: ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to delete meeting')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting meeting: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Error deleting meeting')));
+      }
+    }
+  }
+
+  // Add this helper method to force refresh the parent
+  void _forceRefreshParent() {
+    // This will depend on how your parent widget is structured
+    // If your parent has a refresh method, you might need to pass it down
+    // For now, let's use a simpler approach - just call the onDelete callback
+    // which should trigger a refresh in the parent
+    widget.onDelete?.call(widget.meeting);
   }
 
   Future<void> _notInterested(BuildContext context, String meetingId) async {
@@ -230,11 +352,11 @@ class _MeetingCardState extends State<MeetingCard> {
     } else if (meeting['meeting_time'] != 'N/A' &&
         meeting['meeting_time']?.isNotEmpty == true &&
         meeting['meeting_time'] != '00:00:00') {
-      return 'Time Fixed';
+      return 'Waiting for Seller Confirmation';
     } else if (meeting['meeting_date'] != 'N/A' &&
         meeting['meeting_date']?.isNotEmpty == true &&
         meeting['meeting_date'] != '1970-01-01') {
-      return 'Date Fixed';
+      return 'Please Fix Time';
     } else {
       return 'Meeting Request';
     }
@@ -304,9 +426,7 @@ class _MeetingCardState extends State<MeetingCard> {
     final meetingDate = widget.meeting['meeting_date'] ?? 'N/A';
     final meetingTime = widget.meeting['meeting_time'] ?? 'N/A';
     final sellerApproval = widget.meeting['seller_approvel']?.toString() ?? '0';
-    final sellerId =
-        widget.meeting['created_by']?.toString() ??
-        'Unknown'; // Use created_by (seller ID)
+    final sellerId = widget.meeting['created_by']?.toString() ?? 'Unknown';
     final sellerName = widget.meeting['seller_name']?.toString() ?? 'Seller';
     final sellerImage = widget.meeting['seller_image']?.toString() ?? '';
 
@@ -341,12 +461,8 @@ class _MeetingCardState extends State<MeetingCard> {
     bool step3Completed = isSellerConfirmed && step2Completed;
     bool step3Active = step2Completed && !isSellerConfirmed;
 
-    bool step4Completed =
-        isMeetingDone &&
-        step3Completed; // Meeting Done (only if seller confirmed AND meeting done)
-    bool step4Active =
-        step3Completed &&
-        !isMeetingDone; // Only active if seller confirmed but meeting not done
+    bool step4Completed = isMeetingDone && step3Completed;
+    bool step4Active = step3Completed && !isMeetingDone;
 
     String step1Message =
         step1Completed
@@ -362,6 +478,7 @@ class _MeetingCardState extends State<MeetingCard> {
             : (step3Active ? 'Awaiting Confirmation' : '');
     String step4Message =
         step4Completed ? 'Completed' : (step4Active ? 'Ready' : '');
+
     return FutureBuilder<Map<String, dynamic>>(
       future:
           status == 'Meeting Completed'
@@ -489,8 +606,43 @@ class _MeetingCardState extends State<MeetingCard> {
                                         color: Colors.red,
                                       ),
                                       onPressed: () {
-                                        debugPrint(
-                                          'Close button pressed for meeting ${widget.meeting['id']}',
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return AlertDialog(
+                                              title: const Text(
+                                                'Delete Meeting',
+                                              ),
+                                              content: const Text(
+                                                'Are you sure you want to delete this meeting?',
+                                              ),
+                                              actions: <Widget>[
+                                                TextButton(
+                                                  child: const Text('Cancel'),
+                                                  onPressed:
+                                                      () =>
+                                                          Navigator.of(
+                                                            context,
+                                                          ).pop(),
+                                                ),
+                                                TextButton(
+                                                  child: const Text(
+                                                    'Delete',
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                    ),
+                                                  ),
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop();
+                                                    _deleteMeeting(
+                                                      context,
+                                                      widget.meeting['id'],
+                                                    );
+                                                  },
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         );
                                       },
                                     ),
@@ -554,6 +706,58 @@ class _MeetingCardState extends State<MeetingCard> {
                                               ),
                                             ],
                                           ),
+                                          if (_latitude != null &&
+                                              _latitude!.isNotEmpty &&
+                                              _longitude != null &&
+                                              _longitude!.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.map,
+                                                  size: 12,
+                                                  color: Colors.grey[500],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: GestureDetector(
+                                                    onTap: () async {
+                                                      final mapUrl = Uri.parse(
+                                                        'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
+                                                      );
+                                                      if (await canLaunchUrl(
+                                                        mapUrl,
+                                                      )) {
+                                                        await launchUrl(mapUrl);
+                                                      } else {
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Could not open Google Maps',
+                                                            ),
+                                                            backgroundColor:
+                                                                Colors.red,
+                                                          ),
+                                                        );
+                                                      }
+                                                    },
+                                                    child: const Text(
+                                                      'View on Google Maps',
+                                                      style: TextStyle(
+                                                        color: Colors.blue,
+                                                        decoration:
+                                                            TextDecoration
+                                                                .underline,
+                                                        fontSize: 10,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [
@@ -687,8 +891,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                           MaterialPageRoute(
                                             builder:
                                                 (context) => ChatPage(
-                                                  listenerId:
-                                                      sellerId, // Now correctly the seller ID (created_by)
+                                                  listenerId: sellerId,
                                                   listenerName: sellerName,
                                                   listenerImage: sellerImage,
                                                   initialMessage:
@@ -779,7 +982,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                     Flexible(
                                       flex: 2,
                                       child: _buildTimelineStep(
-                                        title: 'Seller Confirmation',
+                                        title: 'Seller Availability',
                                         message: step3Message,
                                         isActive: step3Active,
                                         isCompleted: step3Completed,

@@ -51,16 +51,20 @@ GoRoute(
   name: RouteNames.buyingStatusPage,
   builder: (context, state) {
     final loggedUser = context.watch<LoggedUserProvider>();
-
     final postId = state.uri.queryParameters['postId'];
     final bidId = state.uri.queryParameters['bidId'];
     final userId = loggedUser.isLoggedIn ? loggedUser.userData?.userId : null;
+    final initialTabIndex = int.tryParse(state.uri.queryParameters['initialTab'] ?? '0') ?? 0;
+    final forceRefresh = state.uri.queryParameters['forceRefresh'] == 'true';
 
     if (loggedUser.isLoggedIn) {
       return BuyingStatusPage(
         userId: userId,
         postId: postId,
         bidId: bidId,
+        initialTabIndex: initialTabIndex,
+  
+        forceRefresh: forceRefresh,
       );
     }
     return LoginPage();

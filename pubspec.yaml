@@ -42,7 +42,8 @@ dependencies:
   geolocator: ^14.0.2
   flutter_spinkit: ^5.2.2
   shared_preferences: ^2.5.3
-  
+  onesignal_flutter: ^5.3.4
+  awesome_notifications: ^0.10.1
 
 
 dev_dependencies:

@@ -1141,7 +1141,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   ];
 
   List<String> get _keralaCities {
-    return context.read<LocationProvider>().districts;
+    final districts = context.read<LocationProvider>().districts;
+    return ['all', ...districts]; // Always include 'all' as the first option
   }
 
   List<Product> get filteredProducts {
@@ -1499,24 +1500,51 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               _isLoadingLocations
                   ? const CircularProgressIndicator()
                   : PopupMenuButton<String>(
+                    key: ValueKey(
+                      locationProvider.selectedLocationName,
+                    ), // Force rebuild on location change
                     icon: const Icon(Icons.location_on, color: Colors.black87),
                     onSelected: (String value) {
                       final id =
                           value == 'all'
                               ? 'all'
                               : _locations
-                                  .firstWhere((loc) => loc.name == value)
+                                  .firstWhere(
+                                    (loc) => loc.name == value,
+                                    orElse:
+                                        () => LocationData(
+                                          id: 'all',
+                                          name: 'All Kerala',
+                                          slug: '',
+                                          parentId: '',
+                                          image: '',
+                                          description: '',
+                                          latitude: '',
+                                          longitude: '',
+                                          popular: '',
+                                          status: '',
+                                          allStoreOnOff: '',
+                                          createdOn: '',
+                                          updatedOn: '',
+                                        ),
+                                  )
                                   .id;
-                      context.read<LocationProvider>().setSelectedLocation(
-                        value,
-                        id: id,
-                      );
-                      _fetchProducts();
+                      if (locationProvider.selectedLocationName != value) {
+                        // Avoid redundant calls
+                        context.read<LocationProvider>().setSelectedLocation(
+                          value,
+                          id: id,
+                        );
+                        _fetchProducts(
+                          forceRefresh: true,
+                        ); // Force refresh to ensure data reload
+                      }
                     },
                     itemBuilder: (BuildContext context) {
                       return _keralaCities.map((String city) {
                         return PopupMenuItem<String>(
                           value: city,
+                          enabled: true, // Ensure all items are clickable
                           child: Row(
                             children: [
                               if (locationProvider.selectedLocationName == city)
@@ -1527,7 +1555,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 ),
                               if (locationProvider.selectedLocationName == city)
                                 const SizedBox(width: 8),
-                              Text(city == 'all' ? 'All Kerala' : city),
+                              Text(city == 'all' ? '' : city),
                             ],
                           ),
                         );
@@ -1639,6 +1667,14 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     final hasOffer = product.ifOfferPrice == '1';
     final isFavorited = _favoritedStatus[product.id] ?? false;
     final isToggling = _togglingIds.contains(product.id);
+
+    // Parse landmark: split by \t and take the last part as the main landmark (e.g., "Chevayur")
+    // Adjust parsing logic if needed based on consistent format
+    String? parsedLandmark;
+    if (product.landMark?.isNotEmpty ?? false) {
+      final parts = product.landMark!.split('\t');
+      parsedLandmark = parts.isNotEmpty ? parts.last.trim() : null;
+    }
 
     return GestureDetector(
       onTap: () {
@@ -1841,7 +1877,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                       decoration: TextDecoration.lineThrough,
                                     ),
                                   ),
-                                  SizedBox(width: 10),
+                                  const SizedBox(width: 10),
                                   Text(
                                     _formatPrice(
                                       double.tryParse(product.offerPrice) ?? 0,
@@ -1874,15 +1910,37 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   color: Colors.grey.shade500,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  _getLocationName(product.parentZoneId),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey.shade600,
+                                Expanded(
+                                  child: Text(
+                                    _getLocationName(product.parentZoneId),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
+                            if (parsedLandmark != null &&
+                                parsedLandmark.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 2.0,
+                                  left: 16.0,
+                                ),
+                                child: Text(
+                                  parsedLandmark,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.grey.shade500,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
                             const SizedBox(height: 4),
                             Builder(
                               builder: (context) {
@@ -2185,6 +2243,22 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   Future<void> _fetchFilterListings() async {
     final locationProvider = context.read<LocationProvider>();
+    developer.log('=== STARTING FILTER FETCH ===', name: 'Filter.Debug');
+    developer.log('Selected filters:', name: 'Filter.Debug');
+    developer.log(
+      '  - Price Range: $_selectedPriceRange',
+      name: 'Filter.Debug',
+    );
+    developer.log('  - Brands: $_selectedBrands', name: 'Filter.Debug');
+    developer.log('  - Year: $_selectedYearRange', name: 'Filter.Debug');
+    developer.log('  - Owners: $_selectedOwnersRange', name: 'Filter.Debug');
+    developer.log('  - Fuel: $_selectedFuelTypes', name: 'Filter.Debug');
+    developer.log(
+      '  - Transmission: $_selectedTransmissions',
+      name: 'Filter.Debug',
+    );
+    developer.log('  - KM: $_selectedKmRange', name: 'Filter.Debug');
+    developer.log('  - Sold By: $_selectedSoldBy', name: 'Filter.Debug');
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -2247,21 +2321,45 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (_selectedBrands.isNotEmpty) {
       queryParams['brands'] = _selectedBrands.join(',');
     }
-    if (_selectedPriceRange != 'all') {
-      final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-      if (parts.length == 2) {
-        queryParams['min_price'] =
-            (double.parse(parts[0].replaceAll(' Lakh', '').trim()) * 100000)
-                .toStringAsFixed(0);
-        queryParams['max_price'] =
-            (double.parse(parts[1].replaceAll(' Lakh', '').trim()) * 100000)
-                .toStringAsFixed(0);
-      } else if (_selectedPriceRange.contains('Under')) {
-        queryParams['max_price'] = '200000';
-      } else if (_selectedPriceRange.contains('Above')) {
-        queryParams['min_price'] = '2000000';
-      }
+   if (_selectedPriceRange != 'all') {
+  developer.log('Applying price filter: $_selectedPriceRange', name: 'Price.Filter');
+  
+  // Check if it's a predefined range or custom range
+  if (_selectedPriceRange == 'Under ₹2 Lakh') {
+    queryParams['min_price'] = '0';
+    queryParams['max_price'] = '200000';
+  } 
+  else if (_selectedPriceRange == 'Above ₹20 Lakh') {
+    queryParams['min_price'] = '2000000';
+    queryParams['max_price'] = '10000000';
+  } 
+  else if (_selectedPriceRange.contains('₹')) {
+    // This is a predefined range with ₹ symbol (like "₹2-5 Lakh")
+    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+    if (parts.length == 2) {
+      final minPart = parts[0].replaceAll(' Lakh', '').trim();
+      final maxPart = parts[1].replaceAll(' Lakh', '').trim();
+      
+      final minPrice = (double.parse(minPart) * 100000).toStringAsFixed(0);
+      final maxPrice = (double.parse(maxPart) * 100000).toStringAsFixed(0);
+      
+      queryParams['min_price'] = minPrice;
+      queryParams['max_price'] = maxPrice;
     }
+  }
+  else if (_selectedPriceRange.contains('-')) {
+    // This is a custom range like "400000-450000" - use as is, no multiplication!
+    final parts = _selectedPriceRange.split('-');
+    if (parts.length == 2) {
+      queryParams['min_price'] = parts[0].trim();
+      queryParams['max_price'] = parts[1].trim();
+      
+      developer.log('Custom price range: ${parts[0]} - ${parts[1]}', name: 'Price.Range');
+    }
+  }
+  
+  developer.log('Final price params: min=${queryParams['min_price']}, max=${queryParams['max_price']}', name: 'Price.Final');
+}
     if (_selectedFuelTypes.isNotEmpty) {
       queryParams['fuel_types'] = _selectedFuelTypes
           .map((fuel) => fuel.toLowerCase())

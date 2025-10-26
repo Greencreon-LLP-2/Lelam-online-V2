@@ -2882,39 +2882,45 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          _isLoadingLocations
-                              ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : Text(
-                                landMark,
-                                style: const TextStyle(color: Colors.grey),
-                              ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.access_time,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            createdOn,
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
+                     Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Row(
+      children: [
+        const Icon(
+          Icons.location_on,
+          size: 16,
+          color: Colors.grey,
+        ),
+        const SizedBox(width: 4),
+        _isLoadingLocations
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              )
+            : Text(
+                landMark, // This shows the district from parent_zone_id
+                style: const TextStyle(color: Colors.grey),
+              ),
+      ],
+    ),
+    const SizedBox(height: 4),
+    Padding(
+      padding: const EdgeInsets.only(left: 20.0), // Indent to align with icon
+      child: Text(
+        widget.product.landMark ?? 'Landmark not specified', // This shows the actual landmark
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 14,
+        ),
+      ),
+    ),
+    const SizedBox(height: 8),
+  ],
+),
                       const SizedBox(height: 16),
                       Text(
                         widget.isAuction
