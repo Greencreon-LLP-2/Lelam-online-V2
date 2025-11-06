@@ -30,9 +30,10 @@ class ChatRoomService {
           final rooms = jsonResponse['data'] as List;
           final room = rooms.firstWhere(
             (r) =>
-                (r['user_id_from'] == userId &&
-                    r['user_id_to'] == listenerId) ||
-                (r['user_id_from'] == listenerId && r['user_id_to'] == userId),
+                (r['user_id_from'].toString() == userId &&
+                    r['user_id_to'].toString() == listenerId) ||
+                (r['user_id_from'].toString() == listenerId &&
+                    r['user_id_to'].toString() == userId),
             orElse: () => null,
           );
           if (room != null) {
@@ -40,11 +41,11 @@ class ChatRoomService {
               'ChatRoomService: Found existing room: ${room['chat_room_id']}',
             );
             return ChatRoom(
-              id: room['chat_room_id'],
-              userIdFrom: room['user_id_from'],
-              userIdTo: room['user_id_to'],
-              createdOn: room['created_on'],
-              updatedOn: room['updated_on'],
+              id: room['chat_room_id'].toString(), // Convert to string
+              userIdFrom: room['user_id_from'].toString(), // Convert to string
+              userIdTo: room['user_id_to'].toString(), // Convert to string
+              createdOn: room['created_on']?.toString() ?? '',
+              updatedOn: room['updated_on']?.toString() ?? '',
             );
           }
         }
@@ -73,11 +74,15 @@ class ChatRoomService {
             'ChatRoomService: Created room: ${newRoom['chat_room_id']}',
           );
           return ChatRoom(
-            id: newRoom['chat_room_id'],
-            userIdFrom: newRoom['user_id_from'],
-            userIdTo: newRoom['user_id_to'],
-            createdOn: newRoom['created_on'],
-            updatedOn: newRoom['updated_on'],
+            id: newRoom['chat_room_id'].toString(), // Convert to string
+            userIdFrom: newRoom['user_id_from']?.toString() ?? userId,
+            userIdTo: newRoom['user_id_to']?.toString() ?? listenerId,
+            createdOn:
+                newRoom['created_on']?.toString() ??
+                DateTime.now().toIso8601String(),
+            updatedOn:
+                newRoom['updated_on']?.toString() ??
+                DateTime.now().toIso8601String(),
           );
         } else {
           throw Exception(
@@ -658,10 +663,10 @@ class ChatPage extends HookWidget {
                                           ? CrossAxisAlignment.end
                                           : CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      message.message,
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
+                                    // Text(
+                                    //   message.message,
+                                    //   style: const TextStyle(fontSize: 14),
+                                    // ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _formatTime(message.createdOn),

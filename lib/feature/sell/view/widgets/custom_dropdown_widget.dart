@@ -14,8 +14,7 @@ class CustomDropdownWidget<T> extends StatefulWidget {
   final GlobalKey<FormFieldState>? fieldKey;
   final Widget? prefixIcon;
   final bool enabled;
-  final VoidCallback?
-  onDropdownOpened; // Optional callback for when dropdown is opened
+  final VoidCallback? onDropdownOpened;
 
   const CustomDropdownWidget({
     super.key,
@@ -88,117 +87,129 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
 
     final T? selectedValue = await showDialog<T?>(
       context: context,
-      barrierDismissible: true, // Allow dismissing by tapping outside
-      builder:
-          (context) => Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
-                minWidth: double.infinity,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header with title and close button
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Select ${widget.label}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+            minWidth: double.infinity,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with title and close button
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Select ${widget.label}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${widget.items.length} items - scroll for more',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.pop(context, null),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Scrollable list with scrollbar
+              Flexible(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    scrollbarTheme: Theme.of(context).scrollbarTheme.copyWith(
+                      thumbColor: MaterialStateProperty.all(Colors.blue),
+                    ),
+                  ),
+                  child: Scrollbar(
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    thickness: 6.0,
+                    radius: const Radius.circular(10),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        // Clear option
+                        ListTile(
+                          title: Text(
+                            'Clear selection',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context, null);
+                          },
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.grey),
-                          onPressed: () => Navigator.pop(context, null),
+                        // Regular items
+                        ...widget.items.map(
+                          (item) => ListTile(
+                            title: Text(
+                              widget.itemToString(item),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            onTap: () {
+                              Navigator.pop(context, item);
+                            },
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(height: 1),
-                  // Scrollable list with scrollbar
-                  Flexible(
-                    child: Theme(
-                      data: Theme.of(context).copyWith(
-                        scrollbarTheme: Theme.of(
-                          context,
-                        ).scrollbarTheme.copyWith(
-                          thumbColor: MaterialStateProperty.all(Colors.blue),
-                        ),
-                      ),
-                      child: Scrollbar(
-                        thumbVisibility: true,
-                        trackVisibility: true,
-                        thickness: 6.0,
-                        radius: const Radius.circular(10),
-                        child: ListView(
-                          shrinkWrap: true,
-                          children: [
-                            // Clear option
-                            ListTile(
-                              title: Text(
-                                'Clear selection',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context, null);
-                              },
-                            ),
-                            // Regular items
-                            ...widget.items.map(
-                              (item) => ListTile(
-                                title: Text(
-                                  widget.itemToString(item),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                onTap: () {
-                                  Navigator.pop(context, item);
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+        ),
+      ),
     );
 
     if (selectedValue != null || selectedValue == null) {
       widget.onChanged?.call(selectedValue);
-      field.didChange(selectedValue); // Update FormField state
+      field.didChange(selectedValue);
       if (mounted) {
         setState(() {
-          _isFocused = false; // Reset focus state after selection
+          _isFocused = false;
         });
       }
       if (widget.fieldKey?.currentState != null) {
         widget.fieldKey!.currentState!.validate();
       }
-      // Ensure no text field gains focus after selection
       FocusScope.of(context).unfocus();
     }
   }
@@ -223,8 +234,7 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
       child: FormField<T>(
         key: widget.fieldKey,
         initialValue: widget.value,
-        validator:
-            widget.validator ??
+        validator: widget.validator ??
             (value) {
               if (widget.isRequired && value == null) {
                 return 'Please select ${widget.label.toLowerCase()}';
@@ -234,15 +244,12 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
         onSaved: widget.onChanged,
         builder: (FormFieldState<T> field) {
           return GestureDetector(
-            onTap:
-                widget.enabled
-                    ? () {
-                      // Unfocus any text field and request focus for dropdown
-                      FocusManager.instance.primaryFocus?.unfocus();
-
-                      _showDropdownDialog(context, field);
-                    }
-                    : null,
+            onTap: widget.enabled
+                ? () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    _showDropdownDialog(context, field);
+                  }
+                : null,
             child: InputDecorator(
               decoration: InputDecoration(
                 hintText: !hasValue ? _placeholderText : null,
@@ -251,22 +258,19 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
                   color: Colors.grey.shade500,
                   fontWeight: FontWeight.w400,
                 ),
-                labelText:
-                    widget.isRequired ? '${widget.label} *' : widget.label,
+                labelText: widget.isRequired ? '${widget.label} *' : widget.label,
                 labelStyle: TextStyle(
                   fontSize: 12,
-                  color:
-                      _isFocused ? Palette.primaryblue : Colors.grey.shade600,
+                  color: _isFocused ? Palette.primaryblue : Colors.grey.shade600,
                   fontWeight: FontWeight.w600,
                 ),
                 floatingLabelBehavior: FloatingLabelBehavior.always,
-                prefixIcon:
-                    widget.prefixIcon != null
-                        ? Container(
-                          margin: const EdgeInsets.all(8),
-                          child: widget.prefixIcon,
-                        )
-                        : null,
+                prefixIcon: widget.prefixIcon != null
+                    ? Container(
+                        margin: const EdgeInsets.all(8),
+                        child: widget.prefixIcon,
+                      )
+                    : null,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: widget.prefixIcon != null ? 8 : 16,
                   vertical: 14,
@@ -295,10 +299,9 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
                   borderSide: const BorderSide(color: Colors.red, width: 2),
                 ),
                 filled: true,
-                fillColor:
-                    widget.enabled
-                        ? (_isFocused ? Colors.white : Colors.grey.shade50)
-                        : Colors.grey.shade100,
+                fillColor: widget.enabled
+                    ? (_isFocused ? Colors.white : Colors.grey.shade50)
+                    : Colors.grey.shade100,
                 errorText: field.errorText,
               ),
               child: Row(
@@ -309,8 +312,7 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
                       style: TextStyle(
                         fontSize: 15,
                         color: hasValue ? Colors.black87 : Colors.grey.shade500,
-                        fontWeight:
-                            hasValue ? FontWeight.w500 : FontWeight.w400,
+                        fontWeight: hasValue ? FontWeight.w500 : FontWeight.w400,
                       ),
                     ),
                   ),
@@ -318,10 +320,7 @@ class _CustomDropdownWidgetState<T> extends State<CustomDropdownWidget<T>> {
                     margin: const EdgeInsets.only(right: 4),
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color:
-                          _isFocused
-                              ? Palette.primaryblue
-                              : Colors.grey.shade600,
+                      color: _isFocused ? Palette.primaryblue : Colors.grey.shade600,
                       size: 22,
                     ),
                   ),

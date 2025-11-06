@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -86,7 +87,8 @@ class PostReviewResponse {
   factory PostReviewResponse.fromJson(Map<String, dynamic> json) {
     return PostReviewResponse(
       status: json['status'] == 'true',
-      data: (json['data'] as List<dynamic>?)
+      data:
+          (json['data'] as List<dynamic>?)
               ?.map((item) => PostReview.fromJson(item))
               .toList() ??
           [],
@@ -147,20 +149,19 @@ class _RealEstateProductDetailsPageState
   bool _isLoadingGallery = true;
   List<String> _galleryImages = [];
   String _galleryError = '';
-bool isLoadingReviews = false;
-String reviewsError = "No answers available";
+  bool isLoadingReviews = false;
+  String reviewsError = "No answers available";
 
   String? _bannerImageUrl;
   bool _isLoadingBanner = false;
   String _bannerError = '';
   String _moveToAuctionButtonText = 'Move to Auction';
 
-
   List<PostReview> reviews = [];
 
   List<PostReview> _questions = [];
-bool _isLoadingQuestions = true;
-String _questionsError = '';
+  bool _isLoadingQuestions = true;
+  String _questionsError = '';
 
   @override
   void initState() {
@@ -183,45 +184,48 @@ String _questionsError = '';
     ]);
   }
 
-Future<void> _fetchQuestions() async {
-  setState(() {
-    _isLoadingQuestions = true;
-    _questionsError = '';
-  });
-
-  try {
-    final url = '$_baseUrl/post-reviews.php?token=$_token&post_id=${widget.product.id}';
-    print('Fetching questions: $url');
-
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {'token': _token},
-    );
-
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      final reviewResponse = PostReviewResponse.fromJson(responseData);
-
-      if (reviewResponse.status) {
-        setState(() {
-          _questions = reviewResponse.data;
-          _isLoadingQuestions = false;
-        });
-        print('Fetched ${_questions.length} questions');
-      } else {
-        throw Exception('API returned status false: ${responseData['code']}');
-      }
-    } else {
-      throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
-    }
-  } catch (e) {
-    print('Error fetching questions: $e');
+  Future<void> _fetchQuestions() async {
     setState(() {
-      _questionsError = 'Failed to load questions: $e';
-      _isLoadingQuestions = false;
+      _isLoadingQuestions = true;
+      _questionsError = '';
     });
+
+    try {
+      final url =
+          '$_baseUrl/post-reviews.php?token=$_token&post_id=${widget.product.id}';
+      print('Fetching questions: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'token': _token},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final reviewResponse = PostReviewResponse.fromJson(responseData);
+
+        if (reviewResponse.status) {
+          setState(() {
+            _questions = reviewResponse.data;
+            _isLoadingQuestions = false;
+          });
+          print('Fetched ${_questions.length} questions');
+        } else {
+          throw Exception('API returned status false: ${responseData['code']}');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      print('Error fetching questions: $e');
+      setState(() {
+        _questionsError = 'Failed to load questions: $e';
+        _isLoadingQuestions = false;
+      });
+    }
   }
-}
 
   Future<bool> _checkAuctionTermsStatus() async {
     if (_userProvider.userId == null) {
@@ -704,7 +708,37 @@ Future<void> _fetchQuestions() async {
       });
     }
   }
+Widget _buildSellerCommentsSection() {
+  // Filter out comments that should be in details section
+  final validComments = uniqueSellerComments.where((comment) {
+    final name = comment.attributeName.toLowerCase().trim();
+    return ![
+      'seller type',
+      'auction starting price', 
+      'auction attempts',
+    ].contains(name);
+  }).toList();
 
+  // Double check for any remaining null/empty values
+  final filteredComments = validComments.where((comment) {
+    final value = comment.attributeValue?.trim() ?? '';
+    return value.isNotEmpty && 
+           value.toLowerCase() != 'null' && 
+           value.toLowerCase() != 'n/a' &&
+           value.toLowerCase() != 'not specified';
+  }).toList();
+
+  if (filteredComments.isEmpty) {
+    return const SizedBox.shrink(); // Hide completely if no valid comments
+  }
+
+  return Column(
+    children: filteredComments.map((comment) => _buildSellerCommentItem(
+      comment.attributeName,
+      comment.attributeValue,
+    )).toList(),
+  );
+}
   void _launchPhoneCall() async {
     const phoneNumber = 'tel:+919626040738';
     if (await canLaunchUrl(Uri.parse(phoneNumber))) {
@@ -1501,7 +1535,6 @@ Future<void> _fetchQuestions() async {
       },
     );
 
-   
     FocusScope.of(context).unfocus();
     _bidController.dispose();
 
@@ -1533,7 +1566,27 @@ Future<void> _fetchQuestions() async {
       },
     );
   }
+ Future<void> _fetchSellerProfileImage() async {
+    try {
+      // Use the same endpoint as EditProfilePage
+      final response = await ApiService().get(
+        url: userDetails, // Use the same userDetails endpoint
+        queryParams: {"user_id": createdBy},
+      );
 
+      if (response['status'] == true && response['code'] == 200) {
+        final userData = UserData.fromJson(response['data'][0]);
+        setState(() {
+          sellerProfileImage =
+              (userData.image?.isNotEmpty ?? false)
+                  ? "$getImageFromServer${userData.image}"
+                  : '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile image: $e');
+    }
+  }
   Future<void> _toggleFavorite() async {
     if (userId == null || userId == 'Unknown') {
       _showLoginPromptDialog(context, 'add or remove from shortlist');
@@ -1805,7 +1858,7 @@ Future<void> _fetchQuestions() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/post-seller-information.php?token=$_token&user_id=${widget.product.createdBy}',
+          'https://lelamonline.com/admin/api/v1/post-seller-information.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=$createdBy',
         ),
       );
 
@@ -1817,11 +1870,13 @@ Future<void> _fetchQuestions() async {
           final data = jsonResponse['data'][0];
           setState(() {
             sellerName = data['name'] ?? 'Unknown';
-            sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
-            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
+
+          // ADD THIS LINE - Call the profile image method
+          await _fetchSellerProfileImage();
         } else {
           setState(() {
             sellerErrorMessage = 'Invalid seller data';
@@ -1841,6 +1896,7 @@ Future<void> _fetchQuestions() async {
       });
     }
   }
+
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -1887,7 +1943,7 @@ Future<void> _fetchQuestions() async {
         Uri.parse(url),
         headers: {'token': _token},
       );
-      print('Raw attributes API response: ${response.body}'); // Add this line
+      print('Raw attributes API response: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
@@ -1898,52 +1954,71 @@ Future<void> _fetchQuestions() async {
         final List<SellerComment> orderedComments = [];
 
         for (var comment in sellerComments.data) {
-          final key = comment.attributeName.toLowerCase().replaceAll(
-            RegExp(r'\s+'),
-            '',
-          );
-          if (!uniqueAttributes.containsKey(key)) {
-            uniqueAttributes[key] = comment;
-            orderedComments.add(comment);
+          // Filter out comments with null or empty values
+          final value = comment.attributeValue?.trim() ?? '';
+          if (value.isNotEmpty &&
+              value.toLowerCase() != 'null' &&
+              value.toLowerCase() != 'n/a' &&
+              value.toLowerCase() != 'not specified') {
+            final key = comment.attributeName.toLowerCase().replaceAll(
+              RegExp(r'\s+'),
+              '',
+            );
+            if (!uniqueAttributes.containsKey(key)) {
+              uniqueAttributes[key] = comment;
+              orderedComments.add(comment);
+            }
           }
         }
 
+        // Add seller type only if it's meaningful
+        final sellerTypeValue =
+            widget.product.byDealer == '1' ? 'Dealer' : 'Owner';
         orderedComments.add(
           SellerComment(
             attributeName: 'Seller Type',
-            attributeValue: widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+            attributeValue: sellerTypeValue,
           ),
         );
         uniqueAttributes['sellertype'] = SellerComment(
           attributeName: 'Seller Type',
-          attributeValue: widget.product.byDealer == '1' ? 'Dealer' : 'Owner',
+          attributeValue: sellerTypeValue,
         );
 
         if (widget.isAuction) {
-          orderedComments.add(
-            SellerComment(
+          // Add auction details only if they have meaningful values
+          final startingPrice =
+              widget.product.auctionStartingPrice?.trim() ?? '';
+          if (startingPrice.isNotEmpty && startingPrice != '0') {
+            orderedComments.add(
+              SellerComment(
+                attributeName: 'Auction Starting Price',
+                attributeValue: formatPriceInt(
+                  double.tryParse(startingPrice) ?? 0,
+                ),
+              ),
+            );
+            uniqueAttributes['auctionstartingprice'] = SellerComment(
               attributeName: 'Auction Starting Price',
               attributeValue: formatPriceInt(
-                double.tryParse(widget.product.auctionStartingPrice) ?? 0,
+                double.tryParse(startingPrice) ?? 0,
               ),
-            ),
-          );
-          orderedComments.add(
-            SellerComment(
+            );
+          }
+
+          final auctionAttempt = widget.product.auctionAttempt?.trim() ?? '';
+          if (auctionAttempt.isNotEmpty && auctionAttempt != '0') {
+            orderedComments.add(
+              SellerComment(
+                attributeName: 'Auction Attempts',
+                attributeValue: auctionAttempt,
+              ),
+            );
+            uniqueAttributes['auctionattempts'] = SellerComment(
               attributeName: 'Auction Attempts',
-              attributeValue: widget.product.auctionAttempt,
-            ),
-          );
-          uniqueAttributes['auctionstartingprice'] = SellerComment(
-            attributeName: 'Auction Starting Price',
-            attributeValue: formatPriceInt(
-              double.tryParse(widget.product.auctionStartingPrice) ?? 0,
-            ),
-          );
-          uniqueAttributes['auctionattempts'] = SellerComment(
-            attributeName: 'Auction Attempts',
-            attributeValue: widget.product.auctionAttempt,
-          );
+              attributeValue: auctionAttempt,
+            );
+          }
         }
 
         setState(() {
@@ -1958,7 +2033,7 @@ Future<void> _fetchQuestions() async {
               }).toList();
 
           print(
-            'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
+            'Filtered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
           print(
             'Filtered detailComments: ${detailComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
@@ -2514,175 +2589,180 @@ Future<void> _fetchQuestions() async {
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'Ask a question about this product',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Ask a question about this product',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => LoginDialog(
-                    onSuccess: () {
-                      Navigator.of(dialogContext).pop();
-                      showDialog(
-                        context: context,
-                        builder: (context) => ReviewDialog(postId: id),
-                      );
-                    },
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Answers section WITHOUT container styling
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    "",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
+                )
+              else if (reviews.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: const Text(
+                    '',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                // Show answers directly without any container
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount:
+                      reviews.where((review) => review.parentId == '0').length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final parent =
+                        reviews
+                            .where((review) => review.parentId == '0')
+                            .toList()[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReviewItem(parent, isReply: false),
+                        // Show replies indented
+                        ...reviews
+                            .where((reply) => reply.parentId == parent.id)
+                            .map(
+                              (reply) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 32.0,
+                                  top: 8.0,
+                                ),
+                                child: _buildReviewItem(reply, isReply: true),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewItem(PostReview review, {required bool isReply}) {
+    return Padding(
+      padding: EdgeInsets.only(left: isReply ? 16.0 : 0.0, bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
+            size: 16,
+            color: Colors.grey[700],
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
+                Text(
+                  review.comment,
+                  style: TextStyle(
+                    fontSize: isReply ? 14 : 16,
+                    color: Colors.black,
+                    fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
+                  ),
+                  semanticsLabel: 'Comment: ${review.comment}',
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Posted on: ${review.createdOn}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ],
             ),
           ),
         ],
       ),
-      const SizedBox(height: 12),
-      
-      // Answers section WITHOUT container styling
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (isLoadingReviews)
-              const Center(child: CircularProgressIndicator())
-            else if (reviewsError.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color.fromARGB(255, 192, 187, 187),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (reviews.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(
-                  '',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              // Show answers directly without any container
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: reviews.where((review) => review.parentId == '0').length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildReviewItem(parent, isReply: false),
-                      // Show replies indented
-                      ...reviews
-                          .where((reply) => reply.parentId == parent.id)
-                          .map(
-                            (reply) => Padding(
-                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
-                              child: _buildReviewItem(reply, isReply: true),
-                            ),
-                          )
-                          .toList(),
-                    ],
-                  );
-                },
-              ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-Widget _buildReviewItem(PostReview review, {required bool isReply}) {
-  return Padding(
-    padding: EdgeInsets.only(
-      left: isReply ? 16.0 : 0.0,
-      bottom: 8.0,
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          isReply ? Icons.subdirectory_arrow_right : Icons.question_answer,
-          size: 16,
-          color: Colors.grey[700],
-        ),
-        SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                review.comment,
-                style: TextStyle(
-                  fontSize: isReply ? 14 : 16,
-                  color: Colors.black,
-                  fontStyle: isReply ? FontStyle.italic : FontStyle.normal,
-                ),
-                semanticsLabel: 'Comment: ${review.comment}',
-              ),
-              SizedBox(height: 4),
-              Text(
-                'Posted on: ${review.createdOn}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
   String _stripHtmlTags(String htmlString) {
     return htmlString.replaceAll(RegExp(r'<[^>]*>'), '').trim();
@@ -2882,45 +2962,48 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                         ),
                       ),
                       const SizedBox(height: 8),
-                     Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Row(
-      children: [
-        const Icon(
-          Icons.location_on,
-          size: 16,
-          color: Colors.grey,
-        ),
-        const SizedBox(width: 4),
-        _isLoadingLocations
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
-              )
-            : Text(
-                landMark, // This shows the district from parent_zone_id
-                style: const TextStyle(color: Colors.grey),
-              ),
-      ],
-    ),
-    const SizedBox(height: 4),
-    Padding(
-      padding: const EdgeInsets.only(left: 20.0), // Indent to align with icon
-      child: Text(
-        widget.product.landMark ?? 'Landmark not specified', // This shows the actual landmark
-        style: const TextStyle(
-          color: Colors.grey,
-          fontSize: 14,
-        ),
-      ),
-    ),
-    const SizedBox(height: 8),
-  ],
-),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              _isLoadingLocations
+                                  ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Text(
+                                    landMark, // This shows the district from parent_zone_id
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 20.0,
+                            ), // Indent to align with icon
+                            child: Text(
+                              widget.product.landMark ??
+                                  'Landmark not specified', // This shows the actual landmark
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         widget.isAuction
@@ -3130,34 +3213,8 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                             style: const TextStyle(color: Colors.red),
                           ),
                         )
-                      else if (uniqueSellerComments.isEmpty)
-                        const Center(
-                          child: Text('No seller comments available'),
-                        )
                       else
-                        Column(
-                          children:
-                              uniqueSellerComments
-                                  .where(
-                                    (comment) =>
-                                        ![
-                                          'seller type',
-                                          'auction starting price',
-                                          'auction attempts',
-                                        ].contains(
-                                          comment.attributeName
-                                              .toLowerCase()
-                                              .trim(),
-                                        ),
-                                  )
-                                  .map(
-                                    (comment) => _buildSellerCommentItem(
-                                      comment.attributeName,
-                                      comment.attributeValue,
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
+                        _buildSellerCommentsSection(), // Use the new method below
                     ],
                   ),
                 ),
@@ -3228,7 +3285,6 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
             right: 0,
             bottom: 0,
             child: Container(
-              
               decoration: const BoxDecoration(),
               child: Row(
                 children: [
@@ -3236,8 +3292,8 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                      context.pushNamed(RouteNames.sellStatusPage);
-                    },
+                          context.pushNamed(RouteNames.sellStatusPage);
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
@@ -3249,7 +3305,7 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                         child: const Text('Edit'),
                       ),
                     ),
-                  
+
                     Expanded(
                       child: ElevatedButton(
                         onPressed: _isLoadingBid ? null : _moveToAuction,
@@ -3291,7 +3347,7 @@ Widget _buildReviewItem(PostReview review, {required bool isReply}) {
                         child: const Text('Place Bid'),
                       ),
                     ),
-                
+
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _showMeetingDialog(context),

@@ -501,7 +501,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             final owners = attributeValues['No of owners'] ?? 'N/A';
                             final transmission = attributeValues['Transmission'] ?? 'N/A';
                             final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
-                            final kmRange = attributeValues['KM Range'] ?? 'N/A';
+                            final kmDriven = attributeValues['KM Driven'] ?? 'N/A';
 
                             if (isFetching && attributeValues.isEmpty) {
                               return const SizedBox(
@@ -520,8 +520,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                   _buildDetailChip(Icons.calendar_today, year),
                                 if (owners != 'N/A')
                                   _buildDetailChip(Icons.person, _getOwnerText(owners)),
-                                if (kmRange != 'N/A')
-                                  _buildDetailChip(Icons.speed, _formatKmRange(kmRange)),
+                                if (kmDriven != 'N/A')
+                                  _buildDetailChip(Icons.speed, _formatKmRange(kmDriven)),
                                 if (fuelType != 'N/A')
                                   _buildDetailChip(Icons.local_gas_station, fuelType),
                                 if (transmission != 'N/A')

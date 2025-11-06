@@ -44,6 +44,7 @@ dependencies:
   shared_preferences: ^2.5.3
   onesignal_flutter: ^5.3.4
   awesome_notifications: ^0.10.1
+  flutter_meta_sdk: ^1.0.5
 
 
 dev_dependencies:

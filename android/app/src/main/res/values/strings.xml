@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Your existing app name -->
+    <string name="app_name">lelamonline_flutter</string>
+    
+    <!-- 🔥 ADD META (FACEBOOK) CONFIGURATION HERE -->
+    <string name="facebook_app_id">1079168567710478</string>
+    <string name="facebook_client_token">68d0789d5248f589035b684de7d7c637</string>
+    <string name="fb_login_protocol_scheme">fb1079168567710478</string>
+</resources>

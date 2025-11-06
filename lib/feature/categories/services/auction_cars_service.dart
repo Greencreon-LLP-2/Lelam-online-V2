@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
@@ -7,63 +8,95 @@ class AuctionService {
   static const String token = '5cb2c9b569416b5db1604e0e12478ded';
 
   // Fetch bid history
-Future<List<Map<String, dynamic>>> fetchBidHistory(String postId) async {
-  final url = '$baseUrl/auction-bid-history.php?token=$token&post_id=$postId';
-  try {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
-        return List<Map<String, dynamic>>.from(jsonResponse['data']).map((bid) {
-          return {
-            'bidder': bid['user_name'] ?? 'Unknown',
-            'amount': '₹${NumberFormat('#,##0').format(double.tryParse(bid['amount'] ?? '0')?.toInt() ?? 0)}',
-            'time': 'N/A', // Set to 'N/A' since API doesn't provide timestamp
-          };
-        }).toList();
-      } else if (jsonResponse['data'] == 'No one yet placed a bid !') {
-        return [];
-      } else {
-        throw Exception('Invalid bid history response');
-      }
-    } else {
-      throw Exception('Failed to load bid history: ${response.statusCode}');
-    }
-  } catch (e) {
-    print('Error fetching bid history: $e');
-    throw Exception('Error fetching bid history: $e');
-  }
-}
-  // Fetch minimum bid increment
-  Future<int> fetchMinBidIncrement(String postId) async {
-    final url = '$baseUrl/auction-increase-min-bid-value.php?token=$token&post_id=$postId';
+  Future<List<Map<String, dynamic>>> fetchBidHistory(String postId) async {
+    final url = '$baseUrl/auction-bid-history.php?token=$token&post_id=$postId';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == 'true' && jsonResponse['data'] is int) {
-          return jsonResponse['data'];
+        if (jsonResponse['status'] == true && jsonResponse['data'] is List) {
+          return List<Map<String, dynamic>>.from(jsonResponse['data']).map((
+            bid,
+          ) {
+            return {
+              'bidder': bid['user_name'] ?? 'Unknown',
+              'amount':
+                  '₹${NumberFormat('#,##0').format(double.tryParse(bid['amount'] ?? '0')?.toInt() ?? 0)}',
+              'time': 'N/A', // Set to 'N/A' since API doesn't provide timestamp
+            };
+          }).toList();
+        } else if (jsonResponse['data'] == 'No one yet placed a bid !') {
+          return [];
         } else {
-          throw Exception('Invalid minimum bid increment response');
+          throw Exception('Invalid bid history response');
         }
       } else {
-        throw Exception('Failed to load min bid increment: ${response.statusCode}');
+        throw Exception('Failed to load bid history: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching min bid increment: $e');
-      throw Exception('Error fetching min bid increment: $e');
+      print('Error fetching bid history: $e');
+      throw Exception('Error fetching bid history: $e');
+    }
+  }
+
+  // Fetch minimum bid increment
+  // Update this method in your AuctionService class
+  Future<double> fetchMinBidIncrement(String postId) async {
+    final url =
+        '$baseUrl/auction-increase-min-bid-value.php?token=$token&post_id=$postId';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        debugPrint('Min Bid Increment API Response: $jsonResponse');
+
+        if (jsonResponse['status'] == 'true') {
+          // Handle different possible response formats
+          if (jsonResponse['data'] is int) {
+            return jsonResponse['data'].toDouble();
+          } else if (jsonResponse['data'] is double) {
+            return jsonResponse['data'];
+          } else if (jsonResponse['data'] is String) {
+            return double.tryParse(jsonResponse['data']) ?? 0.0;
+          } else if (jsonResponse['data'] is Map) {
+            // If data is a map, look for common field names
+            final data = jsonResponse['data'] as Map;
+            final value =
+                data['min_bid_increment'] ??
+                data['min_bid'] ??
+                data['increment'] ??
+                data['value'] ??
+                0;
+            return double.tryParse(value.toString()) ?? 0.0;
+          } else {
+            return 0.0;
+          }
+        } else {
+          debugPrint('API returned false status: ${jsonResponse['message']}');
+          return 0.0;
+        }
+      } else {
+        throw Exception(
+          'Failed to load min bid increment: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fetching min bid increment: $e');
+      return 0.0; // Return default value instead of throwing
     }
   }
 
   // Place a bid
   Future<bool> placeBid(String postId, String userId, int bidAmount) async {
-    final url = '$baseUrl/auction-increase-min-bid.php?token=$token&post_id=$postId&user_id=$userId&bidamt=$bidAmount';
+    final url =
+        '$baseUrl/auction-increase-min-bid.php?token=$token&post_id=$postId&user_id=$userId&bidamt=$bidAmount';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List) {
-          return jsonResponse['data'][0]['message'] == 'Your Bid Amount Successfully Placed.';
+          return jsonResponse['data'][0]['message'] ==
+              'Your Bid Amount Successfully Placed.';
         } else {
           throw Exception('Invalid bid response');
         }
@@ -78,13 +111,15 @@ Future<List<Map<String, dynamic>>> fetchBidHistory(String postId) async {
 
   // Agree to bidding
   Future<bool> agreeToBidding(String postId, String userId) async {
-    final url = '$baseUrl/auction-agree-bidding.php?token=$token&post_id=$postId&user_id=$userId';
+    final url =
+        '$baseUrl/auction-agree-bidding.php?token=$token&post_id=$postId&user_id=$userId';
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List) {
-          return jsonResponse['data'][0]['message'] == 'You Agree Bid and Procced Meeting also Product moved to Market place';
+          return jsonResponse['data'][0]['message'] ==
+              'You Agree Bid and Procced Meeting also Product moved to Market place';
         } else {
           throw Exception('Invalid agree bidding response');
         }

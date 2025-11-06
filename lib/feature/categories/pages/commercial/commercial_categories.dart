@@ -187,32 +187,138 @@ class MarketplaceService {
   }) async {
     final url =
         '$baseUrl/list-category-post-marketplace.php?token=$token&category_id=$categoryId&user_zone_id=$userZoneId';
+
     try {
       final response = await http.get(Uri.parse(url));
+      developer.log(
+        'API Response for location $userZoneId: ${response.statusCode} - ${response.body}',
+      );
+
       if (response.statusCode == 200) {
         final decodedBody = jsonDecode(response.body);
-        if (decodedBody is List) {
-          return decodedBody.map((json) {
-            try {
-              return MarketplacePost.fromJson(json);
-            } catch (e) {
-              print('Error parsing post: $e');
-              print('Problematic JSON: $json');
-              throw Exception('Failed to parse post: $e');
+        developer.log('Decoded response type: ${decodedBody.runtimeType}');
+        developer.log('Decoded response: $decodedBody');
+
+        // Handle string responses first
+        if (decodedBody is String) {
+          developer.log('String response detected: $decodedBody');
+          if (decodedBody.toLowerCase().contains('null') ||
+              decodedBody.toLowerCase().contains('no data') ||
+              decodedBody.isEmpty ||
+              decodedBody == '[]') {
+            developer.log('No posts found - returning empty list');
+            return [];
+          }
+          // Try to parse the string as JSON again in case it's a JSON string
+          try {
+            final redecoded = jsonDecode(decodedBody);
+            if (redecoded is List) {
+              return redecoded
+                  .map((json) => MarketplacePost.fromJson(json))
+                  .toList();
+            } else if (redecoded is Map && redecoded.containsKey('data')) {
+              final data = redecoded['data'];
+              if (data is List) {
+                return data
+                    .map((json) => MarketplacePost.fromJson(json))
+                    .toList();
+              }
             }
-          }).toList();
-        } else if (decodedBody is Map && decodedBody.containsKey('data')) {
-          final data = decodedBody['data'] as List;
-          return data.map((json) => MarketplacePost.fromJson(json)).toList();
-        } else {
-          throw Exception('Unexpected API response format');
+          } catch (e) {
+            developer.log('Failed to re-decode string response: $e');
+            return [];
+          }
+          return [];
         }
+
+        // Handle Map responses
+        if (decodedBody is Map<String, dynamic>) {
+          developer.log('Map response detected with keys: ${decodedBody.keys}');
+
+          // Check for error or empty responses
+          if (decodedBody.containsKey('status') &&
+              decodedBody['status'] == false) {
+            developer.log('API returned false status - no posts');
+            return [];
+          }
+
+          if (decodedBody.containsKey('data')) {
+            final data = decodedBody['data'];
+            if (data == null ||
+                data == 'null' ||
+                (data is String && data.isEmpty)) {
+              developer.log('Null or empty data field');
+              return [];
+            }
+            if (data is List) {
+              return data
+                  .map((json) => MarketplacePost.fromJson(json))
+                  .toList();
+            }
+            if (data is String) {
+              // Data is a string that might contain JSON
+              try {
+                final parsedData = jsonDecode(data);
+                if (parsedData is List) {
+                  return parsedData
+                      .map((json) => MarketplacePost.fromJson(json))
+                      .toList();
+                }
+              } catch (e) {
+                developer.log('Failed to parse data string: $e');
+                return [];
+              }
+            }
+          }
+
+          // If map doesn't have data but might be a direct list in another key
+          for (final key in decodedBody.keys) {
+            if (decodedBody[key] is List) {
+              return (decodedBody[key] as List)
+                  .map((json) => MarketplacePost.fromJson(json))
+                  .toList();
+            }
+          }
+
+          developer.log('Unexpected map structure: $decodedBody');
+          return [];
+        }
+
+        // Handle List responses
+        if (decodedBody is List) {
+          developer.log(
+            'List response detected with ${decodedBody.length} items',
+          );
+          return decodedBody
+              .map((json) {
+                try {
+                  return MarketplacePost.fromJson(json);
+                } catch (e) {
+                  developer.log('Error parsing post: $e');
+                  developer.log('Problematic JSON: $json');
+                  return MarketplacePost.fromJson(
+                    {},
+                  ); // Return empty post instead of throwing
+                }
+              })
+              .where((post) => post.id.isNotEmpty)
+              .toList(); // Filter out empty posts
+        }
+
+        // Handle other unexpected formats
+        developer.log(
+          'Unexpected response format: ${decodedBody.runtimeType} - $decodedBody',
+        );
+        return [];
       } else {
+        developer.log('HTTP error ${response.statusCode}: ${response.body}');
         throw Exception('Failed to load posts: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in fetchPosts: $e');
-      throw Exception('Error fetching posts: $e');
+      developer.log('Error in fetchPosts: $e');
+      developer.log('Stack trace: ${e.toString()}');
+      // Don't throw exception, return empty list instead
+      return [];
     }
   }
 }
@@ -419,23 +525,35 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
       _errorMessage = null;
       _filtersChanged = true;
     });
+
     try {
       final locationProvider = context.read<LocationProvider>();
+      final String userZoneId =
+          locationProvider.selectedLocationId == 'all'
+              ? '0'
+              : locationProvider.selectedLocationId;
+
+      developer.log('Fetching posts for location: $userZoneId');
+
       final posts = await _marketplaceService.fetchPosts(
         categoryId: categoryId,
-        userZoneId:
-            locationProvider.selectedLocationId == 'all'
-                ? '0'
-                : locationProvider.selectedLocationId,
+        userZoneId: userZoneId,
       );
+
+      developer.log('Fetched ${posts.length} posts');
+
       setState(() {
         _posts = posts;
+        _filtersChanged = true;
         _isLoading = false;
+        _errorMessage = null;
       });
     } catch (e) {
+      developer.log('Error in _fetchPosts: $e');
       setState(() {
-        _errorMessage = e.toString();
+        _posts = [];
         _isLoading = false;
+        _errorMessage = 'Failed to load vehicles. Please try again.';
       });
     }
   }
@@ -1258,22 +1376,28 @@ class _CommercialVehiclesPageState extends State<CommercialVehiclesPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.error,
+                            Icons
+                                .location_off, // More appropriate icon for no location results
                             size: 64,
                             color: Colors.grey.shade400,
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Error: $_errorMessage',
+                            'No properties in this location',
                             style: TextStyle(
                               fontSize: 18,
                               color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _fetchPosts,
-                            child: const Text('Retry'),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try selecting a different location or adjust your filters',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),

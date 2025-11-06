@@ -448,7 +448,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     String bidId,
     String postId,
   ) async {
-    print('Opening time dialog for bid_id: $bidId, post_id: $postId');
+    print('Opening date and time dialog for bid_id: $bidId, post_id: $postId');
 
     final bid = bids.firstWhere(
       (b) => b['id'] == bidId && b['post_id'] == postId,
@@ -464,6 +464,22 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
       return;
     }
 
+    // Step 1: Select Date
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (selectedDate == null) {
+      print('Date selection cancelled');
+      return; // User cancelled date selection
+    }
+
+    print('Selected date: $selectedDate');
+
+    // Step 2: Select Time
     final meetingTimes = await _fetchMeetingTimes();
     if (meetingTimes.isEmpty) {
       print('No meeting times available');
@@ -527,12 +543,16 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                               ? null
                               : () async {
                                 print(
-                                  'Submitting meeting time: $selectedTimeValue for bid_id: $bidId',
+                                  'Submitting meeting - Date: $selectedDate, Time: $selectedTimeValue for bid_id: $bidId',
                                 );
                                 try {
                                   final userIdToUse = widget.userId ?? _userId;
+                                  // Format date as yyyy/MM/dd
+                                  final meetingDate = DateFormat(
+                                    'yyyy/MM/dd',
+                                  ).format(selectedDate);
                                   final requestUrl =
-                                      '${widget.baseUrl}/procced-meeting-with-bid.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId&customerbid_id=$bidId&meeting_times=$selectedTimeValue';
+                                      '${widget.baseUrl}/procced-meeting-with-bid.php?token=${widget.token}&user_id=$userIdToUse&post_id=$postId&customerbid_id=$bidId&meeting_times=$selectedTimeValue&meeting_date=$meetingDate';
                                   print('Request URL: $requestUrl');
                                   final response = await http.get(
                                     Uri.parse(requestUrl),
@@ -581,27 +601,30 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              'Meeting scheduled for $selectedTimeName',
+                                              'Meeting scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)} at $selectedTimeName',
                                             ),
                                           ),
                                         );
                                         await _forceRefresh();
+
+                                        // NAVIGATE TO MEETINGS PAGE AFTER SUCCESS
                                         print(
-                                          'Meeting scheduled, navigating to My Meetings tab with Meeting Request',
+                                          'Meeting scheduled, navigating to My Meetings tab',
                                         );
-                                        context.pushNamed(
-                                          RouteNames.buyingStatusPage,
-                                          queryParameters: {
-                                            'initialTab':
-                                                '1', // Select "My Meetings" tab
-                                            'initialStatus':
-                                                'Meeting Request', // Set to "Meeting Request" status
-                                            'postId': postId,
-                                            'bidId': bidId,
-                                            'forceRefresh':
-                                                'true', // Add flag to force refresh
-                                          },
-                                        );
+                                        if (mounted) {
+                                          context.pushNamed(
+                                            RouteNames.buyingStatusPage,
+                                            queryParameters: {
+                                              'initialTab':
+                                                  '1', // Select "My Meetings" tab
+                                              'initialStatus':
+                                                  'Meeting Request', // Set to "Meeting Request" status
+                                              'postId': postId,
+                                              'bidId': bidId,
+                                              'forceRefresh': 'true',
+                                            },
+                                          );
+                                        }
                                       }
                                     } else {
                                       ScaffoldMessenger.of(
@@ -638,7 +661,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
                                 }
                                 Navigator.pop(dialogContext);
                               },
-                      child: const Text('OK'),
+                      child: const Text('Schedule Meeting'),
                     ),
                   ],
                 ),
@@ -651,8 +674,24 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
     print('Post ID: $postId');
     print('User ID: $_userId');
 
+    // Step 1: Select Date Only
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+
+    if (selectedDate == null) {
+      print('Date selection cancelled');
+      return; // User cancelled date selection
+    }
+
+    print('Selected date: $selectedDate');
+
     try {
-      final meetingDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      // Format date as yyyy/MM/dd
+      final meetingDate = DateFormat('yyyy/MM/dd').format(selectedDate);
       final requestUrl =
           '${widget.baseUrl}/procced-meeting-without-bid.php?token=${widget.token}&user_id=$_userId&post_id=$postId&meeting_date=$meetingDate';
 
@@ -677,7 +716,11 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Meeting scheduled successfully')),
+              SnackBar(
+                content: Text(
+                  'Meeting scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)}',
+                ),
+              ),
             );
           }
 
@@ -688,8 +731,7 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
           // Small delay to ensure UI updates
           await Future.delayed(const Duration(milliseconds: 100));
 
-          print('=== CALLING NAVIGATION CALLBACK ===');
-          print('Callback is null: ${widget.onNavigateToMeetings == null}');
+          print('=== NAVIGATING TO MEETINGS PAGE ===');
 
           // Use the callback to navigate to meetings tab
           if (widget.onNavigateToMeetings != null) {
@@ -699,12 +741,17 @@ class _MyBidsWidgetState extends State<MyBidsWidget> {
             widget.onNavigateToMeetings!('Date Fixed', postId, null, true);
             print('=== NAVIGATION CALLBACK CALLED SUCCESSFULLY ===');
           } else {
-            print('ERROR: onNavigateToMeetings callback is null!');
+            // Fallback navigation if callback is not available
+            print('Using fallback navigation');
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Navigation failed - callback is null'),
-                ),
+              context.pushNamed(
+                RouteNames.buyingStatusPage,
+                queryParameters: {
+                  'initialTab': '1', // Select "My Meetings" tab
+                  'initialStatus': 'Date Fixed', // Set to "Date Fixed" status
+                  'postId': postId,
+                  'forceRefresh': 'true',
+                },
               );
             }
           }
@@ -1685,8 +1732,8 @@ class BidCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     isHighBid
-                        ? 'For high bid meeting, Meeting must be done in 24hrs if seller accepts the bid.'
-                        : 'For low bids, schedule a meeting to discuss further with the seller.',
+                        ? 'To proceed schedule a meeting now, Bid will be discussed after fixing meeting date'
+                        : 'Your bid is low please Increase your bid or Proceed a meeting without Bid to discuss further with seller',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.blue[700],

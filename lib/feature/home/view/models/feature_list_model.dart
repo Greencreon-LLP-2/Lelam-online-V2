@@ -83,68 +83,83 @@ class FeatureListModel {
 
   factory FeatureListModel.fromJson(Map<String, dynamic> json) {
     return FeatureListModel(
-      id: json['id'] ?? '',
-      slug: json['slug'] ?? '',
-      title: json['title'] ?? '',
-      categoryId: json['category_id'] ?? '',
-      image: json['image'] ?? '',
-      brand: json['brand'] ?? '',
-      model: json['model'] ?? '',
-      modelVariation: json['model_variation'] ?? '',
-
-      description: json['description'] ?? '',
-      price: json['price'] ?? '',
-      auctionPriceIntervel: json['auction_price_intervel'] ?? '',
-      auctionStartingPrice: json['auction_starting_price'] ?? '',
-      attributeId: List<String>.from(jsonDecode(json['attribute_id'] ?? '[]')),
-      attributeVariationsId: List<String>.from(
-        jsonDecode(json['attribute_variations_id'] ?? '[]'),
-      ),
-      filters: jsonDecode(json['filters'] ?? '{}'),
-      latitude: json['latitude'] ?? '',
-      longitude: json['longitude'] ?? '',
-      userZoneId: json['user_zone_id'] ?? '',
-      parentZoneId: json['parent_zone_id'] ?? '',
-      zoneId: json['zone_id'] ?? '',
-      landMark: json['land_mark'] ?? '',
-      ifAuction: json['if_auction'] ?? '',
-      auctionStatus: json['auction_status'] ?? '',
-      auctionStartin: json['auction_startin'] ?? '',
-      auctionEndin: json['auction_endin'] ?? '',
-      auctionAttempt: json['auction_attempt'] ?? '',
-      adminApproval: json['admin_approval'] ?? '',
-      ifFinance: json['if_finance'] ?? '',
-      ifExchange: json['if_exchange'] ?? '',
-      feature: json['feature'] ?? '',
-      status: json['status'] ?? '',
-      visiterCount: json['visiter_count'] ?? '',
-      ifSold: json['if_sold'] ?? '',
-      ifExpired: json['if_expired'] ?? '',
-      byDealer: json['by_dealer'] ?? '',
-      createdBy: json['created_by'] ?? '',
-      createdOn: json['created_on'] ?? '',
-      updatedOn: json['updated_on'] ?? '',
+      id: _toString(json['id']),
+      slug: _toString(json['slug']),
+      title: _toString(json['title']),
+      categoryId: _toString(json['category_id']),
+      image: _toString(json['image']),
+      brand: _toString(json['brand']),
+      model: _toString(json['model']),
+      modelVariation: _toString(json['model_variation']),
+      description: _toString(json['description']),
+      price: _toString(json['price']),
+      auctionPriceIntervel: _toString(json['auction_price_intervel']),
+      auctionStartingPrice: _toString(json['auction_starting_price']),
+      attributeId: _parseStringList(json['attribute_id']),
+      attributeVariationsId: _parseStringList(json['attribute_variations_id']),
+      filters: _parseFilters(json['filters']),
+      latitude: _toString(json['latitude']),
+      longitude: _toString(json['longitude']),
+      userZoneId: _toString(json['user_zone_id']),
+      parentZoneId: _toString(json['parent_zone_id']),
+      zoneId: _toString(json['zone_id']),
+      landMark: _toString(json['land_mark']),
+      ifAuction: _toString(json['if_auction']),
+      auctionStatus: _toString(json['auction_status']),
+      auctionStartin: _toString(json['auction_startin']),
+      auctionEndin: _toString(json['auction_endin']),
+      auctionAttempt: _toString(json['auction_attempt']),
+      adminApproval: _toString(json['admin_approval']),
+      ifFinance: _toString(json['if_finance']),
+      ifExchange: _toString(json['if_exchange']),
+      feature: _toString(json['feature']),
+      status: _toString(json['status']),
+      visiterCount: _toString(json['visiter_count']),
+      ifSold: _toString(json['if_sold']),
+      ifExpired: _toString(json['if_expired']),
+      byDealer: _toString(json['by_dealer']),
+      createdBy: _toString(json['created_by']),
+      createdOn: _toString(json['created_on']),
+      updatedOn: _toString(json['updated_on']),
     );
   }
 
+  static String _toString(dynamic value) {
+    if (value == null) return '';
+    return value.toString();
+  }
+
   static List<String> _parseStringList(dynamic value) {
+    if (value == null) return [];
+
     if (value is String) {
+      if (value.isEmpty) return [];
       try {
-        final decoded = jsonDecode(value) as List;
-        return decoded.map((e) => e.toString()).toList();
+        final decoded = jsonDecode(value);
+        if (decoded is List) {
+          return decoded.map((e) => e.toString()).toList();
+        }
+        return [value];
       } catch (_) {
-        return [value.toString()];
+        return [value];
       }
     } else if (value is List) {
       return value.map((e) => e.toString()).toList();
     }
-    return [];
+    return [value.toString()];
   }
 
   static Map<String, dynamic> _parseFilters(dynamic value) {
+    if (value == null) return {};
+
     if (value is String) {
+      if (value.isEmpty) return {};
       try {
-        return Map<String, dynamic>.from(jsonDecode(value));
+        final decoded = jsonDecode(value);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        return {};
       } catch (_) {
         return {};
       }

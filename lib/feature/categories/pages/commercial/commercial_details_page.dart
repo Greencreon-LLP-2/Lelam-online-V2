@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -1630,11 +1631,33 @@ class _CommercialProductDetailsPageState
     }
   }
 
+  Future<void> _fetchSellerProfileImage() async {
+    try {
+      // Use the same endpoint as EditProfilePage
+      final response = await ApiService().get(
+        url: userDetails, // Use the same userDetails endpoint
+        queryParams: {"user_id": createdBy},
+      );
+
+      if (response['status'] == true && response['code'] == 200) {
+        final userData = UserData.fromJson(response['data'][0]);
+        setState(() {
+          sellerProfileImage =
+              (userData.image?.isNotEmpty ?? false)
+                  ? "$getImageFromServer${userData.image}"
+                  : '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile image: $e');
+    }
+  }
+
   Future<void> _fetchSellerInfo() async {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.post.createdBy}',
+          'https://lelamonline.com/admin/api/v1/post-seller-information.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=$createdBy',
         ),
       );
 
@@ -1646,11 +1669,13 @@ class _CommercialProductDetailsPageState
           final data = jsonResponse['data'][0];
           setState(() {
             sellerName = data['name'] ?? 'Unknown';
-            sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
-            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
+
+          // ADD THIS LINE - Call the profile image method
+          await _fetchSellerProfileImage();
         } else {
           setState(() {
             sellerErrorMessage = 'Invalid seller data';
@@ -2299,135 +2324,142 @@ class _CommercialProductDetailsPageState
         );
   }
 
-Widget _buildQuestionsSection(BuildContext context, String id) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
-              'Ask a question about this product',
-              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final userProvider = Provider.of<LoggedUserProvider>(
-                context,
-                listen: false,
-              );
-              if (!userProvider.isLoggedIn) {
-                showDialog(
-                  context: context,
-                  builder: (dialogContext) => LoginDialog(
-                    onSuccess: () {
-                      Navigator.of(dialogContext).pop();
-                      showDialog(
-                        context: context,
-                        builder: (context) => ReviewDialog(postId: id),
-                      );
-                    },
-                  ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder: (context) => ReviewDialog(postId: id),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.question_answer, color: Colors.white, size: 20.0),
-                SizedBox(width: 8.0),
-                Text('Ask a question'),
-              ],
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      
-      // Answers section WITHOUT container styling
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildQuestionsSection(BuildContext context, String id) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              '',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            if (isLoadingReviews)
-              const Center(child: CircularProgressIndicator())
-            else if (reviewsError.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color.fromARGB(255, 192, 187, 187),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (reviews.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: const Text(
-                  '',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              // Show answers directly without any container
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: reviews.where((review) => review.parentId == '0').length,
-                separatorBuilder: (context, index) => const Divider(),
-                itemBuilder: (context, index) {
-                  final parent = reviews.where((review) => review.parentId == '0').toList()[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildReviewItem(parent, isReply: false),
-                      // Show replies indented
-                      ...reviews
-                          .where((reply) => reply.parentId == parent.id)
-                          .map(
-                            (reply) => Padding(
-                              padding: const EdgeInsets.only(left: 32.0, top: 8.0),
-                              child: _buildReviewItem(reply, isReply: true),
-                            ),
-                          )
-                          .toList(),
-                    ],
-                  );
-                },
+            Expanded(
+              child: Text(
+                'Ask a question about this product',
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final userProvider = Provider.of<LoggedUserProvider>(
+                  context,
+                  listen: false,
+                );
+                if (!userProvider.isLoggedIn) {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (dialogContext) => LoginDialog(
+                          onSuccess: () {
+                            Navigator.of(dialogContext).pop();
+                            showDialog(
+                              context: context,
+                              builder: (context) => ReviewDialog(postId: id),
+                            );
+                          },
+                        ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (context) => ReviewDialog(postId: id),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.question_answer, color: Colors.white, size: 20.0),
+                  SizedBox(width: 8.0),
+                  Text('Ask a question'),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-    ],
-  );
-}
+        const SizedBox(height: 12),
 
+        // Answers section WITHOUT container styling
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (isLoadingReviews)
+                const Center(child: CircularProgressIndicator())
+              else if (reviewsError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    "",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color.fromARGB(255, 192, 187, 187),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else if (reviews.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: const Text(
+                    '',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              else
+                // Show answers directly without any container
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount:
+                      reviews.where((review) => review.parentId == '0').length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final parent =
+                        reviews
+                            .where((review) => review.parentId == '0')
+                            .toList()[index];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReviewItem(parent, isReply: false),
+                        // Show replies indented
+                        ...reviews
+                            .where((reply) => reply.parentId == parent.id)
+                            .map(
+                              (reply) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 32.0,
+                                  top: 8.0,
+                                ),
+                                child: _buildReviewItem(reply, isReply: true),
+                              ),
+                            )
+                            .toList(),
+                      ],
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildReviewItem(PostReview review, {required bool isReply}) {
     return Padding(
@@ -2639,45 +2671,48 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                         ),
                       ),
                       const SizedBox(height: 8),
-                   Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Row(
-      children: [
-        const Icon(
-          Icons.location_on,
-          size: 16,
-          color: Colors.grey,
-        ),
-        const SizedBox(width: 4),
-        _isLoadingLocations
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
-              )
-            : Text(
-                landMark, // This shows the district from parent_zone_id
-                style: const TextStyle(color: Colors.grey),
-              ),
-      ],
-    ),
-    const SizedBox(height: 4),
-    Padding(
-      padding: const EdgeInsets.only(left: 20.0), // Indent to align with icon
-      child: Text(
-        widget.post.landMark ?? 'Landmark not specified', // This shows the actual landmark
-        style: const TextStyle(
-          color: Colors.grey,
-          fontSize: 14,
-        ),
-      ),
-    ),
-    const SizedBox(height: 8),
-  ],
-),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              _isLoadingLocations
+                                  ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Text(
+                                    landMark, // This shows the district from parent_zone_id
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 20.0,
+                            ), // Indent to align with icon
+                            child: Text(
+                              widget.post.landMark ??
+                                  'Landmark not specified', // This shows the actual landmark
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         '₹${formatPriceInt(double.tryParse(price) ?? 0)}',
@@ -2911,9 +2946,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
             right: 0,
             bottom: 0,
             child: Container(
-          
               decoration: const BoxDecoration(
-               
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
@@ -2947,7 +2980,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                         child: const Text('Edit'),
                       ),
                     ),
-                 
+
                     Expanded(
                       child: ElevatedButton(
                         onPressed: _isLoadingBid ? null : _moveToAuction,
@@ -2989,7 +3022,7 @@ Widget _buildQuestionsSection(BuildContext context, String id) {
                         child: const Text('Place Bid'),
                       ),
                     ),
-                    
+
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _showMeetingDialog(context),

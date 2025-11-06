@@ -139,28 +139,80 @@ class _MeetingCardState extends State<MeetingCard> {
             data['data'] is List &&
             data['data'].isNotEmpty) {
           final post = data['data'][0];
+
+          // Extract location information like in My Bids
+          String location = 'Unknown Location';
+          final parentZoneId = post['parent_zone_id']?.toString();
+          final landMark = post['land_mark']?.toString() ?? '';
+
+          // If you have districts data, fetch it like in My Bids
+          // Otherwise use parent_zone_id directly
+          if (parentZoneId != null && parentZoneId.isNotEmpty) {
+            location = 'Zone $parentZoneId';
+            if (landMark.isNotEmpty) {
+              location += ', $landMark';
+            }
+          } else if (landMark.isNotEmpty) {
+            location = landMark;
+          }
+
           final coords = {
             'latitude': post['latitude']?.toString() ?? '',
             'longitude': post['longitude']?.toString() ?? '',
+            'location': location, // Add location string here
+            'land_mark': landMark,
+            'parent_zone_id': parentZoneId ?? '',
           };
-          debugPrint('Fetched coordinates for post $postId: $coords');
+
+          debugPrint(
+            'Fetched coordinates and location for post $postId: $coords',
+          );
           return coords;
         } else {
           debugPrint(
             'Error: Invalid response or no data found for post $postId',
           );
-          return {'latitude': '', 'longitude': ''};
+          return {
+            'latitude': '',
+            'longitude': '',
+            'location': 'Unknown Location',
+          };
         }
       } else {
         debugPrint(
           'Error: Failed to fetch post details, status code: ${response.statusCode}',
         );
-        return {'latitude': '', 'longitude': ''};
+        return {
+          'latitude': '',
+          'longitude': '',
+          'location': 'Unknown Location',
+        };
       }
     } catch (e) {
       debugPrint('Error fetching post coordinates: $e');
-      return {'latitude': '', 'longitude': ''};
+      return {'latitude': '', 'longitude': '', 'location': 'Unknown Location'};
     }
+  }
+
+  String _getFormattedLocation() {
+    final parentZoneId = widget.meeting['parent_zone_id']?.toString();
+    final landMark = widget.meeting['land_mark']?.toString() ?? '';
+
+    if (parentZoneId != null && parentZoneId.isNotEmpty) {
+      // Try to get from your existing locations cache
+      final locationName = MeetingCard._locationCache[parentZoneId];
+      if (locationName != null) {
+        return landMark.isNotEmpty ? '$locationName, $landMark' : locationName;
+      } else if (landMark.isNotEmpty) {
+        return landMark;
+      } else {
+        return 'Zone $parentZoneId';
+      }
+    } else if (landMark.isNotEmpty) {
+      return landMark;
+    }
+
+    return 'Unknown Location';
   }
 
   Future<void> _fetchAndSetCoordinates() async {
@@ -172,7 +224,37 @@ class _MeetingCardState extends State<MeetingCard> {
     setState(() {
       _latitude = coords['latitude'];
       _longitude = coords['longitude'];
+      // Store the location string as well
+      widget.meeting['location'] = coords['location'];
+      widget.meeting['land_mark'] = coords['land_mark'];
+      widget.meeting['parent_zone_id'] = coords['parent_zone_id'];
     });
+  }
+
+  Future<Map<String, String>> _fetchDistricts() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${widget.baseUrl}/list-location.php?token=${widget.token}'),
+        headers: {'token': widget.token},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'true' && data['data'] is List) {
+          final Map<String, String> districts = {};
+          for (var location in data['data']) {
+            if (location['status'] == '1') {
+              districts[location['id']] = location['name'];
+            }
+          }
+          return districts;
+        }
+      }
+      return {};
+    } catch (e) {
+      debugPrint('Error fetching districts: $e');
+      return {};
+    }
   }
 
   Future<String> _fetchOfferPrice(
@@ -345,14 +427,15 @@ class _MeetingCardState extends State<MeetingCard> {
   }
 
   String _getMeetingStatus(Map<String, dynamic> meeting) {
-    if (meeting['meeting_done'] == '1') {
-      return 'Meeting Completed';
+    // Check if meeting_done is 1 - this takes priority
+    if (meeting['meeting_done'] == '1' || meeting['meeting_done'] == 1) {
+      return 'Meeting Done';
     } else if (meeting['seller_approvel'] == '1') {
       return 'Seller Confirmed';
     } else if (meeting['meeting_time'] != 'N/A' &&
         meeting['meeting_time']?.isNotEmpty == true &&
         meeting['meeting_time'] != '00:00:00') {
-      return 'Waiting for Seller Confirmation';
+      return 'Checking Seller Availability Please Wait';
     } else if (meeting['meeting_date'] != 'N/A' &&
         meeting['meeting_date']?.isNotEmpty == true &&
         meeting['meeting_date'] != '1970-01-01') {
@@ -362,14 +445,47 @@ class _MeetingCardState extends State<MeetingCard> {
     }
   }
 
+  // Helper method to get progress percentage based on status
+  double _getProgressPercentage(String status) {
+    switch (status) {
+      case 'Meeting Request':
+        return 0.0;
+      case 'Please Fix Time':
+        return 0.3; // 30% - Orange color
+      case 'Checking Seller Availability Please Wait':
+        return 0.3; // 30% - Orange color
+      case 'Seller Confirmed':
+        return 0.7; // 50% - Green color
+      case 'Meeting Done':
+        return 1.0; // 100% - Green color
+      default:
+        return 0.0;
+    }
+  }
+
+  // Helper method to get status color
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Please Fix Time':
+        return Colors.orange;
+      case 'Checking Seller Availability Please Wait':
+        return Colors.green;
+      case 'Seller Confirmed':
+        return Colors.green;
+      case 'Meeting Done':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildTimelineStep({
     required String title,
     required bool isActive,
     required bool isCompleted,
     required String message,
+    required Color color,
   }) {
-    Color color =
-        isCompleted ? Colors.green : (isActive ? Colors.blue : Colors.grey);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -415,6 +531,51 @@ class _MeetingCardState extends State<MeetingCard> {
     );
   }
 
+  // Helper method to build status container with progress color
+  Widget _buildStatusContainer(String status, String statusData) {
+    final bool isMeetingDone = status == 'Meeting Done';
+    final Color statusColor = _getStatusColor(status);
+    final double progress = _getProgressPercentage(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.6), // Background color with opacity
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: statusColor,
+          width: isMeetingDone ? 1.5 : 1.0,
+        ),
+      ),
+      constraints: const BoxConstraints(maxWidth: 200),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isMeetingDone) ...[
+            Icon(Icons.check_circle, size: 14, color: statusColor),
+            const SizedBox(width: 4),
+          ] else if (progress > 0) ...[
+            Icon(Icons.circle, size: 14, color: statusColor),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Text(
+              statusData,
+              style: const TextStyle(
+                // Changed to keep text black
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.white, // Always black text
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<LoggedUserProvider>(
@@ -450,7 +611,9 @@ class _MeetingCardState extends State<MeetingCard> {
         widget.meeting['meeting_time']?.isNotEmpty == true &&
         widget.meeting['meeting_time'] != '00:00:00';
     bool isSellerConfirmed = widget.meeting['seller_approvel'] == '1';
-    bool isMeetingDone = widget.meeting['meeting_done'] == '1';
+    bool isMeetingDone =
+        widget.meeting['meeting_done'] == '1' ||
+        widget.meeting['meeting_done'] == 1;
 
     bool step1Completed = isDateSet;
     bool step1Active = !isDateSet;
@@ -479,9 +642,27 @@ class _MeetingCardState extends State<MeetingCard> {
     String step4Message =
         step4Completed ? 'Completed' : (step4Active ? 'Ready' : '');
 
+    // Get colors for each step based on current status
+    Color step1Color =
+        step1Completed
+            ? Colors.green
+            : (step1Active ? Colors.blue : Colors.grey);
+    Color step2Color =
+        step2Completed
+            ? Colors.green
+            : (step2Active ? _getStatusColor(status) : Colors.grey);
+    Color step3Color =
+        step3Completed
+            ? Colors.green
+            : (step3Active ? _getStatusColor(status) : Colors.grey);
+    Color step4Color =
+        step4Completed
+            ? Colors.green
+            : (step4Active ? _getStatusColor(status) : Colors.grey);
+
     return FutureBuilder<Map<String, dynamic>>(
       future:
-          status == 'Meeting Completed'
+          status == 'Meeting Done'
               ? _fetchMeetingDoneStatus(widget.meeting['id'])
               : Future.value({
                 'middleStatus_data': _middleStatusData,
@@ -498,7 +679,7 @@ class _MeetingCardState extends State<MeetingCard> {
             };
         return FutureBuilder<String>(
           future:
-              status == 'Meeting Completed'
+              status == 'Meeting Done'
                   ? _fetchOfferPrice(
                     widget.meeting['user_id'],
                     widget.meeting['post_id'],
@@ -512,7 +693,7 @@ class _MeetingCardState extends State<MeetingCard> {
                 '0.00';
             return FutureBuilder<String>(
               future:
-                  status == 'Meeting Completed'
+                  status == 'Meeting Done'
                       ? _fetchDecisionPendingStatus(widget.meeting['id'])
                       : Future.value(''),
               builder: (context, decisionPendingSnapshot) {
@@ -541,7 +722,7 @@ class _MeetingCardState extends State<MeetingCard> {
                       ),
                       child: Column(
                         children: [
-                          if (status == 'Meeting Completed' &&
+                          if (status == 'Meeting Done' &&
                               decisionPendingStatus.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.all(4),
@@ -576,28 +757,9 @@ class _MeetingCardState extends State<MeetingCard> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[200],
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 200,
-                                      ),
-                                      child: Text(
-                                        statusData['middleStatus_data'],
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
+                                    _buildStatusContainer(
+                                      status,
+                                      statusData['middleStatus_data'],
                                     ),
                                     IconButton(
                                       icon: const Icon(
@@ -648,16 +810,6 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  widget.meeting['title'] ??
-                                      'Unknown Vehicle (ID: ${widget.meeting['post_id']})',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
-                                  ),
-                                ),
                                 const SizedBox(height: 12),
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,164 +819,209 @@ class _MeetingCardState extends State<MeetingCard> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.directions_car,
-                                                size: 12,
-                                                color: Colors.grey[500],
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'App Id: ${widget.meeting['appId'] ?? 'LAD_${widget.meeting['post_id']}'}',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.location_on,
-                                                size: 12,
-                                                color: Colors.grey[500],
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  'Location: $locationName',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          if (_latitude != null &&
-                                              _latitude!.isNotEmpty &&
-                                              _longitude != null &&
-                                              _longitude!.isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            Row(
+                                          // Title wrapped in Container to match image height
+                                          Container(
+                                            constraints: const BoxConstraints(
+                                              minHeight:
+                                                  100, // Match the image height
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .center, // Center content vertically
                                               children: [
-                                                Icon(
-                                                  Icons.map,
-                                                  size: 12,
-                                                  color: Colors.grey[500],
+                                                Text(
+                                                  widget.meeting['title'] ??
+                                                      'Unknown Vehicle (ID: ${widget.meeting['post_id']})',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black87,
+                                                  ),
                                                 ),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: GestureDetector(
-                                                    onTap: () async {
-                                                      final mapUrl = Uri.parse(
-                                                        'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
-                                                      );
-                                                      if (await canLaunchUrl(
-                                                        mapUrl,
-                                                      )) {
-                                                        await launchUrl(mapUrl);
-                                                      } else {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Could not open Google Maps',
-                                                            ),
-                                                            backgroundColor:
-                                                                Colors.red,
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                                    child: const Text(
-                                                      'View on Google Maps',
+                                                const SizedBox(height: 12),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.directions_car,
+                                                      size: 12,
+                                                      color: Colors.grey[500],
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'App Id: ${widget.meeting['appId'] ?? 'LAD_${widget.meeting['post_id']}'}',
                                                       style: TextStyle(
-                                                        color: Colors.blue,
-                                                        decoration:
-                                                            TextDecoration
-                                                                .underline,
                                                         fontSize: 10,
+                                                        color: Colors.grey[600],
                                                       ),
                                                     ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.location_on,
+                                                      size: 12,
+                                                      color: Colors.grey[500],
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Expanded(
+                                                      child: Text(
+                                                        'Location: ${_getFormattedLocation()}',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color:
+                                                              Colors.grey[600],
+                                                        ),
+                                                        overflow:
+                                                            TextOverflow
+                                                                .ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                if (_latitude != null &&
+                                                    _latitude!.isNotEmpty &&
+                                                    _longitude != null &&
+                                                    _longitude!.isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.map,
+                                                        size: 12,
+                                                        color: Colors.grey[500],
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: GestureDetector(
+                                                          onTap: () async {
+                                                            final mapUrl =
+                                                                Uri.parse(
+                                                                  'https://www.google.com/maps/search/?api=1&query=$_latitude,$_longitude',
+                                                                );
+                                                            if (await canLaunchUrl(
+                                                              mapUrl,
+                                                            )) {
+                                                              await launchUrl(
+                                                                mapUrl,
+                                                              );
+                                                            } else {
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                const SnackBar(
+                                                                  content: Text(
+                                                                    'Could not open Google Maps',
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Colors
+                                                                          .red,
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
+                                                          child: const Text(
+                                                            'View on Google Maps',
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.blue,
+                                                              decoration:
+                                                                  TextDecoration
+                                                                      .underline,
+                                                              fontSize: 10,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
+                                                ],
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'Target Price',
+                                                            style: TextStyle(
+                                                              fontSize: 9,
+                                                              color:
+                                                                  Colors
+                                                                      .grey[500],
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            targetPrice == 0
+                                                                ? 'N/A'
+                                                                : '₹${NumberFormat('#,##0').format(targetPrice)}',
+                                                            style: const TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color:
+                                                                  Colors
+                                                                      .black87,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'My Bid',
+                                                            style: TextStyle(
+                                                              fontSize: 9,
+                                                              color:
+                                                                  Colors
+                                                                      .grey[500],
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            bidAmount == 0 &&
+                                                                    !withBid
+                                                                ? 'N/A'
+                                                                : '₹${NumberFormat('#,##0').format(bidAmount)}',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color:
+                                                                  isLowBid
+                                                                      ? Colors
+                                                                          .orange[700]
+                                                                      : Colors
+                                                                          .green[700],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
-                                          ],
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Target Price',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        color: Colors.grey[500],
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      targetPrice == 0
-                                                          ? 'N/A'
-                                                          : '₹${NumberFormat('#,##0').format(targetPrice)}',
-                                                      style: const TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: Colors.black87,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'My Bid',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        color: Colors.grey[500],
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      bidAmount == 0 && !withBid
-                                                          ? 'N/A'
-                                                          : '₹${NumberFormat('#,##0').format(bidAmount)}',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color:
-                                                            isLowBid
-                                                                ? Colors
-                                                                    .orange[700]
-                                                                : Colors
-                                                                    .green[700],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
                                           ),
                                         ],
                                       ),
                                     ),
                                     const SizedBox(width: 12),
+                                    // Image section with fixed height
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(10),
                                       child: CachedNetworkImage(
@@ -833,12 +1030,12 @@ class _MeetingCardState extends State<MeetingCard> {
                                                 ?.toString() ??
                                             '',
                                         width: 120,
-                                        height: 150,
+                                        height: 150, // Fixed height
                                         fit: BoxFit.cover,
                                         placeholder:
                                             (context, url) => Container(
                                               width: 120,
-                                              height: 120,
+                                              height: 150, // Same height
                                               color: Colors.grey[200],
                                               child: const Center(
                                                 child:
@@ -854,7 +1051,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                           );
                                           return Container(
                                             width: 120,
-                                            height: 120,
+                                            height: 150, // Same height
                                             color: Colors.grey[200],
                                             child: const Icon(
                                               Icons.directions_car,
@@ -878,14 +1075,16 @@ class _MeetingCardState extends State<MeetingCard> {
                                     ),
                                   ),
                                 ),
-                                if (sellerApproval == '1') ...[
+                                if (sellerApproval == '1' &&
+                                    status != 'Meeting Done') ...[
                                   const SizedBox(height: 12),
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: ElevatedButton(
                                       onPressed: () {
                                         final initialMessage =
-                                            'Hi, I am $buyerName, I want to buy this $productName $meetingTime and $meetingDate';
+                                            'Hi, I am $buyerName, I want to buy this $productName. I fixed a meeting on  $meetingDate at $meetingTime  please share your number at time accordingly\nThankyou';
+                                        // 'Hello Sir I will be on the given location on date at time for seeing your listed item please share your number on time';
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
@@ -914,7 +1113,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                         ),
                                       ),
                                       child: const Text(
-                                        'Chat with Seller',
+                                        'Request Seller Number',
                                         style: TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -946,6 +1145,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                         message: step1Message,
                                         isActive: step1Active,
                                         isCompleted: step1Completed,
+                                        color: step1Color,
                                       ),
                                     ),
                                     Expanded(
@@ -966,6 +1166,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                         message: step2Message,
                                         isActive: step2Active,
                                         isCompleted: step2Completed,
+                                        color: step2Color,
                                       ),
                                     ),
                                     Expanded(
@@ -986,6 +1187,7 @@ class _MeetingCardState extends State<MeetingCard> {
                                         message: step3Message,
                                         isActive: step3Active,
                                         isCompleted: step3Completed,
+                                        color: step3Color,
                                       ),
                                     ),
                                     Expanded(
@@ -1006,78 +1208,86 @@ class _MeetingCardState extends State<MeetingCard> {
                                         message: step4Message,
                                         isActive: step4Active,
                                         isCompleted: step4Completed,
+                                        color: step4Color,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed:
-                                            status != 'Meeting Completed'
-                                                ? () => widget.onEditDate(
-                                                  widget.meeting,
-                                                )
-                                                : null,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
+                                if (status != 'Meeting Done') ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              status != 'Meeting Done'
+                                                  ? () => widget.onEditDate(
+                                                    widget.meeting,
+                                                  )
+                                                  : null,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors
+                                                    .blue, // Always blue for date buttons
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
                                             ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          step1Completed
-                                              ? 'Edit Date'
-                                              : 'Set Date',
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed:
-                                            (status != 'Meeting Completed' &&
-                                                    step1Completed)
-                                                ? () => widget.onEditTime(
-                                                  widget.meeting,
-                                                )
-                                                : null,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              !step1Completed
-                                                  ? Colors.grey
-                                                  : (step2Completed
-                                                      ? Colors.blue
-                                                      : Colors.orange),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
+                                          child: Text(
+                                            step1Completed
+                                                ? 'Edit Date'
+                                                : 'Set Date',
+                                            style: const TextStyle(
+                                              fontSize: 12,
                                             ),
                                           ),
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          step2Completed
-                                              ? 'Edit Time'
-                                              : 'Fix Time',
-                                          style: const TextStyle(fontSize: 12),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                if (status == 'Meeting Completed') ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              (status != 'Meeting Done' &&
+                                                      step1Completed)
+                                                  ? () => widget.onEditTime(
+                                                    widget.meeting,
+                                                  )
+                                                  : null,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                !step1Completed
+                                                    ? Colors.grey
+                                                    : (step2Completed
+                                                        ? Colors.blue
+                                                        : Colors
+                                                            .orange), // Orange only for "Fix Time"
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            step2Completed
+                                                ? 'Edit Time'
+                                                : 'Fix Time',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                if (status == 'Meeting Done') ...[
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceEvenly,

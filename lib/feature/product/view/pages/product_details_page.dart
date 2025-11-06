@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as developer;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
@@ -748,6 +750,28 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     }
   }
 
+  Future<void> _fetchSellerProfileImage() async {
+    try {
+      // Use the same endpoint as EditProfilePage
+      final response = await ApiService().get(
+        url: userDetails, // Use the same userDetails endpoint
+        queryParams: {"user_id": createdBy},
+      );
+
+      if (response['status'] == true && response['code'] == 200) {
+        final userData = UserData.fromJson(response['data'][0]);
+        setState(() {
+          sellerProfileImage =
+              (userData.image?.isNotEmpty ?? false)
+                  ? "$getImageFromServer${userData.image}"
+                  : '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile image: $e');
+    }
+  }
+
   void showProductBidDialog(BuildContext context) async {
     if (!_userProvider.isLoggedIn) {
       _showLoginPromptDialog(context, 'place a bid');
@@ -770,9 +794,12 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           _currentHighestBid.startsWith('Error')
               ? _currentHighestBid
               : '₹${NumberFormat('#,##0').format(double.tryParse(_currentHighestBid.replaceAll(',', ''))?.round() ?? 0)}';
+
       // Support phone number
       const String supportPhoneNumber = '+918089308048';
+
       if (!mounted) return;
+
       return showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -828,9 +855,31 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                             color: Colors.green[800],
                           ),
                         ),
-                      if (isSuccess && isHighestBid) const SizedBox(height: 8),
+                      if (isSuccess && !isHighestBid)
+                        Text(
+                          'Your bid is low please Increase your bid or Proceed a meeting without Bid to discuss further with seller',
+                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+
+                      // Show API message ONLY when it's a high bid
+                      if (isSuccess && isHighestBid) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          message, // API message shown only for high bids
+                          style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                            fontSize: 16,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 8),
                       Text(
-                        '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
+                        'Please Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
                         style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                           fontSize: 16,
                           color: Colors.grey[800],
@@ -1347,13 +1396,44 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             borderRadius: BorderRadius.circular(16.0),
           ),
           backgroundColor: Colors.white,
-          title: Text(
-            'Meeting Scheduled',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
-            ),
+          contentPadding: const EdgeInsets.only(
+            top: 16,
+            left: 16,
+            right: 16,
+            bottom: 8,
+          ),
+          title: Stack(
+            children: [
+              Align(
+                alignment: Alignment.center,
+                child: Text(
+                  'Meeting Scheduled',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  style: IconButton.styleFrom(
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+            ],
           ),
           content: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -1613,7 +1693,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+          'https://lelamonline.com/admin/api/v1/post-seller-information.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=$createdBy',
         ),
       );
 
@@ -1625,11 +1705,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           final data = jsonResponse['data'][0];
           setState(() {
             sellerName = data['name'] ?? 'Unknown';
-            sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
-            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
+
+          // ADD THIS LINE - Call the profile image method
+          await _fetchSellerProfileImage();
         } else {
           setState(() {
             sellerErrorMessage = 'Invalid seller data';
@@ -2275,6 +2357,20 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
+    // Debug: Print reviews count and parent count (remove in production)
+    // Change this line:
+
+    // To:
+    final parentCount =
+        reviews
+            .where(
+              (review) =>
+                  review.parentId == '0' || (review.parentId?.isEmpty ?? true),
+            )
+            .length;
+
+    // A
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2330,26 +2426,20 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
 
-        // Answers section WITHOUT container styling
+        // Answers section
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
               if (isLoadingReviews)
                 const Center(child: CircularProgressIndicator())
               else if (reviewsError.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    "",
+                    reviewsError, // <-- Fixed: Use actual error message
                     style: const TextStyle(
                       fontSize: 16,
                       color: Color.fromARGB(255, 192, 187, 187),
@@ -2361,7 +2451,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: const Text(
-                    '',
+                    'No questions and answers available yet. Be the first to ask!', // <-- Fixed: Meaningful message
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey,
@@ -2371,25 +2461,33 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                 )
               else
-                // Show answers directly without any container
+                // Show Q&A list
                 ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount:
-                      reviews.where((review) => review.parentId == '0').length,
+                  itemCount: parentCount, // Use the computed count for clarity
                   separatorBuilder: (context, index) => const Divider(),
                   itemBuilder: (context, index) {
-                    final parent =
+                    final parentReviews =
                         reviews
-                            .where((review) => review.parentId == '0')
-                            .toList()[index];
+                            .where(
+                              (review) =>
+                                  review.parentId == '0' ||
+                                  (review.parentId?.isEmpty ?? true),
+                            )
+                            .toList();
+                    if (index >= parentReviews.length)
+                      return const SizedBox.shrink(); // Safety check
+                    final parent = parentReviews[index];
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildReviewItem(parent, isReply: false),
                         // Show replies indented
                         ...reviews
-                            .where((reply) => reply.parentId == parent.id)
+                            .where(
+                              (reply) => reply.parentId == parent.id.toString(),
+                            ) // <-- Fixed: Ensure string comparison if id is int
                             .map(
                               (reply) => Padding(
                                 padding: const EdgeInsets.only(
@@ -2700,40 +2798,55 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(width: 4),
-                              _isLoadingLocations
-                                  ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                  : Text(
-                                    landMark, // This shows the district from parent_zone_id
-                                    style: const TextStyle(color: Colors.grey),
+                              // Location + Landmark section on the left
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    size: 16,
+                                    color: Colors.grey,
                                   ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              left: 20.0,
-                            ), // Indent to align with icon
-                            child: Text(
-                              widget.product.landMark ??
-                                  'Landmark not specified', // This shows the actual landmark
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 14,
+                                  const SizedBox(width: 4),
+                                  _isLoadingLocations
+                                      ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : Text(
+                                        [
+                                          if (landMark.isNotEmpty) landMark,
+                                          if (widget.product.landMark != null &&
+                                              widget
+                                                  .product
+                                                  .landMark!
+                                                  .isNotEmpty)
+                                            widget.product.landMark!,
+                                        ].join(
+                                          ' | ',
+                                        ), // Combines location and landmark
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 14,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                ],
                               ),
-                            ),
+
+                              // Created on date on the right
+                              Text(
+                                createdOn,
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
                         ],

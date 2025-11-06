@@ -15,6 +15,8 @@ import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'dart:developer' as developer;
 
+import 'package:url_launcher/url_launcher.dart';
+
 class MyAdsWidget extends StatefulWidget {
   final Map<String, dynamic>? adData;
 
@@ -38,6 +40,37 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
     super.initState();
     _userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
     _loadAds();
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    // Remove any spaces or special characters from the phone number
+    final cleanedNumber = phoneNumber.replaceAll(RegExp(r'[-\s]'), '');
+
+    // Create the tel URL
+    final Uri telLaunchUri = Uri(scheme: 'tel', path: cleanedNumber);
+
+    try {
+      if (await canLaunchUrl(telLaunchUri)) {
+        await launchUrl(telLaunchUri);
+      } else {
+        Fluttertoast.showToast(
+          msg: 'Could not launch phone app',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('Error launching phone app: $e');
+      Fluttertoast.showToast(
+        msg: 'Error making call: $e',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
   }
 
   Future<void> _loadAds() async {
@@ -857,7 +890,10 @@ class _MyAdsWidgetState extends State<MyAdsWidget> {
                         borderRadius: BorderRadius.zero,
                       ),
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      // Replace with your actual support number
+                      _makePhoneCall('+918089308048');
+                    },
                     icon: const Icon(
                       Icons.phone,
                       color: Colors.white,

@@ -209,11 +209,15 @@ class MarketplaceService {
         if (data['status'] == 'true' &&
             data['data'] is List &&
             (data['data'] as List).isNotEmpty) {
-          final variations = data['data'][0]['variations'] ?? 'N/A';
+          final variationData = data['data'][0];
+          final variations = variationData['variations'] ?? 'N/A';
+          final brand = variationData['brand'] ?? 'N/A';
+          final model = variationData['model'] ?? 'N/A';
+
           return ModelVariation(
             variations: variations,
             brand: brand,
-            model: modelVariations,
+            model: model, // Fixed: was using undefined variable modelVariations
           );
         } else {
           return null;
@@ -628,28 +632,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
+    // Check if user needs to login for auctions
     if (_listingType == 'auction' &&
         (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
-      developer.log(
-        'Showing login dialog: userId=$_userId, listingType=$_listingType',
-      );
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (BuildContext dialogContext) => LoginDialog(
-              onSuccess: () async {
-                await _checkLoginStatus();
-                await _fetchProducts(forceRefresh: true);
-              },
-            ),
-      );
-      setState(() {
-        _isLoading = false;
-        _errorMessage = null;
-      });
+      developer.log('User not logged in for auctions, showing login dialog');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      }
       return;
     }
+
     if (forceRefresh) {
       MarketplaceService.clearCache();
       _postAttributeValuesCache.clear();
@@ -657,12 +652,16 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _filteredProductsCache.clear();
       _modelVariationsCache.clear();
       _fetchingModelVariationIds.clear();
-      _hasCheckedAuctions = false; // Reset auction check on force refresh
+      _hasCheckedAuctions = false;
     }
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+
     try {
       final locationProvider = context.read<LocationProvider>();
       final posts = await _marketplaceService.fetchPosts(
@@ -674,26 +673,43 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         listingType: _listingType,
         userId: _userId ?? '',
       );
+
+      // Check if posts is null or empty
+      if (posts == null) {
+        if (mounted) {
+          setState(() {
+            _products = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
       final products = posts.map((post) => post.toProduct()).toList();
 
-      // Update _hasActiveAuctions only if not already checked
+      // Update auction status
       if (!_hasCheckedAuctions) {
         if (_listingType == 'Marketplace') {
-          final auctionPosts = await _marketplaceService.fetchPosts(
-            categoryId: '1',
-            userZoneId:
-                locationProvider.selectedLocationId == 'all'
-                    ? '0'
-                    : locationProvider.selectedLocationId,
-            listingType: 'auction',
-            userId: _userId ?? '',
-          );
-          final auctionProducts =
-              auctionPosts.map((post) => post.toProduct()).toList();
-          _hasActiveAuctions = auctionProducts.any(
-            (product) =>
-                product.ifAuction == '1' && product.auctionStatus == '1',
-          );
+          try {
+            final auctionPosts = await _marketplaceService.fetchPosts(
+              categoryId: '1',
+              userZoneId:
+                  locationProvider.selectedLocationId == 'all'
+                      ? '0'
+                      : locationProvider.selectedLocationId,
+              listingType: 'auction',
+              userId: _userId ?? '',
+            );
+            final auctionProducts =
+                auctionPosts?.map((post) => post.toProduct()).toList() ?? [];
+            _hasActiveAuctions = auctionProducts.any(
+              (product) =>
+                  product.ifAuction == '1' && product.auctionStatus == '1',
+            );
+          } catch (e) {
+            developer.log('Error checking auction availability: $e');
+            _hasActiveAuctions = false;
+          }
         } else {
           _hasActiveAuctions = products.any(
             (product) =>
@@ -703,14 +719,17 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         _hasCheckedAuctions = true;
       }
 
-      setState(() {
-        _products = products;
-        _filtersChanged = true;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _products = products;
+          _filtersChanged = true;
+          _isLoading = false;
+        });
+      }
 
-      await _fetchShortlistStatus(); // Fetch shortlist status
+      await _fetchShortlistStatus();
 
+      // Fetch initial attributes
       final initialVisibleCount = 10;
       final initialProducts = products.take(initialVisibleCount).toList();
       for (final product in initialProducts) {
@@ -724,11 +743,13 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         }
       }
     } catch (e) {
+      developer.log('Error in _fetchProducts: $e');
+
       if (e.toString().contains('Please accept live auction terms')) {
         bool accepted = await _showTermsAndConditionsDialog(context);
-        if (accepted) {
+        if (accepted && mounted) {
           await _fetchProducts();
-        } else {
+        } else if (mounted) {
           setState(() {
             _errorMessage =
                 'You must accept the auction terms to view auctions.';
@@ -738,17 +759,21 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       } else if (e.toString().contains(
         'Unexpected data format: Data not found',
       )) {
-        setState(() {
-          _products = [];
-          _filteredProductsCache = [];
-          _isLoading = false;
-          _errorMessage = null;
-        });
+        if (mounted) {
+          setState(() {
+            _products = [];
+            _filteredProductsCache = [];
+            _isLoading = false;
+            _errorMessage = null;
+          });
+        }
       } else {
-        setState(() {
-          _errorMessage = 'Failed to load cars. Please try again.';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Failed to load cars. Please try again.';
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -1910,37 +1935,29 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                   color: Colors.grey.shade500,
                                 ),
                                 const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    _getLocationName(product.parentZoneId),
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (parsedLandmark != null &&
-                                parsedLandmark.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 2.0,
-                                  left: 16.0,
-                                ),
-                                child: Text(
-                                  parsedLandmark,
+                                Text(
+                                  _getLocationName(product.parentZoneId),
                                   style: TextStyle(
-                                    fontSize: 9,
-                                    color: Colors.grey.shade500,
-                                    fontStyle: FontStyle.italic,
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
+                                if (parsedLandmark != null &&
+                                    parsedLandmark.isNotEmpty)
+                                  Text(
+                                    " • $parsedLandmark", // Added a separator
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.grey.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
+                            ),
                             const SizedBox(height: 4),
                             Builder(
                               builder: (context) {
@@ -2321,45 +2338,51 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     if (_selectedBrands.isNotEmpty) {
       queryParams['brands'] = _selectedBrands.join(',');
     }
-   if (_selectedPriceRange != 'all') {
-  developer.log('Applying price filter: $_selectedPriceRange', name: 'Price.Filter');
-  
-  // Check if it's a predefined range or custom range
-  if (_selectedPriceRange == 'Under ₹2 Lakh') {
-    queryParams['min_price'] = '0';
-    queryParams['max_price'] = '200000';
-  } 
-  else if (_selectedPriceRange == 'Above ₹20 Lakh') {
-    queryParams['min_price'] = '2000000';
-    queryParams['max_price'] = '10000000';
-  } 
-  else if (_selectedPriceRange.contains('₹')) {
-    // This is a predefined range with ₹ symbol (like "₹2-5 Lakh")
-    final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
-    if (parts.length == 2) {
-      final minPart = parts[0].replaceAll(' Lakh', '').trim();
-      final maxPart = parts[1].replaceAll(' Lakh', '').trim();
-      
-      final minPrice = (double.parse(minPart) * 100000).toStringAsFixed(0);
-      final maxPrice = (double.parse(maxPart) * 100000).toStringAsFixed(0);
-      
-      queryParams['min_price'] = minPrice;
-      queryParams['max_price'] = maxPrice;
+    if (_selectedPriceRange != 'all') {
+      developer.log(
+        'Applying price filter: $_selectedPriceRange',
+        name: 'Price.Filter',
+      );
+
+      // Check if it's a predefined range or custom range
+      if (_selectedPriceRange == 'Under ₹2 Lakh') {
+        queryParams['min_price'] = '0';
+        queryParams['max_price'] = '200000';
+      } else if (_selectedPriceRange == 'Above ₹20 Lakh') {
+        queryParams['min_price'] = '2000000';
+        queryParams['max_price'] = '10000000';
+      } else if (_selectedPriceRange.contains('₹')) {
+        // This is a predefined range with ₹ symbol (like "₹2-5 Lakh")
+        final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
+        if (parts.length == 2) {
+          final minPart = parts[0].replaceAll(' Lakh', '').trim();
+          final maxPart = parts[1].replaceAll(' Lakh', '').trim();
+
+          final minPrice = (double.parse(minPart) * 100000).toStringAsFixed(0);
+          final maxPrice = (double.parse(maxPart) * 100000).toStringAsFixed(0);
+
+          queryParams['min_price'] = minPrice;
+          queryParams['max_price'] = maxPrice;
+        }
+      } else if (_selectedPriceRange.contains('-')) {
+        // This is a custom range like "400000-450000" - use as is, no multiplication!
+        final parts = _selectedPriceRange.split('-');
+        if (parts.length == 2) {
+          queryParams['min_price'] = parts[0].trim();
+          queryParams['max_price'] = parts[1].trim();
+
+          developer.log(
+            'Custom price range: ${parts[0]} - ${parts[1]}',
+            name: 'Price.Range',
+          );
+        }
+      }
+
+      developer.log(
+        'Final price params: min=${queryParams['min_price']}, max=${queryParams['max_price']}',
+        name: 'Price.Final',
+      );
     }
-  }
-  else if (_selectedPriceRange.contains('-')) {
-    // This is a custom range like "400000-450000" - use as is, no multiplication!
-    final parts = _selectedPriceRange.split('-');
-    if (parts.length == 2) {
-      queryParams['min_price'] = parts[0].trim();
-      queryParams['max_price'] = parts[1].trim();
-      
-      developer.log('Custom price range: ${parts[0]} - ${parts[1]}', name: 'Price.Range');
-    }
-  }
-  
-  developer.log('Final price params: min=${queryParams['min_price']}, max=${queryParams['max_price']}', name: 'Price.Final');
-}
     if (_selectedFuelTypes.isNotEmpty) {
       queryParams['fuel_types'] = _selectedFuelTypes
           .map((fuel) => fuel.toLowerCase())

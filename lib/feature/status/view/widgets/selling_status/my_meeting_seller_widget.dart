@@ -111,7 +111,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
   final List<String> statuses = [
     'Date Fixed',
     'Upcoming Meetings',
-   // 'Waiting Meetings',
+    'Ongoing Meeting',
     'Meeting Done',
   ];
   int selectedIndex = 0;
@@ -218,7 +218,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       return;
     }
 
-    // If postId is missing, log warning but continue (show empty list)
     if (widget.postId == null || widget.postId!.isEmpty) {
       debugPrint(
         'WARNING: postId is null/empty - APIs will fail, showing empty list',
@@ -235,8 +234,6 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
 
     setState(() {
       isLoading = true;
-      errorMessage = null;
-      meetings = [];
     });
 
     try {
@@ -251,9 +248,13 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
           url =
               '${widget.baseUrl}/sell-upcoming-meetings.php?token=${widget.token}&post_id=${widget.postId}';
           break;
-        case 2:
+        case 2: // Ongoing Meeting
           url =
               '${widget.baseUrl}/sell-waiting-for-meeting.php?token=${widget.token}&post_id=${widget.postId}';
+          break;
+        case 3: // Meeting Done
+          url =
+              '${widget.baseUrl}/sell-meeting-done-list.php?token=${widget.token}&post_id=${widget.postId}';
           break;
         default:
           url =
@@ -266,9 +267,15 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       debugPrint('Raw response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        // Clean the response by removing HTML tags and extracting JSON
+        String cleanedResponse = _cleanApiResponse(response.body);
+        debugPrint('Cleaned response: $cleanedResponse');
+
+        final responseData = jsonDecode(cleanedResponse);
         debugPrint('Response data type: ${responseData.runtimeType}');
         debugPrint('Response data: $responseData');
+
+        List<Map<String, dynamic>> loadedMeetings = [];
 
         if (responseData is Map<String, dynamic> &&
             (responseData['status'] == true ||
@@ -288,18 +295,32 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
               'post_id': widget.postId,
               'bid_amount': meeting['bid_amount']?.toString() ?? '',
               'meeting_date': meeting['meeting_date']?.toString() ?? '',
+              'location_link': meeting['location_link']?.toString() ?? '',
+              'created_date':
+                  meeting['created_date']?.toString() ??
+                  DateTime.now().toIso8601String(),
+              // Add specific fields for ongoing meetings
+              'meeting_done': meeting['meeting_done'] ?? 0,
+              'skip_meeting': meeting['skip_meeting'] ?? 0,
             };
-            debugPrint(
-              'Added meeting ${meetingDataMap['id']} to list: $meetingDataMap',
-            );
-            meetings.add(meetingDataMap);
+            loadedMeetings.add(meetingDataMap);
           }
+
+          // Reverse the list to show newest first (assuming API returns oldest first)
+          loadedMeetings = loadedMeetings.reversed.toList();
+          debugPrint('Reversed list to show newest first');
         } else {
           debugPrint(
             'Unexpected response format or empty data: ${responseData.toString()}',
           );
-          // Don't set error for empty data - just show empty list
-          meetings = [];
+          loadedMeetings = [];
+        }
+
+        if (mounted) {
+          setState(() {
+            meetings = loadedMeetings;
+            errorMessage = null;
+          });
         }
 
         debugPrint('Total meetings loaded: ${meetings.length}');
@@ -307,17 +328,57 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
         debugPrint(
           'No meetings: ${response.statusCode} - ${response.reasonPhrase}',
         );
-        errorMessage = 'No meetings';
+        if (mounted) {
+          setState(() {
+            errorMessage = 'No meetings';
+            meetings = [];
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error loading meetings: $e');
-      errorMessage = 'No meeting found';
+      if (mounted) {
+        setState(() {
+          errorMessage = 'No meeting found';
+          meetings = [];
+        });
+      }
     }
 
     if (mounted) {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  // Helper method to clean API response by removing HTML and extracting JSON
+  String _cleanApiResponse(String rawResponse) {
+    try {
+      // If the response starts with HTML tags, try to extract JSON
+      if (rawResponse.trim().startsWith('<')) {
+        // Find the first occurrence of '{' which should be the start of JSON
+        final jsonStartIndex = rawResponse.indexOf('{');
+        if (jsonStartIndex != -1) {
+          // Find the last occurrence of '}' which should be the end of JSON
+          final jsonEndIndex = rawResponse.lastIndexOf('}');
+          if (jsonEndIndex != -1 && jsonEndIndex > jsonStartIndex) {
+            final jsonString = rawResponse.substring(
+              jsonStartIndex,
+              jsonEndIndex + 1,
+            );
+            debugPrint('Extracted JSON: $jsonString');
+            return jsonString;
+          }
+        }
+        // If we can't extract JSON properly, return empty JSON object
+        return '{"status":false,"data":[]}';
+      }
+      // If no HTML tags, return the response as is
+      return rawResponse;
+    } catch (e) {
+      debugPrint('Error cleaning API response: $e');
+      return '{"status":false,"data":[]}';
     }
   }
 
@@ -390,10 +451,21 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
       );
       return;
     }
+
+    // Store the meeting ID for removal
+    final String meetingId = meeting['id'];
+
+    // Remove the meeting from the list immediately before API call
+    if (mounted) {
+      setState(() {
+        meetings.removeWhere((m) => m['id'] == meetingId);
+      });
+    }
+
     try {
       final response = await http.get(
         Uri.parse(
-          '${widget.baseUrl}/sell-skip-meeting.php?token=${widget.token}&ads_post_customer_meeting_id=${meeting['id']}',
+          '${widget.baseUrl}/sell-skip-meeting.php?token=${widget.token}&ads_post_customer_meeting_id=$meetingId',
         ),
         headers: {'token': widget.token},
       );
@@ -404,6 +476,8 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Meeting skipped successfully')),
           );
+
+          // Refresh the list to get updated data from server
           await _loadMeetings();
           widget.onRefreshMeetings?.call();
         } else {
@@ -414,6 +488,8 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
               ),
             ),
           );
+          // If API failed, reload the original list
+          await _loadMeetings();
         }
       } else {
         debugPrint(
@@ -422,12 +498,16 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Failed to skip meeting')));
+        // If API failed, reload the original list
+        await _loadMeetings();
       }
     } catch (e) {
       debugPrint('Error skipping meeting: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Error skipping meeting')));
+      // If API failed, reload the original list
+      await _loadMeetings();
     }
   }
 
@@ -529,34 +609,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _buildPillRow(),
-                // statuses.map((status) {
-                //   final index = statuses.indexOf(status);
-                //   return Padding(
-                //     padding: const EdgeInsets.symmetric(horizontal: 4),
-                //     child: StatusPill(
-                //       label: status,
-                //       isActive: index == selectedIndex,
-                //       activeColor: AppTheme.primaryColor,
-                //       inactiveColor: Colors.grey,
-                //       onTap: () {
-                //         debugPrint(
-                //           'StatusPill tapped: $status (index: $index)',
-                //         );
-                //         if (mounted) {
-                //           setState(() {
-                //             selectedIndex = index;
-                //             locationText = '';
-                //             debugPrint('Selected tab: $status');
-                //           });
-                //           _loadMeetings();
-                //         }
-                //       },
-                //     ),
-                //   );
-                // }).toList(),
-              ),
+              child: Row(children: _buildPillRow()),
             ),
           ),
           Expanded(
@@ -659,10 +712,116 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                           color: Colors.black87,
                                         ),
                                       ),
+                                      const SizedBox(height: 8),
+
+                                      // Display meeting information
+                                      if (meeting['meeting_date'] != null &&
+                                          meeting['meeting_date'].isNotEmpty)
+                                        Text(
+                                          'Meeting Date: ${meeting['meeting_date']}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+
+                                      if (meeting['bid_amount'] != null &&
+                                          meeting['bid_amount'].isNotEmpty)
+                                        Text(
+                                          'Bid Amount: ${meeting['bid_amount']}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+
+                                      // Ongoing Meeting specific buttons
+                                      if (selectedIndex == 2) ...[
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed:
+                                                    () => _markMeetingDone(
+                                                      context,
+                                                      meeting,
+                                                    ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.green,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                      ),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.white,
+                                                      size: 18,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'Yes',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed:
+                                                    () => _skipMeeting(
+                                                      context,
+                                                      meeting,
+                                                    ),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 12,
+                                                      ),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.cancel,
+                                                      color: Colors.white,
+                                                      size: 18,
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text(
+                                                      'No',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+
+                                      // Other status buttons (existing code)
                                       if (selectedIndex == 0 &&
                                           meeting['mobile'] != null &&
                                           meeting['mobile'].isNotEmpty) ...[
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 8),
                                         ElevatedButton(
                                           onPressed: () async {
                                             final phoneNumber =
@@ -753,13 +912,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                                 ),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ],
-                                      if (selectedIndex == 2) ...[
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
+                                            const SizedBox(width: 10),
                                             Expanded(
                                               child: ElevatedButton(
                                                 onPressed:
@@ -769,7 +922,7 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                                     ),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor:
-                                                      AppTheme.primaryColor,
+                                                      Colors.orange,
                                                 ),
                                                 child: const Text(
                                                   'Skip Meeting',
@@ -779,27 +932,95 @@ class _MyMeetingsSellerWidget extends State<MyMeetingsSellerWidget> {
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: ElevatedButton(
-                                                onPressed:
-                                                    () => _markMeetingDone(
+                                          ],
+                                        ),
+
+                                        // ADD THIS SECTION FOR MOBILE NUMBER IN UPCOMING MEETINGS
+                                        // ADD THIS SECTION FOR MOBILE NUMBER IN UPCOMING MEETINGS
+                                        if (meeting['mobile'] != null &&
+                                            meeting['mobile'].isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          SizedBox(
+                                            width:
+                                                double.infinity, // Full width
+                                            child: ElevatedButton(
+                                              onPressed: () async {
+                                                final phoneNumber =
+                                                    meeting['mobile'];
+                                                final Uri phoneUri = Uri(
+                                                  scheme: 'tel',
+                                                  path: phoneNumber,
+                                                );
+                                                try {
+                                                  if (await canLaunchUrl(
+                                                    phoneUri,
+                                                  )) {
+                                                    await launchUrl(
+                                                      phoneUri,
+                                                      mode:
+                                                          LaunchMode
+                                                              .externalApplication,
+                                                    );
+                                                    debugPrint(
+                                                      'Initiated call to: $phoneNumber',
+                                                    );
+                                                  } else {
+                                                    debugPrint(
+                                                      'Cannot initiate call to: $phoneNumber',
+                                                    );
+                                                    ScaffoldMessenger.of(
                                                       context,
-                                                      meeting,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Could not initiate call',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                } catch (e) {
+                                                  debugPrint(
+                                                    'Error initiating call: $e',
+                                                  );
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Error initiating call',
+                                                      ),
                                                     ),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      AppTheme.primaryColor,
-                                                ),
-                                                child: const Text(
-                                                  'Meeting Done',
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                  ),
+                                                  );
+                                                }
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.green,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 12,
+                                                    ),
+                                              ),
+                                              child: const Text(
+                                                'Call Buyer',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
                                                 ),
                                               ),
                                             ),
-                                          ],
+                                          ),
+                                        ],
+                                      ],
+                                      if (selectedIndex == 3) ...[
+                                        // Meeting Done - No buttons needed
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Meeting Completed',
+                                          style: TextStyle(
+                                            color: Colors.green[700],
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ],
                                       if (meeting['location_link'] != null &&

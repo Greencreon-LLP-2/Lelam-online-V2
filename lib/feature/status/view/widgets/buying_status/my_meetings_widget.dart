@@ -60,7 +60,7 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget>
   static const Duration _cacheExpiry = Duration(
     minutes: 3,
   ); // 3 minutes cache expiry
-   final Set<String> _processedMeetingIds = <String>{};
+  final Set<String> _processedMeetingIds = <String>{};
   bool _isCurrentlyLoading = false;
   final List<String> statuses = [
     'Date Fixed',
@@ -500,250 +500,279 @@ class _MyMeetingsWidgetState extends State<MyMeetingsWidget>
     }
   }
 
-Future<void> _loadMeetings() async {
-  // Prevent multiple simultaneous loads
-  if (_isCurrentlyLoading) {
-    developer.log('=== LOAD MEETINGS ALREADY IN PROGRESS, SKIPPING ===');
-    return;
-  }
-  
-  _isCurrentlyLoading = true;
-  developer.log('=== LOAD MEETINGS STARTED ===');
-  developer.log('Current meetings count before load: ${meetings.length}');
-  developer.log('Force refresh: ${widget.forceRefresh}');
-  
-  // Clear the processed IDs tracker
-  _processedMeetingIds.clear();
+  Future<void> _loadMeetings() async {
+    // Prevent multiple simultaneous loads
+    if (_isCurrentlyLoading) {
+      developer.log('=== LOAD MEETINGS ALREADY IN PROGRESS, SKIPPING ===');
+      return;
+    }
 
-  if (!mounted || _userId == null || _userId == 'Unknown') {
-    developer.log('Skipping load: Invalid user ID or not mounted');
-    _isCurrentlyLoading = false;
-    return;
-  }
+    _isCurrentlyLoading = true;
+    developer.log('=== LOAD MEETINGS STARTED ===');
+    developer.log('Current meetings count before load: ${meetings.length}');
+    developer.log('Force refresh: ${widget.forceRefresh}');
 
-  setState(() {
-    isLoading = true;
-    errorMessage = null;
-    meetings = []; // CLEAR meetings at start
-  });
+    // Clear the processed IDs tracker
+    _processedMeetingIds.clear();
 
-  try {
-    final headers = {
-      'token': widget.token,
-      'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
-    };
+    if (!mounted || _userId == null || _userId == 'Unknown') {
+      developer.log('Skipping load: Invalid user ID or not mounted');
+      _isCurrentlyLoading = false;
+      return;
+    }
 
-    String url = '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
-    developer.log('Fetching meetings from: $url');
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+      meetings = []; // CLEAR meetings at start
+    });
 
-    final response = await retry(
-      () => http.get(Uri.parse(url), headers: headers),
-      maxAttempts: 3,
-      delayFactor: const Duration(seconds: 2),
-      randomizationFactor: 0.25,
-      onRetry: (e) => developer.log('Retrying meetings fetch: $e'),
-    );
-    
-    developer.log('Response status: ${response.statusCode}');
-    developer.log('Raw response body: ${response.body}');
+    try {
+      final headers = {
+        'token': widget.token,
+        'Cookie': 'PHPSESSID=a99k454ctjeu4sp52ie9dgua76',
+      };
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      developer.log('Raw API response received');
-      developer.log('Response data type: ${responseData.runtimeType}');
-      
-      if (responseData is Map<String, dynamic> &&
-          (responseData['status'] == true || responseData['status'] == 'true') &&
-          responseData['data'] is List) {
-        
-        final List<dynamic> meetingData = responseData['data'];
-        developer.log('Found ${meetingData.length} meetings in API response');
-        
-        final List<Map<String, dynamic>> newMeetings = [];
-        
-        for (var i = 0; i < meetingData.length; i++) {
-          final meeting = meetingData[i];
-          final String meetingId = meeting['id']?.toString() ?? 'unknown_$i';
-          developer.log('Processing meeting [$i]: ID: $meetingId');
-          
-          // Check for duplicate meeting IDs in THIS API response
-          if (_processedMeetingIds.contains(meetingId)) {
-            developer.log('=== DUPLICATE MEETING DETECTED IN API RESPONSE: $meetingId ===');
-            continue; // Skip this duplicate
-          }
-          _processedMeetingIds.add(meetingId);
-          
-          developer.log(
-            'Processing meeting: id=${meeting['id']}, date=${meeting['meeting_date']}, time=${meeting['meeting_time']}, done=${meeting['meeting_done']}, seller_approvel=${meeting['seller_approvel']}',
-          );
+      String url =
+          '${widget.baseUrl}/my-meeting-request.php?token=${widget.token}&user_id=${Uri.encodeComponent(_userId!)}';
+      developer.log('Fetching meetings from: $url');
 
-          Map<String, dynamic>? postDetails;
-          // Only fetch post details if post_id is valid (not 0)
-          if (meeting['post_id'] != null &&
-              meeting['post_id'] != '0' &&
-              meeting['post_id'] != 0) {
-            postDetails = await _fetchPostDetails(meeting['post_id']);
-          }
+      final response = await retry(
+        () => http.get(Uri.parse(url), headers: headers),
+        maxAttempts: 3,
+        delayFactor: const Duration(seconds: 2),
+        randomizationFactor: 0.25,
+        onRetry: (e) => developer.log('Retrying meetings fetch: $e'),
+      );
 
-          // If post details fetch failed or post_id is 0, create default post details
-          if (postDetails == null) {
-            postDetails = {
-              'title': 'Vehicle (ID: ${meeting['post_id'] ?? 'Unknown'})',
-              'price': '0',
-              'image': '',
-              'location': 'Unknown Location',
-              'by_dealer': '0',
-              'created_by': '', // Default empty
-            };
+      developer.log('Response status: ${response.statusCode}');
+      developer.log('Raw response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        developer.log('Raw API response received');
+        developer.log('Response data type: ${responseData.runtimeType}');
+
+        if (responseData is Map<String, dynamic> &&
+            (responseData['status'] == true ||
+                responseData['status'] == 'true') &&
+            responseData['data'] is List) {
+          final List<dynamic> meetingData = responseData['data'];
+          developer.log('Found ${meetingData.length} meetings in API response');
+
+          final List<Map<String, dynamic>> newMeetings = [];
+
+          for (var i = 0; i < meetingData.length; i++) {
+            final meeting = meetingData[i];
+            final String meetingId = meeting['id']?.toString() ?? 'unknown_$i';
+            developer.log('Processing meeting [$i]: ID: $meetingId');
+
+            // Check for duplicate meeting IDs in THIS API response
+            if (_processedMeetingIds.contains(meetingId)) {
+              developer.log(
+                '=== DUPLICATE MEETING DETECTED IN API RESPONSE: $meetingId ===',
+              );
+              continue; // Skip this duplicate
+            }
+            _processedMeetingIds.add(meetingId);
+
             developer.log(
-              'Using default post details for meeting ${meeting['id']}',
+              'Processing meeting: id=${meeting['id']}, date=${meeting['meeting_date']}, time=${meeting['meeting_time']}, done=${meeting['meeting_done']}, seller_approvel=${meeting['seller_approvel']}',
             );
+
+            Map<String, dynamic>? postDetails;
+            // Only fetch post details if post_id is valid (not 0)
+            if (meeting['post_id'] != null &&
+                meeting['post_id'] != '0' &&
+                meeting['post_id'] != 0) {
+              postDetails = await _fetchPostDetails(meeting['post_id']);
+            }
+
+            // If post details fetch failed or post_id is 0, create default post details
+            if (postDetails == null) {
+              postDetails = {
+                'title': 'Vehicle (ID: ${meeting['post_id'] ?? 'Unknown'})',
+                'price': '0',
+                'image': '',
+                'location': 'Unknown Location',
+                'by_dealer': '0',
+                'created_by': '', // Default empty
+              };
+              developer.log(
+                'Using default post details for meeting ${meeting['id']}',
+              );
+            }
+
+            final meetingDataMap = <String, dynamic>{
+              'id': meeting['id']?.toString() ?? 'N/A',
+              'user_id':
+                  meeting['user_id']?.toString() ?? _userId, // Buyer's ID
+              'post_id': meeting['post_id']?.toString() ?? 'N/A',
+              'bid_id': meeting['bid_id']?.toString() ?? '0',
+              'with_bid': meeting['with_bid']?.toString() ?? '0',
+              'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
+              'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
+              'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
+              'if_location_request':
+                  meeting['if_location_request']?.toString() ?? '0',
+              'latitude': meeting['latitude']?.toString() ?? '',
+              'longitude': meeting['longitude']?.toString() ?? '',
+              'location_link': meeting['location_link']?.toString() ?? '',
+              'location_request_count':
+                  meeting['location_request_count']?.toString() ?? '0',
+              'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
+              'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
+              'status': meeting['status']?.toString() ?? '1',
+              'meeting_done': meeting['meeting_done']?.toString() ?? '0',
+              'if_junk': meeting['if_junk']?.toString() ?? '0',
+              'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
+              'if_skipped': meeting['if_skipped']?.toString() ?? '0',
+              'if_not_intersect':
+                  meeting['if_not_intersect']?.toString() ?? '0',
+              'if_revisit': meeting['if_revisit']?.toString() ?? '0',
+              'if_decisionpedding':
+                  meeting['if_decisionpedding']?.toString() ?? '0',
+              'if_expired': meeting['if_expired']?.toString() ?? '0',
+              'if_cancel': meeting['if_cancel']?.toString() ?? '0',
+              'if_sold': meeting['if_sold']?.toString() ?? '0',
+              'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
+              'price_offered': meeting['price_offered']?.toString() ?? '0.00',
+              'created_on':
+                  meeting['created_on']?.toString() ??
+                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'updated_on':
+                  meeting['updated_on']?.toString() ??
+                  DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+              'title':
+                  postDetails['title'] ??
+                  'Unknown Vehicle (ID: ${meeting['post_id']})',
+              'carImage': postDetails['image'] ?? '',
+              'appId': 'APP_${meeting['post_id']}',
+              'bidDate':
+                  meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
+              'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
+              'targetPrice': postDetails['price'] ?? '0',
+              'bidPrice': meeting['bid_amount']?.toString() ?? '0',
+              'location': postDetails['location'] ?? 'Unknown Location',
+              'store':
+                  postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
+              'if_auction': meeting['if_auction']?.toString() ?? '0',
+              'middleStatus_data': 'Schedule meeting',
+              'footerStatus_data':
+                  'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
+              'timer': '0',
+              'parent_zone_id': meeting['parent_zone_id']?.toString() ?? '',
+              'created_by': postDetails['created_by'] ?? '', // Added seller ID
+            };
+
+            developer.log(
+              'Added meeting ${meeting['id']} to list: Date: ${meetingDataMap['meeting_date']}, Time: ${meetingDataMap['meeting_time']}, Seller ID: ${meetingDataMap['created_by']}',
+            );
+            newMeetings.add(meetingDataMap);
           }
 
-          final meetingDataMap = <String, dynamic>{
-            'id': meeting['id']?.toString() ?? 'N/A',
-            'user_id': meeting['user_id']?.toString() ?? _userId, // Buyer's ID
-            'post_id': meeting['post_id']?.toString() ?? 'N/A',
-            'bid_id': meeting['bid_id']?.toString() ?? '0',
-            'with_bid': meeting['with_bid']?.toString() ?? '0',
-            'bid_amount': meeting['bid_amount']?.toString() ?? '0.00',
-            'meeting_date': meeting['meeting_date']?.toString() ?? 'N/A',
-            'meeting_time': meeting['meeting_time']?.toString() ?? 'N/A',
-            'if_location_request': meeting['if_location_request']?.toString() ?? '0',
-            'latitude': meeting['latitude']?.toString() ?? '',
-            'longitude': meeting['longitude']?.toString() ?? '',
-            'location_link': meeting['location_link']?.toString() ?? '',
-            'location_request_count': meeting['location_request_count']?.toString() ?? '0',
-            'seller_approvel': meeting['seller_approvel']?.toString() ?? '0',
-            'admin_approvel': meeting['admin_approvel']?.toString() ?? '0',
-            'status': meeting['status']?.toString() ?? '1',
-            'meeting_done': meeting['meeting_done']?.toString() ?? '0',
-            'if_junk': meeting['if_junk']?.toString() ?? '0',
-            'if_reschedule': meeting['if_reschedule']?.toString() ?? '0',
-            'if_skipped': meeting['if_skipped']?.toString() ?? '0',
-            'if_not_intersect': meeting['if_not_intersect']?.toString() ?? '0',
-            'if_revisit': meeting['if_revisit']?.toString() ?? '0',
-            'if_decisionpedding': meeting['if_decisionpedding']?.toString() ?? '0',
-            'if_expired': meeting['if_expired']?.toString() ?? '0',
-            'if_cancel': meeting['if_cancel']?.toString() ?? '0',
-            'if_sold': meeting['if_sold']?.toString() ?? '0',
-            'if_reject_bid': meeting['if_reject_bid']?.toString() ?? '0',
-            'price_offered': meeting['price_offered']?.toString() ?? '0.00',
-            'created_on': meeting['created_on']?.toString() ?? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-            'updated_on': meeting['updated_on']?.toString() ?? DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
-            'title': postDetails['title'] ?? 'Unknown Vehicle (ID: ${meeting['post_id']})',
-            'carImage': postDetails['image'] ?? '',
-            'appId': 'APP_${meeting['post_id']}',
-            'bidDate': meeting['created_on']?.toString().split(' ')[0] ?? 'N/A',
-            'expirationDate': meeting['exp_date']?.toString() ?? 'N/A',
-            'targetPrice': postDetails['price'] ?? '0',
-            'bidPrice': meeting['bid_amount']?.toString() ?? '0',
-            'location': postDetails['location'] ?? 'Unknown Location',
-            'store': postDetails['by_dealer'] == '1' ? 'Dealer' : 'Individual',
-            'if_auction': meeting['if_auction']?.toString() ?? '0',
-            'middleStatus_data': 'Schedule meeting',
-            'footerStatus_data': 'Due to convenience reasons meeting location can be requested 24 hrs before meeting time only',
-            'timer': '0',
-            'parent_zone_id': meeting['parent_zone_id']?.toString() ?? '',
-            'created_by': postDetails['created_by'] ?? '', // Added seller ID
-          };
-          
           developer.log(
-            'Added meeting ${meeting['id']} to list: Date: ${meetingDataMap['meeting_date']}, Time: ${meetingDataMap['meeting_time']}, Seller ID: ${meetingDataMap['created_by']}',
+            'Total unique meetings processed: ${newMeetings.length}',
           );
-          newMeetings.add(meetingDataMap);
-        }
 
-        developer.log('Total unique meetings processed: ${newMeetings.length}');
-        
-        // Check for duplicates in the final list
-        final meetingIds = newMeetings.map((m) => m['id']).toList();
-        final uniqueIds = meetingIds.toSet();
-        if (meetingIds.length != uniqueIds.length) {
-          developer.log('=== FINAL DUPLICATE CHECK: DUPLICATES FOUND ===');
-          developer.log('Total meetings: ${meetingIds.length}, Unique meetings: ${uniqueIds.length}');
-          developer.log('Duplicate IDs: ${meetingIds.where((id) => meetingIds.where((i) => i == id).length > 1).toSet()}');
+          // Check for duplicates in the final list
+          final meetingIds = newMeetings.map((m) => m['id']).toList();
+          final uniqueIds = meetingIds.toSet();
+          if (meetingIds.length != uniqueIds.length) {
+            developer.log('=== FINAL DUPLICATE CHECK: DUPLICATES FOUND ===');
+            developer.log(
+              'Total meetings: ${meetingIds.length}, Unique meetings: ${uniqueIds.length}',
+            );
+            developer.log(
+              'Duplicate IDs: ${meetingIds.where((id) => meetingIds.where((i) => i == id).length > 1).toSet()}',
+            );
+          } else {
+            developer.log('=== FINAL DUPLICATE CHECK: NO DUPLICATES ===');
+          }
+
+          // Update static cache after successful fetch
+          _updateStaticCache();
+
+          // Update state with new meetings
+          setState(() {
+            meetings = newMeetings;
+            isLoading = false;
+          });
+
+          developer.log(
+            'Meetings loaded successfully: ${meetings.length} items',
+          );
         } else {
-          developer.log('=== FINAL DUPLICATE CHECK: NO DUPLICATES ===');
+          developer.log(
+            'Unexpected response format: ${responseData.toString()}',
+          );
+          setState(() {
+            errorMessage = 'Currently No Meeting';
+            isLoading = false;
+          });
         }
-
-        // Update static cache after successful fetch
-        _updateStaticCache();
-        
-        // Update state with new meetings
+      } else if (response.statusCode == 429) {
+        developer.log('Rate limit exceeded for meetings fetch');
         setState(() {
-          meetings = newMeetings;
+          errorMessage = 'Too many requests. Please try again later.';
           isLoading = false;
         });
-        
-        developer.log('Meetings loaded successfully: ${meetings.length} items');
       } else {
-        developer.log(
-          'Unexpected response format: ${responseData.toString()}',
-        );
+        developer.log('Failed to fetch meetings: ${response.reasonPhrase}');
         setState(() {
-          errorMessage = 'Currently No Meeting';
+          errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
           isLoading = false;
         });
       }
-    } else if (response.statusCode == 429) {
-      developer.log('Rate limit exceeded for meetings fetch');
+    } catch (e) {
+      developer.log('Error loading meetings: $e');
       setState(() {
-        errorMessage = 'Too many requests. Please try again later.';
+        errorMessage = 'Error loading meetings: $e';
         isLoading = false;
       });
-    } else {
-      developer.log('Failed to fetch meetings: ${response.reasonPhrase}');
+    } finally {
+      _isCurrentlyLoading = false;
+    }
+
+    if (mounted) {
       setState(() {
-        errorMessage = 'Failed to fetch meetings: ${response.reasonPhrase}';
         isLoading = false;
       });
     }
-  } catch (e) {
-    developer.log('Error loading meetings: $e');
-    setState(() {
-      errorMessage = 'Error loading meetings: $e';
-      isLoading = false;
-    });
-  } finally {
-    _isCurrentlyLoading = false;
+
+    developer.log(
+      '=== LOAD MEETINGS COMPLETED - ${meetings.length} meetings ===',
+    );
   }
 
-  if (mounted) {
-    setState(() {
-      isLoading = false;
-    });
-  }
-  
-  developer.log('=== LOAD MEETINGS COMPLETED - ${meetings.length} meetings ===');
-}
   List<Map<String, dynamic>> _getFilteredMeetings() {
     final status = statuses[selectedIndex];
     var filteredMeetings =
         meetings.where((meeting) {
           if (status == 'Date Fixed') {
-            return meeting['meeting_done'] == '0' &&
-                meeting['meeting_date'] != 'N/A' &&
+            // REMOVED: meeting['meeting_done'] == '0' &&
+            return meeting['meeting_date'] != 'N/A' &&
                 meeting['meeting_date']?.isNotEmpty == true &&
                 meeting['meeting_date'] != '1970-01-01';
           } else if (status == 'Meeting Request') {
-            return meeting['meeting_done'] == '0' &&
-                (meeting['meeting_date'] == 'N/A' ||
-                    meeting['meeting_date']?.isEmpty == true ||
-                    meeting['meeting_date'] == '1970-01-01');
+            // REMOVED: meeting['meeting_done'] == '0' &&
+            return (meeting['meeting_date'] == 'N/A' ||
+                meeting['meeting_date']?.isEmpty == true ||
+                meeting['meeting_date'] == '1970-01-01');
           } else if (status == 'Awaiting Location') {
-            return meeting['meeting_done'] == '0' &&
-                meeting['meeting_time'] != 'N/A' &&
+            // REMOVED: meeting['meeting_done'] == '0' &&
+            return meeting['meeting_time'] != 'N/A' &&
                 meeting['meeting_time']?.isNotEmpty == true &&
                 meeting['meeting_time'] != '00:00:00';
           } else if (status == 'Ready For Meeting') {
-            return meeting['meeting_done'] == '0' &&
-                meeting['seller_approvel'] == '1';
+            // REMOVED: meeting['meeting_done'] == '0' &&
+            return meeting['seller_approvel'] == '1';
           } else if (status == 'Meeting Completed') {
             return meeting['meeting_done'] == '1';
           }
           return false;
         }).toList();
+
     filteredMeetings.sort((a, b) {
       final aDate =
           DateTime.tryParse(a['updated_on'] ?? a['created_on'] ?? '') ??
@@ -761,7 +790,7 @@ Future<void> _loadMeetings() async {
     // Debug: Print all filtered meetings
     for (var meeting in filteredMeetings) {
       developer.log(
-        'Filtered meeting: ${meeting['id']} - Date: ${meeting['meeting_date']}, Time: ${meeting['meeting_time']}, Seller ID: ${meeting['created_by']}',
+        'Filtered meeting: ${meeting['id']} - Date: ${meeting['meeting_date']}, Time: ${meeting['meeting_time']}, Meeting Done: ${meeting['meeting_done']}, Seller ID: ${meeting['created_by']}',
       );
     }
 

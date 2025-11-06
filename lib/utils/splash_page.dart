@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lelamonline_flutter/core/router/route_names.dart';
@@ -10,7 +9,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _imageFadeAnimation;
   late Animation<Offset> _brandSlideAnimation;
@@ -24,26 +24,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
     );
 
-    _imageFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _imageFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
     _brandSlideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
 
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        print('Attempting to navigate to ${RouteNames.mainscaffold}'); // Debug print
+        print(
+          'Attempting to navigate to ${RouteNames.mainscaffold}',
+        ); // Debug print
         try {
           context.go(RouteNames.mainscaffold);
         } catch (e) {
-          print('Navigation error: $e'); 
+          print('Navigation error: $e');
         }
       } else {
         print('Widget not mounted, skipping navigation');
@@ -60,8 +61,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-backgroundColor: Color(0xFF3261AB),
-
+      backgroundColor: Color(0xFF3261AB),
 
       body: Stack(
         children: [
@@ -99,11 +99,11 @@ backgroundColor: Color(0xFF3261AB),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 20.0),
               child: Text(
-                'Powered by Green Creon LLP',
+                'Powered by GreenCreon LLP',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white, 
+                  color: Colors.white,
                 ),
               ),
             ),

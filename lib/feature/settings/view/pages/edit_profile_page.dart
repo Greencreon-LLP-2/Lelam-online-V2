@@ -157,124 +157,128 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return changedFields;
   }
 
-Future<void> _saveChanges({required int saveType}) async {
-  if (!_formKey.currentState!.validate()) {
-    Fluttertoast.showToast(
-      msg: "Please fill in all required fields correctly",
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.orange.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
-    return;
-  }
-
-  try {
-    final changedFields = _getChangedFields(saveType: saveType);
-    final isImageUpdated = _selectedImagePath != null;
-
-    // Only make API call if there are changes or a new image is selected
-    if (changedFields.isNotEmpty || isImageUpdated) {
-      changedFields['user_id'] = _userProvider.userData?.userId ?? '';
-
-      // Call the profile update API
-      final response = await ApiService().postMultipart(
-        url: userProfileUpdate,
-        fields: changedFields,
-        fileField: "image",
-        filePath: _selectedImagePath,
-      );
-
-      if (response["status"] == true && response["code"] == 200) {
-        // Re-fetch the full updated user data (same as MainScaffold)
-        final updatedResponse = await ApiService().get(
-          url: userDetails,
-          queryParams: {"user_id": _userProvider.userData?.userId ?? ''},
-        );
-
-        if (updatedResponse['status'] == true && updatedResponse['code'] == 200) {
-          final updatedUserData = UserData.fromJson(
-            updatedResponse['data'][0] as Map<String, dynamic>,
-          );
-
-          // Update Hive via provider
-          await Provider.of<LoggedUserProvider>(
-            context,
-            listen: false,
-          ).setUser(updatedUserData);
-
-          // Update local state with new data
-          setState(() {
-            _originalData = updatedUserData.toJson();
-            _nameController.text = updatedUserData.name;
-            _emailController.text = updatedUserData.username;
-            _phoneController.text = updatedUserData.mobile;
-            _address1Controller.text = updatedUserData.address1;
-            _address2Controller.text = updatedUserData.address2;
-            _stateController.text = updatedUserData.state;
-            _pincodeController.text = ''; // Update if pincode is added to UserData
-            _cityController.text = updatedUserData.state; // Update if city is added
-            _countryController.text = updatedUserData.country;
-            _originalImageUrl = (updatedUserData.image?.isNotEmpty ?? false)
-                ? "$getImageFromServer${updatedUserData.image}"
-                : null;
-            _selectedImagePath = null; // Clear selected image after update
-          });
-
-          // Clear password field if password update was successful
-          if (saveType == 1) {
-            _newPasswordController.clear();
-          }
-
-          // Show success message
-          String successMessage;
-          if (saveType == 1) {
-            successMessage = "Password updated successfully";
-          } else if (isImageUpdated && changedFields.isEmpty) {
-            successMessage = "Profile image updated successfully";
-          } else {
-            successMessage = "Profile updated successfully";
-          }
-
-          Fluttertoast.showToast(
-            msg: successMessage,
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.green.withOpacity(0.8),
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-        } else {
-          throw Exception('Failed to fetch updated user data');
-        }
-      } else {
-        throw Exception(response["data"]?.toString() ?? 'Update failed');
-      }
-    } else {
+  Future<void> _saveChanges({required int saveType}) async {
+    if (!_formKey.currentState!.validate()) {
       Fluttertoast.showToast(
-        msg: "No changes detected",
+        msg: "Please fill in all required fields correctly",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.orange.withOpacity(0.8),
         textColor: Colors.white,
         fontSize: 16.0,
       );
+      return;
     }
-  } catch (e, stack) {
-    print('Error in _saveChanges: $e');
-    print(stack);
-    Fluttertoast.showToast(
-      msg: "Error: $e",
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.red.withOpacity(0.8),
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
-    // Do NOT call Navigator.pop(context) here to avoid unintended navigation
+
+    try {
+      final changedFields = _getChangedFields(saveType: saveType);
+      final isImageUpdated = _selectedImagePath != null;
+
+      // Only make API call if there are changes or a new image is selected
+      if (changedFields.isNotEmpty || isImageUpdated) {
+        changedFields['user_id'] = _userProvider.userData?.userId ?? '';
+
+        // Call the profile update API
+        final response = await ApiService().postMultipart(
+          url: userProfileUpdate,
+          fields: changedFields,
+          fileField: "image",
+          filePath: _selectedImagePath,
+        );
+
+        if (response["status"] == true && response["code"] == 200) {
+          // Re-fetch the full updated user data (same as MainScaffold)
+          final updatedResponse = await ApiService().get(
+            url: userDetails,
+            queryParams: {"user_id": _userProvider.userData?.userId ?? ''},
+          );
+
+          if (updatedResponse['status'] == true &&
+              updatedResponse['code'] == 200) {
+            final updatedUserData = UserData.fromJson(
+              updatedResponse['data'][0] as Map<String, dynamic>,
+            );
+
+            // Update Hive via provider
+            await Provider.of<LoggedUserProvider>(
+              context,
+              listen: false,
+            ).setUser(updatedUserData);
+
+            // Update local state with new data
+            setState(() {
+              _originalData = updatedUserData.toJson();
+              _nameController.text = updatedUserData.name;
+              _emailController.text = updatedUserData.username;
+              _phoneController.text = updatedUserData.mobile;
+              _address1Controller.text = updatedUserData.address1;
+              _address2Controller.text = updatedUserData.address2;
+              _stateController.text = updatedUserData.state;
+              _pincodeController.text =
+                  ''; // Update if pincode is added to UserData
+              _cityController.text =
+                  updatedUserData.state; // Update if city is added
+              _countryController.text = updatedUserData.country;
+              _originalImageUrl =
+                  (updatedUserData.image?.isNotEmpty ?? false)
+                      ? "$getImageFromServer${updatedUserData.image}"
+                      : null;
+              _selectedImagePath = null; // Clear selected image after update
+            });
+
+            // Clear password field if password update was successful
+            if (saveType == 1) {
+              _newPasswordController.clear();
+            }
+
+            // Show success message
+            String successMessage;
+            if (saveType == 1) {
+              successMessage = "Password updated successfully";
+            } else if (isImageUpdated && changedFields.isEmpty) {
+              successMessage = "Profile image updated successfully";
+            } else {
+              successMessage = "Profile updated successfully";
+            }
+
+            Fluttertoast.showToast(
+              msg: successMessage,
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.BOTTOM,
+              backgroundColor: Colors.green.withOpacity(0.8),
+              textColor: Colors.white,
+              fontSize: 16.0,
+            );
+          } else {
+            throw Exception('Failed to fetch updated user data');
+          }
+        } else {
+          throw Exception(response["data"]?.toString() ?? 'Update failed');
+        }
+      } else {
+        Fluttertoast.showToast(
+          msg: "No changes detected",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.orange.withOpacity(0.8),
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+      }
+    } catch (e, stack) {
+      print('Error in _saveChanges: $e');
+      print(stack);
+      Fluttertoast.showToast(
+        msg: "Error: $e",
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red.withOpacity(0.8),
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      // Do NOT call Navigator.pop(context) here to avoid unintended navigation
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -340,20 +344,21 @@ Future<void> _saveChanges({required int saveType}) async {
                                   : _originalImageUrl != null
                                   ? ClipOval(
                                     child: CachedNetworkImage(
-  imageUrl: _originalImageUrl!,
-  width: 120,
-  height: 120,
-  fit: BoxFit.cover,
-  placeholder: (context, url) => Image.asset(
-    'assets/images/avatar.gif',
-    fit: BoxFit.cover,
-  ),
-  errorWidget: (context, url, error) => Image.asset(
-    'assets/images/avatar.gif',
-    fit: BoxFit.cover,
-  ),
-),
-
+                                      imageUrl: _originalImageUrl!,
+                                      width: 120,
+                                      height: 120,
+                                      fit: BoxFit.cover,
+                                      placeholder:
+                                          (context, url) => Image.asset(
+                                            'assets/images/avatar.gif',
+                                            fit: BoxFit.cover,
+                                          ),
+                                      errorWidget:
+                                          (context, url, error) => Image.asset(
+                                            'assets/images/avatar.gif',
+                                            fit: BoxFit.cover,
+                                          ),
+                                    ),
                                   )
                                   : Image.asset(
                                     'assets/images/avatar.gif',

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 
 import 'package:lelamonline_flutter/core/router/route_names.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
@@ -181,7 +182,27 @@ class _MarketPlaceProductDetailsPageState
       });
     }
   }
+  Future<void> _fetchSellerProfileImage() async {
+    try {
+      // Use the same endpoint as EditProfilePage
+      final response = await ApiService().get(
+        url: userDetails, // Use the same userDetails endpoint
+        queryParams: {"user_id": createdBy},
+      );
 
+      if (response['status'] == true && response['code'] == 200) {
+        final userData = UserData.fromJson(response['data'][0]);
+        setState(() {
+          sellerProfileImage =
+              (userData.image?.isNotEmpty ?? false)
+                  ? "$getImageFromServer${userData.image}"
+                  : '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile image: $e');
+    }
+  }
   Future<void> _showResponseDialog(
     String message,
     bool isSuccess,
@@ -250,9 +271,31 @@ class _MarketPlaceProductDetailsPageState
                           color: Colors.green[800],
                         ),
                       ),
-                    if (isSuccess && isHighestBid) const SizedBox(height: 8),
+                    if (isSuccess && !isHighestBid)
+                      Text(
+                        'Your bid is low please Increase your bid or Proceed a meeting without Bid to discuss further with seller',
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange[800],
+                        ),
+                      ),
+
+                    // Show API message ONLY when it's a high bid
+                    if (isSuccess && isHighestBid) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        message, // API message shown only for high bids
+                        style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          fontSize: 16,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 8),
                     Text(
-                      '$message\n\nPlease Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
+                      'Please Note, Bid Acceptance is purely seller decision, seller also reserves the right to disagree your bid if he feels the price is low. Call support now for more details',
                       style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                         fontSize: 16,
                         color: Colors.grey[800],
@@ -2013,7 +2056,7 @@ class _MarketPlaceProductDetailsPageState
     try {
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/post-seller-information.php?token=$token&user_id=${widget.product.createdBy}',
+          'https://lelamonline.com/admin/api/v1/post-seller-information.php?token=5cb2c9b569416b5db1604e0e12478ded&user_id=$createdBy',
         ),
       );
 
@@ -2025,11 +2068,13 @@ class _MarketPlaceProductDetailsPageState
           final data = jsonResponse['data'][0];
           setState(() {
             sellerName = data['name'] ?? 'Unknown';
-            sellerProfileImage = data['profile_image'];
             sellerNoOfPosts = data['no_post'] ?? 0;
-            sellerActiveFrom = data['active_from'] ?? 'N/A';
+            sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
+
+          // ADD THIS LINE - Call the profile image method
+          await _fetchSellerProfileImage();
         } else {
           setState(() {
             sellerErrorMessage = 'Invalid seller data';
@@ -2835,6 +2880,20 @@ class _MarketPlaceProductDetailsPageState
   }
 
   Widget _buildQuestionsSection(BuildContext context, String id) {
+    // Enhanced filter: treat orphans (replies without parent in list) as top-level
+    final parentReviews =
+        reviews
+            .where(
+              (review) =>
+                  review.parentId == '0' ||
+                  (review.parentId?.isEmpty ?? true) ||
+                  !reviews.any((r) => r.id.toString() == review.parentId),
+            )
+            .toList();
+    final parentCount = parentReviews.length;
+    developer.log(
+      'Reviews count: ${reviews.length}, Parent count: $parentCount' as String,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2891,17 +2950,13 @@ class _MarketPlaceProductDetailsPageState
           ],
         ),
         const SizedBox(height: 12),
-
-        // Answers section WITHOUT container styling
+        // Answers section
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              
               const SizedBox(height: 8),
               if (isLoadingReviews)
                 const Center(child: CircularProgressIndicator())
@@ -2909,7 +2964,7 @@ class _MarketPlaceProductDetailsPageState
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Text(
-                    "",
+                    reviewsError,
                     style: const TextStyle(
                       fontSize: 16,
                       color: Color.fromARGB(255, 192, 187, 187),
@@ -2917,11 +2972,11 @@ class _MarketPlaceProductDetailsPageState
                     textAlign: TextAlign.center,
                   ),
                 )
-              else if (reviews.isEmpty)
+              else if (parentReviews.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: const Text(
-                    '',
+                    'No questions and answers available yet. Be the first to ask!',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey,
@@ -2931,25 +2986,76 @@ class _MarketPlaceProductDetailsPageState
                   ),
                 )
               else
-                // Show answers directly without any container
+                // Show Q&A list
                 ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount:
-                      reviews.where((review) => review.parentId == '0').length,
+                  itemCount: parentCount,
                   separatorBuilder: (context, index) => const Divider(),
                   itemBuilder: (context, index) {
-                    final parent =
-                        reviews
-                            .where((review) => review.parentId == '0')
-                            .toList()[index];
+                    if (index >= parentReviews.length)
+                      return const SizedBox.shrink(); // Safety check
+                    final parent = parentReviews[index];
+                    // If orphan reply, label it
+                    final isOrphanReply =
+                        parent.parentId != '0' &&
+                        (parent.parentId?.isEmpty ?? false);
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildReviewItem(parent, isReply: false),
-                        // Show replies indented
+                        // Top-level item (question or orphan reply)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.question_answer,
+                                size: 16,
+                                color: Colors.grey[700],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (isOrphanReply)
+                                      Text(
+                                        'Reply (Parent Question Missing):',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    Text(
+                                      parent.comment,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black,
+                                        fontStyle: FontStyle.normal,
+                                      ),
+                                      semanticsLabel:
+                                          'Comment: ${parent.comment}',
+                                    ),
+                                    Text(
+                                      'Posted on: ${parent.createdOn}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Replies indented
                         ...reviews
-                            .where((reply) => reply.parentId == parent.id)
+                            .where(
+                              (reply) => reply.parentId == parent.id.toString(),
+                            )
                             .map(
                               (reply) => Padding(
                                 padding: const EdgeInsets.only(
@@ -3024,11 +3130,21 @@ class _MarketPlaceProductDetailsPageState
       );
     }
 
-    if (uniqueSellerComments.isEmpty) {
-      return const Center(child: Text('No seller comments available'));
+    // Filter out comments with null or empty values
+    final validComments =
+        uniqueSellerComments.where((comment) {
+          final value = comment.attributeValue?.trim() ?? '';
+          return value.isNotEmpty &&
+              value.toLowerCase() != 'null' &&
+              value.toLowerCase() != 'n/a' &&
+              value.toLowerCase() != 'not specified';
+        }).toList();
+
+    if (validComments.isEmpty) {
+      return const SizedBox.shrink(); // Hide completely if no valid comments
     }
 
-    // Helper function to format attribute names (e.g., "no of owners" -> "No of Owners")
+    // Helper function to format attribute names
     String formatAttributeName(String name) {
       return name
           .split(' ')
@@ -3049,15 +3165,16 @@ class _MarketPlaceProductDetailsPageState
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        // Ensure the comments are rendered in the order of uniqueSellerComments
-        ...uniqueSellerComments
-            .map(
-              (comment) => _buildSellerCommentItem(
-                formatAttributeName(comment.attributeName),
-                comment.attributeValue,
-              ),
-            )
-            .toList(),
+        // Keep the original layout without dividers
+        Column(
+          children:
+              validComments.map((comment) {
+                return _buildSellerCommentItem(
+                  formatAttributeName(comment.attributeName),
+                  comment.attributeValue!,
+                );
+              }).toList(),
+        ),
       ],
     );
   }
@@ -3263,12 +3380,6 @@ class _MarketPlaceProductDetailsPageState
                                 color: Colors.grey[600],
                               ),
                             ),
-                           
-                            const SizedBox(width: 4),
-                            Text(
-                              createdOn,
-                              style: const TextStyle(color: Colors.grey),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -3276,49 +3387,61 @@ class _MarketPlaceProductDetailsPageState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  size: 16,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(width: 4),
-                                _isLoadingLocations
-                                    ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                    : Text(
-                                      landMark, // This shows the district from parent_zone_id
-                                      style: const TextStyle(
-                                        color: Colors.grey,
-                                      ),
+                                // Location + Landmark section on the left
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      size: 16,
+                                      color: Colors.grey,
                                     ),
-                                    
-                              ],
-                              
-                            ),
-
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 20.0,
-                              ), // Indent to align with icon
-                              child: Text(
-                                widget.product.landMark ??
-                                    'Landmark not specified', // This shows the actual landmark
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
+                                    const SizedBox(width: 4),
+                                    _isLoadingLocations
+                                        ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                        : Text(
+                                          [
+                                            if (landMark.isNotEmpty) landMark,
+                                            if (widget.product.landMark !=
+                                                    null &&
+                                                widget
+                                                    .product
+                                                    .landMark!
+                                                    .isNotEmpty)
+                                              widget.product.landMark!,
+                                          ].join(
+                                            ' | ',
+                                          ), // Combines location and landmark
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                  ],
                                 ),
-                              ),
+
+                                // Created on date on the right
+                                Text(
+                                  createdOn,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 8),
                           ],
                         ),
+
                         // if (latitude.isNotEmpty && longitude.isNotEmpty) ...[
                         //   const SizedBox(height: 8),
                         //   GestureDetector(

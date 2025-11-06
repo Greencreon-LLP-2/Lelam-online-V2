@@ -1,8 +1,8 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter_meta_sdk/flutter_meta_sdk.dart'; // Added for Meta SDK integration
 import 'package:lelamonline_flutter/core/router/app_router.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/core/service/core_data_notifier.dart';
@@ -11,11 +11,43 @@ import 'package:lelamonline_flutter/core/service/push_notification_service.dart'
 import 'package:lelamonline_flutter/feature/home/view/provider/location_provider.dart';
 import 'package:lelamonline_flutter/feature/home/view/provider/product_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart'; // Added for OneSignal integration
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
+
+  // Initialize Meta SDK and log app activation
+  final metaSdk = FlutterMetaSdk();
+  metaSdk.logEvent(name: 'fb_mobile_activate_app');
+
+  // Initialize OneSignal for push notifications
+  OneSignal.initialize("c-a9d3-4987-beff-64dc671f75d5");
+
+  // Enable verbose logging for debugging (remove in production)
+  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+
+  // Request permission (silent prompt)
+  OneSignal.Notifications.requestPermission(false);
+
+  // Handle notification received (display it)
+  OneSignal.Notifications.addForegroundWillDisplayListener((event) {
+    event.notification.display();
+  });
+
+  // Handle notification opened (e.g., navigate)
+  OneSignal.Notifications.addClickListener((event) {
+    print('Notification clicked: ${event.notification.title}');
+    // Add navigation logic here, e.g., using appRouter
+  });
+
+  // Handle permission changes (corrected to addPermissionObserver)
+  OneSignal.Notifications.addPermissionObserver((state) {
+  });
+
+  // Note: The OneSignal REST API key ("YjYzOGJjN2UtMTk5Zi00YjMwLTlhZTAtOGZlZWJiZmIwYzMw") is typically used server-side for sending notifications.
+  // If needed in your PushNotificationService, pass it there (e.g., for backend integration).
 
   // Lock orientation to portrait
   await SystemChrome.setPreferredOrientations([
@@ -34,7 +66,7 @@ void main() async {
     ),
   );
 
-  // Initialize AwesomeNotifications
+  // Initialize AwesomeNotifications (kept for local notifications; can coexist with OneSignal for push)
   await AwesomeNotificationService().initialize();
 
   // Initialize user provider

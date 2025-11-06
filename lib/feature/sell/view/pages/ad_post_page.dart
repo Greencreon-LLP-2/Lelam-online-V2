@@ -537,14 +537,6 @@ class _AdPostPageState extends State<AdPostPage> {
     );
   }
 
-  // void _submitForm() {
-  //   print('AdPostPage _submitForm called');
-  //   if (_formKey.currentState!.validate()) {
-  //     _formKey.currentState!.save();
-  //     _adPostFormKey.currentState?._submitForm();
-  //   }
-  // }
-
   Future<void> _fetchGalleryImages(String postId) async {
     try {
       final response = await http.get(
@@ -667,6 +659,12 @@ class _AdPostFormState extends State<AdPostForm>
     'landMark': TextEditingController(),
     'registration': TextEditingController(),
     'insurance': TextEditingController(),
+    'year': TextEditingController(),
+    'noOfOwners': TextEditingController(),
+    'fuelType': TextEditingController(),
+    'transmission': TextEditingController(),
+    'kmRange': TextEditingController(),
+    'soldBy': TextEditingController(),
   };
   final Map<String, List<AttributeVariation>> _attributeVariations = {};
   Map<String, String> _attributeIdMap = {};
@@ -683,7 +681,7 @@ class _AdPostFormState extends State<AdPostForm>
   final Map<String, TextEditingController> _attributeControllers = {};
   String? _selectedDistrict;
 
-  final GlobalKey _imagesKey = GlobalKey();
+  final GlobalKey<FormFieldState> _imagesKey = GlobalKey<FormFieldState>();
   final GlobalKey<FormFieldState> _brandKey = GlobalKey<FormFieldState>();
   final GlobalKey<FormFieldState> _modelKey = GlobalKey<FormFieldState>();
   final GlobalKey<FormFieldState> _variationKey = GlobalKey<FormFieldState>();
@@ -694,6 +692,13 @@ class _AdPostFormState extends State<AdPostForm>
   final GlobalKey<FormFieldState> _registrationKey =
       GlobalKey<FormFieldState>();
   final GlobalKey<FormFieldState> _insuranceKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _yearKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _noOfOwnersKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _fuelTypeKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _transmissionKey =
+      GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _kmRangeKey = GlobalKey<FormFieldState>();
+  final GlobalKey<FormFieldState> _soldByKey = GlobalKey<FormFieldState>();
   Map<String, GlobalKey<FormFieldState>> _attrKeys = {};
 
   double? _latitude;
@@ -742,12 +747,13 @@ class _AdPostFormState extends State<AdPostForm>
       end: 1,
     ).animate(_animationController);
     _animationController.forward();
+
+    // Initialize _attrKeys as empty, it will be populated after fetching attributes
+    _attrKeys = {};
+
     _fetchInitialData();
-    _attrKeys = {
-      for (var attr in _attributes) attr.name: GlobalKey<FormFieldState>(),
-    };
     setState(() {
-      _isLoadingImages = false; // Images are loaded
+      _isLoadingImages = false;
     });
   }
 
@@ -875,12 +881,18 @@ class _AdPostFormState extends State<AdPostForm>
     _attributes = await AttributeValueService.fetchAttributes(
       widget.categoryId,
     );
+
+    // Initialize attribute keys AFTER fetching attributes
     setState(() {
+      _attrKeys = {
+        for (var attr in _attributes) attr.name: GlobalKey<FormFieldState>(),
+      };
       _attributeIdMap = {for (var attr in _attributes) attr.name: attr.id};
       _selectedAttributes = {for (var attr in _attributes) attr.name: null};
       _attributeControllers.addAll({
         for (var attr in _attributes) attr.name: TextEditingController(),
       });
+
       if (widget.adData?['filters'] != null) {
         try {
           final filters =
@@ -901,36 +913,40 @@ class _AdPostFormState extends State<AdPostForm>
       var variations = await AttributeValueService.fetchAttributeVariations(
         attr.id,
       );
-      // Sort and filter variations for "Year" and "No of owners"
-      if (attr.name == 'Year' || attr.name == 'No of owners') {
-        if (attr.name == 'Year') {
-          // Filter years to include only 2000 to 2025
-          variations =
-              variations.where((v) {
-                final year = int.tryParse(v.name);
-                return year != null && year >= 2000 && year <= 2025;
-              }).toList();
-          // Sort in descending order
-          variations.sort((a, b) {
-            final aYear = int.tryParse(a.name)!;
-            final bYear = int.tryParse(b.name)!;
-            return bYear.compareTo(aYear); // Descending: 2025, 2024, ..., 2000
-          });
-        } else {
-          // For No of owners, handle numeric and non-numeric cases
-          variations.sort((a, b) {
-            final aValue = int.tryParse(a.name);
-            final bValue = int.tryParse(b.name);
-            if (aValue != null && bValue != null) {
-              return aValue.compareTo(bValue); // Ascending: 1, 2, 3
-            } else {
-              return a.name.compareTo(b.name);
-            }
-          });
-        }
+
+      // Special sorting and filtering for specific attributes
+      if (attr.name == 'Year') {
+        variations =
+            variations.where((v) {
+              final year = int.tryParse(v.name);
+              return year != null &&
+                  year >= 2000 &&
+                  year <= DateTime.now().year + 1;
+            }).toList();
+        variations.sort((a, b) {
+          final aYear = int.tryParse(a.name) ?? 0;
+          final bYear = int.tryParse(b.name) ?? 0;
+          return bYear.compareTo(aYear);
+        });
+      } else if (attr.name == 'No of owners') {
+        variations.sort((a, b) {
+          final aValue = int.tryParse(a.name) ?? 0;
+          final bValue = int.tryParse(b.name) ?? 0;
+          return aValue.compareTo(bValue);
+        });
+      } else if (attr.name == 'KM Range') {
+        variations.sort((a, b) {
+          final aRange = int.tryParse(a.name.split('-').first.trim()) ?? 0;
+          final bRange = int.tryParse(b.name.split('-').first.trim()) ?? 0;
+          return aRange.compareTo(bRange);
+        });
+      } else {
+        variations.sort((a, b) => a.name.compareTo(b.name));
       }
+
       setState(() {
         _attributeVariations[attr.name] = variations;
+
         if (_selectedAttributes[attr.name] != null) {
           final variation = variations.firstWhere(
             (v) => v.id == _selectedAttributes[attr.name],
@@ -952,6 +968,86 @@ class _AdPostFormState extends State<AdPostForm>
               _selectedAttributes[attr.name] ?? '';
         }
       });
+    }
+  }
+
+  void _scrollToFirstInvalidField() {
+    // Check for image validation first
+    if (_selectedImages.isEmpty) {
+      Scrollable.ensureVisible(
+        _imagesKey.currentContext!,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+      return;
+    }
+
+    // Check category-specific required fields
+    if (widget.categoryId == '1' || widget.categoryId == '2') {
+      if (_selectedBrand == null) {
+        Scrollable.ensureVisible(
+          _brandKey.currentContext!,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+        return;
+      }
+      if (_selectedBrandModel == null) {
+        Scrollable.ensureVisible(
+          _modelKey.currentContext!,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+        return;
+      }
+    }
+
+    // Check form field validations for Key Information section
+    final keyInfoFieldKeys = [
+      _listPriceKey,
+      _districtKey,
+      _landMarkKey,
+      _descriptionKey,
+      if (widget.categoryId == '1') _registrationKey,
+      if (widget.categoryId == '1') _insuranceKey,
+    ];
+
+    for (var key in keyInfoFieldKeys) {
+      if (key.currentState != null && key.currentState!.hasError) {
+        Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+        return;
+      }
+    }
+
+    // Check required attributes in More Info section
+    final requiredAttributes = _getRequiredAttributes();
+    for (var attrName in requiredAttributes) {
+      if (_selectedAttributes[attrName]?.isEmpty ?? true) {
+        if (_attrKeys.containsKey(attrName)) {
+          Scrollable.ensureVisible(
+            _attrKeys[attrName]!.currentContext!,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        }
+        return;
+      }
+    }
+
+    // Check form field validations for More Info section
+    for (var key in _attrKeys.values) {
+      if (key.currentState != null && key.currentState!.hasError) {
+        Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+        return;
+      }
     }
   }
 
@@ -1035,11 +1131,14 @@ class _AdPostFormState extends State<AdPostForm>
     BuildContext bottomSheetContext,
     ImageSource source,
   ) async {
+    // Close the bottom sheet immediately when user makes a selection
+    Navigator.pop(bottomSheetContext);
+
     if (_selectedImages.length >= _maxImages) {
       _showSnackBar('Maximum $_maxImages images allowed', Colors.red);
-      Navigator.pop(bottomSheetContext);
       return;
     }
+
     try {
       if (source == ImageSource.camera) {
         final image = await _imagePicker.pickImage(
@@ -1065,10 +1164,8 @@ class _AdPostFormState extends State<AdPostForm>
           });
         }
       }
-      Navigator.pop(bottomSheetContext);
     } catch (e) {
       _showSnackBar('Error picking image: $e', Colors.red);
-      Navigator.pop(bottomSheetContext);
     }
   }
 
@@ -1128,6 +1225,8 @@ class _AdPostFormState extends State<AdPostForm>
         ];
       }
     });
+
+    // Additional filters for vehicle-specific fields
     if (widget.categoryId == '1') {
       if (_controllers['registration']!.text.isNotEmpty) {
         filters[_attributeIdMap['Registration valid till'] ?? '27'] = [
@@ -1140,7 +1239,70 @@ class _AdPostFormState extends State<AdPostForm>
         ];
       }
     }
+
     return filters;
+  }
+
+  bool _validateForm() {
+    // Check images
+    if (_selectedImages.isEmpty) {
+      _scrollToFirstInvalidField();
+      return false;
+    }
+
+    // Check category-specific required fields
+    if (widget.categoryId == '1' || widget.categoryId == '2') {
+      if (_selectedBrand == null) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+      if (_selectedBrandModel == null) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+    }
+
+    if (widget.categoryId == '3') {
+      if (_controllers['listPrice']!.text.isEmpty) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+      if (_brandModels.isNotEmpty && _selectedBrand == null) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+      if (_selectedBrandModel == null) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+    }
+
+    if (widget.categoryId == '4' && _selectedBrand == null) {
+      if (_controllers['listPrice']!.text.isEmpty) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+      _scrollToFirstInvalidField();
+      return false;
+    }
+
+    // Validate all form fields
+    if (!widget.formKey.currentState!.validate()) {
+      _scrollToFirstInvalidField();
+      return false;
+    }
+
+    // Check required attributes in More Info section
+    final requiredAttributes = _getRequiredAttributes();
+    for (var attrName in requiredAttributes) {
+      if (_selectedAttributes[attrName]?.isEmpty ?? true) {
+        _scrollToFirstInvalidField();
+        return false;
+      }
+    }
+
+    // If we reach here, all validations passed
+    return true;
   }
 
   Future<void> _fetchLocation() async {
@@ -1181,135 +1343,12 @@ class _AdPostFormState extends State<AdPostForm>
   }
 
   Future<void> _submitForm() async {
-    // Image check (not part of form validation)
-    if (_selectedImages.isEmpty) {
-      Scrollable.ensureVisible(
-        _imagesKey.currentContext!,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-      _showSnackBar('Please select at least 1 image', Colors.red);
-      return;
+    // First, validate everything and check if form can be submitted
+    if (!_validateForm()) {
+      return; // Stop submission if validation fails
     }
-    // Category-specific null checks (before form validate)
-    if (widget.categoryId == '1' || widget.categoryId == '2') {
-      if (_selectedBrand == null) {
-        Scrollable.ensureVisible(
-          _brandKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please select Category/Brand', Colors.red);
-        return;
-      }
-      if (_selectedBrandModel == null) {
-        Scrollable.ensureVisible(
-          _modelKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please select a model', Colors.red);
-        return;
-      }
-    }
-    if (widget.categoryId == '3') {
-      if (_controllers['listPrice']!.text.isEmpty) {
-        Scrollable.ensureVisible(
-          _listPriceKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please provide listing price', Colors.red);
-        return;
-      }
-      if (_brandModels.isNotEmpty && _selectedBrand == null) {
-        Scrollable.ensureVisible(
-          _brandKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please select a Brand Type', Colors.red);
-        return;
-      }
-      if (_selectedBrandModel == null) {
-        Scrollable.ensureVisible(
-          _modelKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please select Sale/rent type from Brand', Colors.red);
-        return;
-      }
-    }
-    if (widget.categoryId == '4' && _selectedBrand == null) {
-      if (_controllers['listPrice']!.text.isEmpty) {
-        Scrollable.ensureVisible(
-          _listPriceKey.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-        _showSnackBar('Please provide listing price', Colors.red);
-        return;
-      }
-      Scrollable.ensureVisible(
-        _brandKey.currentContext!,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-      _showSnackBar('Please select Sale/rent type from Model', Colors.red);
-      return;
-    }
-    // Form validation (covers validators in fields like required attributes, price, etc.)
-    if (!widget.formKey.currentState!.validate()) {
-      // Collect keys in screen order (add any missing ones like registration/insurance if they have fields)
-      final List<GlobalKey<FormFieldState>> fieldKeys = [
-        _brandKey,
-        _modelKey,
-        _variationKey,
-        _listPriceKey,
-        _districtKey,
-        _landMarkKey,
-        _descriptionKey,
-        if (widget.categoryId == '1') _registrationKey,
-        if (widget.categoryId == '1') _insuranceKey,
-        ..._attrKeys.values,
-      ];
-      // Find and scroll to first field with error
-      for (var key in fieldKeys) {
-        if (key.currentState != null && key.currentState!.hasError) {
-          Scrollable.ensureVisible(
-            key.currentContext!,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          );
-          break;
-        }
-      }
-      return;
-    }
-    // Check required attributes
-    final requiredAttributes = _getRequiredAttributes();
-    final missingAttributes =
-        requiredAttributes
-            .where((attr) => _selectedAttributes[attr]?.isEmpty ?? true)
-            .toList();
-    if (missingAttributes.isNotEmpty) {
-      // Scroll to first missing attr
-      final firstMissing = missingAttributes.first;
-      if (_attrKeys.containsKey(firstMissing)) {
-        Scrollable.ensureVisible(
-          _attrKeys[firstMissing]!.currentContext!,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-      _showSnackBar(
-        'Please provide values for: ${missingAttributes.join(", ")}',
-        Colors.red,
-      );
-      return;
-    }
-    // Prepare form data
+
+    // If all validations pass, proceed with form submission
     final filters = getFilters();
     final formData = {
       'user_id': widget.userId,
@@ -1337,39 +1376,38 @@ class _AdPostFormState extends State<AdPostForm>
         'insurance_upto': _controllers['insurance']!.text,
       },
     };
+
     try {
       setState(() => isSaving = true);
       final apiService = ApiService();
       Map<String, dynamic> response;
       final mainImagePath = _selectedImages[_coverImageIndex].path;
       final allImagePaths = _selectedImages.map((e) => e.path).toList();
+
       if (widget.postId != null && widget.adData != null) {
         // Edit existing post
-        print(
-          'Calling edit API: ${AttributeValueService.baseUrl}/flutter-edit-post.php',
-        );
         formData['post_id'] = widget.postId!;
         formData['token'] = AttributeValueService.token;
 
-        // Delete all existing gallery images to avoid duplicates, then re-add all current as gallery
         final allOldGalleryIds =
             _existingImages
                 .where((img) => !(img['isMain'] ?? false))
                 .map((img) => img['id']?.toString())
                 .where((id) => id != null && id.isNotEmpty)
+                .cast<String>() // Add this line
                 .toList();
-        _deleteGalleryIds.addAll(allOldGalleryIds as Iterable<String>);
+
+        _deleteGalleryIds.addAll(allOldGalleryIds); // No cast needed now
 
         if (_deleteGalleryIds.isNotEmpty) {
           formData['delete_gallery'] = jsonEncode(_deleteGalleryIds);
-          print('Sending delete_gallery: $_deleteGalleryIds');
         }
 
         response = await apiService.postInfinityMultipart(
           url: "${AttributeValueService.baseUrl}/flutter-edit-post.php",
           fields: formData,
           mainImagePath: mainImagePath,
-          galleryImagePaths: allImagePaths, // All images including main
+          galleryImagePaths: allImagePaths,
         );
       } else {
         // Create new post
@@ -1399,9 +1437,10 @@ class _AdPostFormState extends State<AdPostForm>
             'by_dealer': '0',
           },
           mainImagePath: mainImagePath,
-          galleryImagePaths: allImagePaths, // All images including main
+          galleryImagePaths: allImagePaths,
         );
       }
+
       if (response['status'] == 'true') {
         // Construct complete adData to pass to MyAdsWidget
         final newAdData = {
@@ -1413,11 +1452,9 @@ class _AdPostFormState extends State<AdPostForm>
           'category_id': widget.categoryId,
           'price': _controllers['listPrice']!.text,
           'description': _controllers['description']!.text,
-          'image':
-              response['image'] ??
-              '', // Use server-provided image URL if available
+          'image': response['image'] ?? '',
           'district': _selectedDistrict,
-          'status': '0', // Assume pending until approved
+          'status': '0',
           'created_on': DateTime.now().toIso8601String(),
           'admin_approval': '0',
           'if_auction': '0',
@@ -1670,32 +1707,39 @@ class _AdPostFormState extends State<AdPostForm>
     ],
   );
 
-  Widget _buildImageSection() => Column(
+  Widget _buildImageSection() => FormField<List<XFile>>(
     key: _imagesKey,
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Add Photos',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+    initialValue: _selectedImages,
+    validator:
+        (value) =>
+            (value?.isEmpty ?? true) ? 'Please add at least one image' : null,
+    builder:
+        (FormFieldState<List<XFile>> field) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Add Photos',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      _selectedImages.isEmpty
-          ? Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [_buildImagePicker()],
-          )
-          : _buildImagePicker(),
-      const SizedBox(height: 24),
-    ],
+            const SizedBox(height: 16),
+            _selectedImages.isEmpty
+                ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [_buildImagePicker()],
+                )
+                : _buildImagePicker(),
+            const SizedBox(height: 24),
+          ],
+        ),
   );
 
   Widget _buildKeyInfoSection() => Column(
@@ -1823,7 +1867,7 @@ class _AdPostFormState extends State<AdPostForm>
       CustomFormField(
         fieldKey: _landMarkKey,
         controller: _controllers['landMark']!,
-        label: 'Landmark',
+        label: 'Place',
         alignLabelWithHint: true,
       ),
       const SizedBox(height: 12),
@@ -1901,12 +1945,18 @@ class _AdPostFormState extends State<AdPostForm>
                 final isRequired = _getRequiredAttributes().contains(attr.name);
                 final hasVariations =
                     _attributeVariations[attr.name]?.isNotEmpty ?? false;
+
+                // Make sure the key exists for this attribute
+                if (!_attrKeys.containsKey(attr.name)) {
+                  _attrKeys[attr.name] = GlobalKey<FormFieldState>();
+                }
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child:
                       hasVariations
                           ? CustomDropdownWidget<String>(
-                            fieldKey: _attrKeys[attr.name],
+                            fieldKey: _attrKeys[attr.name]!,
                             label: attr.name,
                             value: _selectedAttributes[attr.name],
                             items:
@@ -1917,10 +1967,9 @@ class _AdPostFormState extends State<AdPostForm>
                             onChanged: (newValue) {
                               if (newValue != null &&
                                   newValue != 'No options available') {
-                                setState(
-                                  () =>
-                                      _selectedAttributes[attr.name] = newValue,
-                                );
+                                setState(() {
+                                  _selectedAttributes[attr.name] = newValue;
+                                });
                               }
                             },
                             isRequired: isRequired,
@@ -1934,10 +1983,10 @@ class _AdPostFormState extends State<AdPostForm>
                                             ? 'Please select ${attr.name}'
                                             : null
                                     : null,
-                            hintText: '',
+                            hintText: 'Select ${attr.name}',
                           )
                           : CustomFormField(
-                            fieldKey: _attrKeys[attr.name],
+                            fieldKey: _attrKeys[attr.name]!,
                             controller: _attributeControllers[attr.name]!,
                             label: attr.name,
                             isRequired: isRequired,
@@ -1957,7 +2006,6 @@ class _AdPostFormState extends State<AdPostForm>
               }),
             ],
           );
-
   Widget _buildSubmitButton() => SafeArea(
     child: Align(
       alignment: Alignment.bottomCenter,
@@ -1978,7 +2026,7 @@ class _AdPostFormState extends State<AdPostForm>
           child:
               isSaving
                   ? const Text(
-                    'Loading...', // Change to "Loading..." text
+                    'post uploading please wait...', // Change to "Loading..." text
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,

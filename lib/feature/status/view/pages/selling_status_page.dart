@@ -15,7 +15,10 @@ class SellingStatusPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
 
     if (!userProvider.isLoggedIn) {
       return Scaffold(
@@ -44,40 +47,51 @@ class SellingStatusPage extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-   appBar: AppBar(
-  centerTitle: true,
-  title: const Text(
-    'Selling Status',
-    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-  ),
-  backgroundColor: AppTheme.primaryColor,
-  elevation: 0,
-  iconTheme: const IconThemeData(color: Colors.white),
-  leading: GoRouterState.of(context).matchedLocation != '/${RouteNames.mainscaffold}'
-      ? IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.goNamed(RouteNames.mainscaffold),
-        )
-      : null, // Hide back arrow when in MainScaffold
-  bottom: const TabBar(
-    dividerColor: Colors.transparent,
-    isScrollable: false,
-    indicatorColor: Colors.white,
-    labelColor: Colors.white,
-    unselectedLabelColor: Colors.white70,
-    labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-    unselectedLabelStyle: TextStyle(fontSize: 14),
-    tabs: [Tab(text: 'My Ads'), Tab(text: 'Sold')],
-  ),
-),
-        backgroundColor: Colors.grey[50],
-        body: TabBarView(
-          children: [
-            MyAdsWidget(adData: adData),
-            SoldPage(),
-          ],
+        appBar: AppBar(
+          centerTitle: true,
+          title: const Text(
+            'Selling Status',
+            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          backgroundColor: AppTheme.primaryColor,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Colors.white),
+          leading:
+              _shouldShowBackArrow(context)
+                  ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.goNamed(RouteNames.mainscaffold);
+                      }
+                    },
+                  )
+                  : null,
+          bottom: const TabBar(
+            dividerColor: Colors.transparent,
+            isScrollable: false,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: TextStyle(fontSize: 14),
+            tabs: [Tab(text: 'My Ads'), Tab(text: 'Sold')],
+          ),
         ),
+        backgroundColor: Colors.grey[50],
+        body: TabBarView(children: [MyAdsWidget(adData: adData), SoldPage()]),
       ),
     );
+  }
+
+  bool _shouldShowBackArrow(BuildContext context) {
+    final currentLocation = GoRouterState.of(context).uri.toString();
+    final isInMainScaffold =
+        currentLocation == '/${RouteNames.mainscaffold}' ||
+        ModalRoute.of(context)?.settings.name?.contains('mainscaffold') == true;
+
+    return !isInMainScaffold;
   }
 }

@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as developer;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
+import 'package:lelamonline_flutter/core/model/user_model.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
 import 'package:lelamonline_flutter/core/service/logged_user_provider.dart';
 import 'package:lelamonline_flutter/feature/categories/models/market_place_detail.dart';
@@ -20,7 +23,7 @@ import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:provider/provider.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
   final dynamic product;
@@ -51,7 +54,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   List<ContainerInfo> _containerInfo = [];
   String _containerInfoError = '';
 
-    String _modelVariation = 'N/A';
+  String _modelVariation = 'N/A';
 
   final AuctionService _auctionService = AuctionService();
   List<Map<String, dynamic>> _bidHistory = [];
@@ -108,112 +111,220 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     }
   }
 
+  Timer? _refreshTimer;
   @override
   void initState() {
     super.initState();
     _loadUserId();
     _fetchAllData();
+    _startAutoRefresh();
   }
 
- Future<void> _fetchAllData() async {
-  setState(() {
-    _isLoading = true;
-    _isLoadingLocations = true;
-  });
-  try {
-    await Future.wait([
-      _fetchLocations(),
-      _fetchAttributesData(),
-      _fetchVariation(), // Add this
-      _fetchSellerInfo(),
-      _fetchContainerInfo(),
-      _fetchFavoriteStatus(),
-      _auctionService.fetchBidHistory(id).then((value) {
-        _bidHistory = value;
-      }),
-      _auctionService.fetchMinBidIncrement(id).then((value) {
-        _minBidIncrement = value.toDouble();
-      }),
-    ]);
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
-    setState(() {
-      if (_bidHistory.isNotEmpty) {
-        _currentHighestBid = _bidHistory[0]['amount']?.replaceAll('₹', '').replaceAll(',', '') ?? '0';
-        _currentBid = int.tryParse(_currentHighestBid) ?? 0;
-      } else {
-        _currentHighestBid = auctionStartingPrice;
-        _currentBid = int.tryParse(auctionStartingPrice) ?? 0;
-      }
-      _isLoading = false;
-      _isLoadingLocations = false;
-    });
-  } catch (e) {
-    debugPrint('Error fetching auction data: $e');
-    setState(() {
-      _isLoading = false;
-      _isLoadingLocations = false;
-      _currentHighestBid = 'Error: Failed to fetch bid data';
+  void _startAutoRefresh() {
+    // Refresh every 3 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _refreshBidData();
     });
   }
-}
 
-Future<void> _fetchFavoriteStatus() async {
-  if (userId == null || userId!.isEmpty) return;
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId'),
-      headers: {'token': token},
-    );
-    debugPrint('Favorite Status API Response: Status=${response.statusCode}, Body=${response.body}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == 'true') {
+  Future<void> _refreshBidData() async {
+    try {
+      await Future.wait([
+        _auctionService.fetchBidHistory(id).then((value) {
+          if (mounted) {
+            setState(() {
+              _bidHistory = value;
+            });
+          }
+        }),
+        _fetchMinBidIncrementFromApi(),
+      ]);
+
+      if (mounted) {
         setState(() {
-          _isFavorited = data['data']?['is_favorited'] == 'true';
+          if (_bidHistory.isNotEmpty) {
+            _currentHighestBid =
+                _bidHistory[0]['amount']
+                    ?.replaceAll('₹', '')
+                    .replaceAll(',', '') ??
+                '0';
+            _currentBid = int.tryParse(_currentHighestBid) ?? 0;
+          } else {
+            _currentHighestBid = auctionStartingPrice;
+            _currentBid = int.tryParse(auctionStartingPrice) ?? 0;
+          }
         });
-        debugPrint('Set _isFavorited: $_isFavorited');
+      }
+    } catch (e) {
+      debugPrint('Error refreshing bid data: $e');
+    }
+  }
+
+  // Update your existing _fetchMinBidIncrementFromApi method
+  Future<void> _fetchMinBidIncrementFromApi() async {
+    try {
+      final minBidValue = await _auctionService.fetchMinBidIncrement(id);
+      if (mounted) {
+        setState(() {
+          _minBidIncrement = minBidValue;
+        });
+      }
+      debugPrint('Minimum bid increment from API: $_minBidIncrement');
+    } catch (e) {
+      debugPrint('Error fetching min bid increment: $e');
+      final fallbackValue = double.tryParse(auctionPriceIntervel) ?? 1000.0;
+      if (mounted) {
+        setState(() {
+          _minBidIncrement = fallbackValue;
+        });
       }
     }
-  } catch (e) {
-    debugPrint('Error fetching favorite status: $e');
   }
-}
 
-Future<void> _toggleFavorite() async {
-  if (userId == null || userId!.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please log in to favorite this item')),
-    );
-    return;
-  }
-  try {
-    final response = await http.post(
-      Uri.parse('$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId&action=${_isFavorited ? 'remove' : 'add'}'),
-      headers: {'token': token},
-    );
-    debugPrint('Toggle Favorite API Response: Status=${response.statusCode}, Body=${response.body}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == 'true') {
-        setState(() {
-          _isFavorited = !_isFavorited;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_isFavorited ? 'Added to favorites' : 'Removed from favorites')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update favorite status')),
-        );
-      }
+  Future<void> _fetchAllData() async {
+    setState(() {
+      _isLoading = true;
+      _isLoadingLocations = true;
+    });
+    try {
+      await Future.wait([
+        _fetchLocations(),
+        _fetchAttributesData(),
+        _fetchVariation(), // Add this
+        _fetchSellerInfo(),
+        _fetchContainerInfo(),
+        _fetchFavoriteStatus(),
+        _auctionService.fetchBidHistory(id).then((value) {
+          _bidHistory = value;
+        }),
+        _fetchMinBidIncrementFromApi(),
+        _auctionService.fetchMinBidIncrement(id).then((value) {
+          _minBidIncrement = value.toDouble();
+        }),
+      ]);
+
+      setState(() {
+        if (_bidHistory.isNotEmpty) {
+          _currentHighestBid =
+              _bidHistory[0]['amount']
+                  ?.replaceAll('₹', '')
+                  .replaceAll(',', '') ??
+              '0';
+          _currentBid = int.tryParse(_currentHighestBid) ?? 0;
+        } else {
+          _currentHighestBid = auctionStartingPrice;
+          _currentBid = int.tryParse(auctionStartingPrice) ?? 0;
+        }
+        _isLoading = false;
+        _isLoadingLocations = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching auction data: $e');
+      setState(() {
+        _isLoading = false;
+        _isLoadingLocations = false;
+        _currentHighestBid = 'Error: Failed to fetch bid data';
+      });
     }
-  } catch (e) {
-    debugPrint('Error toggling favorite: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: $e')),
-    );
   }
-}
+
+  Future<void> _fetchFavoriteStatus() async {
+    if (userId == null || userId!.isEmpty) return;
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId',
+        ),
+        headers: {'token': token},
+      );
+      debugPrint(
+        'Favorite Status API Response: Status=${response.statusCode}, Body=${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'true') {
+          setState(() {
+            _isFavorited = data['data']?['is_favorited'] == 'true';
+          });
+          debugPrint('Set _isFavorited: $_isFavorited');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching favorite status: $e');
+    }
+  }
+
+  Future<void> _fetchSellerProfileImage() async {
+    try {
+      // Use the same endpoint as EditProfilePage
+      final response = await ApiService().get(
+        url: userDetails, // Use the same userDetails endpoint
+        queryParams: {"user_id": createdBy},
+      );
+
+      if (response['status'] == true && response['code'] == 200) {
+        final userData = UserData.fromJson(response['data'][0]);
+        setState(() {
+          sellerProfileImage =
+              (userData.image?.isNotEmpty ?? false)
+                  ? "$getImageFromServer${userData.image}"
+                  : '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile image: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (userId == null || userId!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to favorite this item')),
+      );
+      return;
+    }
+    try {
+      final response = await http.post(
+        Uri.parse(
+          '$baseUrl/favorite.php?token=$token&post_id=$id&user_id=$userId&action=${_isFavorited ? 'remove' : 'add'}',
+        ),
+        headers: {'token': token},
+      );
+      debugPrint(
+        'Toggle Favorite API Response: Status=${response.statusCode}, Body=${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'true') {
+          setState(() {
+            _isFavorited = !_isFavorited;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isFavorited ? 'Added to favorites' : 'Removed from favorites',
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to update favorite status')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
 
   Future<void> _loadUserId() async {
     final userProvider = Provider.of<LoggedUserProvider>(
@@ -373,41 +484,47 @@ Future<void> _toggleFavorite() async {
     return iconMap[bootstrapIcon] ?? Icons.info_outline;
   }
 
-Future<void> _fetchVariation() async {
-  try {
-    final response = await http.get(
-      Uri.parse('$baseUrl/post-brand-model-variation.php?token=$token&post_id=$id'),
-      headers: {'token': token},
-    );
-    debugPrint('Variation API Response: Status=${response.statusCode}, Body=${response.body}');
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      debugPrint('Parsed Variation Data: $data');
-      if (data['status'] == 'true' && data['data'] is List && (data['data'] as List).isNotEmpty) {
-        final variations = data['data'][0]['variations']?.toString() ?? 'N/A';
-        setState(() {
-          _modelVariation = variations;
-        });
-        debugPrint('Set _modelVariation: $variations');
+  Future<void> _fetchVariation() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/post-brand-model-variation.php?token=$token&post_id=$id',
+        ),
+        headers: {'token': token},
+      );
+      debugPrint(
+        'Variation API Response: Status=${response.statusCode}, Body=${response.body}',
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        debugPrint('Parsed Variation Data: $data');
+        if (data['status'] == 'true' &&
+            data['data'] is List &&
+            (data['data'] as List).isNotEmpty) {
+          final variations = data['data'][0]['variations']?.toString() ?? 'N/A';
+          setState(() {
+            _modelVariation = variations;
+          });
+          debugPrint('Set _modelVariation: $variations');
+        } else {
+          debugPrint('No valid variation data: $data');
+          setState(() {
+            _modelVariation = 'N/A';
+          });
+        }
       } else {
-        debugPrint('No valid variation data: $data');
+        debugPrint('Variation API failed with status: ${response.statusCode}');
         setState(() {
           _modelVariation = 'N/A';
         });
       }
-    } else {
-      debugPrint('Variation API failed with status: ${response.statusCode}');
+    } catch (e, stackTrace) {
+      debugPrint('Error fetching variation: $e\n$stackTrace');
       setState(() {
         _modelVariation = 'N/A';
       });
     }
-  } catch (e, stackTrace) {
-    debugPrint('Error fetching variation: $e\n$stackTrace');
-    setState(() {
-      _modelVariation = 'N/A';
-    });
   }
-}
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -478,16 +595,17 @@ Future<void> _fetchVariation() async {
 
         setState(() {
           uniqueSellerComments = orderedComments;
-          detailComments = uniqueSellerComments.where((comment) {
-            final name = comment.attributeName.toLowerCase().trim();
-            return [
-              'year',
-              'no of owners',
-              'fuel type',
-              'transmission',
-              'km range',
-            ].contains(name);
-          }).toList();
+          detailComments =
+              uniqueSellerComments.where((comment) {
+                final name = comment.attributeName.toLowerCase().trim();
+                return [
+                  'year',
+                  'no of owners',
+                  'fuel type',
+                  'transmission',
+                  'km range',
+                ].contains(name);
+              }).toList();
           debugPrint(
             'Ordered uniqueSellerComments: ${uniqueSellerComments.map((c) => "${c.attributeName}: ${c.attributeValue}").toList()}',
           );
@@ -566,12 +684,14 @@ Future<void> _fetchVariation() async {
             jsonResponse['data'].isNotEmpty) {
           final data = jsonResponse['data'][0];
           setState(() {
-            sellerName = data['user_name'] ?? 'Unknown';
-            sellerProfileImage = data['profile_image'];
+            sellerName = data['name'] ?? 'Unknown';
             sellerNoOfPosts = data['no_post'] ?? 0;
             sellerActiveFrom = data['active_from'] ?? '';
             isLoadingSeller = false;
           });
+
+          // ADD THIS LINE - Call the profile image method
+          await _fetchSellerProfileImage();
         } else {
           setState(() {
             sellerErrorMessage = 'Invalid seller data';
@@ -596,21 +716,22 @@ Future<void> _fetchVariation() async {
     if (zoneId == 'all') return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -646,25 +767,27 @@ Future<void> _fetchVariation() async {
     _transformationController.value = Matrix4.identity();
   }
 
- List<String> get _images {
-  if (image.isNotEmpty) {
-    try {
-      // Check if image is a JSON string containing multiple images
-      final imageData = jsonDecode(image);
-      if (imageData is List) {
-        return imageData.map((img) => 'https://lelamonline.com/admin/$img').toList();
-      } else if (imageData is String) {
-        return ['https://lelamonline.com/admin/$imageData'];
+  List<String> get _images {
+    if (image.isNotEmpty) {
+      try {
+        // Check if image is a JSON string containing multiple images
+        final imageData = jsonDecode(image);
+        if (imageData is List) {
+          return imageData
+              .map((img) => 'https://lelamonline.com/admin/$img')
+              .toList();
+        } else if (imageData is String) {
+          return ['https://lelamonline.com/admin/$imageData'];
+        }
+      } catch (e) {
+        // If not JSON, treat as a single image
+        return ['https://lelamonline.com/admin/$image'];
       }
-    } catch (e) {
-      // If not JSON, treat as a single image
-      return ['https://lelamonline.com/admin/$image'];
     }
+    return [
+      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+    ];
   }
-  return [
-    'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
-  ];
-}
 
   void _showFullScreenGallery(BuildContext context) {
     Navigator.of(context).push(
@@ -681,33 +804,41 @@ Future<void> _fetchVariation() async {
                 backgroundColor: Colors.white,
                 body: Stack(
                   children: [
-                  PageView.builder(
-  controller: _pageController,
-  itemCount: _images.length,
-  onPageChanged: (index) {
-    setState(() {
-      _currentImageIndex = index;
-    });
-  },
-  itemBuilder: (context, index) {
-    return GestureDetector(
-      onTap: () => _showFullScreenGallery(context),
-      child: CachedNetworkImage(
-        imageUrl: _images[index],
-        width: double.infinity,
-        height: 400,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[200],
-          child: const Center(
-            child: Icon(Icons.error_outline, size: 50, color: Colors.red),
-          ),
-        ),
-      ),
-    );
-  },
-),
+                    PageView.builder(
+                      controller: _pageController,
+                      itemCount: _images.length,
+                      onPageChanged: (index) {
+                        setState(() {
+                          _currentImageIndex = index;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTap: () => _showFullScreenGallery(context),
+                          child: CachedNetworkImage(
+                            imageUrl: _images[index],
+                            width: double.infinity,
+                            height: 400,
+                            fit: BoxFit.cover,
+                            placeholder:
+                                (context, url) => const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                            errorWidget:
+                                (context, url, error) => Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline,
+                                      size: 50,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                          ),
+                        );
+                      },
+                    ),
                     CustomSafeArea(
                       child: Column(
                         children: [
@@ -832,10 +963,9 @@ Future<void> _fetchVariation() async {
 
   void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
     final TextEditingController bidAmountController = TextEditingController();
-    if (isIncrease) {
-      bidAmountController.text =
-          (_currentBid + _minBidIncrement).toInt().toString();
-    }
+
+    // Pre-fill with minimum increment bid for both buttons
+    bidAmountController.text = _minBidIncrement.toInt().toString();
 
     showDialog(
       context: context,
@@ -848,24 +978,39 @@ Future<void> _fetchVariation() async {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Enter your bid amount in rupees'),
-              const SizedBox(height: 16),
-              if (isIncrease) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Min. increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+
+              Text(
+                'Minimum Bid increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Palette.primaryblue,
                 ),
-              ],
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: bidAmountController,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: false,
                 ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  // Add comma formatter for better readability
+                  TextInputFormatter.withFunction((oldValue, newValue) {
+                    if (newValue.text.isEmpty) {
+                      return newValue;
+                    }
+                    final number =
+                        int.tryParse(newValue.text.replaceAll(',', '')) ?? 0;
+                    final formatted = NumberFormat('#,##,###').format(number);
+                    return TextEditingValue(
+                      text: formatted,
+                      selection: TextSelection.collapsed(
+                        offset: formatted.length,
+                      ),
+                    );
+                  }),
+                ],
                 decoration: const InputDecoration(
                   prefixText: '₹',
                   hintText: '0',
@@ -882,7 +1027,10 @@ Future<void> _fetchVariation() async {
             ),
             ElevatedButton(
               onPressed: () async {
-                final String amount = bidAmountController.text;
+                final String amount = bidAmountController.text.replaceAll(
+                  ',',
+                  '',
+                );
                 if (amount.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -894,23 +1042,13 @@ Future<void> _fetchVariation() async {
                 }
 
                 final int bidAmount = int.tryParse(amount) ?? 0;
-                final double minimumPrice = _currentBid + _minBidIncrement;
-                if (bidAmount <= _currentBid) {
+
+                // Validate against the minimum bid increment only
+                if (bidAmount < _minBidIncrement) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Bid must be higher than ₹${NumberFormat('#,##0').format(_currentBid)}',
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-                if (bidAmount < minimumPrice) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Minimum price enter ₹${NumberFormat('#,##0').format(minimumPrice)}',
+                        'Minimum bid increment is ₹${NumberFormat('#,##0').format(_minBidIncrement)}',
                       ),
                       backgroundColor: Colors.red,
                     ),
@@ -921,16 +1059,17 @@ Future<void> _fetchVariation() async {
                 if (userId == null || userId == 'Unknown') {
                   showDialog(
                     context: context,
-                    builder: (context) => ChatOptionsDialog(
-                      onChatWithSupport: () {
-                        debugPrint("Support contacted");
-                      },
-                      onChatWithSeller: () {
-                        debugPrint("Chat with seller started");
-                      },
-                      baseUrl: baseUrl,
-                      token: token,
-                    ),
+                    builder:
+                        (context) => ChatOptionsDialog(
+                          onChatWithSupport: () {
+                            debugPrint("Support contacted");
+                          },
+                          onChatWithSeller: () {
+                            debugPrint("Chat with seller started");
+                          },
+                          baseUrl: baseUrl,
+                          token: token,
+                        ),
                   );
                   return;
                 }
@@ -947,16 +1086,19 @@ Future<void> _fetchVariation() async {
                       _currentHighestBid = bidAmount.toString();
                       _bidHistory.insert(0, {
                         'bidder': 'You',
-                        'amount': '₹${NumberFormat('#,##').format(bidAmount)}',
+                        'amount':
+                            '₹${NumberFormat('#,##,###').format(bidAmount)}',
                         'time': 'Just now',
                       });
                     });
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Bid placed successfully!'),
-                        backgroundColor: Colors.green,
-                      ),
+                    Fluttertoast.showToast(
+                      msg: "Bid placed successfully!",
+                      toastLength: Toast.LENGTH_SHORT,
+                      gravity: ToastGravity.BOTTOM,
+                      backgroundColor: Colors.green,
+                      textColor: Colors.white,
+                      fontSize: 16.0,
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -985,20 +1127,61 @@ Future<void> _fetchVariation() async {
 
   Future<void> _moveToMarketplace(BuildContext context) async {
     const String token = '5cb2c9b569416b5db1604e0e12478ded';
-    final String url = '$baseUrl/auction-back-to-marketplace.php?token=$token&post_id=$id';
+    final String url =
+        '$baseUrl/auction-back-to-marketplace.php?token=$token&post_id=$id';
 
     try {
       final response = await http.get(Uri.parse(url));
       debugPrint('Move to Marketplace API response: ${response.body}');
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List && jsonResponse['data'].isNotEmpty) {
-          final message = jsonResponse['data'][0]['message'] ?? 'Product moved to Market place!';
+        if (jsonResponse['status'] == 'true' &&
+            jsonResponse['data'] is List &&
+            jsonResponse['data'].isNotEmpty) {
+          final message =
+              jsonResponse['data'][0]['message'] ??
+              'Product moved to Market place!';
           showDialog(
             context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Success'),
-              content: Text(message),
+            builder:
+                (context) => AlertDialog(
+                  title: const Text('Success'),
+                  content: Text(message),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        // Close the dialog
+                        Navigator.pop(context);
+                        // Navigate to User Cars page
+                        context.go('/usedCarsPage'); // Using GoRouter
+                        // OR if using Navigator:
+                        // Navigator.pushAndRemoveUntil(
+                        //   context,
+                        //   MaterialPageRoute(builder: (context) => MarketUsedCarsPage()),
+                        //   (route) => false,
+                        // );
+                      },
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+          );
+        } else {
+          throw Exception('Invalid API response');
+        }
+      } else {
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error moving to marketplace: $e');
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Error'),
+              content: Text('Failed to move to marketplace: $e'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -1006,84 +1189,199 @@ Future<void> _fetchVariation() async {
                 ),
               ],
             ),
-          );
-        } else {
-          throw Exception('Invalid API response');
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      debugPrint('Error moving to marketplace: $e');
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Error'),
-          content: Text('Failed to move to marketplace: $e'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
       );
     }
   }
 
   Future<void> _agreeBidProceedMeeting(BuildContext context) async {
     const String token = '5cb2c9b569416b5db1604e0e12478ded';
-    final String url = '$baseUrl/auction-agree-bidding.php?token=$token&post_id=$id&user_id=$userId';
+    final String url =
+        '$baseUrl/auction-agree-bidding.php?token=$token&post_id=$id&user_id=$userId';
 
     try {
       final response = await http.get(Uri.parse(url));
       debugPrint('Agree Bid Proceed Meeting API response: ${response.body}');
+
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
-        if (jsonResponse['status'] == 'true' && jsonResponse['data'] is List && jsonResponse['data'].isNotEmpty) {
-          final message = jsonResponse['data'][0]['message'] ?? 'You Agree Bid and Proceed Meeting also Product moved to Market place';
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Success'),
-              content: Text(message),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
+        if (jsonResponse['status'] == 'true' &&
+            jsonResponse['data'] is List &&
+            jsonResponse['data'].isNotEmpty) {
+          // Show custom dialog instead of the generic success message
+          // Show custom dialog instead of the generic success message
+          await _showAgreeBidSuccessDialog(context);
+
+          // Automatically add the buyer bid to My Bids page
+          _addBuyerBidToMyBids();
         } else {
           throw Exception('Invalid API response');
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
+        throw Exception(
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
     } catch (e) {
       debugPrint('Error agreeing bid: $e');
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Error'),
-          content: Text('Failed to agree bid and proceed meeting: $e'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+      _showErrorDialog(context, 'Failed to agree bid and proceed meeting: $e');
+    }
+  }
+
+  Future<void> _showAgreeBidSuccessDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap button to close
+      builder:
+          (context) => AlertDialog(
+            title: const Text(
+              'Success!',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
             ),
-          ],
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Thank you for showing interest on proceeding with high bid.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'High bidder will soon fix a meeting for viewing your item.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'For more details call support.',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+
+                // Support contact information
+              ],
+            ),
+            actions: [
+              // Call Support Button
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  _callSupport();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.phone, size: 18),
+                    SizedBox(width: 4),
+                    Text('Call Support'),
+                  ],
+                ),
+              ),
+              // OK Button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  // You can add any additional actions here
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Palette.primaryblue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _callSupport() async {
+    const phoneNumber = 'tel:+918089308048';
+    final Uri url = Uri.parse(phoneNumber);
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not launch phone app'),
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _transformationController.dispose();
-    super.dispose();
+  Future<void> _addBuyerBidToMyBids() async {
+    try {
+      // Get the highest bidder information from bid history
+      if (_bidHistory.isNotEmpty) {
+        final highestBid = _bidHistory[0];
+        final bidderName = highestBid['bidder'] ?? 'Unknown Buyer';
+        final bidAmount = highestBid['amount'] ?? '0';
+
+        // Prepare data for My Bids
+        final bidData = {
+          'post_id': id,
+          'post_title': title,
+          'bidder_name': bidderName,
+          'bid_amount': bidAmount,
+          'bid_time': DateTime.now().toIso8601String(),
+          'status': 'Meeting Scheduled',
+          'product_image': _images.isNotEmpty ? _images[0] : '',
+        };
+
+        // Call API to add to My Bids
+        final response = await http.post(
+          Uri.parse(
+            '$baseUrl/add-to-my-bids.php',
+          ), // You'll need to create this endpoint
+          body: {
+            'token': token,
+            'user_id': userId,
+            'bid_data': jsonEncode(bidData),
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body);
+          if (result['status'] == 'true') {
+            debugPrint('Bid successfully added to My Bids page');
+
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Bid successfully added to My Bids'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            debugPrint('Failed to add bid to My Bids: ${result['message']}');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error adding bid to My Bids: $e');
+    }
+  }
+
+  void _showErrorDialog(BuildContext context, String errorMessage) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text(errorMessage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
@@ -1171,13 +1469,15 @@ Future<void> _fetchVariation() async {
                               ),
                             ),
                             const Spacer(),
-                          IconButton(
-  icon: Icon(
-    _isFavorited ? Icons.favorite : Icons.favorite_border,
-    color: _isFavorited ? Colors.red : Colors.white,
-  ),
-  onPressed: _toggleFavorite,
-),
+                            IconButton(
+                              icon: Icon(
+                                _isFavorited
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isFavorited ? Colors.red : Colors.white,
+                              ),
+                              onPressed: _toggleFavorite,
+                            ),
                             IconButton(
                               icon: const Icon(
                                 Icons.share,
@@ -1210,10 +1510,11 @@ Future<void> _fetchVariation() async {
                               ),
                             ),
                             const SizedBox(height: 4),
+                            // In your build method, update the current highest bid display:
                             Text(
                               _currentHighestBid.startsWith('Error')
                                   ? _currentHighestBid
-                                  : '₹${NumberFormat('#,##0').format(int.tryParse(_currentHighestBid) ?? 0)}',
+                                  : '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -1240,10 +1541,13 @@ Future<void> _fetchVariation() async {
                           ),
                         ),
                         const SizedBox(height: 4),
-                       Text(
-          _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
-          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-        ),
+                        Text(
+                          _modelVariation.isNotEmpty ? _modelVariation : 'N/A',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -1255,16 +1559,16 @@ Future<void> _fetchVariation() async {
                             const SizedBox(width: 4),
                             _isLoadingLocations
                                 ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    landMark,
-                                    style: const TextStyle(color: Colors.grey),
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
+                                )
+                                : Text(
+                                  landMark,
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
                             const Spacer(),
                           ],
                         ),
@@ -1329,16 +1633,19 @@ Future<void> _fetchVariation() async {
                               onPressed: () {
                                 showDialog(
                                   context: context,
-                                  builder: (context) => ChatOptionsDialog(
-                                    onChatWithSupport: () {
-                                      debugPrint("Support contacted");
-                                    },
-                                    onChatWithSeller: () {
-                                      debugPrint("Chat with seller started");
-                                    },
-                                    baseUrl: baseUrl,
-                                    token: token,
-                                  ),
+                                  builder:
+                                      (context) => ChatOptionsDialog(
+                                        onChatWithSupport: () {
+                                          debugPrint("Support contacted");
+                                        },
+                                        onChatWithSeller: () {
+                                          debugPrint(
+                                            "Chat with seller started",
+                                          );
+                                        },
+                                        baseUrl: baseUrl,
+                                        token: token,
+                                      ),
                                 );
                               },
                               icon: const Icon(Icons.support_agent),
@@ -1387,28 +1694,33 @@ Future<void> _fetchVariation() async {
                           )
                         else
                           Column(
-                            children: uniqueSellerComments
-                                .where(
-                                  (comment) =>
-                                      comment.attributeName
-                                          .toLowerCase()
-                                          .trim() !=
-                                      'co driver side rear tyre',
-                                )
-                                .map(
-                                  (comment) => _buildSellerCommentItem(
-                                    comment.attributeName,
-                                    comment.attributeName
-                                                .toLowerCase()
-                                                .trim() ==
-                                            'no of owners'
-                                        ? _getOwnerText(
-                                            comment.attributeValue,
-                                          )
-                                        : comment.attributeValue,
-                                  ),
-                                )
-                                .toList(),
+                            children:
+                                uniqueSellerComments
+                                    .where(
+                                      (comment) =>
+                                          comment.attributeName
+                                                  .toLowerCase()
+                                                  .trim() !=
+                                              'co driver side rear tyre' &&
+                                          comment.attributeValue != null &&
+                                          comment.attributeValue
+                                              .trim()
+                                              .isNotEmpty,
+                                    )
+                                    .map(
+                                      (comment) => _buildSellerCommentItem(
+                                        comment.attributeName,
+                                        comment.attributeName
+                                                    .toLowerCase()
+                                                    .trim() ==
+                                                'no of owners'
+                                            ? _getOwnerText(
+                                              comment.attributeValue,
+                                            )
+                                            : comment.attributeValue,
+                                      ),
+                                    )
+                                    .toList(),
                           ),
                       ],
                     ),
@@ -1454,14 +1766,15 @@ Future<void> _fetchVariation() async {
                           )
                         else
                           Column(
-                            children: _bidHistory
-                                .map(
-                                  (bid) => _buildBidHistoryItem(
-                                    bid['bidder'] ?? 'Guest User',
-                                    bid['amount'] ?? 'N/A',
-                                  ),
-                                )
-                                .toList(),
+                            children:
+                                _bidHistory
+                                    .map(
+                                      (bid) => _buildBidHistoryItem(
+                                        bid['bidder'] ?? 'Guest User',
+                                        bid['amount'] ?? 'N/A',
+                                      ),
+                                    )
+                                    .toList(),
                           ),
                       ],
                     ),
@@ -1490,9 +1803,10 @@ Future<void> _fetchVariation() async {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: isSeller
-                            ? () => _moveToMarketplace(context)
-                            : () => _showBidDialog(context),
+                        onPressed:
+                            isSeller
+                                ? () => _moveToMarketplace(context)
+                                : () => _showBidDialog(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primarypink,
                           foregroundColor: Colors.white,
@@ -1501,14 +1815,18 @@ Future<void> _fetchVariation() async {
                             borderRadius: BorderRadius.zero,
                           ),
                         ),
-                        child: Text(isSeller ? 'Back to Market Place' : 'Enter Price'),
+                        child: Text(
+                          isSeller ? 'Back to Market Place' : 'Enter Price',
+                        ),
                       ),
                     ),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: isSeller
-                            ? () => _agreeBidProceedMeeting(context)
-                            : () => _showBidDialog(context, isIncrease: true),
+                        onPressed:
+                            isSeller
+                                ? () => _agreeBidProceedMeeting(context)
+                                : () =>
+                                    _showBidDialog(context, isIncrease: true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,
@@ -1517,7 +1835,12 @@ Future<void> _fetchVariation() async {
                             borderRadius: BorderRadius.zero,
                           ),
                         ),
-                        child: Text(isSeller ? 'Agree Bid Proceed meeting' : 'Increase minimum Bid',textAlign: TextAlign.center,),
+                        child: Text(
+                          isSeller
+                              ? 'Agree Bid Proceed meeting'
+                              : 'Increase minimum Bid',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                   ],
@@ -1613,59 +1936,85 @@ Future<void> _fetchVariation() async {
     return isLoadingSeller
         ? const Center(child: CircularProgressIndicator())
         : sellerErrorMessage.isNotEmpty
-            ? Center(
-                child: Text(
-                  sellerErrorMessage,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              )
-            : GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SellerInformationPage(userId: createdBy),
-                    ),
-                  );
-                },
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundImage:
-                          sellerProfileImage != null && sellerProfileImage!.isNotEmpty
-                              ? CachedNetworkImageProvider(sellerProfileImage!)
-                              : const AssetImage('assets/images/avatar.gif')
-                                  as ImageProvider,
-                      radius: 30,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sellerName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+        ? Center(
+          child: Text(
+            sellerErrorMessage,
+            style: const TextStyle(color: Colors.red),
+          ),
+        )
+        : GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SellerInformationPage(userId: createdBy),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.grey[200],
+                child:
+                    sellerProfileImage != null && sellerProfileImage!.isNotEmpty
+                        ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: sellerProfileImage!,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                placeholder:
+                                    (context, url) => CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                errorWidget: (context, url, error) {
+                                  debugPrint(
+                                    'CachedNetworkImage ERROR: $error',
+                                  );
+                                  return Icon(Icons.error, color: Colors.red);
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Member Since $sellerActiveFrom',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Posts: $sellerNoOfPosts',
-                            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                          ),
-                        ],
+                          ],
+                        )
+                        : Icon(
+                          Icons.person,
+                          size: 30,
+                          color: Colors.blue.shade600,
+                        ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sellerName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Member Since $sellerActiveFrom',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Posts: $sellerNoOfPosts',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
                   ],
                 ),
-              );
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
   }
 }
