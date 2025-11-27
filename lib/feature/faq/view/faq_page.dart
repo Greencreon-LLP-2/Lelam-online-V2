@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart'; // Add this import
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
 import 'package:lelamonline_flutter/core/service/api_service.dart';
-import 'package:dio/dio.dart'; // For downloading PDF
-import 'package:open_file/open_file.dart'; // For opening PDF
-import 'package:path_provider/path_provider.dart'; // For temporary storage
-import 'package:path/path.dart' as path; // For file extension handling
+import 'package:dio/dio.dart';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'dart:io';
 
 class FAQPage extends StatefulWidget {
@@ -106,7 +107,6 @@ class _FAQPageState extends State<FAQPage> {
       return;
     }
 
-    // Optional: Show a loading dialog for better UX during download
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -122,28 +122,22 @@ class _FAQPageState extends State<FAQPage> {
     );
 
     try {
-      // Get temporary directory
       final dir = await getTemporaryDirectory();
       
-      // Generate a safe filename: Use last part of URL, ensure .pdf extension
       String fileName = path.basename(pdfUrl);
       if (!fileName.toLowerCase().endsWith('.pdf')) {
-        // If no .pdf extension, append it (common for generic URLs)
         fileName = '$fileName.pdf';
       }
       final filePath = path.join(dir.path, fileName);
       final file = File(filePath);
 
-      // Download the PDF
       await Dio().download(pdfUrl, filePath);
 
-      // Close loading dialog
       Navigator.of(context).pop();
 
-      // Open the downloaded PDF with explicit MIME type
       final result = await OpenFile.open(
         filePath,
-        type: 'application/pdf',  // Explicit MIME type to force PDF viewer
+        type: 'application/pdf',
       );
       if (result.type != ResultType.done) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +145,6 @@ class _FAQPageState extends State<FAQPage> {
         );
       }
     } catch (e) {
-      // Close loading dialog if still open
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -239,9 +232,21 @@ class _FAQPageState extends State<FAQPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              answer,
-                              style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            // Replace Text widget with Html widget
+                            Html(
+                              data: answer,
+                              style: {
+                                "body": Style(
+                                  fontSize: FontSize(14),
+                                  color: Colors.black87,
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                ),
+                                "p": Style(
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                ),
+                              },
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -253,8 +258,8 @@ class _FAQPageState extends State<FAQPage> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
                                     onPressed: () => _openPDF(pdf),
-                                    icon: const Icon(Icons.picture_as_pdf,color: Colors.white,),
-                                    label: const Text('View PDF' , style: TextStyle(color: Colors.white),),
+                                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                                    label: const Text('View PDF', style: TextStyle(color: Colors.white)),
                                   ),
                                 const Spacer(),
                                 Text(

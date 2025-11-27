@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as developer;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:lelamonline_flutter/core/api/api_constant.dart';
@@ -22,7 +25,10 @@ import 'package:lelamonline_flutter/feature/chat/views/widget/chat_dialog.dart';
 import 'package:lelamonline_flutter/feature/home/view/models/location_model.dart';
 import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AuctionProductDetailsPage extends StatefulWidget {
@@ -67,6 +73,12 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   String? userId;
   String _currentHighestBid = '0';
   bool isLoadingSellerComments = false;
+
+  // Hive related variables
+  late final Box _preferencesBox;
+  bool _hasShownIncreaseBidDialog = false;
+  bool _isUserBidSelected = false;
+
   String get id => _getProperty('id') ?? '';
   String get title => _getProperty('title') ?? '';
   String get image => _getProperty('image') ?? '';
@@ -112,25 +124,272 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   }
 
   Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
+    _initializeHive();
     _loadUserId();
     _fetchAllData();
     _startAutoRefresh();
   }
 
+  Future<void> _initializeHive() async {
+    _preferencesBox = await Hive.openBox('app_preferences');
+  }
+
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _preferencesBox.close();
     super.dispose();
   }
 
   void _startAutoRefresh() {
-    // Refresh every 3 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _refreshBidData();
     });
+  }
+
+  // Add this method to check if user's bid is selected
+  Future<bool> _checkIfUserBidSelected() async {
+    try {
+      if (userId == null || userId!.isEmpty) return false;
+      
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/check-bid-selected.php?token=$token&post_id=$id&user_id=$userId',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] == 'true' && data['is_selected'] == true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking bid selection: $e');
+      return false;
+    }
+  }
+
+  // Add this method to show the increase bid dialog
+  Future<void> _showIncreaseBidDialog() async {
+    // Check if we've already shown this dialog for this product
+    final String dialogKey = 'increase_bid_dialog_$id';
+    _hasShownIncreaseBidDialog = _preferencesBox.get(dialogKey, defaultValue: false);
+    
+    if (_hasShownIncreaseBidDialog) {
+      // If already shown, just show the regular bid dialog
+      _showBidDialog(context, isIncrease: true);
+      return;
+    }
+
+    // Check if user's bid is selected in meetings
+    _isUserBidSelected = await _checkIfUserBidSelected();
+
+    // Show the informational dialog
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Increase Your Bid'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_isUserBidSelected)
+                const Text(
+                  'Great news! Your bid is currently selected in ongoing meetings.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                )
+              else
+                const Text(
+                  'Increase your bid to improve your chances of winning this auction.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              const SizedBox(height: 12),
+              Text(
+                _isUserBidSelected
+                    ? 'Increasing your bid now will strengthen your position as the preferred buyer.'
+                    : 'Your bid is not currently selected. Consider increasing it to become more competitive.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Minimum Bid increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Palette.primaryblue,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Mark as shown and don't show again
+                _preferencesBox.put(dialogKey, true);
+                _hasShownIncreaseBidDialog = true;
+              },
+              child: const Text('Not Now'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Mark as shown and don't show again
+                _preferencesBox.put(dialogKey, true);
+                _hasShownIncreaseBidDialog = true;
+                // Show the actual bid dialog
+                _showBidDialog(context, isIncrease: true);
+              },
+              child: const Text('Increase Bid'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _shareProduct() async {
+    try {
+      final String shareText = await _buildShareText();
+
+      if (_images.isNotEmpty && _images[0].isNotEmpty) {
+        await _shareWithImage(shareText, _images[0]);
+      } else {
+        await Share.share(shareText);
+      }
+    } catch (e) {
+      debugPrint('Error sharing product: $e');
+      final String shareText = await _buildShareText();
+      await _shareTextOnly(shareText);
+    }
+  }
+
+  Future<void> _shareWithImage(String shareText, String imageUrl) async {
+    try {
+      final File imageFile = await _downloadAndSaveImage(imageUrl);
+      final List<XFile> files = [XFile(imageFile.path)];
+      await Share.shareXFiles(
+        files,
+        text: shareText,
+        subject: 'Check out this auction on Lelam Online',
+      );
+      _cleanupTempFile(imageFile);
+    } catch (e) {
+      debugPrint('Error sharing with image: $e');
+      await Share.share(shareText);
+    }
+  }
+
+  Future<File> _downloadAndSaveImage(String imageUrl) async {
+    try {
+      final Directory tempDir = await getTemporaryDirectory();
+      final String fileName =
+          'auction_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String filePath = path.join(tempDir.path, fileName);
+      final http.Response response = await http.get(Uri.parse(imageUrl));
+
+      if (response.statusCode == 200) {
+        final File file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        return file;
+      } else {
+        throw Exception('Failed to download image: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading image: $e');
+      throw e;
+    }
+  }
+
+  void _cleanupTempFile(File file) async {
+    await Future.delayed(const Duration(seconds: 10));
+    try {
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint('Temporary file cleaned up');
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up temp file: $e');
+    }
+  }
+
+  Future<void> _shareTextOnly(String shareText) async {
+    try {
+      await Share.share(shareText);
+    } catch (e) {
+      debugPrint('Error in text-only share: $e');
+      await _copyToClipboard(shareText);
+      _showCopySuccess();
+    }
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  void _showCopySuccess() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Product details copied to clipboard!'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<String> _buildShareText() async {
+    String currentBid =
+        '₹${NumberFormat('#,##,###').format(int.tryParse(_currentHighestBid) ?? 0)}';
+    String startingPrice =
+        '₹${_formatPrice(double.tryParse(auctionStartingPrice) ?? 0)}';
+    String targetPriceFormatted =
+        '₹${_formatPrice(double.tryParse(targetPrice) ?? 0)}';
+
+    return '''
+🚗 ${title}
+
+${_modelVariation.isNotEmpty ? _modelVariation : ''}
+
+🏷️ Auction Details:
+• Starting Price: $startingPrice
+• Target Price: $targetPriceFormatted
+• Current Highest Bid: $currentBid
+• Location: ${_isLoadingLocations ? 'Loading...' : landMark}
+
+⏰ Auction Ending: ${_formatAuctionEndTime()}
+
+Bid now on Lelam Online!
+''';
+  }
+
+  String _formatAuctionEndTime() {
+    try {
+      final auctionEndTime =
+          DateTime.tryParse(auctionEndin) ??
+          DateTime.now().add(const Duration(days: 2, hours: 5));
+      final timeLeft = auctionEndTime.difference(DateTime.now());
+
+      if (timeLeft.inDays > 0) {
+        return '${timeLeft.inDays} days ${timeLeft.inHours % 24} hours';
+      } else if (timeLeft.inHours > 0) {
+        return '${timeLeft.inHours} hours ${timeLeft.inMinutes % 60} minutes';
+      } else {
+        return '${timeLeft.inMinutes} minutes';
+      }
+    } catch (e) {
+      return 'Soon';
+    }
   }
 
   Future<void> _refreshBidData() async {
@@ -166,7 +425,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
     }
   }
 
-  // Update your existing _fetchMinBidIncrementFromApi method
   Future<void> _fetchMinBidIncrementFromApi() async {
     try {
       final minBidValue = await _auctionService.fetchMinBidIncrement(id);
@@ -196,7 +454,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
       await Future.wait([
         _fetchLocations(),
         _fetchAttributesData(),
-        _fetchVariation(), // Add this
+        _fetchVariation(),
         _fetchSellerInfo(),
         _fetchContainerInfo(),
         _fetchFavoriteStatus(),
@@ -262,9 +520,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
   Future<void> _fetchSellerProfileImage() async {
     try {
-      // Use the same endpoint as EditProfilePage
       final response = await ApiService().get(
-        url: userDetails, // Use the same userDetails endpoint
+        url: userDetails,
         queryParams: {"user_id": createdBy},
       );
 
@@ -469,7 +726,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             ),
           ),
         ],
-      ),
+      )
+
+
     );
   }
 
@@ -690,7 +949,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             isLoadingSeller = false;
           });
 
-          // ADD THIS LINE - Call the profile image method
           await _fetchSellerProfileImage();
         } else {
           setState(() {
@@ -770,7 +1028,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   List<String> get _images {
     if (image.isNotEmpty) {
       try {
-        // Check if image is a JSON string containing multiple images
         final imageData = jsonDecode(image);
         if (imageData is List) {
           return imageData
@@ -780,12 +1037,11 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
           return ['https://lelamonline.com/admin/$imageData'];
         }
       } catch (e) {
-        // If not JSON, treat as a single image
         return ['https://lelamonline.com/admin/$image'];
       }
     }
     return [
-      'https://images.pexels.com/photos/170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
+      'https://images.pexels.com/photos-170811/pexels-photo-170811.jpeg?cs=srgb&dl=pexels-mikebirdy-170811.jpg&fm=jpg',
     ];
   }
 
@@ -963,8 +1219,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
   void _showBidDialog(BuildContext context, {bool isIncrease = false}) {
     final TextEditingController bidAmountController = TextEditingController();
-
-    // Pre-fill with minimum increment bid for both buttons
     bidAmountController.text = _minBidIncrement.toInt().toString();
 
     showDialog(
@@ -978,7 +1232,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Enter your bid amount in rupees'),
-
               Text(
                 'Minimum Bid increment: ₹${NumberFormat('#,##,###').format(_minBidIncrement)}',
                 style: const TextStyle(
@@ -995,7 +1248,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                 ),
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
-                  // Add comma formatter for better readability
                   TextInputFormatter.withFunction((oldValue, newValue) {
                     if (newValue.text.isEmpty) {
                       return newValue;
@@ -1043,7 +1295,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
                 final int bidAmount = int.tryParse(amount) ?? 0;
 
-                // Validate against the minimum bid increment only
                 if (bidAmount < _minBidIncrement) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -1150,16 +1401,8 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                   actions: [
                     TextButton(
                       onPressed: () {
-                        // Close the dialog
                         Navigator.pop(context);
-                        // Navigate to User Cars page
-                        context.go('/usedCarsPage'); // Using GoRouter
-                        // OR if using Navigator:
-                        // Navigator.pushAndRemoveUntil(
-                        //   context,
-                        //   MaterialPageRoute(builder: (context) => MarketUsedCarsPage()),
-                        //   (route) => false,
-                        // );
+                        context.go('/usedCarsPage');
                       },
                       child: const Text('OK'),
                     ),
@@ -1207,11 +1450,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
         if (jsonResponse['status'] == 'true' &&
             jsonResponse['data'] is List &&
             jsonResponse['data'].isNotEmpty) {
-          // Show custom dialog instead of the generic success message
-          // Show custom dialog instead of the generic success message
           await _showAgreeBidSuccessDialog(context);
-
-          // Automatically add the buyer bid to My Bids page
           _addBuyerBidToMyBids();
         } else {
           throw Exception('Invalid API response');
@@ -1230,7 +1469,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
   Future<void> _showAgreeBidSuccessDialog(BuildContext context) async {
     showDialog(
       context: context,
-      barrierDismissible: false, // User must tap button to close
+      barrierDismissible: false,
       builder:
           (context) => AlertDialog(
             title: const Text(
@@ -1260,15 +1499,12 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 16),
-
-                // Support contact information
               ],
             ),
             actions: [
-              // Call Support Button
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context);
                   _callSupport();
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.blue),
@@ -1281,11 +1517,9 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                   ],
                 ),
               ),
-              // OK Button
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close dialog
-                  // You can add any additional actions here
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Palette.primaryblue,
@@ -1316,13 +1550,11 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
 
   Future<void> _addBuyerBidToMyBids() async {
     try {
-      // Get the highest bidder information from bid history
       if (_bidHistory.isNotEmpty) {
         final highestBid = _bidHistory[0];
         final bidderName = highestBid['bidder'] ?? 'Unknown Buyer';
         final bidAmount = highestBid['amount'] ?? '0';
 
-        // Prepare data for My Bids
         final bidData = {
           'post_id': id,
           'post_title': title,
@@ -1333,11 +1565,10 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
           'product_image': _images.isNotEmpty ? _images[0] : '',
         };
 
-        // Call API to add to My Bids
         final response = await http.post(
           Uri.parse(
             '$baseUrl/add-to-my-bids.php',
-          ), // You'll need to create this endpoint
+          ),
           body: {
             'token': token,
             'user_id': userId,
@@ -1349,8 +1580,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
           final result = jsonDecode(response.body);
           if (result['status'] == 'true') {
             debugPrint('Bid successfully added to My Bids page');
-
-            // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Bid successfully added to My Bids'),
@@ -1483,9 +1712,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                                 Icons.share,
                                 color: Colors.white,
                               ),
-                              onPressed: () {
-                                // TODO: Implement share functionality
-                              },
+                              onPressed: _shareProduct,
                             ),
                           ],
                         ),
@@ -1510,7 +1737,6 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            // In your build method, update the current highest bid display:
                             Text(
                               _currentHighestBid.startsWith('Error')
                                   ? _currentHighestBid
@@ -1825,8 +2051,7 @@ class _AuctionProductDetailsPageState extends State<AuctionProductDetailsPage> {
                         onPressed:
                             isSeller
                                 ? () => _agreeBidProceedMeeting(context)
-                                : () =>
-                                    _showBidDialog(context, isIncrease: true),
+                                : _showIncreaseBidDialog, // Updated this line
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Palette.primaryblue,
                           foregroundColor: Colors.white,

@@ -130,7 +130,8 @@ class _HomePageState extends State<HomePage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load districts: $e';
+          _errorMessage =
+              '"dear developer if your read this please leave the company"';
         });
       }
       if (_errorMessage != null && context.mounted) {
@@ -162,7 +163,9 @@ class _HomePageState extends State<HomePage>
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to refresh: $e'),
+          content: Text(
+            "dear developer if your read this please leave the company",
+          ),
           backgroundColor: Colors.red.withOpacity(0.8),
         ),
       );

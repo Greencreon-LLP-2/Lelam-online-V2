@@ -24,11 +24,19 @@ class ChatOptionsDialog extends StatelessWidget {
   });
 
   Future<Map<String, dynamic>> createChatRoom(
-      BuildContext context, int userIdTo) async {
-    final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
-    final userIdFrom = userProvider.userData?.userId ?? '6'; // Fallback to '6' if userId is null
+    BuildContext context,
+    int userIdTo,
+  ) async {
+    final userProvider = Provider.of<LoggedUserProvider>(
+      context,
+      listen: false,
+    );
+    final userIdFrom =
+        userProvider.userData?.userId ??
+        '6'; // Fallback to '6' if userId is null
     final url = Uri.parse(
-        '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userIdFrom&user_id_to=$userIdTo');
+      '$baseUrl/chat-room-create.php?token=$token&user_id_from=$userIdFrom&user_id_to=$userIdTo',
+    );
 
     try {
       final response = await http.get(url);
@@ -41,83 +49,98 @@ class ChatOptionsDialog extends StatelessWidget {
       }
     } catch (e) {
       print('Error creating chat room: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
       return {};
     }
   }
 
-  void handleChat(BuildContext context, int userIdTo, String chatType, VoidCallback onSuccess) async {
+  void handleChat(
+    BuildContext context,
+    int userIdTo,
+    String chatType,
+    VoidCallback onSuccess,
+  ) async {
     if (chatType == 'support') {
       Navigator.of(context).pop();
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.white,
-          title: const Text(
-            'Call Support',
-            style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
-          ),
-          content: const Text('Contact support at: +918089308048'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                final Uri dialerUri = Uri(scheme: 'tel', path: '9626040738');
-                if (await url_launcher.canLaunchUrl(dialerUri)) {
-                  await url_launcher.launchUrl(dialerUri);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not launch dialer')),
-                  );
-                }
-                onChatWithSupport();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
+        builder:
+            (context) => AlertDialog(
+              backgroundColor: Colors.white,
+              title: const Text(
+                'Call Support',
+                style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+              ),
+              content: const Text('Contact support at: +918089308048'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
                 ),
-              ),
-              child: const Text(
-                'Call',
-                style: TextStyle(color: Colors.white),
-              ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    final Uri dialerUri = Uri(
+                      scheme: 'tel',
+                      path: '8089308048',
+                    );
+                    if (await url_launcher.canLaunchUrl(dialerUri)) {
+                      await url_launcher.launchUrl(dialerUri);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Could not launch dialer'),
+                        ),
+                      );
+                    }
+                    onChatWithSupport();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  child: const Text(
+                    'Call',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
       );
     } else {
-      final userProvider = Provider.of<LoggedUserProvider>(context, listen: false);
+      final userProvider = Provider.of<LoggedUserProvider>(
+        context,
+        listen: false,
+      );
       if (!userProvider.isLoggedIn) {
         Navigator.of(context).pop();
         showDialog(
           context: context,
-          builder: (context) => LoginDialog(
-            onSuccess: () async {
-              // After successful login, create chat room and proceed
-              final data = await createChatRoom(context, userIdTo);
-              if (data.isNotEmpty) {
-                final chatRoomId = data['chat_room_id'];
-                final message = data['message'];
+          builder:
+              (context) => LoginDialog(
+                onSuccess: () async {
+                  // After successful login, create chat room and proceed
+                  final data = await createChatRoom(context, userIdTo);
+                  if (data.isNotEmpty) {
+                    final chatRoomId = data['chat_room_id'];
+                    final message = data['message'];
 
-                if (message != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
-                }
+                    if (message != null) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(message)));
+                    }
 
-                if (chatRoomId != null) {
-                  onSuccess();
-                }
-              }
-            },
-          ),
+                    if (chatRoomId != null) {
+                      onSuccess();
+                    }
+                  }
+                },
+              ),
         );
         return;
       }
@@ -128,9 +151,9 @@ class ChatOptionsDialog extends StatelessWidget {
         final message = data['message'];
 
         if (message != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
         }
 
         if (chatRoomId != null) {
@@ -168,11 +191,7 @@ class ChatOptionsDialog extends StatelessWidget {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.phone,
-                    color: Colors.white,
-                    size: 20.0,
-                  ),
+                  Icon(Icons.phone, color: Colors.white, size: 20.0),
                   SizedBox(width: 8.0),
                   Text(
                     'Call Sales Expert',

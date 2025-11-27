@@ -663,10 +663,10 @@ class ChatPage extends HookWidget {
                                           ? CrossAxisAlignment.end
                                           : CrossAxisAlignment.start,
                                   children: [
-                                    // Text(
-                                    //   message.message,
-                                    //   style: const TextStyle(fontSize: 14),
-                                    // ),
+                                    Text(
+                                      message.message,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
                                     const SizedBox(height: 4),
                                     Text(
                                       _formatTime(message.createdOn),

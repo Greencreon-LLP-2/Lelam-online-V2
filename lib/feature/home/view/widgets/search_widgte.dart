@@ -88,7 +88,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           data['data'] != null &&
           data['data'] is List) {
         final results = data['data'] as List;
-        final posts = results.map((json) => MarketplacePost.fromJson(json)).toList();
+        final posts =
+            results.map((json) => MarketplacePost.fromJson(json)).toList();
         final products = posts.map((post) => post.toProduct()).toList();
         setState(() {
           _products = products;
@@ -120,7 +121,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     }
     _fetchingPostIds.add(postId);
     try {
-      final attributes = await MarketplaceService2().fetchPostDetailsWithIcons(postId);
+      final attributes = await MarketplaceService2().fetchPostDetailsWithIcons(
+        postId,
+      );
       if (mounted) {
         setState(() {
           _postAttributeValuesCache[postId] = attributes;
@@ -138,7 +141,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   }
 
   Future<void> _fetchVariation(String postId, String variationId) async {
-    if (_variationCache.containsKey(postId) || _fetchingVariationIds.contains(postId)) {
+    if (_variationCache.containsKey(postId) ||
+        _fetchingVariationIds.contains(postId)) {
       return;
     }
     _fetchingVariationIds.add(postId);
@@ -147,8 +151,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
         url: '$baseUrl/post-brand-model-variation.php',
         queryParams: {'token': token, 'post_id': postId},
       );
-      if (response['status'] == 'true' && response['data'] is List && response['data'].isNotEmpty) {
-        final data = response['data'][0]; // Access the first item in the data list
+      if (response['status'] == 'true' &&
+          response['data'] is List &&
+          response['data'].isNotEmpty) {
+        final data =
+            response['data'][0]; // Access the first item in the data list
         final variation = data['variations']?.toString() ?? 'N/A';
         if (mounted) {
           setState(() {
@@ -214,10 +221,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductDetailsPage(
-          product: featureListModel,
-          isAuction: featureListModel.ifAuction == "1",
-        ),
+        builder:
+            (context) => ProductDetailsPage(
+              product: featureListModel,
+              isAuction: featureListModel.ifAuction == "1",
+            ),
       ),
     );
   }
@@ -226,21 +234,22 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     if (zoneId == 'all' || zoneId.isEmpty) return 'All Kerala';
     final location = _locations.firstWhere(
       (loc) => loc.id == zoneId,
-      orElse: () => LocationData(
-        id: '',
-        slug: '',
-        parentId: '',
-        name: zoneId,
-        image: '',
-        description: '',
-        latitude: '',
-        longitude: '',
-        popular: '',
-        status: '',
-        allStoreOnOff: '',
-        createdOn: '',
-        updatedOn: '',
-      ),
+      orElse:
+          () => LocationData(
+            id: '',
+            slug: '',
+            parentId: '',
+            name: zoneId,
+            image: '',
+            description: '',
+            latitude: '',
+            longitude: '',
+            popular: '',
+            status: '',
+            allStoreOnOff: '',
+            createdOn: '',
+            updatedOn: '',
+          ),
     );
     return location.name;
   }
@@ -267,7 +276,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     final kmMatch = RegExp(r'(\d+)').firstMatch(value);
     if (kmMatch != null) {
       final number = int.parse(kmMatch.group(1)!);
-      final formattedNumber = NumberFormat.decimalPattern('en_IN').format(number);
+      final formattedNumber = NumberFormat.decimalPattern(
+        'en_IN',
+      ).format(number);
       return value.replaceFirst(RegExp(r'\d+'), formattedNumber);
     }
     return value;
@@ -300,7 +311,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
 
     return GestureDetector(
       onTap: () {
-        developer.log('Tapped product: ${product.title}, isAuction: $isAuction');
+        developer.log(
+          'Tapped product: ${product.title}, isAuction: $isAuction',
+        );
         FocusScope.of(context).unfocus();
         _openProductDetails(product);
       },
@@ -335,13 +348,17 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: CachedNetworkImage(
-                            imageUrl: 'https://lelamonline.com/admin/${product.image}',
+                            imageUrl:
+                                'https://lelamonline.com/admin/${product.image}',
                             fit: BoxFit.cover,
                             width: 120,
                             height: 150,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                            placeholder:
+                                (context, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                             errorWidget: (context, url, error) {
                               developer.log(
                                 'Failed to load image: https://lelamonline.com/admin/${product.image}',
@@ -363,7 +380,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             top: 4,
                             left: 4,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red,
                                 borderRadius: BorderRadius.circular(4),
@@ -383,7 +403,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             top: 4,
                             left: 4,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.blue,
                                 borderRadius: BorderRadius.circular(12),
@@ -391,7 +414,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(Icons.verified, size: 12, color: Colors.white),
+                                  Icon(
+                                    Icons.verified,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
                                   SizedBox(width: 4),
                                   Text(
                                     "Verified",
@@ -426,7 +453,10 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          _variationCache[product.id] ?? (product.modelVariation.isNotEmpty ? product.modelVariation : 'N/A'),
+                          _variationCache[product.id] ??
+                              (product.modelVariation.isNotEmpty
+                                  ? product.modelVariation
+                                  : 'N/A'),
                           style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey.shade600,
@@ -447,7 +477,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _formatPrice(double.tryParse(product.price) ?? 0),
+                                _formatPrice(
+                                  double.tryParse(product.price) ?? 0,
+                                ),
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey.shade600,
@@ -456,7 +488,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                               ),
                               SizedBox(width: 10),
                               Text(
-                                _formatPrice(double.tryParse(product.offerPrice) ?? 0),
+                                _formatPrice(
+                                  double.tryParse(product.offerPrice) ?? 0,
+                                ),
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -483,11 +517,15 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                               color: Colors.grey.shade500,
                             ),
                             const SizedBox(width: 4),
-                            Text(
-                              _getLocationName(product.parentZoneId),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
+                            Expanded(
+                              child: Text(
+                                '${_getLocationName(product.parentZoneId)}${product.landMark != null && product.landMark!.isNotEmpty ? ' | ${product.landMark!}' : ''}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -495,19 +533,28 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                         const SizedBox(height: 4),
                         Builder(
                           builder: (context) {
-                            final attributeValues = _postAttributeValuesCache[product.id] ?? {};
-                            final isFetching = _fetchingPostIds.contains(product.id);
+                            final attributeValues =
+                                _postAttributeValuesCache[product.id] ?? {};
+                            final isFetching = _fetchingPostIds.contains(
+                              product.id,
+                            );
                             final year = attributeValues['Year'] ?? 'N/A';
-                            final owners = attributeValues['No of owners'] ?? 'N/A';
-                            final transmission = attributeValues['Transmission'] ?? 'N/A';
-                            final fuelType = attributeValues['Fuel Type'] ?? 'N/A';
-                            final kmDriven = attributeValues['KM Driven'] ?? 'N/A';
+                            final owners =
+                                attributeValues['No of owners'] ?? 'N/A';
+                            final transmission =
+                                attributeValues['Transmission'] ?? 'N/A';
+                            final fuelType =
+                                attributeValues['Fuel Type'] ?? 'N/A';
+                            final kmDriven =
+                                attributeValues['KM Driven'] ?? 'N/A';
 
                             if (isFetching && attributeValues.isEmpty) {
                               return const SizedBox(
                                 height: 32,
                                 child: Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               );
                             }
@@ -519,13 +566,25 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                 if (year != 'N/A')
                                   _buildDetailChip(Icons.calendar_today, year),
                                 if (owners != 'N/A')
-                                  _buildDetailChip(Icons.person, _getOwnerText(owners)),
+                                  _buildDetailChip(
+                                    Icons.person,
+                                    _getOwnerText(owners),
+                                  ),
                                 if (kmDriven != 'N/A')
-                                  _buildDetailChip(Icons.speed, _formatKmRange(kmDriven)),
+                                  _buildDetailChip(
+                                    Icons.speed,
+                                    _formatKmRange(kmDriven),
+                                  ),
                                 if (fuelType != 'N/A')
-                                  _buildDetailChip(Icons.local_gas_station, fuelType),
+                                  _buildDetailChip(
+                                    Icons.local_gas_station,
+                                    fuelType,
+                                  ),
                                 if (transmission != 'N/A')
-                                  _buildDetailChip(Icons.settings, transmission),
+                                  _buildDetailChip(
+                                    Icons.settings,
+                                    transmission,
+                                  ),
                               ],
                             );
                           },
@@ -539,103 +598,131 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             if (isAuction || isFinanceAvailable || isExchangeAvailable)
               Container(
                 decoration: BoxDecoration(
-                  color: (isAuction || isFinanceAvailable || isExchangeAvailable)
-                      ? Palette.primarylightblue
-                      : Colors.grey.shade50,
+                  color:
+                      (isAuction || isFinanceAvailable || isExchangeAvailable)
+                          ? Palette.primarylightblue
+                          : Colors.grey.shade50,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: isAuction
-                      ? Row(
-                          children: [
-                            const Icon(Icons.gavel, size: 10, color: Colors.black),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Attempts: ${product.auctionAttempt}/3',
-                              style: const TextStyle(
-                                fontSize: 10,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child:
+                      isAuction
+                          ? Row(
+                            children: [
+                              const Icon(
+                                Icons.gavel,
+                                size: 10,
                                 color: Colors.black,
-                                fontWeight: FontWeight.w600,
                               ),
-                            ),
-                          ],
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            if (isFinanceAvailable && isExchangeAvailable) ...[
-                              Row(
-                                children: const [
-                                  Icon(Icons.account_balance, size: 10, color: Colors.black),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Finance Available',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Expanded(
-                                child: Align(
-                                  alignment: Alignment.center,
-                                  child: Container(
-                                    height: 14,
-                                    width: 1,
-                                    color: Colors.black54,
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                  ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Attempts: ${product.auctionAttempt}/3',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Row(
-                                children: const [
-                                  Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Exchange Available',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else if (isFinanceAvailable) ...[
-                              Row(
-                                children: const [
-                                  Icon(Icons.account_balance, size: 10, color: Colors.black),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Finance Available',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else if (isExchangeAvailable) ...[
-                              Row(
-                                children: const [
-                                  Icon(Icons.swap_horiz, size: 10, color: Colors.black),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Exchange Available',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ],
-                          ],
-                        ),
+                          )
+                          : Row(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            children: [
+                              if (isFinanceAvailable &&
+                                  isExchangeAvailable) ...[
+                                Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.account_balance,
+                                      size: 10,
+                                      color: Colors.black,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Finance Available',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Expanded(
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: Container(
+                                      height: 14,
+                                      width: 1,
+                                      color: Colors.black54,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.swap_horiz,
+                                      size: 10,
+                                      color: Colors.black,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Exchange Available',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (isFinanceAvailable) ...[
+                                Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.account_balance,
+                                      size: 10,
+                                      color: Colors.black,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Finance Available',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else if (isExchangeAvailable) ...[
+                                Row(
+                                  children: const [
+                                    Icon(
+                                      Icons.swap_horiz,
+                                      size: 10,
+                                      color: Colors.black,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Exchange Available',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
                 ),
               ),
           ],
@@ -654,68 +741,71 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading || _isLoadingLocations
-          ? const Center(child: CircularProgressIndicator(color: Palette.primaryblue))
-          : _errorMessage != null
+      body:
+          _isLoading || _isLoadingLocations
+              ? const Center(
+                child: CircularProgressIndicator(color: Palette.primaryblue),
+              )
+              : _errorMessage != null
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error, size: 64, color: Colors.grey.shade400),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
-                        ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error, size: 64, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => _fetchProducts(widget.searchQuery),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : _products.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No cars found',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Try adjusting your search terms',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _products.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(_products[index]);
-                      },
                     ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => _fetchProducts(widget.searchQuery),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+              : _products.isEmpty
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.search_off,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No cars found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your search terms',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(8),
+                itemCount: _products.length,
+                itemBuilder: (context, index) {
+                  return _buildProductCard(_products[index]);
+                },
+              ),
     );
   }
 }

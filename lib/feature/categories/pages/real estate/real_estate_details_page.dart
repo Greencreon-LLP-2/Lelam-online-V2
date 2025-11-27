@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,7 +32,10 @@ import 'package:lelamonline_flutter/utils/custom_safe_area.dart';
 import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer' as developer;
 
@@ -594,6 +598,109 @@ class _RealEstateProductDetailsPageState
     }
   }
 
+  Future<void> _shareProduct() async {
+    try {
+      final String shareText = await _buildShareText();
+
+      if (_images.isNotEmpty && _images[0].isNotEmpty) {
+        await _shareWithImage(shareText, _images[0]);
+      } else {
+        await Share.share(shareText);
+      }
+    } catch (e) {
+      debugPrint('Error sharing product: $e');
+      // Fallback - copy to clipboard
+      final String shareText = await _buildShareText();
+      await Clipboard.setData(ClipboardData(text: shareText));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product details copied to clipboard!')),
+      );
+    }
+  }
+
+  Future<void> _shareWithImage(String shareText, String imageUrl) async {
+    try {
+      // Download and save image temporarily
+      final File imageFile = await _downloadAndSaveImage(imageUrl);
+
+      // Create list of files to share
+      final List<XFile> files = [XFile(imageFile.path)];
+
+      // Share with text and image
+      await Share.shareXFiles(
+        files,
+        text: shareText,
+        subject: 'Check out this property on Lelam Online',
+      );
+
+      // Clean up: delete temporary file after a delay
+      _cleanupTempFile(imageFile);
+    } catch (e) {
+      debugPrint('Error sharing with image: $e');
+      // Fallback to text-only share
+      await Share.share(shareText);
+    }
+  }
+
+  Future<File> _downloadAndSaveImage(String imageUrl) async {
+    try {
+      // Create a temporary directory
+      final Directory tempDir = await getTemporaryDirectory();
+      final String fileName =
+          'property_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String filePath = path.join(tempDir.path, fileName);
+
+      // Download the image
+      final http.Response response = await http.get(Uri.parse(imageUrl));
+
+      if (response.statusCode == 200) {
+        // Save the image to temporary file
+        final File file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+        return file;
+      } else {
+        throw Exception('Failed to download image: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading image: $e');
+      throw e;
+    }
+  }
+
+  void _cleanupTempFile(File file) async {
+    // Wait for a bit before cleaning up to ensure share is complete
+    await Future.delayed(const Duration(seconds: 10));
+    try {
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint('Temporary file cleaned up');
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up temp file: $e');
+    }
+  }
+
+  Future<String> _buildShareText() async {
+    String priceFormatted =
+        widget.isAuction
+            ? 'Starting Bid: ₹${formatPriceInt(double.tryParse(widget.product.auctionStartingPrice) ?? 0)}'
+            : '₹${formatPriceInt(double.tryParse(price) ?? 0)}';
+
+    // Create product link
+    String productLink = 'https://lelamonline.com/real-estate/$id';
+
+    return '''
+🏠 $title
+
+📍 Location: ${_isLoadingLocations ? 'Loading...' : landMark}
+💰 Price: $priceFormatted
+
+
+Download Lelam Online App:
+https://play.google.com/store/apps/details?id=com.lelam.online&pli=1
+''';
+  }
+
   Future<void> _fetchBannerImage() async {
     print('RealEstateProductDetailsPage - _fetchBannerImage: Starting');
     try {
@@ -708,39 +815,48 @@ class _RealEstateProductDetailsPageState
       });
     }
   }
-Widget _buildSellerCommentsSection() {
-  // Filter out comments that should be in details section
-  final validComments = uniqueSellerComments.where((comment) {
-    final name = comment.attributeName.toLowerCase().trim();
-    return ![
-      'seller type',
-      'auction starting price', 
-      'auction attempts',
-    ].contains(name);
-  }).toList();
 
-  // Double check for any remaining null/empty values
-  final filteredComments = validComments.where((comment) {
-    final value = comment.attributeValue?.trim() ?? '';
-    return value.isNotEmpty && 
-           value.toLowerCase() != 'null' && 
-           value.toLowerCase() != 'n/a' &&
-           value.toLowerCase() != 'not specified';
-  }).toList();
+  Widget _buildSellerCommentsSection() {
+    // Filter out comments that should be in details section
+    final validComments =
+        uniqueSellerComments.where((comment) {
+          final name = comment.attributeName.toLowerCase().trim();
+          return ![
+            'seller type',
+            'auction starting price',
+            'auction attempts',
+          ].contains(name);
+        }).toList();
 
-  if (filteredComments.isEmpty) {
-    return const SizedBox.shrink(); // Hide completely if no valid comments
+    // Double check for any remaining null/empty values
+    final filteredComments =
+        validComments.where((comment) {
+          final value = comment.attributeValue?.trim() ?? '';
+          return value.isNotEmpty &&
+              value.toLowerCase() != 'null' &&
+              value.toLowerCase() != 'n/a' &&
+              value.toLowerCase() != 'not specified';
+        }).toList();
+
+    if (filteredComments.isEmpty) {
+      return const SizedBox.shrink(); // Hide completely if no valid comments
+    }
+
+    return Column(
+      children:
+          filteredComments
+              .map(
+                (comment) => _buildSellerCommentItem(
+                  comment.attributeName,
+                  comment.attributeValue,
+                ),
+              )
+              .toList(),
+    );
   }
 
-  return Column(
-    children: filteredComments.map((comment) => _buildSellerCommentItem(
-      comment.attributeName,
-      comment.attributeValue,
-    )).toList(),
-  );
-}
   void _launchPhoneCall() async {
-    const phoneNumber = 'tel:+919626040738';
+    const phoneNumber = 'tel:+918089308048';
     if (await canLaunchUrl(Uri.parse(phoneNumber))) {
       await launchUrl(Uri.parse(phoneNumber));
     } else {
@@ -1133,7 +1249,7 @@ Widget _buildSellerCommentsSection() {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Last Highest Bid:',
+                    'Current Highest Bid:',
                     style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -1566,7 +1682,8 @@ Widget _buildSellerCommentsSection() {
       },
     );
   }
- Future<void> _fetchSellerProfileImage() async {
+
+  Future<void> _fetchSellerProfileImage() async {
     try {
       // Use the same endpoint as EditProfilePage
       final response = await ApiService().get(
@@ -1587,6 +1704,7 @@ Widget _buildSellerCommentsSection() {
       debugPrint('Error fetching profile image: $e');
     }
   }
+
   Future<void> _toggleFavorite() async {
     if (userId == null || userId == 'Unknown') {
       _showLoginPromptDialog(context, 'add or remove from shortlist');
@@ -1896,7 +2014,6 @@ Widget _buildSellerCommentsSection() {
       });
     }
   }
-
 
   Future<void> _fetchLocations() async {
     setState(() {
@@ -2940,9 +3057,7 @@ Widget _buildSellerCommentsSection() {
                               ),
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
-                            onPressed: () {
-                              // Share functionality
-                            },
+                            onPressed: _shareProduct,
                           ),
                         ],
                       ),

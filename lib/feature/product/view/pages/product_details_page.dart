@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as developer;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -27,7 +28,10 @@ import 'package:lelamonline_flutter/utils/login_dialog.dart';
 import 'package:lelamonline_flutter/utils/palette.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:lelamonline_flutter/utils/review_dialog.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProductDetailsPage extends StatefulWidget {
@@ -196,7 +200,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           setState(() {
             reviews = [];
             reviewsError =
-                responseData['data']?.toString() ?? 'No reviews available';
+                responseData['data']?.toString() ?? 'No questions Yet';
             isLoadingReviews = false;
           });
         }
@@ -232,6 +236,87 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       }
     } finally {
       if (mounted) setState(() => isLoadingDetails = false);
+    }
+  }
+
+  Future<String> _buildShareText() async {
+    String priceFormatted = '₹${formatPriceInt(double.tryParse(price) ?? 0)}';
+
+    // Create product link - adjust this URL to match your product URL structure
+    String productLink = 'https://lelamonline.com/product/$id';
+
+    return '''
+🚗 $title
+
+${_modelVariation.isNotEmpty ? _modelVariation : ''}
+
+💰 Price: $priceFormatted
+📍 Location: ${_isLoadingLocations ? 'Loading...' : landMark}
+
+
+Download Lelam Online App:
+https://play.google.com/store/apps/details?id=com.lelam.online&pli=1
+''';
+  }
+
+  Future<void> _shareProduct() async {
+    try {
+      final String shareText = await _buildShareText();
+
+      if (_images.isNotEmpty && _images[0].isNotEmpty) {
+        await _shareWithImage(shareText, _images[0]);
+      } else {
+        await Share.share(shareText);
+      }
+    } catch (e) {
+      debugPrint('Error sharing product: $e');
+      final String shareText = await _buildShareText();
+      await Clipboard.setData(ClipboardData(text: shareText));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product details copied to clipboard!')),
+      );
+    }
+  }
+
+  Future<void> _shareWithImage(String shareText, String imageUrl) async {
+    try {
+      final File imageFile = await _downloadAndSaveImage(imageUrl);
+      final List<XFile> files = [XFile(imageFile.path)];
+
+      await Share.shareXFiles(files, text: shareText);
+
+      // Clean up temporary file
+      _cleanupTempFile(imageFile);
+    } catch (e) {
+      debugPrint('Error sharing with image: $e');
+      await Share.share(shareText);
+    }
+  }
+
+  Future<File> _downloadAndSaveImage(String imageUrl) async {
+    final Directory tempDir = await getTemporaryDirectory();
+    final String fileName =
+        'product_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final String filePath = path.join(tempDir.path, fileName);
+
+    final http.Response response = await http.get(Uri.parse(imageUrl));
+    if (response.statusCode == 200) {
+      final File file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+      return file;
+    } else {
+      throw Exception('Failed to download image');
+    }
+  }
+
+  void _cleanupTempFile(File file) async {
+    await Future.delayed(const Duration(seconds: 10));
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up temp file: $e');
     }
   }
 
@@ -889,7 +974,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Last Highest Bid:',
+                    'Current Highest Bid:',
                     style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -2572,8 +2657,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       );
     }
 
-    if (uniqueSellerComments.isEmpty) {
-      return const Center(child: Text('Loding.....'));
+    // Filter out comments with null, empty, or "null" string values
+    final validComments =
+        uniqueSellerComments.where((comment) {
+          final value = comment.attributeValue?.trim() ?? '';
+          return value.isNotEmpty &&
+              value.toLowerCase() != 'null' &&
+              value.toLowerCase() != 'n/a' &&
+              value.toLowerCase() != 'not specified' &&
+              value.toLowerCase() != 'unknown';
+        }).toList();
+
+    if (validComments.isEmpty) {
+      return const SizedBox.shrink(); // Hide completely if no valid comments
     }
 
     String formatAttributeName(String name) {
@@ -2596,7 +2692,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        ...uniqueSellerComments
+        ...validComments
             .where(
               (comment) =>
                   comment.attributeName.toLowerCase().trim() !=
@@ -2765,9 +2861,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                           IconButton(
                             icon: const Icon(Icons.share, color: Colors.white),
                             tooltip: 'Share',
-                            onPressed: () {
-                              // Share functionality
-                            },
+                            onPressed: _shareProduct,
                           ),
                         ],
                       ),
@@ -2926,9 +3020,42 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                 _buildContainerInfo(),
                 const Divider(),
 
+                // Seller Comments and Description Section
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: _buildSellerCommentsSection(),
+                  padding: const EdgeInsets.all(10.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Seller Comments
+                      _buildSellerCommentsSection(),
+
+                      const SizedBox(height: 16),
+
+                      // Description
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Description',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.product.description?.isNotEmpty == true
+                                ? widget.product.description!
+                                : 'No description available',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 _buildBannerAd(),
                 const Divider(),

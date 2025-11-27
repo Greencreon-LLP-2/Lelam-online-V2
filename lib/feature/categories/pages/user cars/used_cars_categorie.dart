@@ -436,9 +436,45 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _checkAuctionAvailability() async {
-    if (_hasCheckedAuctions) return; // Avoid redundant checks
+    developer.log(
+      '=== CHECKING AUCTION AVAILABILITY ===',
+      name: 'AuctionDebug',
+    );
+
     try {
+      // Method 1: Check from currently loaded products first
+      if (_products.isNotEmpty) {
+        bool hasActiveAuctions = _products.any(
+          (product) => product.ifAuction == '1' && product.auctionStatus == '1',
+        );
+
+        developer.log(
+          'Method 1 - Checked ${_products.length} loaded products: hasActiveAuctions=$hasActiveAuctions',
+          name: 'AuctionDebug',
+        );
+
+        if (hasActiveAuctions) {
+          if (mounted) {
+            setState(() {
+              _hasActiveAuctions = true;
+              _hasCheckedAuctions = true;
+            });
+          }
+          return;
+        }
+      }
+
+      // Method 2: If no products loaded or no active auctions found, try direct API call
       final locationProvider = context.read<LocationProvider>();
+
+      // Use a valid user ID - if empty, use a default
+      String userIdForCheck = _userId?.isNotEmpty == true ? _userId! : '0';
+
+      developer.log(
+        'Method 2 - Fetching auction posts with params: categoryId=1, userZoneId=${locationProvider.selectedLocationId == 'all' ? '0' : locationProvider.selectedLocationId}, userId=$userIdForCheck',
+        name: 'AuctionDebug',
+      );
+
       final auctionPosts = await _marketplaceService.fetchPosts(
         categoryId: '1',
         userZoneId:
@@ -446,28 +482,56 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                 ? '0'
                 : locationProvider.selectedLocationId,
         listingType: 'auction',
-        userId: _userId ?? '',
+        userId: userIdForCheck,
       );
+
+      developer.log(
+        'Raw auction posts received: ${auctionPosts.length}',
+        name: 'AuctionDebug',
+      );
+
+      // Log all received posts for debugging
+      for (var post in auctionPosts) {
+        developer.log(
+          'Auction Post: ${post.title} - ifAuction: ${post.ifAuction}, auctionStatus: ${post.auctionStatus}',
+          name: 'AuctionDebug',
+        );
+      }
+
       final auctionProducts =
           auctionPosts.map((post) => post.toProduct()).toList();
-      setState(() {
-        _hasActiveAuctions = auctionProducts.any(
-          (product) => product.ifAuction == '1' && product.auctionStatus == '1',
+
+      // Check if any product has BOTH if_auction = 1 AND auction_status = 1
+      bool hasActiveAuctions = auctionProducts.any((product) {
+        bool condition =
+            product.ifAuction == '1' && product.auctionStatus == '1';
+        developer.log(
+          'Product ${product.title}: ifAuction=${product.ifAuction}, auctionStatus=${product.auctionStatus}, meetsCondition=$condition',
+          name: 'AuctionDebug',
         );
-        _hasCheckedAuctions = true;
+        return condition;
       });
+
       developer.log(
-        'Initial auction check: _hasActiveAuctions=$_hasActiveAuctions',
+        'Final result - Has active auctions: $hasActiveAuctions',
+        name: 'AuctionDebug',
       );
-    } catch (e) {
-      developer.log('Error checking auction availability: $e');
-      if (e.toString().contains('Please accept live auction terms')) {
+
+      if (mounted) {
         setState(() {
-          _hasActiveAuctions =
-              true; // Set to true since terms error implies auctions exist
+          _hasActiveAuctions = hasActiveAuctions;
+          _hasCheckedAuctions = true;
         });
-      } else {
+      }
+    } catch (e) {
+      developer.log(
+        'Error in _checkAuctionAvailability: $e',
+        name: 'AuctionDebug',
+      );
+
+      if (mounted) {
         setState(() {
+          _hasActiveAuctions = false;
           _hasCheckedAuctions = true;
         });
       }
@@ -542,13 +606,21 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                 key: 'auction_terms_accepted',
                                 value: 'true',
                               );
-                              context.pop();
+                              Navigator.pop(
+                                dialogContext,
+                                true,
+                              ); // Use Navigator instead of context.pop()
                             } else {
-                              setState(() {
-                                _errorMessage =
-                                    'Failed to accept terms. Please try again.';
-                              });
-                              context.pop();
+                              // Don't set error message here, just show a snackbar
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Failed to accept terms. Please try again.',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              Navigator.pop(dialogContext, false);
                             }
                           }
                           : null,
@@ -561,6 +633,24 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       },
     ).then((value) {
       isAccepted = value ?? false;
+
+      // CRITICAL FIX: After terms acceptance, refresh the auction data
+      if (isAccepted && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setState(() {
+            _listingType = 'auction';
+            _products = [];
+            _postAttributeValuesCache.clear();
+            _fetchingPostIds.clear();
+            _filteredProductsCache.clear();
+            _filtersChanged = true;
+            _hasCheckedAuctions = false; // Reset this to force recheck
+          });
+          _fetchProducts(forceRefresh: true);
+        });
+      }
+
+      return isAccepted;
     });
 
     return isAccepted;
@@ -632,19 +722,6 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Future<void> _fetchProducts({bool forceRefresh = false}) async {
-    // Check if user needs to login for auctions
-    if (_listingType == 'auction' &&
-        (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
-      developer.log('User not logged in for auctions, showing login dialog');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = null;
-        });
-      }
-      return;
-    }
-
     if (forceRefresh) {
       MarketplaceService.clearCache();
       _postAttributeValuesCache.clear();
@@ -652,7 +729,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       _filteredProductsCache.clear();
       _modelVariationsCache.clear();
       _fetchingModelVariationIds.clear();
-      _hasCheckedAuctions = false;
+      _hasActiveAuctions = false; // Reset auction status on force refresh
     }
 
     if (mounted) {
@@ -675,11 +752,12 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       );
 
       // Check if posts is null or empty
-      if (posts == null) {
+      if (posts == null || posts.isEmpty) {
         if (mounted) {
           setState(() {
             _products = [];
             _isLoading = false;
+            _hasActiveAuctions = false; // No posts means no active auctions
           });
         }
         return;
@@ -687,37 +765,8 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
       final products = posts.map((post) => post.toProduct()).toList();
 
-      // Update auction status
-      if (!_hasCheckedAuctions) {
-        if (_listingType == 'Marketplace') {
-          try {
-            final auctionPosts = await _marketplaceService.fetchPosts(
-              categoryId: '1',
-              userZoneId:
-                  locationProvider.selectedLocationId == 'all'
-                      ? '0'
-                      : locationProvider.selectedLocationId,
-              listingType: 'auction',
-              userId: _userId ?? '',
-            );
-            final auctionProducts =
-                auctionPosts?.map((post) => post.toProduct()).toList() ?? [];
-            _hasActiveAuctions = auctionProducts.any(
-              (product) =>
-                  product.ifAuction == '1' && product.auctionStatus == '1',
-            );
-          } catch (e) {
-            developer.log('Error checking auction availability: $e');
-            _hasActiveAuctions = false;
-          }
-        } else {
-          _hasActiveAuctions = products.any(
-            (product) =>
-                product.ifAuction == '1' && product.auctionStatus == '1',
-          );
-        }
-        _hasCheckedAuctions = true;
-      }
+      // Always check auction availability when fetching products
+      await _checkAuctionAvailability();
 
       if (mounted) {
         setState(() {
@@ -745,6 +794,20 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
     } catch (e) {
       developer.log('Error in _fetchProducts: $e');
 
+      // Handle the case where non-logged-in user tries to access auctions
+      if (e.toString().contains('Please accept live auction terms') &&
+          (_userId == null || _userId!.isEmpty || _userId == 'Unknown')) {
+        if (mounted) {
+          setState(() {
+            _products = [];
+            _isLoading = false;
+            _hasActiveAuctions = false; // No auctions for non-logged-in users
+            _errorMessage = 'Please login to view auctions';
+          });
+        }
+        return;
+      }
+
       if (e.toString().contains('Please accept live auction terms')) {
         bool accepted = await _showTermsAndConditionsDialog(context);
         if (accepted && mounted) {
@@ -754,6 +817,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             _errorMessage =
                 'You must accept the auction terms to view auctions.';
             _isLoading = false;
+            _hasActiveAuctions = false; // Terms not accepted = no auctions
           });
         }
       } else if (e.toString().contains(
@@ -764,6 +828,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
             _products = [];
             _filteredProductsCache = [];
             _isLoading = false;
+            _hasActiveAuctions = false; // No data found = no auctions
             _errorMessage = null;
           });
         }
@@ -772,6 +837,7 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
           setState(() {
             _errorMessage = 'Failed to load cars. Please try again.';
             _isLoading = false;
+            _hasActiveAuctions = false; // Error = assume no auctions
           });
         }
       }
@@ -1040,8 +1106,36 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       builder: (dialogContext) {
         return LoginDialog(
           onSuccess: () {
+            // Update user ID after successful login
+            _userId = _userProvider.userId;
+            // Refresh data
             _fetchLocations();
             _fetchShortlistStatus();
+            // After login, automatically switch to auction if that's what user wanted
+            if (action.contains('auction')) {
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                // Check if user needs to accept terms
+                final termsAccepted = await _storage.read(
+                  key: 'auction_terms_accepted',
+                );
+                if (termsAccepted != 'true') {
+                  bool accepted = await _showTermsAndConditionsDialog(context);
+                  if (!accepted) {
+                    return; // Don't switch to auction if terms not accepted
+                  }
+                }
+
+                setState(() {
+                  _listingType = 'auction';
+                  _products = [];
+                  _postAttributeValuesCache.clear();
+                  _fetchingPostIds.clear();
+                  _filteredProductsCache.clear();
+                  _filtersChanged = true;
+                });
+                _fetchProducts(forceRefresh: true);
+              });
+            }
           },
         );
       },
@@ -1386,84 +1480,132 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
   }
 
   Widget _buildListingTypeButtons() {
-    // Show buttons only if there are active auctions
-    if (!_hasActiveAuctions) {
-      return const SizedBox.shrink();
+    // For debugging, always show with current status
+    developer.log(
+      'Building listing type buttons: _hasActiveAuctions=$_hasActiveAuctions, _hasCheckedAuctions=$_hasCheckedAuctions',
+      name: 'AuctionDebug',
+    );
+
+    // Show both buttons ONLY when we have active auctions
+    if (_hasActiveAuctions) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  if (_listingType != 'Marketplace') {
+                    setState(() {
+                      _listingType = 'Marketplace';
+                      _products = [];
+                      _postAttributeValuesCache.clear();
+                      _fetchingPostIds.clear();
+                      _filteredProductsCache.clear();
+                      _filtersChanged = true;
+                    });
+                    _fetchProducts(forceRefresh: true);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      _listingType == 'Marketplace'
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade200,
+                  foregroundColor:
+                      _listingType == 'Marketplace'
+                          ? Colors.white
+                          : Colors.black87,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Marketplace',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  // Check if user is logged in
+                  if (_userId == null || _userId!.isEmpty) {
+                    _showLoginPromptDialog('access auctions');
+                    return;
+                  }
+
+                  if (_listingType != 'auction') {
+                    final termsAccepted = await _storage.read(
+                      key: 'auction_terms_accepted',
+                    );
+                    if (termsAccepted != 'true') {
+                      bool accepted = await _showTermsAndConditionsDialog(
+                        context,
+                      );
+                      if (!accepted) return;
+                    }
+
+                    setState(() {
+                      _listingType = 'auction';
+                      _products = [];
+                      _postAttributeValuesCache.clear();
+                      _fetchingPostIds.clear();
+                      _filteredProductsCache.clear();
+                      _filtersChanged = true;
+                    });
+                    _fetchProducts(forceRefresh: true);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      _listingType == 'auction'
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade200,
+                  foregroundColor:
+                      _listingType == 'auction' ? Colors.white : Colors.black87,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Auction',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
+    // If no active auctions, don't show any buttons
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildNoSearchResultsUI() {
+    return Center(
+      child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (_listingType != 'Marketplace') {
-                  setState(() {
-                    _listingType = 'Marketplace';
-                    _products = [];
-                    _postAttributeValuesCache.clear();
-                    _fetchingPostIds.clear();
-                    _filteredProductsCache.clear();
-                    _filtersChanged = true;
-                  });
-                  _fetchProducts(forceRefresh: true);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _listingType == 'Marketplace'
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade200,
-                foregroundColor:
-                    _listingType == 'Marketplace'
-                        ? Colors.white
-                        : Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Marketplace',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+          Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Searched item not available at the moment',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (_listingType != 'auction') {
-                  setState(() {
-                    _listingType = 'auction';
-                    _products = [];
-                    _postAttributeValuesCache.clear();
-                    _fetchingPostIds.clear();
-                    _filteredProductsCache.clear();
-                    _filtersChanged = true;
-                  });
-                  _fetchProducts(forceRefresh: true);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _listingType == 'auction'
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade200,
-                foregroundColor:
-                    _listingType == 'auction' ? Colors.white : Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Auction',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
+          const SizedBox(height: 8),
+          Text(
+            'Try searching with different keywords',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -1472,6 +1614,25 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      developer.log(
+        '=== UI STATE === _hasActiveAuctions: $_hasActiveAuctions, _hasCheckedAuctions: $_hasCheckedAuctions, _products.length: ${_products.length}',
+        name: 'AuctionDebug',
+      );
+
+      // Debug: Check if any products have if_auction=1 and auction_status=1
+      if (_products.isNotEmpty) {
+        for (var product in _products) {
+          if (product.ifAuction == '1' && product.auctionStatus == '1') {
+            developer.log(
+              'FOUND ACTIVE AUCTION: ${product.title} - ifAuction: ${product.ifAuction}, auctionStatus: ${product.auctionStatus}',
+              name: 'AuctionDebug',
+            );
+          }
+        }
+      }
+    });
+
     developer.log(
       'Building UI: isLoading=$_isLoading, filteredProducts=${filteredProducts.length}, products=${_products.length}, errorMessage=$_errorMessage',
     );
@@ -1554,15 +1715,19 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                                         ),
                                   )
                                   .id;
+
                       if (locationProvider.selectedLocationName != value) {
-                        // Avoid redundant calls
                         context.read<LocationProvider>().setSelectedLocation(
                           value,
                           id: id,
                         );
-                        _fetchProducts(
-                          forceRefresh: true,
-                        ); // Force refresh to ensure data reload
+
+                        // Always use filter API if any filters are active
+                        if (_getActiveFilterCount() > 0) {
+                          _fetchFilterListings();
+                        } else {
+                          _fetchProducts(forceRefresh: true);
+                        }
                       }
                     },
                     itemBuilder: (BuildContext context) {
@@ -1597,61 +1762,11 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                     ),
                   )
                   : _errorMessage != null
-                  ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => _fetchProducts(forceRefresh: true),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  )
+                  ? _buildNoResultsUI() // Use the existing conflict UI for errors
                   : filteredProducts.isEmpty
-                  ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No cars found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your filters or search terms',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
+                  ? _searchQuery.isNotEmpty
+                      ? _buildNoSearchResultsUI() // New UI for search with no results
+                      : _buildNoResultsUI() // Existing UI for no results without search (like conflict)
                   : RefreshIndicator(
                     onRefresh: () => _fetchProducts(forceRefresh: true),
                     child: ListView.builder(
@@ -1680,6 +1795,77 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
                   ),
         );
       },
+    );
+  }
+
+  Widget _buildNoResultsUI() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.warning_amber, size: 64, color: Colors.orange.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Filters & Location Conflict',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.orange.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Text(
+              'Filters and location search cannot be used together.\n\n'
+              'Please use either:\n'
+              '• Filters only\n'
+              '• Location only\n',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  // Clear filters but keep location
+                  setState(() {
+                    _selectedBrands = [];
+                    _selectedPriceRange = 'all';
+                    _selectedYearRange = 'all';
+                    _selectedOwnersRange = 'all';
+                    _selectedFuelTypes = [];
+                    _selectedTransmissions = [];
+                    _selectedKmRange = 'all';
+                    _selectedSoldBy = 'all';
+                    _filtersChanged = true;
+                  });
+                  _fetchProducts(forceRefresh: true);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade600,
+                ),
+                child: const Text('Use Location Only'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: () {
+                  // Clear location but keep filters
+                  context.read<LocationProvider>().setSelectedLocation(
+                    'All Kerala',
+                    id: 'all',
+                  );
+                  _fetchFilterListings();
+                },
+                child: const Text('Use Filters Only'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -2260,30 +2446,24 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
 
   Future<void> _fetchFilterListings() async {
     final locationProvider = context.read<LocationProvider>();
-    developer.log('=== STARTING FILTER FETCH ===', name: 'Filter.Debug');
-    developer.log('Selected filters:', name: 'Filter.Debug');
+
+    developer.log('=== FILTER + LOCATION REQUEST ===', name: 'Filter.Location');
     developer.log(
-      '  - Price Range: $_selectedPriceRange',
-      name: 'Filter.Debug',
+      'Location: ${locationProvider.selectedLocationId}',
+      name: 'Filter.Location',
     );
-    developer.log('  - Brands: $_selectedBrands', name: 'Filter.Debug');
-    developer.log('  - Year: $_selectedYearRange', name: 'Filter.Debug');
-    developer.log('  - Owners: $_selectedOwnersRange', name: 'Filter.Debug');
-    developer.log('  - Fuel: $_selectedFuelTypes', name: 'Filter.Debug');
     developer.log(
-      '  - Transmission: $_selectedTransmissions',
-      name: 'Filter.Debug',
+      'Filters count: ${_getActiveFilterCount()}',
+      name: 'Filter.Location',
     );
-    developer.log('  - KM: $_selectedKmRange', name: 'Filter.Debug');
-    developer.log('  - Sold By: $_selectedSoldBy', name: 'Filter.Debug');
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
       _filteredProductsCache = [];
-      // _postAttributeValuesCache.clear();
-      _fetchingPostIds.clear();
     });
 
+    // Build query parameters
     final Map<String, String> queryParams = {
       'category_id': '1',
       'user_zone_id':
@@ -2291,20 +2471,34 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
               ? '0'
               : locationProvider.selectedLocationId,
       'listing_type': _listingType.toLowerCase(),
-      'user_id': _userId ?? '647', // Match your form-data
+      'user_id': _userId ?? '647',
     };
 
-    // Construct attributes map for owners, Km Driven, and years
-    Map<String, List<String>> attributes = {};
+    // Add filters only if they are active
+    final Map<String, List<String>> attributes = {};
 
     // Owners filter
     if (_selectedOwnersRange != 'all') {
-      attributes['2'] = [_ownerIdMap[_selectedOwnersRange] ?? ''];
+      final ownerId = _ownerIdMap[_selectedOwnersRange];
+      if (ownerId != null) {
+        attributes['2'] = [ownerId];
+        developer.log(
+          'Owner filter: $_selectedOwnersRange -> $ownerId',
+          name: 'Filter.Location',
+        );
+      }
     }
 
     // Km Driven filter
     if (_selectedKmRange != 'all') {
-      attributes['10'] = [_kmRangeIdMap[_selectedKmRange] ?? ''];
+      final kmId = _kmRangeIdMap[_selectedKmRange];
+      if (kmId != null) {
+        attributes['10'] = [kmId];
+        developer.log(
+          'KM filter: $_selectedKmRange -> $kmId',
+          name: 'Filter.Location',
+        );
+      }
     }
 
     // Year filter
@@ -2325,26 +2519,33 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         ); // 1985–2009
       }
       if (yearIds.isNotEmpty) {
-        attributes['1'] = yearIds; // Attribute ID "1" for Year
+        attributes['1'] = yearIds;
+        developer.log(
+          'Year filter: $_selectedYearRange -> $yearIds',
+          name: 'Filter.Location',
+        );
       }
     }
 
-    // Encode attributes as JSON string
+    // Add attributes if any exist
     if (attributes.isNotEmpty) {
       queryParams['attributes'] = jsonEncode(attributes);
+      developer.log(
+        'Attributes: ${queryParams['attributes']}',
+        name: 'Filter.Location',
+      );
     }
 
     // Other filters
     if (_selectedBrands.isNotEmpty) {
       queryParams['brands'] = _selectedBrands.join(',');
-    }
-    if (_selectedPriceRange != 'all') {
       developer.log(
-        'Applying price filter: $_selectedPriceRange',
-        name: 'Price.Filter',
+        'Brands: ${_selectedBrands.join(',')}',
+        name: 'Filter.Location',
       );
+    }
 
-      // Check if it's a predefined range or custom range
+    if (_selectedPriceRange != 'all') {
       if (_selectedPriceRange == 'Under ₹2 Lakh') {
         queryParams['min_price'] = '0';
         queryParams['max_price'] = '200000';
@@ -2352,55 +2553,53 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
         queryParams['min_price'] = '2000000';
         queryParams['max_price'] = '10000000';
       } else if (_selectedPriceRange.contains('₹')) {
-        // This is a predefined range with ₹ symbol (like "₹2-5 Lakh")
         final parts = _selectedPriceRange.replaceAll('₹', '').split('-');
         if (parts.length == 2) {
           final minPart = parts[0].replaceAll(' Lakh', '').trim();
           final maxPart = parts[1].replaceAll(' Lakh', '').trim();
-
           final minPrice = (double.parse(minPart) * 100000).toStringAsFixed(0);
           final maxPrice = (double.parse(maxPart) * 100000).toStringAsFixed(0);
-
           queryParams['min_price'] = minPrice;
           queryParams['max_price'] = maxPrice;
         }
-      } else if (_selectedPriceRange.contains('-')) {
-        // This is a custom range like "400000-450000" - use as is, no multiplication!
-        final parts = _selectedPriceRange.split('-');
-        if (parts.length == 2) {
-          queryParams['min_price'] = parts[0].trim();
-          queryParams['max_price'] = parts[1].trim();
-
-          developer.log(
-            'Custom price range: ${parts[0]} - ${parts[1]}',
-            name: 'Price.Range',
-          );
-        }
       }
-
       developer.log(
-        'Final price params: min=${queryParams['min_price']}, max=${queryParams['max_price']}',
-        name: 'Price.Final',
+        'Price range: ${queryParams['min_price']} - ${queryParams['max_price']}',
+        name: 'Filter.Location',
       );
     }
+
     if (_selectedFuelTypes.isNotEmpty) {
       queryParams['fuel_types'] = _selectedFuelTypes
           .map((fuel) => fuel.toLowerCase())
           .join(',');
+      developer.log(
+        'Fuel types: ${_selectedFuelTypes.join(',')}',
+        name: 'Filter.Location',
+      );
     }
+
     if (_selectedTransmissions.isNotEmpty) {
       queryParams['transmissions'] = _selectedTransmissions
           .map((trans) => trans.toLowerCase())
           .join(',');
+      developer.log(
+        'Transmissions: ${_selectedTransmissions.join(',')}',
+        name: 'Filter.Location',
+      );
     }
+
     if (_selectedSoldBy != 'all') {
       queryParams['sold_by'] = _selectedSoldBy.toLowerCase().replaceAll(
         ' ',
         '_',
       );
+      developer.log('Sold by: $_selectedSoldBy', name: 'Filter.Location');
     }
 
     try {
+      developer.log('Final API params: $queryParams', name: 'Filter.Location');
+
       final apiService = ApiService();
       final Map<String, dynamic> response = await apiService.postMultipart(
         url: "$baseUrl/filter-used-cars-listings.php",
@@ -2408,61 +2607,88 @@ class _UsedCarsPageState extends State<UsedCarsPage> {
       );
 
       developer.log(
-        'Filter API query params: $queryParams',
-        name: 'API.Request',
+        'API Response: ${response['status']}',
+        name: 'Filter.Location',
       );
-      developer.log('Filter API raw response: $response', name: 'API.Response');
+      developer.log(
+        'Data length: ${response['data'] is List ? (response['data'] as List).length : 'N/A'}',
+        name: 'Filter.Location',
+      );
 
-      final dataList = response['data'] as List<dynamic>? ?? [];
-      final finalPosts =
-          dataList
-              .map(
-                (item) =>
-                    MarketplacePost.fromJson(item as Map<String, dynamic>),
-              )
-              .toList();
+      if (response['status'] == true && response['data'] is List) {
+        final dataList = response['data'] as List<dynamic>;
 
-      var products = finalPosts.map((post) => post.toProduct()).toList();
-
-      // Sort by newest (createdOn descending) to match initial fetch order
-      products.sort((a, b) {
-        try {
-          final dateA = DateTime.parse(a.createdOn);
-          final dateB = DateTime.parse(b.createdOn);
-          return dateB.compareTo(dateA); // Newest first
-        } catch (e) {
-          developer.log('Error parsing dates for sorting: $e');
-          return 0; // Fallback: no sort change
+        if (dataList.isEmpty) {
+          setState(() {
+            _products = [];
+            _filteredProductsCache = [];
+            _isLoading = false;
+            _errorMessage =
+                'No cars found with selected filters in ${locationProvider.selectedLocationName}.';
+          });
+          return;
         }
-      });
 
-      setState(() {
-        _products = products;
-        _filteredProductsCache = products;
-        _filtersChanged = true;
-        _isLoading = false;
-      });
+        final finalPosts =
+            dataList
+                .map(
+                  (item) =>
+                      MarketplacePost.fromJson(item as Map<String, dynamic>),
+                )
+                .toList();
 
-      // Fetch attributes for all products
-      for (final product in _products) {
-        if (!_postAttributeValuesCache.containsKey(product.id) &&
-            !_fetchingPostIds.contains(product.id)) {
-          _fetchPostAttributes(product.id);
+        var products = finalPosts.map((post) => post.toProduct()).toList();
+
+        // Sort by newest
+        products.sort((a, b) {
+          try {
+            final dateA = DateTime.parse(a.createdOn);
+            final dateB = DateTime.parse(b.createdOn);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
+        });
+
+        setState(() {
+          _products = products;
+          _filteredProductsCache = products;
+          _filtersChanged = true;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+
+        // Fetch attributes for products
+        for (final product in _products) {
+          if (!_postAttributeValuesCache.containsKey(product.id) &&
+              !_fetchingPostIds.contains(product.id)) {
+            _fetchPostAttributes(product.id);
+          }
+          if (!_modelVariationsCache.containsKey(product.id) &&
+              !_fetchingModelVariationIds.contains(product.id)) {
+            _fetchModelVariation(product.id);
+          }
         }
-        if (!_modelVariationsCache.containsKey(product.id) &&
-            !_fetchingModelVariationIds.contains(product.id)) {
-          _fetchModelVariation(product.id);
-        }
+      } else {
+        throw Exception('Invalid API response: ${response['data']}');
       }
     } catch (e) {
-      developer.log(
-        'Error while fetching filter listings: $e',
-        name: 'API.Error',
-      );
+      developer.log('Error in filter listings: $e', name: 'Filter.Location');
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load filtered cars. Please try again.';
+        _errorMessage =
+            'No cars found with selected filters in ${locationProvider.selectedLocationName}. Try adjusting your filters.';
       });
     }
+  }
+
+  void _handleEmptyResults() {
+    final locationProvider = context.read<LocationProvider>();
+    setState(() {
+      _isLoading = false;
+      _errorMessage =
+          'No cars found with selected filters in ${locationProvider.selectedLocationName}. '
+          'Try changing location or adjusting filters.';
+    });
   }
 }
