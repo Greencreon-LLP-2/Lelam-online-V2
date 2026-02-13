@@ -2889,13 +2889,30 @@ Widget _buildSellerCommentsSection() {
                     SafeArea(
                       child: Row(
                         children: [
-                          IconButton(
+                          SizedBox(width: 10),
+                        Container(
+                        width: 35,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
                             onPressed: () => Navigator.pop(context),
                             icon: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: Colors.black,
+                              size: 20,
                             ),
                           ),
+                        ),
                           const Spacer(),
                           _isLoadingFavorite
                               ? const SizedBox(
@@ -2908,7 +2925,22 @@ Widget _buildSellerCommentsSection() {
                                   ),
                                 ),
                               )
-                              : IconButton(
+                        : Container(
+                          width: 35,
+                          height: 35,
+                          decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                          BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                          ),
+                          ],
+                          ),
+                          child: IconButton(
+                                padding: const EdgeInsets.all(5),
                                 tooltip:
                                     _isFavorited
                                         ? 'Remove from Shortlist'
@@ -2928,8 +2960,8 @@ Widget _buildSellerCommentsSection() {
                                     color:
                                         _isFavorited
                                             ? Colors.red
-                                            : Colors.white,
-                                    size: 28,
+                                            : Colors.black,
+                                    size: 20,
                                     semanticLabel:
                                         _isFavorited
                                             ? 'Remove from Shortlist'
@@ -2938,12 +2970,31 @@ Widget _buildSellerCommentsSection() {
                                 ),
                                 onPressed: _toggleFavorite,
                               ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
+                          ),
+                          SizedBox(width: 10),
+                              Container(
+                                width: 35,
+                                height: 35,
+                                decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                                ),
+                                ],
+                                ),
+                              child:IconButton(
+                                padding: const EdgeInsets.all(5),
+                            icon: const Icon(Icons.share, color: Colors.black, size: 20,),
                             onPressed: () {
                               // Share functionality
                             },
                           ),
+                              ),
+                          SizedBox(width: 10),
                         ],
                       ),
                     ),

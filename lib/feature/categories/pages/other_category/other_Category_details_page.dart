@@ -2352,13 +2352,30 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                     SafeArea(
                       child: Row(
                         children: [
-                          IconButton(
+                          SizedBox(width: 10),
+                        Container(
+                        width: 35,
+                        height: 35,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
                             onPressed: () => Navigator.pop(context),
                             icon: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: Colors.black,
+                              size: 20,
                             ),
                           ),
+                        ),
                           const Spacer(),
                           _isLoadingShortlist
                               ? const SizedBox(
@@ -2371,7 +2388,21 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                   ),
                                 ),
                               )
-                              : IconButton(
+                              : Container(
+                                width: 35,
+                                height: 35,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: IconButton(
                                 tooltip:
                                     _isShortlisted
                                         ? 'Remove from Shortlist'
@@ -2386,17 +2417,36 @@ class _BikeDetailsPageState extends State<BikeDetailsPage> {
                                     color:
                                         _isShortlisted
                                             ? Colors.red
-                                            : Colors.white,
+                                            : Colors.black,
+                                    size: 20,
                                   ),
                                 ),
                                 onPressed: _toggleShortlist,
                               ),
-                          IconButton(
-                            icon: const Icon(Icons.share, color: Colors.white),
+                          ),
+                          SizedBox(width: 10),
+                          Container(
+                            width: 35,
+                            height: 35,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withOpacity(0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                            icon: const Icon(Icons.share, color: Colors.black, size: 20,),
                             onPressed: () {
                               // Share functionality
                             },
                           ),
+                          ),
+                          SizedBox(width: 10),
                         ],
                       ),
                     ),
